@@ -15,9 +15,6 @@ SectorBuffer:   .fill 512, 0
 .segment Code "Floppy Loader"
 Floppy: {
 
-ErrorJmp:
-                jmp Error
-
 InitFileTracksAndSectors: {
                 // map sector data to $de00
                 lda #$81
@@ -40,13 +37,13 @@ InitFileTracksAndSectors: {
                 // Load directory
                 ldx #40
                 ldy #00
-                jsr ReadSector
-                bcs ErrorJmp
+                lbsr ReadSector
+                lbcs Error
 
                 ldx $de00
                 ldy $de01
-                jsr ReadSector
-                bcs ErrorJmp
+                lbsr ReadSector
+                lbcs Error
 
 ReadFilenames:
                 ldy #$00
@@ -126,12 +123,12 @@ NextFilename:
 
                 // Next directory sector
                 ldx #40
-                jsr ReadSector
+                lbsr ReadSector
                 bcs Error
                 bra ReadFilenames // Continue reading directory entries
 
 EndOfDirectory:
-                jsr Cleanup
+                lbsr Cleanup
                 rts
 
 FilenameMatch:
@@ -154,7 +151,7 @@ FilenameMatch:
 } // InitFileTracksAndSectors
 
 Error: {
-                jsr Cleanup
+                lbsr Cleanup
                 sec
                 rts
 }
@@ -169,7 +166,7 @@ PrepareDrive: {
                 lda #$20
                 sta $d081
 
-                jsr WaitForBusyClear
+                lbsr WaitForBusyClear
 
                 rts
 }
@@ -215,7 +212,7 @@ ReadSector: {
                 lda #$40
                 sta $d081
 
-                jsr WaitForBusyClear
+                lbsr WaitForBusyClear
 
                 lda $d082
                 // RNF or CRC error flag check
@@ -280,9 +277,9 @@ ReadRoom: {
                 lda #$80
 	        trb $d689
 
-                jsr PrepareDrive
+                lbsr PrepareDrive
 NextSector:
-                jsr ReadSector
+                lbsr ReadSector
                 bcc !+
                 rts
 !:
@@ -321,7 +318,7 @@ NextSector:
                 bra NextSector
 
 Finished:
-                jsr Cleanup
+                lbsr Cleanup
                 rts
 }
 
