@@ -15,9 +15,14 @@
 Entry: {
                 jsr Init
                 jsr AttachMMd81
-                
+
                 jsr InitGfx
                 jsr Floppy.InitFileTracksAndSectors
+
+                lda #45
+                ldx #$00
+                ldy #$80
+                jsr Floppy.ReadRoom
 
                 jsr DrawImage
 

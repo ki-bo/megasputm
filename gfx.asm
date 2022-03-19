@@ -275,7 +275,7 @@ nexty:
                 sta DmaCopyRlePixels + $0a
                 lda RLE_Data.dest_ptr + 1
                 sta DmaCopyRlePixels + $0b
-                DmaJob(DmaCopyRlePixels)
+                DmaJobEnhanced(DmaCopyRlePixels)
 
                 // Move to next char column after 8 double-pixel strips (16 pixels)
                 inw RLE_Data.dest_ptr

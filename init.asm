@@ -73,8 +73,8 @@ Init: {
                 lda #0         // hi
                 sta $d059
 
-                DmaJob(ClearScreenDmaJob)
-                DmaJob(ClearColorRamDmaJob)
+                DmaJobEnhanced(ClearScreenDmaJob)
+                DmaJobEnhanced(ClearColorRamDmaJob)
 
                 rts
 }

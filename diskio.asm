@@ -8,7 +8,6 @@ ReadPtr:        .word $0000
 NextTrack:      .byte $00
 NextSector:     .byte $00
 QTrkSecList:    .fill 4,0
-TmpByte:        .byte $00
 
 * = $200 "Floppy buffer" virtual
 SectorBuffer:   .fill 512, 0
@@ -171,6 +170,8 @@ PrepareDrive: {
                 sta $d081
 
                 jsr WaitForBusyClear
+
+                rts
 }
 
 ReadNextSector: {
@@ -247,9 +248,84 @@ WaitForBusyClear: {
 CopySectorBuffer: {
                 lda #$80
 	        trb $d689
-                DmaJob(DmaSectorData)
+                DmaJobEnhanced(DmaSectorData)
                 rts
 }
+
+//----------------------------------------
+
+// Reads room (a:room no, x:<add, y:>addr)
+// push room number and address to stack
+ReadRoom: {
+                stx DmaCopyBuffer.DstAddr
+                sty DmaCopyBuffer.DstAddr + 1
+                
+                asl
+                pha
+                LoadQReg($4ff00)
+                stq QTrkSecList
+                plz
+
+                lda ((QTrkSecList)),z
+                inz
+                tax
+                lda ((QTrkSecList)),z
+                tay
+
+                // map sector data to $de00
+                lda #$81
+                sta $d680
+
+                // See floppy buffer, not SD buffer
+                lda #$80
+	        trb $d689
+
+                jsr PrepareDrive
+NextSector:
+                jsr ReadSector
+                bcc !+
+                rts
+!:
+                StW(ReadPtr, $de00)
+                bbr0 ReadSecondHalf,!+
+                inc ReadPtr + 1 // odd sector number, data at $df00
+!:
+                lda ReadPtr + 1
+                sec
+                sbc #$72
+                sta DmaCopyBuffer.SrcAddr + 1
+                DmaJobEnhanced(DmaCopyBuffer)
+
+                ldz #$00
+                lda (ReadPtr),z
+                beq Finished
+                tax
+                inz
+                lda (ReadPtr),z
+                tay
+
+                lda DmaCopyBuffer.DstAddr
+                sta ReadPtr
+                lda DmaCopyBuffer.DstAddr + 1
+                sta ReadPtr + 1
+                ldz #$00
+!:
+                lda (ReadPtr),z
+                eor #$ff
+                sta (ReadPtr),z
+                inz
+                cpz #$fe
+                bne !-
+
+                AddByteToWord(DmaCopyBuffer.DstAddr, $fe)
+                bra NextSector
+
+Finished:
+                jsr Cleanup
+                rts
+}
+
+//----------------------------------------
 
 LflFilename:
                 .text "00.LFL"
@@ -272,3 +348,17 @@ DmaSectorData:
                 .word $0200 // dst $0000200
                 .byte $00
                 .word $0000 // will be ignored for simple copy job, but put here for completeness
+
+DmaCopyBuffer: {
+                .byte $0a // F018A format
+                .byte $80, $ff // src $ffxxxxx
+                .byte $00 // end of job otion list
+
+                .byte $00 // copy command (no chain)
+Size:           .word $00fe // size
+SrcAddr:        .word $6c02 // src $ffd6c02
+                .byte $0d
+DstAddr:        .word $0200 // dst $0000200
+DstMB:          .byte $00
+                .word $0000 // will be ignored for simple copy job, but put here for completeness
+}

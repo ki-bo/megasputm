@@ -19,6 +19,15 @@
 .macro DmaJob(jobaddr) {
                 lda #[jobaddr >> 16]
                 sta $d702
+                lda #>jobaddr
+                sta $d701
+                lda #<jobaddr
+                sta $d700
+}
+
+.macro DmaJobEnhanced(jobaddr) {
+                lda #[jobaddr >> 16]
+                sta $d702
                 sta $d704
                 lda #>jobaddr
                 sta $d701
