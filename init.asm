@@ -1,8 +1,15 @@
 .cpu _45gs02
 
 #import "mega65_std.asm"
+#import "diskio.asm"
 
 .segment Code "Initialization"
+
+.align $10
+TmpPage_Init: {
+                .fill $10, 0
+}
+
 Init: {
                 // 40 MHz
                 lda #65	
@@ -59,10 +66,6 @@ Init: {
                 lda #%00000111 
                 tsb $d054
 
-                // Enable 2K color ram at $d800
-                lda #%00000001
-                tsb $d030
-
                 // 40 char mode (will be 20 chars in 16 col NCM mode)
                 lda #%10000000
                 trb $d031
@@ -79,18 +82,75 @@ Init: {
                 rts
 }
 
+//-------------------------------------
+
+.segment Code "ReadIndex"
+ReadIndex: {
+                .const BUFFER = $8000
+
+                lda #$00 // index room id
+                ldx #<BUFFER
+                ldy #>BUFFER
+                lbsr Floppy.ReadRoom
+
+                tba
+                sta RestoreBP
+                lda #>TmpPage_Init
+                tab
+
+                StW(SrcPtr, BUFFER + 2) // start at offset 2 after magic bytes
+                ldz #$00
+                lda (SrcPtr), z
+                sta GlobalDmaCopyLo.Length
+                inw SrcPtr
+                lda (SrcPtr), z
+                sta GlobalDmaCopyLo.Length + 1
+                inw SrcPtr
+
+                // Copy global objects data
+                CopyW(SrcPtr, GlobalDmaCopyLo.SrcAddr)
+                CopyAddr(GlobalObjects, GlobalDmaCopyLo.DstAddr)
+                StW(GlobalDmaCopyLo.Length, 780)
+                DmaJob(GlobalDmaCopyLo)
+
+                // *SrcPtr += *GlobalDmaCopyLo.Length
+                AddWordsIndirect(SrcPtr, GlobalDmaCopyLo.Length)
+
+                lda RestoreBP:#$00
+                tab
+
+                rts
+
+.segment Virtual
+* = TmpPage_Init "TmpBP ReadIndex" virtual
+.zp {
+Counter:        .word $0000
+SrcPtr:         .word $0000
+}
+
+
+}
+
+//-------------------------------------
+
+.segment Code "AttachMMd81"
 AttachMMd81: {
+                tay
+                lda #$12
+                sta $02
+                lda #$34
+                sta $02
                 ldy #>(Hyppo_Filename)
                 // hyppo_setname trap
                 lda #$2e
                 sta $d640
-                clv
+                nop
                 bcc !+
 
                 // hyppo_d81attach0 trap
                 lda #$40
                 sta $d640
-                clv
+                nop
                 bcc !+
 
                 rts
@@ -116,3 +176,4 @@ Hyppo_Filename:
                 .encoding "ascii"
                 .text "MM.D81"
                 .byte 0
+

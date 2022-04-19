@@ -1,12 +1,14 @@
+#importonce
+
 .cpu _45gs02
 
 .segment Virtual
 * = $02 "Floppy Vars" virtual
-FilenamePtr:    .word $0000
 ReadSecondHalf: .byte $00
 ReadPtr:        .word $0000
 NextTrack:      .byte $00
 NextSector:     .byte $00
+FileSize:       .word $0000
 QTrkSecList:    .fill 4,0
 
 * = $200 "Floppy buffer" virtual
@@ -256,18 +258,31 @@ CopySectorBuffer: {
 ReadRoom: {
                 stx DmaCopyBuffer.DstAddr
                 sty DmaCopyBuffer.DstAddr + 1
-                
+
                 asl
                 pha
                 LoadQReg($4ff00)
                 stq QTrkSecList
                 plz
 
+                beq !+
+                // Room size not yet read
+                StW(FileSize, $0000)
+                bra !++
+!:
+                // Room zero does not have file size, read until last sector
+                StW(FileSize, $ffff)
+!:
+                // Init dma copy with net sector size
+                lda #$fe
+                sta DmaCopyBuffer.Size
+                sta BlockSize
+
                 lda ((QTrkSecList)),z
                 inz
-                tax
+                sta NextTrack
                 lda ((QTrkSecList)),z
-                tay
+                sta NextSector
 
                 // map sector data to $de00
                 lda #$81
@@ -278,8 +293,8 @@ ReadRoom: {
 	        trb $d689
 
                 lbsr PrepareDrive
-NextSector:
-                lbsr ReadSector
+SectorLoop:
+                lbsr ReadNextSector
                 bcc !+
                 rts
 !:
@@ -291,31 +306,63 @@ NextSector:
                 sec
                 sbc #$72
                 sta DmaCopyBuffer.SrcAddr + 1
-                DmaJobEnhanced(DmaCopyBuffer)
 
+                // Read next track/sector
                 ldz #$00
                 lda (ReadPtr),z
-                beq Finished
-                tax
+                beq Finished // Next track 0 -> last sector
+                sta NextTrack
                 inz
                 lda (ReadPtr),z
-                tay
+                sta NextSector
+
+                // Check whether file size needs to be read
+                lda FileSize
+                bne !+
+                lda FileSize + 1
+                bne !+
+                // Room size 0 -> read first two bytes
+                inz
+                lda (ReadPtr),z
+                sta FileSize
+                inz
+                lda (ReadPtr),z
+                sta FileSize + 1
+                // Two bytes already read
+                dew FileSize
+                dew FileSize
+!:
+                lda FileSize + 1
+                bne !+
+                lda FileSize
+                beq Finished
+                cmp #$fe
+                bpl !+
+                sta DmaCopyBuffer.Size
+                sta BlockSize
+!:
+                DmaJobEnhanced(DmaCopyBuffer)
 
                 lda DmaCopyBuffer.DstAddr
                 sta ReadPtr
                 lda DmaCopyBuffer.DstAddr + 1
                 sta ReadPtr + 1
+
                 ldz #$00
 !:
                 lda (ReadPtr),z
                 eor #$ff
                 sta (ReadPtr),z
                 inz
-                cpz #$fe
+                cpz BlockSize:#$fe
                 bne !-
 
+                lda BlockSize
+                cmp #$fe
+                bne Finished
+
                 AddByteToWord(DmaCopyBuffer.DstAddr, $fe)
-                bra NextSector
+                lbra SectorLoop
 
 Finished:
                 lbsr Cleanup

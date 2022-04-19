@@ -28,6 +28,9 @@ Q3:		.word $0000
 .segment Code "gfx"
 
 InitGfx: {
+                // Enable 2K color ram at $d800
+                lda #%00000001
+                tsb $d030
                 // Set color ram for first 16 rows
                 StW($02, $d800)
                 ldz #$00
@@ -43,6 +46,9 @@ InitGfx: {
                 bne !col-
                 dey
                 bne !row-
+                // Disable 2K color ram again at $d800
+                lda #%00000001
+                trb $d030
 
                 // Screen memory $0000400
                 lda #$00
@@ -306,7 +312,7 @@ DmaCopyRlePixels:
                 .byte $04
                 .word $0000 // will be ignored for simple copy job, but put here for completeness
 
-.segment Tables
+.segment Tables "Colors"
 Colors:
                 .byte $0, $0, $0, 	$0, $0, $A, 	$0, $A, $0, 	$0, $A, $A
     		.byte $A, $0, $0, 	$A, $0, $A, 	$A, $5, $0, 	$A, $A, $A

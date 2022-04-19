@@ -94,11 +94,14 @@
         !:
 }
 
-.macro StW(addr, wordvalue) {
-                lda #<wordvalue
+.macro SubtractByteFromWord(addr, bytevalue) {
+                sec
+                lda addr
+                sbc #bytevalue
                 sta addr
-                lda #>wordvalue
-                sta addr + 1
+                bcs !+
+                dec addr + 1
+        !:
 }
 
 .macro AddWordToWord(addr, wordvalue) {
@@ -109,4 +112,54 @@
                 lda addr + 1
                 adc #[wordvalue >> 8]
                 sta addr + 1
+}
+
+// *addr1 += *addr2
+.macro AddWordsIndirect(addr1, addr2) {
+                ldz #$00
+                lda (addr1),z
+                clc
+                adc (addr2),z
+                sta (addr1),z
+                inz
+                lda (addr1),z
+                adc (addr2),z
+                sta (addr1),z
+}
+
+.macro StW(addr, wordvalue) {
+                lda #<wordvalue
+                sta addr
+                lda #>wordvalue
+                sta addr + 1
+}
+
+// Copies 2 bytes from src to dst
+.macro CopyW(src, dst) {
+                lda src
+                sta dst
+                lda src + 1
+                sta dst + 1
+}
+
+// Copies the address of src to dst
+.macro CopyAddr(src, dst) {
+                lda #<src
+                sta dst
+                lda #>src
+                sta dst + 1
+}
+
+
+
+// Pseudocommands
+.function _16bitNextArg(arg) {
+        .return (arg.getType()==AT_IMMEDIATE) ? CmdArgument(AT_IMMEDIATE, >arg.getValue()) : CmdArgument(arg.getType(), arg.getValue + 1)
+}
+
+.pseudocommand inc16 arg {
+        inc arg
+        bne !+
+        inc _16bitNextArg(arg)
+!:
 }
