@@ -10,9 +10,7 @@ NextTrack:      .byte $00
 NextSector:     .byte $00
 FileSize:       .word $0000
 QTrkSecList:    .fill 4,0
-
-* = $200 "Floppy buffer" virtual
-SectorBuffer:   .fill 512, 0
+QSectorData:    .fill 4,0
 
 .segment Code "Floppy Loader"
 Floppy: {
@@ -26,73 +24,85 @@ InitFileTracksAndSectors: {
                 lda #$80
 	        trb $d689
 
+                lbsr PrepareDrive
+
+                // Floppy controller sector buffer address
+                LoadQReg($ffd6c00)
+                stq QSectorData
+
                 // Init track/sector list with 0s
                 LoadQReg($4ff00)
                 stq QTrkSecList
                 ldz #54*2 - 1
-!:
                 lda #$00
+!:
                 sta ((QTrkSecList)),z
                 dez
                 bpl !-
 
                 // Load directory
-                ldx #40
-                ldy #00
+                ldx #40 // Track 40
+                ldy #00 // Sector 00
                 lbsr ReadSector
                 lbcs Error
 
-                ldx $de00
-                ldy $de01
+                // Jump to second sector on track 40 (start of filename entries)
+                ldz #00
+                lda ((QSectorData)),z
+                tax
+                inz
+                lda ((QSectorData)),z
+                tay
+
                 lbsr ReadSector
                 lbcs Error
 
 ReadFilenames:
-                ldy #$00
-                StW(ReadPtr, $de00)
+                lda #$6c
                 bbr0 ReadSecondHalf,!+
-                inc ReadPtr + 1 // odd sector number, data at $df00
+                inc // odd sector number, data at $ffd6d00
 !:
-                iny
-                lda (ReadPtr),y
+                sta QSectorData+1
+                ldz #$01
+                lda ((QSectorData)),z
                 sta NextSector  // remember next directory sector
                 bra !+
 FilenameLoop:
                 // skip first two bytes
-                iny
+                inz
 !:
-                iny
-                lda (ReadPtr),y
-                iny
+                inz
+                lda ((QSectorData)),z
+                inz
                 cmp #$82 // PRG file type
                 bne NextFilename
-                lda (ReadPtr),y
+                lda ((QSectorData)),z
                 beq NextFilename // Skip if file's track is 0
-                iny
+                inz
                 sta FileTrack
-                lda (ReadPtr),y
+                lda ((QSectorData)),z
                 cmp #40 // invalid sector number
                 bpl NextFilename
-                iny
+                inz
                 sta FileSector
 
 FilenameCmp:
-                lda (ReadPtr),y
-                iny
+                lda ((QSectorData)),z
+                inz
                 // check for number
                 cmp #$30 // petscii '0'
                 bmi NextFilename
-                cmp #$40 // petscii '9' + 1
+                cmp #$3a // petscii '9' + 1
                 bpl NextFilename
                 and #$0f // convert ascii to number
                 sta LflFilename
 
-                lda (ReadPtr),y
-                iny
+                lda ((QSectorData)),z
+                inz
                 // check for number
                 cmp #$30 // petscii '0'
                 bmi NextFilename
-                cmp #$40 // petscii '9' + 1
+                cmp #$3a // petscii '9' + 1
                 bpl NextFilename
                 and #$0f
                 sta LflFilename + 1
@@ -100,12 +110,10 @@ FilenameCmp:
                 // compare remaining filename bytes 'xx.LFL'
                 ldx #$02
 !:
-                lda (ReadPtr),y
-                cmp #$a0
-                beq FilenameMatch
+                lda ((QSectorData)),z
                 cmp LflFilename,x
                 bne NextFilename
-                iny
+                inz
                 inx
                 cpx #$07
                 bne !-
@@ -113,18 +121,18 @@ FilenameCmp:
 
 NextFilename:
                 // Jump to next multiple of 32 bytes
-                tya
+                tza
                 and #%11100000
                 clc
                 adc #$20
-                tay
+                taz
                 bne FilenameLoop
                 // Sector done, load next one
                 ldy NextSector
                 beq EndOfDirectory // no more directory sectors
 
                 // Next directory sector
-                ldx #40
+                ldx #40 // Track 40
                 lbsr ReadSector
                 bcs Error
                 bra ReadFilenames // Continue reading directory entries
@@ -143,18 +151,23 @@ FilenameMatch:
                 adc Times2Val:#$00
                 adc LflFilename + 1
                 asl // *2 to get to byte list position
+                phz
                 taz 
                 lda FileTrack:#$00
                 sta ((QTrkSecList)),z
                 inz
                 lda FileSector:#$00
                 sta ((QTrkSecList)),z
+                plz
                 bra NextFilename
 } // InitFileTracksAndSectors
 
 Error: {
                 lbsr Cleanup
                 sec
+                lda #$02
+                sta $d020
+                sta $d021
                 rts
 }
                 
@@ -180,6 +193,9 @@ ReadNextSector: {
 }
 
 // read track x (1-80) sector y (0-39)
+// sets ReadSecondHalf to either 
+//  0 (sector data available at $ffd6c00); or
+//  1 (sector data available at $ffd6d00)
 ReadSector: {
                 // logical track (1-80) to physical track (0-79)
                 dex
@@ -229,25 +245,13 @@ Cleanup: {
                 // LED and motor off
                 lda #$00
                 sta $d080
-                // Unmap sector buffer
-                lda #$82
-                sta $d680
                 rts
 }
 
 WaitForBusyClear: {
-                // bit 7? still busy
+                // bit 7 set -> still busy
                 lda $d082
                 bmi WaitForBusyClear
-                rts
-}
-
-//----------------------------------------
-
-CopySectorBuffer: {
-                lda #$80
-	        trb $d689
-                DmaJobEnhanced(DmaSectorData)
                 rts
 }
 
@@ -263,7 +267,10 @@ ReadRoom: {
                 pha
                 LoadQReg($4ff00)
                 stq QTrkSecList
-                plz
+                // Floppy controller sector buffer address
+                LoadQReg($ffd6c00)
+                stq QSectorData
+                plz // z = room number
 
                 beq !+
                 // Room size not yet read
@@ -279,14 +286,10 @@ ReadRoom: {
                 sta BlockSize
 
                 lda ((QTrkSecList)),z
-                inz
                 sta NextTrack
+                inz
                 lda ((QTrkSecList)),z
                 sta NextSector
-
-                // map sector data to $de00
-                lda #$81
-                sta $d680
 
                 // See floppy buffer, not SD buffer
                 lda #$80
@@ -298,22 +301,20 @@ SectorLoop:
                 bcc !+
                 rts
 !:
-                StW(ReadPtr, $de00)
+                lda #$6c
                 bbr0 ReadSecondHalf,!+
-                inc ReadPtr + 1 // odd sector number, data at $df00
+                inc
 !:
-                lda ReadPtr + 1
-                sec
-                sbc #$72
+                sta QSectorData + 1
                 sta DmaCopyBuffer.SrcAddr + 1
 
                 // Read next track/sector
                 ldz #$00
-                lda (ReadPtr),z
+                lda ((QSectorData)),z
                 beq Finished // Next track 0 -> last sector
                 sta NextTrack
                 inz
-                lda (ReadPtr),z
+                lda ((QSectorData)),z
                 sta NextSector
 
                 // Check whether file size needs to be read
@@ -321,21 +322,23 @@ SectorLoop:
                 bne !+
                 lda FileSize + 1
                 bne !+
-                // Room size 0 -> read first two bytes
+                // Room size still 0 -> read size from first two bytes of room file
                 inz
-                lda (ReadPtr),z
+                lda ((QSectorData)),z
                 sta FileSize
                 inz
-                lda (ReadPtr),z
+                lda ((QSectorData)),z
                 sta FileSize + 1
-                // Two bytes already read
+                // Two bytes already read, adjust filesize to remaining bytes
                 dew FileSize
                 dew FileSize
 !:
                 lda FileSize + 1
                 bne !+
                 lda FileSize
+                // If FileSize == 0, reading is finished
                 beq Finished
+                // FileSize < 256: check whether we need to read less bytes than a complete sector
                 cmp #$fe
                 bpl !+
                 sta DmaCopyBuffer.Size
@@ -379,19 +382,6 @@ LflFilename:
 
 
 .segment DmaJobs "FloppyDma"
-DmaSectorData:
-                .byte $0a // F018A format
-                .byte $80, $ff // src $ffxxxxx
-                .byte $81, $00 // dst $00xxxxx
-                .byte $00 // end of job option list
-
-                .byte $00 // copy command (no chain)
-                .word $0200 // size
-                .word $6c00 // src $ffd6c00
-                .byte $0d
-                .word $0200 // dst $0000200
-                .byte $00
-                .word $0000 // will be ignored for simple copy job, but put here for completeness
 
 DmaCopyBuffer: {
                 .byte $0a // F018A format
