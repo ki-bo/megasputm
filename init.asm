@@ -57,6 +57,10 @@ Init: {
                 sta $d640
                 nop
 
+                // Disable hot register behaviour
+                lda #%10000000
+                trb $d05d
+
                 // Black screen
                 lda #$00
                 sta $d020
@@ -70,15 +74,27 @@ Init: {
                 lda #%10000000
                 trb $d031
 
+                // Reset TEXTPOS to default
+                lda #$50   // lo
+                sta $d04c
+                lda #$0f   // hi = 0
+                trb $d04d
+
                 // advance 40 bytes per char line
                 lda #40        // lo
                 sta $d058
                 lda #0         // hi
                 sta $d059
 
+                // display 40 chrs per row
+                lda #40
+                sta $d05e
+                lda #%00110000  // reset upper two bits of 10 bit value
+                trb $d063
+
                 DmaJobEnhanced(ClearScreenDmaJob)
                 DmaJobEnhanced(ClearColorRamDmaJob)
-
+                
                 rts
 }
 

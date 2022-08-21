@@ -104,6 +104,16 @@
         !:
 }
 
+.macro SubtractWordFromWord(addr, wordvalue) {
+                sec
+                lda addr
+                sbc #<wordvalue
+                sta addr
+                lda addr + 1
+                sbc #>wordvalue
+                sta addr + 1
+}
+
 .macro AddWordToWord(addr, wordvalue) {
                 clc
                 lda addr

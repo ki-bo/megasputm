@@ -36,10 +36,10 @@ InitGfx: {
                 ldz #$00
                 ldy #16
 !row:  	        ldx #20
-!col:		lda #$08
+!col:		lda #$08      // bit 3 = enable NCM mode (16 pixels per char)
                 sta ($02),z
                 inw $02
-                lda #$0f
+                lda #$0f      // color code $f matches color index $f
                 sta ($02),z
                 inw $02
                 dex
@@ -59,12 +59,14 @@ InitGfx: {
                 lda #$00
                 sta $d060
 
-                // Char data at $40000
-                lda #$04
-                sta $d06a
                 lda #$00
-                sta $d069
-                sta $d068
+                sta GlobalDmaFill.FillValue
+                StW(GlobalDmaFill.Length, 20480) // Clear char data for room picture (20 chars * 16 rows * 64 bytes/char)
+                StW(GlobalDmaFill.DstAddr, $0000)
+                lda #$04
+                sta GlobalDmaFill.DstAddr + 2
+                DmaJob(GlobalDmaFill)
+
 
                 // Select color palette 3 for text and map it
                 lda #%11111111
@@ -89,30 +91,43 @@ InitGfx: {
 
 
                 StW($02, $0400)
-                StW($04, $0400)
-                StW($06, $1000)
+                StW($04, $1000)
 
-                // Fill screen ram (16bit chars: $1000, $1001, $1002, ...)
+                // Fill screen ram (16bit chars: $1000, $1001, $1002, ..., $113F)
+                // Lower 13 bits of char value are char data position in ram (*64 bytes per char for its bitmap data)
+                // Char $1000 has position $40000 ($1000 * 64)
+                //
+                // We use column strips of characters since our room gfx is provided in pixel columns instead of rows.
+                // The room picture is 128 pixels high (16 rows of characters).
+                //
+                //  Col 1 Col 2         Col20
+                // +-----+-----+- ... -+-----+
+                // |$1000|$1010|       |$1130|  Row 1
+                // +-----+-----+- ...  +-----+
+                // |$1001|$1011|       |$1131|  Row 2
+                // +-----+-----+- ...  +-----+
+                // |...  |...  |       |...  |  ...
+                // +-----+-----+- ...  +-----+
+                // |$100F|$101F|       |$113F|  Row 16
+                // +-----+-----+- ...  +-----+
                 cld
-                ldx #20
+                ldx #20                 // 20 NCM chars per row
 !column:
                 ldy #16                 // 16 rows
-!:              ldz #$00
-                lda $06
+                bra start_loop          // Skip addition (next line) for first row
+!:              
+                AddByteToWord($02, 40)  // Add 40 bytes to get to next row
+start_loop:     
+                ldz #$00
+                lda $04
                 sta ($02),z
                 inz
-                lda $07
+                lda $05
                 sta ($02),z
-                inw $06
-                AddByteToWord($02, 40)
+                inw $04
                 dey
                 bne !-
-                inw $04
-                inw $04
-                lda $04
-                sta $02
-                lda $05
-                sta $03
+                SubtractWordFromWord($02, 15 * 40 - 2) // Reset address in $02 to next column (go back 15 rows and advance by two bytes which is one char)
                 dex
                 bne !column-
 
@@ -136,7 +151,7 @@ DrawImage: {
                 sta RLE_Data.dest_ptr + 1
                 sta RLE_Data.tmp1               // Init current color with 0
                 
-                StW(RLE_Data.x_count, 160)      // 320 pixels to go = 160 pixel nibbles 
+                StW(RLE_Data.x_count, 160)      // 320 pixels to go = 160 iterations (2 cols per decode cycle) 
 
                 // Assume room loaded at $8000, find room image offset at $0a
                 StW($02, $8000)
