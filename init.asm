@@ -55,7 +55,7 @@ Init: {
                 // Disable C65 ROM write protection via Hypervisor trap
                 lda #$70
                 sta $d640
-                nop
+                clv
 
                 // Disable hot register behaviour
                 lda #%10000000
@@ -166,7 +166,7 @@ AttachMMd81: {
                 // hyppo_d81attach0 trap
                 lda #$40
                 sta $d640
-                nop
+                clv
                 bcc !+
 
                 rts

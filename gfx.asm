@@ -173,9 +173,6 @@ ColorStripLoop:
                 lda RLE_Data.tmp1
 
 RleOddCol: {
-                nop
-                nop
-                
                 // Odd column
                 ldy #$00			// y coord
 col_loop:
