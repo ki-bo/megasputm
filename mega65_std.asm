@@ -164,12 +164,34 @@
 
 // Pseudocommands
 .function _16bitNextArg(arg) {
-        .return (arg.getType()==AT_IMMEDIATE) ? CmdArgument(AT_IMMEDIATE, >arg.getValue()) : CmdArgument(arg.getType(), arg.getValue + 1)
+        .return (arg.getType()==AT_IMMEDIATE) ? CmdArgument(AT_IMMEDIATE, >arg.getValue()) : CmdArgument(arg.getType(), arg.getValue() + 1)
 }
 
 .pseudocommand inc16 arg {
         inc arg
         bne !+
         inc _16bitNextArg(arg)
+!:
+}
+
+.pseudocommand ldax arg {
+        lda arg
+        ldx _16bitNextArg(arg)
+}
+
+.pseudocommand stax arg {
+        sta arg
+        stx _16bitNextArg(arg)
+}
+
+.pseudocommand adc16 arguments {
+        clc
+        adc arguments
+        bcc !+
+        tay
+        txa
+        adc _16bitNextArg(arguments)
+        tax
+        tya
 !:
 }

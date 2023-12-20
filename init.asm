@@ -114,23 +114,12 @@ ReadIndex: {
                 lda #>TmpPage_Init
                 tab
 
-                StW(SrcPtr, BUFFER + 2) // start at offset 2 after magic bytes
-                ldz #$00
-                lda (SrcPtr), z
-                sta GlobalDmaCopyLo.Length
-                inw SrcPtr
-                lda (SrcPtr), z
-                sta GlobalDmaCopyLo.Length + 1
-                inw SrcPtr
-
-                // Copy global objects data
-                CopyW(SrcPtr, GlobalDmaCopyLo.SrcAddr)
-                CopyAddr(GlobalObjects, GlobalDmaCopyLo.DstAddr)
-                StW(GlobalDmaCopyLo.Length, 780)
-                DmaJob(GlobalDmaCopyLo)
-
-                // *SrcPtr += *GlobalDmaCopyLo.Length
-                AddWordsIndirect(SrcPtr, GlobalDmaCopyLo.Length)
+                CopyW(BUFFER + 2, NumGlobalObjs)
+                StW(GlobalObjsPtr, BUFFER + 4)
+                
+                ldax BUFFER + 4
+                adc16 NumGlobalObjs
+                
 
                 lda RestoreBP:#$00
                 tab
@@ -138,7 +127,7 @@ ReadIndex: {
                 rts
 
 .segment Virtual
-* = TmpPage_Init "TmpBP ReadIndex" virtual
+* = <TmpPage_Init "TmpBP ReadIndex" virtual
 .zp {
 Counter:        .word $0000
 SrcPtr:         .word $0000

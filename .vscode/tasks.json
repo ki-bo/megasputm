@@ -1,0 +1,35 @@
+{
+        // See https://go.microsoft.com/fwlink/?LinkId=733558
+        // for the documentation about the tasks.json format
+        "version": "2.0.0",
+        "tasks": [
+                {
+                        "label": "Start xemu",
+                        "type": "process",
+                        "command": "/Users/robert/coding/mega65/xemu_gurce/build/bin/xmega65.native",
+                        "args": [
+                                "-besure",
+                                "-uartmon",
+                                "/tmp/xemu.sock",
+                                "-rom",
+                                "/Users/robert/coding/mega65/ROM/920376.ROM"
+                        ],
+                        "problemMatcher": {
+                                "pattern": [
+                                        {
+                                          "regexp": "_______",
+                                          "file": 1,
+                                          "location": 2,
+                                          "message": 3
+                                        }
+                                ],      
+                                "background": {
+                                        "activeOnStart": true,
+                                        "beginsPattern": ".",
+                                        "endsPattern": "^FDC:"
+                                }
+                        },
+                        "isBackground": true,
+                }
+        ]
+}
