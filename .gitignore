@@ -1,4 +1,2 @@
-.DS_Store
+/.cache
 /build
-/.source.txt
-/gamedata/**
