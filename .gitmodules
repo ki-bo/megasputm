@@ -1,3 +1,3 @@
 [submodule "mega65-libc"]
 	path = mega65-libc
-	url = https://github.com/MEGA65/mega65-libc.git
+	url = https://github.com/ki-bo/mega65-libc.git
