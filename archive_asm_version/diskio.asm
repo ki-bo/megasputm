@@ -22,7 +22,7 @@ InitFileTracksAndSectors: {
 
                 // See floppy buffer, not SD buffer
                 lda #$80
-	        trb $d689
+	            trb $d689
 
                 lbsr PrepareDrive
 
