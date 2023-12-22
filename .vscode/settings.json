@@ -1,5 +1,2 @@
 {
-    "cmake.configureArgs": [
-        "-DCMAKE_PREFIX_PATH=/Users/roberthennig/coding/mega65/llvm-mos"
-    ]
 }
