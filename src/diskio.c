@@ -162,17 +162,10 @@ void read_file_entry(uint8_t *read_ptr)
   }
   room_number += read_ptr[i] - 0x30;
   ++i;
-  const char *file_suffix = ".LFL";
-  for (uint8_t j = 0; j < 4; ++j) {
+  const char *file_suffix = ".LFL\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0";
+  for (uint8_t j = 0; j < 14; ++j) {
     if (read_ptr[i] != file_suffix[j]) {
       // invalid file suffix
-      return;
-    }
-    ++i;
-  }
-  for (uint8_t j = 0; j < 10; ++j) {
-    if (read_ptr[i] != 0xa0) {
-      // invalid file name
       return;
     }
     ++i;
