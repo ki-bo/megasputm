@@ -15,3 +15,5 @@ inline void clear_bits(uint16_t address, uint8_t mask)
                : "i"(address), "a"(mask) /* input operands */
                :                         /* clobber list */);
 }
+
+void fatal_error(const char *message);

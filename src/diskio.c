@@ -31,10 +31,7 @@ void diskio_init(void)
   memset(track_list, 0, sizeof(track_list));
   memset(sector_list, 0, sizeof(sector_list));
 
-  for (uint8_t i = 0; i < 39; i++) {
-    load_block(40, i);
-  }
-  //load_block(40, 3);
+  load_block(40, 3);
   
   led_and_motor_off();
 }
@@ -68,10 +65,21 @@ static uint8_t load_block(uint8_t track, uint8_t block)
     physical_sector = (block - 20) / 2 + 1;
     side = 1;
   }
+  
   POKE(0xd085, physical_sector);
   POKE(0xd086, side);
 
-  return (block & 1);
+  POKE(0xd081, 0x40); // read sector command (buffered mode)
+
+  // RNF or CRC error flag check
+  if (PEEK(0xd082) & 0x18) {
+    // error
+    fatal_error("Error reading sector");
+  }
+
+  // all even blocks are in first half of buffer, all odd blocks in second half
+  // we return 0 if block is in first half, 1 if in second half
+  return block % 2;
 }
 
 void led_and_motor_off(void)
