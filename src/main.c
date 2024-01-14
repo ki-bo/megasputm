@@ -1,8 +1,13 @@
 #include "diskio.h"
-#include <mega65/memory.h>
+#include "gfx.h"
+#include "util.h"
+#include <calypsi/intrinsics6502.h>
 
-int main() {
-  mega65_io_enable();
+__task void main(void) 
+{
+  dma_init();
   diskio_init();
-  return 0;
+  diskio_load_room(45, FAR_U8_PTR(0x12000));
+  //gfx_init();
+  while(1) POKE(0xd020, 5);
 }

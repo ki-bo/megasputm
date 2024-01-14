@@ -2,3 +2,9 @@
 /build
 .DS_Store
 .source.txt
+/obj/**
+/*.sym
+/*.vs
+/*.dbg
+/ByteDump.txt
+/asminfo.txt

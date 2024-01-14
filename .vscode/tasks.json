@@ -1,0 +1,20 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Xemu",
+            "type": "shell",
+            "command": "/Applications/Xemu/xmega65.app/Contents/MacOS/xmega65",
+            "args": [
+                "-besure",
+                "-prg",
+                "mmprg.raw",
+                "-8",
+                "gamedata/mm.d81"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
