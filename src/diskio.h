@@ -10,7 +10,13 @@
  * It reads the start tracks and sectors of each room from the disk
  * directory and caches them in memory.
  */
-void diskio_init(void);
+void diskio_init_entry(void);
+
+void diskio_map(void);
+
+void diskio_unmap(void);
+
+void diskio_load_file(const char *filename, uint8_t __far *address);
 
 /**
  * @brief Loads a room from disk into memory.
@@ -19,5 +25,7 @@ void diskio_init(void);
  * @param address The address in memory to load the room to.
  */
 void diskio_load_room(uint8_t room, __far uint8_t *address);
+
+void diskio_load();
 
 #endif // __DISKIO_H

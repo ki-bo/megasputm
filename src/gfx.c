@@ -5,7 +5,7 @@
 #define SCREEN_RAM 0xd000
 #define BG_BITMAP 0x40000ul
 
-#pragma clang section text="initcode" rodata="initcdata"
+#pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 const char palette_red[16] = {
   0x0, 0x0, 0x0, 0x0,  0xa, 0xa, 0xa, 0xa,  0x5, 0x5, 0x5, 0x5,  0xf, 0xf, 0xf, 0xf
 };
@@ -39,3 +39,11 @@ void gfx_init()
     screen -= 639;
   }
 }
+
+#pragma clang section text="code_gfx" rodata="cdata_gfx" data="data_gfx" bss="bss_gfx"
+void gfx_test()
+{
+  VICIV.bordercol = COLOR_WHITE;
+}
+
+static const char dummy_data[0x1000] = {1};

@@ -1,13 +1,22 @@
 #include "diskio.h"
 #include "dma.h"
+#include "map.h"
 #include "util.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
+// The diskio functions are banked in when used
+// Use the bank_diskio() before calling any functions in this file
+// Use unbank_diskio() to restore the previous bank
+
+#pragma clang section bss="bss_diskio"
+
 static uint8_t track_list[54];
 static uint8_t sector_list[54];
 static uint8_t current_track;
+static uint8_t file_track;
+static uint8_t file_block;
 
 static void prepare_drive(void);
 static void wait_for_busy_clear(void);
@@ -68,6 +77,9 @@ enum
 };
 
 static void read_whole_track(uint8_t track);
+static void scan_sector_order(uint8_t track, uint8_t side);
+
+static void search_file(const char *filename);
 
 /**
  * @brief Loads a sector from the floppy disk into the floppy buffer.
@@ -80,6 +92,8 @@ static void read_whole_track(uint8_t track);
  * @param block Logical block number (0-39)
  */
 static void load_block(uint8_t track, uint8_t block);
+
+static void read_error(void);
 
 static void led_and_motor_off(void);
 
@@ -111,16 +125,21 @@ static uint8_t read_next_directory_block(void);
 static uint8_t read_file_entry(void);
 
 
-// public functions
-#pragma clang section text="initcode" rodata="initcdata"
-void diskio_init(void)
-{
-  debug_out("Initializing diskio %d\n", 0);
 
+
+
+// ************************************************************************************************
+// code_init functions
+// ************************************************************************************************
+#pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
+
+//-----------------------------------------------------------------------------------------------
+
+void diskio_init_entry(void)
+{
   memset(track_list, 0, sizeof(track_list));
   memset(sector_list, 0, sizeof(sector_list));
 
-  POKE(0xd680, 0x81); // map FDC buffer to $de00
   *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
   prepare_drive();
 
@@ -131,25 +150,149 @@ void diskio_init(void)
   }
   current_track = 0;
 
-  /*read_whole_track(40);
-  POKE(0xd020, 3);
-  while(1);*/
-
   // Loading file list in the directory, starting at track 40, block 3
   POKE(0xd020,0);
+  debug_out("loading dir");
   load_block(40, 3);
+  debug_msg("first block loaded");
   while (read_next_directory_block() != 0);
   
   led_and_motor_off();
-
-  POKE(0xd680, 0x82); // unmap FDC buffer from $de00
 }
 
-#pragma clang section text="code" rodata="cdata"
+//-----------------------------------------------------------------------------------------------
+
+static uint8_t read_next_directory_block() 
+{
+  uint8_t next_track = FDC.data;
+  uint8_t next_block = FDC.data;
+  for (uint8_t i = 0; i < 8; ++i) {
+    uint8_t skip = 32 - read_file_entry();
+    for (uint8_t j = 0; j < skip; ++j) {
+      FDC.data;
+    }
+  }
+  if (next_track == 0) {
+    return 0;
+  }
+
+  load_block(next_track, next_block);
+  return 1;
+}
+
+//-----------------------------------------------------------------------------------------------
+
+uint8_t read_file_entry()
+{
+  uint8_t i = 1;
+  uint8_t tmp;
+
+  if (FDC.data != 0x82) {
+    // not a PRG file
+    return i;   
+  }
+  ++i;
+  uint8_t file_track = FDC.data;
+  if (file_track == 0 || file_track > 80) {
+    // invalid track number
+    return i;
+  }
+  ++i;
+  uint8_t file_block = FDC.data;
+  if (file_block >= 40) {
+    // invalid block number
+    return i;
+  }
+  ++i;
+  tmp = FDC.data;
+  if (tmp < 0x30 || tmp > 0x39) {
+    // invalid room number
+    return i;
+  }
+  uint8_t room_number = (tmp - 0x30) * 10;
+  ++i;
+  tmp = FDC.data;
+  if (tmp < 0x30 || tmp > 0x39) {
+    // invalid room number
+    return i;
+  }
+  room_number += tmp - 0x30;
+  
+  const char *file_suffix = ".LFL\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0";
+  for (uint8_t j = 0; j < 14; ++j) {
+    ++i;
+    if (FDC.data != file_suffix[j]) {
+      // invalid file suffix
+      return i;
+    }
+  }
+
+  // all checks passed, we found a valid xx.lfl file with xx being the room number
+  track_list[room_number] = file_track;
+  sector_list[room_number] = file_block;
+
+  return i;
+}
+
+// ************************************************************************************************
+// code_diskio functions
+// ************************************************************************************************
+#pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
+
+//-----------------------------------------------------------------------------------------------
+
+void diskio_load_file(const char *filename, uint8_t __far *address)
+{
+  static dmalist_two_options_t dmalist_copy = {
+    .opt_token1 = 0x80,
+    .opt_arg1 = 0xff,
+    .opt_token2 = 0x81,
+    .opt_arg2 = 00,
+    .end_of_options = 0x00,
+    .command = 0x00,      //!< DMA copy command
+    .count = 0x00fe,
+    .src_addr = 0x6c02,
+    .src_bank = 0x0d,
+    .dst_addr = 0x0000,
+    .dst_bank = 0x00
+  };
+
+  debug_out("Loading file %s\n", filename);
+  prepare_drive();
+
+  search_file(filename);
+  
+  if (file_track == 0) {
+    led_and_motor_off();
+    fatal_error("File not found");
+  }
+
+  DMA.addrbank = 1;
+  DMA.addrmsb = MSB(&dmalist_copy);
+
+  while (file_track != 0) {
+    debug_out("Loading track %d, block %d", file_track, file_block);
+    load_block(file_track, file_block);
+    dmalist_copy.src_addr = file_block % 2 == 0 ? 0x6c02 : 0x6d02;
+
+    file_track = FDC.data;
+    file_block = FDC.data;
+
+    if (file_track == 0) {
+      dmalist_copy.count = file_block - 1;
+    }
+    dmalist_copy.dst_addr = (uint16_t)address;
+    dmalist_copy.dst_bank = BANK(address);
+    DMA.etrig = LSB(&dmalist_copy);
+    address += 254;
+  }
+  
+  led_and_motor_off();
+}
+
 void diskio_load_room(uint8_t room, __far uint8_t *address)
 {
   debug_out("Loading room %d\n", room);
-  POKE(0xd680, 0x81); // map FDC buffer to $de00
   prepare_drive();
   uint8_t next_track = track_list[room];
   uint8_t next_block = sector_list[room];
@@ -163,20 +306,16 @@ void diskio_load_room(uint8_t room, __far uint8_t *address)
     if (next_track == 0) {
       payload_size = next_block - 1;
     }
-    /*for (uint8_t i = 0; i < payload_size ; ++i) {
+    for (uint8_t i = 0; i < payload_size ; ++i) {
       *address = FDC.data ^ 0xff;
       ++address;
-    }*/
-
-    address += payload_size;
+    }
   }
   
   led_and_motor_off();
-  POKE(0xd680, 0x82); // unmap FDC buffer from $de00
 }
 
-
-// private functions
+//-----------------------------------------------------------------------------------------------
 
 static void prepare_drive(void)
 {
@@ -186,10 +325,14 @@ static void prepare_drive(void)
   wait_for_busy_clear();
 }
 
-static void wait_for_busy_clear(void)
+//-----------------------------------------------------------------------------------------------
+
+inline static void wait_for_busy_clear(void)
 {
   while (FDC.status & FDC_BUSY_MASK);
 }
+
+//-----------------------------------------------------------------------------------------------
 
 static void step_to_track(uint8_t track)
 {
@@ -206,6 +349,46 @@ static void step_to_track(uint8_t track)
     wait_for_busy_clear();
   }
 }
+
+//-----------------------------------------------------------------------------------------------
+
+static void scan_sector_order(uint8_t track, uint8_t side)
+{
+  --track;
+
+  step_to_track(track);
+
+  if (side == 0) {
+    FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
+  }
+  else {
+    FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
+  }
+
+  uint8_t cur_sector = *NEAR_VU8_PTR(0xd6a4);
+  while (cur_sector == *NEAR_VU8_PTR(0xd6a4));
+  cur_sector = *NEAR_VU8_PTR(0xd6a4);
+  while (cur_sector == *NEAR_VU8_PTR(0xd6a4));
+  cur_sector = *NEAR_VU8_PTR(0xd6a4);
+  uint8_t num_sectors_read = 0;
+  uint8_t sectors[20];
+
+  while (num_sectors_read < 20) {
+    if (cur_sector != *NEAR_VU8_PTR(0xd6a4)) {
+      // sector has been read
+      cur_sector = *NEAR_VU8_PTR(0xd6a4);
+      sectors[num_sectors_read] = cur_sector;
+      ++num_sectors_read;
+    }
+  }
+
+  //debug_out("%02d %02d %02d %02d %02d %02d %02d %02d %02d %02d", sectors[0], sectors[1], sectors[2], sectors[3], sectors[4], sectors[5], sectors[6], sectors[7], sectors[8], sectors[9]);
+  //debug_out("%02d %02d %02d %02d %02d %02d %02d %02d %02d %02d", sectors[10], sectors[11], sectors[12], sectors[13], sectors[14], sectors[15], sectors[16], sectors[17], sectors[18], sectors[19]);
+  //debug_out("\n");
+
+}
+
+//-----------------------------------------------------------------------------------------------
 
 static void read_whole_track(uint8_t track)
 {
@@ -266,6 +449,83 @@ static void read_whole_track(uint8_t track)
     POKE(0xd020, 0);
 }
 
+//-----------------------------------------------------------------------------------------------
+
+static void search_file(const char *filename)
+{
+  uint8_t next_track = 40;
+  uint8_t next_block = 3;
+
+  while (next_track != 0)
+  {
+    load_block(next_track, next_block);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    int8_t skip = 0;
+    for (uint8_t i = 0; i < 8; ++i) {
+      while (--skip >= 0) {
+        FDC.data;
+      }
+      skip = 31;
+      if (FDC.data != 0x82) {
+        // not a PRG file
+        debug_msg("not a PRG file");
+        continue;
+      }
+      --skip;
+      file_track = FDC.data;
+      if (file_track == 0 || file_track > 80) {
+        // invalid track number
+        debug_msg("invalid track number");
+        continue;
+      }
+      --skip;
+      file_block = FDC.data;
+      if (file_block >= 40) {
+        // invalid block number
+        debug_msg("invalid block number");
+        continue;
+      }
+      uint8_t no_match = 0;
+      uint8_t k;
+      for (k = 0; k < 16; ++k) {
+        if (filename[k] == '\0') {
+          break;
+        }
+        --skip;
+        if (FDC.data != filename[k]) {
+          // not the file we are looking for
+          debug_out("no match k=%d", k);
+          no_match = 1;
+          break;
+        }
+      }
+      if (no_match) {
+        continue;
+      }
+      for (; k < 16; ++k) {
+        --skip;
+        if (FDC.data != '\xa0') {
+          // not the file we are looking for
+          debug_msg("no match 2");
+          no_match = 1;
+          break;
+        }
+      }
+      if (no_match) {
+        continue;
+      }
+
+      return;
+    }
+  }
+
+  // file not found
+  file_track = 0;
+}
+
+//-----------------------------------------------------------------------------------------------
+
 static void load_block(uint8_t track, uint8_t block)
 {
   static uint8_t last_physical_track = 255;
@@ -294,21 +554,37 @@ static void load_block(uint8_t track, uint8_t block)
       FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
     }
 
-    //step_to_track(track);
+    step_to_track(track);
 
     FDC.track = track;
     FDC.sector = physical_sector;
     FDC.side = side;
-    FDC.command = FDC_CMD_READ_SECTOR;
-    while(!(FDC.status & FDC_RDREQ_MASK));
-    wait_for_busy_clear();
-    while(!(FDC.status & (FDC_DRQ_MASK | FDC_EQ_MASK)));
 
-    // RNF or CRC error flag check
+    FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
+  
+    FDC.command = FDC_CMD_READ_SECTOR;
+
+    // RNF or CRC flags indicate an error (RNF = not found, CRC = data error)
+    // DRQ and EQ flags indicate that the sector was completely read
+    // We need to make sure the CPU read pointer is reset to the beginning of the sector buffer
+    // (we made sure to disable SWAP first, otherwise the CPU read pointer will be reset to the
+    // middle of the sector buffer and EQ won't get set)
+    //
+    // NOTE: While this is true for real drives, seems the FDC int the MEGA65 does not set EQ
+    //       when the CPU read pointer is reset to the beginning of the sector buffer and
+    //       disk images are used. So, we dont check for EQ when the sector is read.
+    //       Usually, when BUSY is cleared, the status should report DRQ and EQ set.
+    //       We just rely on the data being in the buffer once BUSY is cleared.
+    while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
+    if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
+      read_error();
+    }
+
+    wait_for_busy_clear(); // sector reading to buffer completed when BUSY is cleared
+
+    //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
     if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-      // error
-      led_and_motor_off();
-      fatal_error("Error reading sector");
+      read_error();
     }
 
     last_physical_track = track;
@@ -324,81 +600,17 @@ static void load_block(uint8_t track, uint8_t block)
   }
 }
 
+//-----------------------------------------------------------------------------------------------
+
+static void read_error(void)
+{
+  led_and_motor_off();
+  fatal_error("Error reading sector");
+}
+
+//-----------------------------------------------------------------------------------------------
+
 static void led_and_motor_off(void)
 {
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
-}
-
-
-// private init functions
-
-#pragma clang section text="initcode" rodata="initcdata"
-static uint8_t read_next_directory_block() 
-{
-  uint8_t next_track = FDC.data;
-  uint8_t next_block = FDC.data;
-  for (uint8_t i = 0; i < 8; ++i) {
-    uint8_t skip = 32 - read_file_entry();
-    for (uint8_t j = 0; j < skip; ++j) {
-      FDC.data;
-    }
-  }
-  if (next_track == 0) {
-    return 0;
-  }
-
-  load_block(next_track, next_block);
-  return 1;
-}
-
-uint8_t read_file_entry()
-{
-  uint8_t i = 1;
-  uint8_t tmp;
-
-  if (FDC.data != 0x82) {
-    // not a PRG file
-    return i;   
-  }
-  ++i;
-  uint8_t file_track = FDC.data;
-  if (file_track == 0 || file_track > 80) {
-    // invalid track number
-    return i;
-  }
-  ++i;
-  uint8_t file_block = FDC.data;
-  if (file_block >= 40) {
-    // invalid block number
-    return i;
-  }
-  ++i;
-  tmp = FDC.data;
-  if (tmp < 0x30 || tmp > 0x39) {
-    // invalid room number
-    return i;
-  }
-  uint8_t room_number = (tmp - 0x30) * 10;
-  ++i;
-  tmp = FDC.data;
-  if (tmp < 0x30 || tmp > 0x39) {
-    // invalid room number
-    return i;
-  }
-  room_number += tmp - 0x30;
-  
-  const char *file_suffix = ".LFL\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0";
-  for (uint8_t j = 0; j < 14; ++j) {
-    ++i;
-    if (FDC.data != file_suffix[j]) {
-      // invalid file suffix
-      return i;
-    }
-  }
-
-  // all checks passed, we found a valid xx.lfl file with xx being the room number
-  track_list[room_number] = file_track;
-  sector_list[room_number] = file_block;
-
-  return i;
 }

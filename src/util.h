@@ -1,7 +1,6 @@
 #ifndef __UTIL_H
 #define __UTIL_H
 
-#include "dma.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -39,18 +38,27 @@
 #define FAR_VU8_PTR(X) ((__far volatile uint8_t *)(X))
 #define FAR_VI8_PTR(X) ((__far volatile int8_t *)(X))
 
+#define LSB(X)  ((uint8_t)((uint8_t)(X)))
+#define MSB(X)  ((uint8_t)((uint16_t)(X) >> 8))
+#define MB(X)   ((uint8_t)((uintptr_t)(X) >> 16))
+#define BANK(X) ((uint8_t)(((uint8_t)((uintptr_t)(X) >> 16)) & 0x0f))
 
 void fatal_error(const char *message);
 
+#if 1
 extern char msg[80];
 #define debug_out(...) sprintf(msg, __VA_ARGS__); \
                        debug_msg(msg);
+#else
+#define debug_out(...)
+#endif
 
 void debug_msg(char* msg);
 
 // Memory functions (overloaded using DMA functionality)
 void *memcpy(void *dest, const void *src, size_t n);
-__far void *memcpy_to_bank(void __far *dest, const void *src, size_t n);
+void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n);
+void __far *memcpy_far(void __far *dest, const void __far *src, size_t n);
 void memcpy_to_io(void __far *dest, const void *src, size_t n);
 void *memset(void *s, int c, size_t n);
 

@@ -52,13 +52,13 @@ void *memcpy(void *dest, const void *src, size_t n)
   dmalist_copy.dst_addr = (uint16_t)dest;
 
   DMA.addrbank    = 0;
-  DMA.addrmsb     = (uint8_t)((uint16_t)&dmalist_copy >> 8);
-  DMA.addrlsbtrig = (uint8_t)((uint16_t)&dmalist_copy & 0xff);  
+  DMA.addrmsb     = MSB(&dmalist_copy);
+  DMA.addrlsbtrig = LSB(&dmalist_copy);
 
   return dest;
 }
 
-__far void *memcpy_to_bank(__far void *dest, const void *src, size_t n)
+void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n)
 {
   static dmalist_t dmalist_copy = {
     .command = 0x00,      //!< DMA copy command
@@ -71,12 +71,36 @@ __far void *memcpy_to_bank(__far void *dest, const void *src, size_t n)
 
   dmalist_copy.count    = n;
   dmalist_copy.src_addr = (uint16_t)src;
-  dmalist_copy.dst_bank = (uint8_t)((uint32_t)dest >> 16) & 0x0f;
+  dmalist_copy.dst_bank = BANK(dest);
   dmalist_copy.dst_addr = (uint16_t)dest;
 
   DMA.addrbank = 0;
-  DMA.addrmsb  = (uint8_t)((uint16_t)&dmalist_copy >> 8);
-  DMA.etrig    = (uint8_t)((uint16_t)&dmalist_copy & 0xff); 
+  DMA.addrmsb  = MSB(&dmalist_copy);
+  DMA.etrig    = LSB(&dmalist_copy); 
+
+  return dest; 
+}
+
+void __far *memcpy_far(void __far *dest, const void __far *src, size_t n)
+{
+  static dmalist_t dmalist_copy = {
+    .command = 0x00,      //!< DMA copy command
+    .count = 0x0000,
+    .src_addr = 0x0000,
+    .src_bank = 0x00,
+    .dst_addr = 0x0000,
+    .dst_bank = 0x00
+  };
+
+  dmalist_copy.count    = n;
+  dmalist_copy.src_bank = BANK(src);
+  dmalist_copy.src_addr = (uint16_t)src;
+  dmalist_copy.dst_bank = BANK(dest);
+  dmalist_copy.dst_addr = (uint16_t)dest;
+
+  DMA.addrbank = 0;
+  DMA.addrmsb  = MSB(&dmalist_copy);
+  DMA.etrig    = LSB(&dmalist_copy); 
 
   return dest; 
 }
@@ -97,12 +121,12 @@ void memcpy_to_io(__far void *dest, const void *src, size_t n)
 
   dmalist_copy.count    = n;
   dmalist_copy.src_addr = (uint16_t)src;
-  dmalist_copy.dst_bank = (uint8_t)((uint32_t)dest >> 16) & 0x0f;
+  dmalist_copy.dst_bank = BANK(dest);
   dmalist_copy.dst_addr = (uint16_t)dest;
 
   DMA.addrbank = 0;
-  DMA.addrmsb  = (uint8_t)((uint16_t)&dmalist_copy >> 8);
-  DMA.etrig    = (uint8_t)((uint16_t)&dmalist_copy & 0xff);  
+  DMA.addrmsb  = MSB(&dmalist_copy);
+  DMA.etrig    = LSB(&dmalist_copy);
 }
 
 void *memset(void *s, int c, size_t n)
@@ -118,8 +142,8 @@ void *memset(void *s, int c, size_t n)
   dmalist_fill.dst_addr  = (uint16_t)s;
 
   DMA.addrbank    = 0;
-  DMA.addrmsb     = (uint8_t)((uint16_t)&dmalist_fill >> 8);
-  DMA.addrlsbtrig = (uint8_t)((uint16_t)&dmalist_fill & 0xff);  
+  DMA.addrmsb     = MSB(&dmalist_fill);
+  DMA.addrlsbtrig = LSB(&dmalist_fill);
 
   return s;
 }

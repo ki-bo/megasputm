@@ -8,3 +8,7 @@
 /*.dbg
 /ByteDump.txt
 /asminfo.txt
+.DS_Store
+*.raw
+*.lst
+/*.d81
