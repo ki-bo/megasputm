@@ -1,6 +1,7 @@
 #ifndef __UTIL_H
 #define __UTIL_H
 
+#include "error.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -43,7 +44,8 @@
 #define MB(X)   ((uint8_t)((uintptr_t)(X) >> 16))
 #define BANK(X) ((uint8_t)(((uint8_t)((uintptr_t)(X) >> 16)) & 0x0f))
 
-void fatal_error(const char *message);
+void fatal_error(enum errorcode_t error);
+void fatal_error_str(const char *message);
 
 #if 1
 extern char msg[80];

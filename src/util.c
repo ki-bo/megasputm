@@ -8,7 +8,12 @@
 
 char msg[80];
 
-void fatal_error(const char *message)
+void fatal_error(enum errorcode_t error)
+{
+  debug_out("Fatal error: %d", error);
+}
+
+void fatal_error_str(const char *message)
 {
   debug_msg((char *)message);
   while (1) POKE(0xd020, 2);
@@ -25,14 +30,14 @@ void debug_msg(char* msg)
     msg++;
   }
   __asm volatile(" lda #0x0d\n"
-                  " sta 0xd643\n"
-                  " nop\n"
-                  " lda #0x0a\n"
-                  " sta 0xd643\n"
-                  " nop"
-                  : /* no output operands */
-                  : /* no input operands*/
-                  : "a" /* clobber list */);
+                 " sta 0xd643\n"
+                 " nop\n"
+                 " lda #0x0a\n"
+                 " sta 0xd643\n"
+                 " nop"
+                 : /* no output operands */
+                 : /* no input operands*/
+                 : "a" /* clobber list */);
 }
 
 

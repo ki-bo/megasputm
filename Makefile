@@ -4,12 +4,13 @@ ETHLOAD = /Users/robert/bin/etherload.osx
 M65FTP = /Users/robert/bin/mega65_ftp.osx
 
 
-.phony: all clean run
-run: runtime.raw
-	cp gamedata/MM.D81 mm.d81
-	c1541 -attach mm.d81 -write runtime.raw m00 -write m1-1.raw m11
+.phony: all clean run debug_xemu
+run: mm.d81
 	$(M65FTP) -e -c"put mm.d81"
 	$(ETHLOAD) -m mm.d81 -r autoboot.raw
+
+debug_xemu: mm.d81
+	/Applications/Xemu/xmega65.app/Contents/MacOS/xmega65 -8 mm.d81 -besure
 
 # Common source files
 ASM_SRCS = startup.s
@@ -39,6 +40,9 @@ runtime.raw:  $(OBJS) mega65-mm.scm
 mm.elf: $(OBJS) mega65-mm.scm
 	ln6502 --target=mega65 mega65-mm.scm --debug --verbose --cstartup=mm --rtattr exit=simplified --rtattr printf=nofloat -o $@ $(filter-out mega65-mm.scm,$^) --list-file=mm-debug.lst --semi-hosted
 
+mm.d81: runtime.raw
+	cp gamedata/MM.D81 mm.d81
+	c1541 -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write m1-1.raw m11
 
 
 clean:

@@ -121,8 +121,9 @@ __low_level_init:
 ;;;
 ;;; load_runtime - load runtime sections from disk into memory
 ;;;
-;;; This routine loads the runtime code into memory at $200. It needs to be
-;;; called before any runtime function is called.
+;;; This routine loads the runtime code into memory at $200, and the diskio
+;;; code into memory at $14002. The runtime is temporarily loaded to $8000, 
+;;; and then copied to its final destination.
 ;;;
 ;;; Will disable interrupts before the runtime is copied to $200, and will
 ;;; keep them disabled when returning.
@@ -146,26 +147,24 @@ load_runtime:
 		sta reloc_size_runtime+1
 
 load_diskio:
-		lda reloc_source_diskio
+		; load diskio code to 0x14002
+		lda #0x02
 		sta file_load_address
-		lda reloc_source_diskio+1
+		lda #0x40
 		sta file_load_address+1
+		lda #0x01
+		sta file_load_address+2
 		lda #3
 		ldx #.byte0 filename_diskio
 		ldy #.byte1 filename_diskio
 		jsr load_file
-		stx reloc_size_diskio
-		tya
-		sec
-		sbc reloc_source_diskio+1
-		sta reloc_size_diskio+1
 
 		sei
 		lda #1
 		trb 0xd703		; disable F018B mode
 		sta 0xd707
 		.byte 0			; end of job options
-		.byte 4			; copy command, chained
+		.byte 0			; copy command
 reloc_size_runtime:
 		.word 0			; count
 reloc_source_runtime:
@@ -175,19 +174,6 @@ reloc_source_runtime:
 		.byte 0			; destination bank
 		.byte 0			; cmd high
 		.byte 0			; modulo / ignored
-
-		.byte 0			; end of job options
-		.byte 0			; copy command
-reloc_size_diskio:
-		.word 0			; count
-reloc_source_diskio:
-		.word 0xa000		; source
-		.byte 0			; source bank
-		.word 0x2002		; destination
-		.byte 1			; destination bank
-		.byte 0			; cmd high
-		.byte 0			; modulo / ignored
-
 		rts
 
 relocate_init:
@@ -218,11 +204,11 @@ relocate_init:
 		.section startup, root, noreorder
 load_file:
 		jsr 0xffbd		; SETNAM
-		lda #32
+		lda #0
 		ldx #8
 		ldy #0
 		jsr 0xffba		; SETLFS
-		lda #0
+		lda #4
 		ldx #0
 		jsr 0xff6b		; SETBNK
 		lda #0
@@ -242,6 +228,7 @@ loadok$:
 		rts
 file_load_address:
 		.word 0
+		.byte 0
 
 filename_runtime:
 		.ascii "M00"
@@ -253,4 +240,4 @@ filename_diskio:
 		.word 0x0200
 
 		.section diskio_load_address
-		.word 0x2000
+		.word 0x0000

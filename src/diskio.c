@@ -1,5 +1,6 @@
 #include "diskio.h"
 #include "dma.h"
+#include "error.h"
 #include "map.h"
 #include "util.h"
 #include <stdint.h>
@@ -243,11 +244,9 @@ uint8_t read_file_entry()
 
 void diskio_load_file(const char *filename, uint8_t __far *address)
 {
-  static dmalist_two_options_t dmalist_copy = {
-    .opt_token1 = 0x80,
-    .opt_arg1 = 0xff,
-    .opt_token2 = 0x81,
-    .opt_arg2 = 00,
+  static dmalist_single_option_t dmalist_copy = {
+    .opt_token = 0x80,
+    .opt_arg = 0xff,
     .end_of_options = 0x00,
     .command = 0x00,      //!< DMA copy command
     .count = 0x00fe,
@@ -264,7 +263,7 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
   
   if (file_track == 0) {
     led_and_motor_off();
-    fatal_error("File not found");
+    fatal_error(ERR_FILE_NOT_FOUND);
   }
 
   DMA.addrbank = 1;
@@ -436,8 +435,7 @@ static void read_whole_track(uint8_t track)
       // RNF or CRC error flag check
       if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
         // error
-        led_and_motor_off();
-        fatal_error("Error reading sector");
+        read_error();
       }
     }
 
@@ -605,7 +603,7 @@ static void load_block(uint8_t track, uint8_t block)
 static void read_error(void)
 {
   led_and_motor_off();
-  fatal_error("Error reading sector");
+  fatal_error(ERR_SECTOR_READ_FAILED);
 }
 
 //-----------------------------------------------------------------------------------------------

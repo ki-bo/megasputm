@@ -18,7 +18,7 @@ void unmap_all(void)
 
 void map_diskio(void)
 {
-  __asm (" lda #0x00\n"
+  __asm (" lda #0x20\n"
          " ldx #0x21\n"
          " ldy #0x00\n"
          " ldz #0x00\n"
