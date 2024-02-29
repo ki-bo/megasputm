@@ -147,10 +147,10 @@ load_runtime:
 		sta reloc_size_runtime+1
 
 load_diskio:
-		; load diskio code to 0x14002
-		lda #0x02
+		; load diskio code to 0x12000
+		lda #0x00
 		sta file_load_address
-		lda #0x40
+		lda #0x20
 		sta file_load_address+1
 		lda #0x01
 		sta file_load_address+2
@@ -204,16 +204,21 @@ relocate_init:
 		.section startup, root, noreorder
 load_file:
 		jsr 0xffbd		; SETNAM
-		lda #0
+		lda #32
 		ldx #8
 		ldy #0
 		jsr 0xffba		; SETLFS
-		lda #4
-		ldx #0
-		jsr 0xff6b		; SETBNK
-		lda #0
-		ldx file_load_address
+		;; need to comment out as MEGA65 ROM is broken and doesn't support SETBNK
+		;lda file_load_address+2
+		;ldx #0
+		;jsr 0xff6b		; SETBNK
+		;; set BANK and MSB of load address via ZP instead ...
+		sta 0xb0
+		lda file_load_address+2
+		sta 0xaf
 		ldy file_load_address+1
+		ldx file_load_address
+		lda #0b01000000		; bit6 = raw read (don't skip first 2 bytes)
 		jsr 0xffd5		; LOAD
 
 		bcc loadok$
@@ -232,12 +237,6 @@ file_load_address:
 
 filename_runtime:
 		.ascii "M00"
-
+		
 filename_diskio:
 		.ascii "M11"
-
-		.section runtime_load_address
-		.word 0x0200
-
-		.section diskio_load_address
-		.word 0x0000

@@ -10,7 +10,7 @@ run: mm.d81
 	$(ETHLOAD) -m mm.d81 -r autoboot.raw
 
 debug_xemu: mm.d81
-	/Applications/Xemu/xmega65.app/Contents/MacOS/xmega65 -8 mm.d81 -besure
+	/Applications/Xemu/xmega65.app/Contents/MacOS/xmega65 -uartmon :4510 -8 mm.d81 -besure
 
 # Common source files
 ASM_SRCS = startup.s

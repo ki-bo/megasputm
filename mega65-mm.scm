@@ -14,9 +14,8 @@
         ; The runtime code will be loaded to 0x200, the load address is only here to
         ; put it into the resulting raw file. These two bytes will not be loaded 
         ; into memory.
-        (memory runtime (address (#x1fe . #x1fff))
+        (memory runtime (address (#x200 . #x1fff))
                 (section
-                        (runtime_load_address #x1fe)
                         code
                         data
                         switch
@@ -63,41 +62,46 @@
                 )
         )
 
-        (memory banked-code-0 (address (#x2000 . #x5fff)) 
-                (scatter-to bank1_0000)
+        (memory banked-code-0 (address (#x2000 . #x3dff)) 
+                (scatter-to bank1_2000)
                 (section
-                        code_gfx
-                        cdata_gfx
-                )
-        )
-
-        (memory banked-code-1 (address (#x4000 . #x5dff)) 
-                (scatter-to bank1_4000)
-                (section
-                        (diskio_load_address #x4000)  ; need to skip first 2 bytes due to loading with kernal routines
                         code_diskio
                         cdata_diskio
                         data_diskio
                 )
         )
 
-        (memory banked-bss-1 (address (#x5e00 . #x5fff)) 
-                (scatter-to bank1_5e00)
+        (memory banked-bss-0 (address (#x3e00 . #x3fff)) 
+                (scatter-to bank1_3e00)
                 (section
                         bss_diskio
                 )
         )
  
-        (memory m1-0 (address (#x10000 . #x13fff))
+        (memory banked-code-1 (address (#x4000 . #x5fff)) 
+                (scatter-to bank1_4000)
+                (section
+                        code_gfx
+                        cdata_gfx
+                )
+        )
+
+        (memory m1-0 (address (#x10000 . #x11fff))
                 (section 
                         (bank1_0000 #x10000)
                 )
         )
 
-        (memory m1-1 (address (#x14000 . #x15fff))
+        (memory m1-1 (address (#x12000 . #x13fff))
+                (section 
+                        (bank1_2000 #x12000)
+                        (bank1_3e00 #x13e00)
+                )
+        )
+
+        (memory m1-2 (address (#x14000 . #x15fff))
                 (section 
                         (bank1_4000 #x14000)
-                        (bank1_5e00 #x15e00)
                 )
         )
 
