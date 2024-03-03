@@ -88,6 +88,9 @@ typedef struct __f011 {
 } f011_t;
 
 #define FDC (*(struct __f011 *)0xd080)
+#define FDC_BUF FAR_U8_PTR(0xffd6c00)
+#define DISK_CACHE 0x8000000UL
+#define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x10000UL))
 
 enum
 {
@@ -179,6 +182,19 @@ static void led_and_motor_off(void);
 static void load_index(void);
 
 /**
+ * @brief Marks all blocks in disk cache as not-available
+ *
+ * Disk cache is in attic ram, starting at 0x8000000. Each physical sector
+ * is 512 bytes long. The cache can hold 20*80=1600 sectors.
+ * The first two bytes of each block are used to store the track and block
+ * number of the next block. Legal values are only 0-80 for the track
+ * number (0 = last block). Therefore, we use the unsused value 0xff to mark 
+ * a sector as not available (such a value should never occur on the disk
+ * for the 'next track' byte).
+ */
+static void invalidate_disk_cache(void);
+
+/**
  * @brief Parses lfl file entries in the FDC buffer and caches them
  * 
  * The function assumes a directory block has been loaded into the FDC buffer.
@@ -230,6 +246,7 @@ void diskio_init_entry(void)
 {
   memset(track_list, 0, sizeof(track_list));
   memset(sector_list, 0, sizeof(sector_list));
+  invalidate_disk_cache();
 
   *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
   prepare_drive();
@@ -243,9 +260,7 @@ void diskio_init_entry(void)
 
   // Loading file list in the directory, starting at track 40, block 3
   POKE(0xd020,0);
-  debug_out("loading dir");
   load_block(40, 3);
-  debug_msg("first block loaded");
   while (read_next_directory_block() != 0);
   
   load_index();
@@ -372,6 +387,18 @@ static void load_index(void)
   }
 }
 
+//-----------------------------------------------------------------------------------------------
+
+static void invalidate_disk_cache(void)
+{
+  uint8_t __far *ptr = FAR_U8_PTR(DISK_CACHE);
+
+  for (uint16_t block = 0; block < 20 * 80; ++block) {
+    *ptr = 0xff;
+    // workaround for bug in compiler, should be: ptr += 512UL;
+    ptr = FAR_U8_PTR((uint32_t)ptr + 512UL);
+  }
+}
 
 // ************************************************************************************************
 // code_diskio functions
@@ -394,7 +421,6 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
     .dst_bank = 0x00
   };
 
-  debug_out("Loading file %s\n", filename);
   prepare_drive();
 
   search_file(filename);
@@ -409,7 +435,6 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
   dmalist_copy.count = 254;
 
   while (file_track != 0) {
-    debug_out("Loading track %d, block %d", file_track, file_block);
     load_block(file_track, file_block);
     dmalist_copy.src_addr = file_block % 2 == 0 ? 0x6c02 : 0x6d02;
 
@@ -430,14 +455,12 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
 
 void diskio_load_room(uint8_t room, __far uint8_t *address)
 {
-  debug_out("Loading room %d\n", room);
   prepare_drive();
   uint8_t next_track = track_list[room];
   uint8_t next_block = sector_list[room];
   uint8_t payload_size = 254;
 
   while (next_track != 0) {
-    debug_out("Loading track %d, block %d", next_track, next_block);
     load_block(next_track, next_block);
     next_track = FDC.data;
     next_block = FDC.data;
@@ -606,21 +629,18 @@ static void search_file(const char *filename)
       skip = 31;
       if (FDC.data != 0x82) {
         // not a PRG file
-        debug_msg("not a PRG file");
         continue;
       }
       --skip;
       file_track = FDC.data;
       if (file_track == 0 || file_track > 80) {
         // invalid track number
-        debug_msg("invalid track number");
         continue;
       }
       --skip;
       file_block = FDC.data;
       if (file_block >= 40) {
         // invalid block number
-        debug_msg("invalid block number");
         continue;
       }
       uint8_t no_match = 0;
@@ -632,7 +652,6 @@ static void search_file(const char *filename)
         --skip;
         if (FDC.data != filename[k]) {
           // not the file we are looking for
-          debug_out("no match k=%d", k);
           no_match = 1;
           break;
         }
@@ -644,7 +663,6 @@ static void search_file(const char *filename)
         --skip;
         if (FDC.data != '\xa0') {
           // not the file we are looking for
-          debug_msg("no match 2");
           no_match = 1;
           break;
         }
@@ -665,68 +683,125 @@ static void search_file(const char *filename)
 
 static void load_block(uint8_t track, uint8_t block)
 {
+  static dmalist_two_options_t dmalist_copy_from_cache = {
+    .opt_token1 = 0x80,
+    .opt_arg1 = 0x80,
+    .opt_token2 = 0x81,
+    .opt_arg2 = 0xff,
+    .end_of_options = 0x00,
+    .command = 0x00,      //!< DMA copy command
+    .count = 0x0200,
+    .src_addr = 0x0000,
+    .src_bank = 0x00,
+    .dst_addr = 0x6c00,
+    .dst_bank = 0x0d
+  };
+
+  static dmalist_two_options_t dmalist_copy_to_cache = {
+    .opt_token1 = 0x80,
+    .opt_arg1 = 0xff,
+    .opt_token2 = 0x81,
+    .opt_arg2 = 0x80,
+    .end_of_options = 0x00,
+    .command = 0x00,      //!< DMA copy command
+    .count = 0x0200,
+    .src_addr = 0x6c00,
+    .src_bank = 0x0d,
+    .dst_addr = 0x0000,
+    .dst_bank = 0x00
+  };
+
+  if (track == 0 || track > 80 || block > 39) {
+    led_and_motor_off();
+    fatal_error(ERR_INVALID_DISK_LOCATION);
+  }
+
+
   static uint8_t last_physical_track = 255;
   static uint8_t last_physical_sector;
   static uint8_t last_side;
   uint8_t physical_sector;
   uint8_t side;
 
-  if (block < 20) {
-    physical_sector = block / 2 + 1;
-    side = 0;
-  }
-  else {
-    physical_sector = (char)(block - 20) / 2 + 1;
+  physical_sector = block / 2;
+  --track; // logical track numbers are 1-80, physical track numbers are 0-79
+
+  const uint32_t cache_offset = ((uint32_t)track * 20UL + (uint32_t)physical_sector) * 512UL;
+  const uint8_t __far *cache_block = FAR_U8_PTR(DISK_CACHE + cache_offset);
+
+  ++physical_sector;
+  if (block > 10) {
+    physical_sector -= 10;
     side = 1;
   }
-  --track; // logical track numbers are 1-80, physical track numbers are 0-79
+  else {
+    side = 0;
+  }
 
   FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
 
-  if (physical_sector != last_physical_sector || track != last_physical_track || side != last_side) {
-    if (side == 0) {
-      FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
-    }
-    else {
-      FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
-    }
-
-    step_to_track(track);
-
-    FDC.track = track;
-    FDC.sector = physical_sector;
-    FDC.side = side;
-
-    FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
-  
-    FDC.command = FDC_CMD_READ_SECTOR;
-
-    // RNF or CRC flags indicate an error (RNF = not found, CRC = data error)
-    // DRQ and EQ flags both set indicates that the sector was completely read
-    // We need to make sure the CPU read pointer is reset to the beginning of the sector buffer
-    // (we made sure to disable SWAP first, otherwise the CPU read pointer will be reset to the
-    // middle of the sector buffer and EQ won't get set)
-    //
-    // NOTE: While this is true for real drives, seems the FDC in the MEGA65 does not set EQ
-    //       when the CPU read pointer is reset to the beginning of the sector buffer and
-    //       disk images are used. So, we dont check for EQ when the sector is read.
-    //       Usually, when BUSY is cleared, the status should report DRQ and EQ set.
-    //       We just rely on the data being in the buffer once BUSY is cleared.
-    while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
-    if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
-      read_error();
-    }
-
-    wait_for_busy_clear(); // sector reading to buffer completed when BUSY is cleared
-
-    //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
-    if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-      read_error();
-    }
-
+  if (*cache_block != 0xff) {
+    // block is in cache
+    dmalist_copy_from_cache.src_addr = LSB16(cache_block);
+    dmalist_copy_from_cache.src_bank = BANK(cache_block);
+    dma_trigger_far_ext(UNBANKED_PTR(&dmalist_copy_from_cache));
     last_physical_track = track;
     last_physical_sector = physical_sector;
     last_side = side;
+  }
+  else {
+    // block is not in cache - need to read it from disk
+
+    if (physical_sector != last_physical_sector || track != last_physical_track || side != last_side) {
+      if (side == 0) {
+        FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
+      }
+      else {
+        FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
+      }
+
+      step_to_track(track);
+
+      FDC.track = track;
+      FDC.sector = physical_sector;
+      FDC.side = side;
+
+      FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
+    
+      FDC.command = FDC_CMD_READ_SECTOR;
+
+      // RNF or CRC flags indicate an error (RNF = not found, CRC = data error)
+      // DRQ and EQ flags both set indicates that the sector was completely read
+      // We need to make sure the CPU read pointer is reset to the beginning of the sector buffer
+      // (we made sure to disable SWAP first, otherwise the CPU read pointer will be reset to the
+      // middle of the sector buffer and EQ won't get set)
+      //
+      // NOTE: While this is true for real drives, seems the FDC in the MEGA65 does not set EQ
+      //       when the CPU read pointer is reset to the beginning of the sector buffer and
+      //       disk images are used. So, we dont check for EQ when the sector is read.
+      //       Usually, when BUSY is cleared, the status should report DRQ and EQ set.
+      //       We just rely on the data being in the buffer once BUSY is cleared.
+      while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
+      if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
+        read_error();
+      }
+
+      wait_for_busy_clear(); // sector reading to buffer completed when BUSY is cleared
+
+      //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
+      if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
+        read_error();
+      }
+
+      // copy the sector to the cache
+      dmalist_copy_to_cache.dst_addr = LSB16(cache_block);
+      dmalist_copy_to_cache.dst_bank = BANK(cache_block);
+      dma_trigger_far_ext(UNBANKED_PTR(&dmalist_copy_to_cache));
+
+      last_physical_track = track;
+      last_physical_sector = physical_sector;
+      last_side = side;
+    }
   }
 
   if (block & 1) {

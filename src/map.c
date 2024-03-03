@@ -20,6 +20,19 @@ void map_diskio(void)
 {
   __asm (" lda #0x00\n"
          " ldx #0x21\n"
+         " tay\n"
+         " taz\n"
+         " map\n"
+         " eom"
+         :                 /* no output operands */
+         :                 /* no input operands */
+         : "a","x","y","z" /* clobber list */);
+}
+
+void map_gfx(void)
+{
+  __asm (" lda #0x20\n"
+         " ldx #0x21\n"
          " ldy #0x00\n"
          " ldz #0x00\n"
          " map\n"

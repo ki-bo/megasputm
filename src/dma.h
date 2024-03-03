@@ -11,6 +11,8 @@ struct __dma {
   uint8_t en018b;
   uint8_t addrmb;
   volatile uint8_t etrig;
+  uint8_t unused;
+  volatile uint8_t trig_inline;
 };
 
 #define DMA (*(struct __dma *)0xd700)

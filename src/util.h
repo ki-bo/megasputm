@@ -39,10 +39,11 @@
 #define FAR_VU8_PTR(X) ((__far volatile uint8_t *)(X))
 #define FAR_VI8_PTR(X) ((__far volatile int8_t *)(X))
 
-#define LSB(X)  ((uint8_t)((uint8_t)(X)))
-#define MSB(X)  ((uint8_t)((uint16_t)(X) >> 8))
-#define MB(X)   ((uint8_t)((uintptr_t)(X) >> 16))
-#define BANK(X) ((uint8_t)(((uint8_t)((uintptr_t)(X) >> 16)) & 0x0f))
+#define LSB(X)   ((uint8_t)((uint8_t)(X)))
+#define MSB(X)   ((uint8_t)((uint16_t)(X) >> 8))
+#define LSB16(X) ((uint16_t)(X))
+#define MB(X)    ((uint8_t)((uintptr_t)(X) >> 16))
+#define BANK(X)  ((uint8_t)(((uint8_t)((uintptr_t)(X) >> 16)) & 0x0f))
 
 void fatal_error(enum errorcode_t error);
 void fatal_error_str(const char *message);

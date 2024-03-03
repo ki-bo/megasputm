@@ -4,6 +4,7 @@
 
 #define SCREEN_RAM 0xd000
 #define BG_BITMAP 0x40000ul
+#define FRAMECOUNT (*(volatile uint8_t *)0xd7fa)
 
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 const char palette_red[16] = {
@@ -16,8 +17,18 @@ const char palette_blue[16] = {
   0x0, 0xa, 0x0, 0xa,  0x0, 0xa, 0x0, 0xa,  0x5, 0xf, 0x5, 0xf,  0x5, 0xf, 0x5, 0xf
 };
 
+//*****************************************************************************
+// Private functions
+//*****************************************************************************
+static void fade_out(void);
+
+//*****************************************************************************
+// Function definitions, init
+//*****************************************************************************
 void gfx_init()
 {
+  fade_out();
+
   VICIV.scrnptr = (uint32_t)SCREEN_RAM;
   VICIV.bordercol = COLOR_BLACK;
   VICIV.screencol = COLOR_BLACK;
@@ -40,10 +51,41 @@ void gfx_init()
   }
 }
 
+//-----------------------------------------------------------------------------
+
+static void fade_out(void)
+{
+  uint8_t all_zero = 0;
+
+  while (!all_zero) {
+    all_zero = 1;
+    uint8_t i = 0;
+    do {
+      if (PALETTE.red[i] > 0) {
+        --PALETTE.red[i];
+        all_zero = 0;
+      }
+      if (PALETTE.green[i] > 0) {
+        --PALETTE.green[i];
+        all_zero = 0;
+      }
+      if (PALETTE.blue[i] > 0) {
+        --PALETTE.blue[i];
+        all_zero = 0;
+      }
+    }
+    while (++i != 0);
+    uint8_t cur_frame = FRAMECOUNT;
+    while (cur_frame == FRAMECOUNT) {}
+  }
+}
+
+//*****************************************************************************
+// Function definitions, code_gfx
+//*****************************************************************************
 #pragma clang section text="code_gfx" rodata="cdata_gfx" data="data_gfx" bss="bss_gfx"
+
 void gfx_test()
 {
   VICIV.bordercol = COLOR_WHITE;
 }
-
-static const char dummy_data[0x1000] = {1};

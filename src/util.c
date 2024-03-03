@@ -11,6 +11,7 @@ char msg[80];
 void fatal_error(enum errorcode_t error)
 {
   debug_out("Fatal error: %d", error);
+  while (1) POKE(0xd020, 2);
 }
 
 void fatal_error_str(const char *message)
