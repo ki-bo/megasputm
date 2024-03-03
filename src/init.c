@@ -1,6 +1,7 @@
 #include "init.h"
 #include "util.h"
 #include "dma.h"
+#include "diskio.h"
 #include "gfx.h"
 #include "map.h"
 
@@ -11,7 +12,9 @@ void global_init(void)
   POKE16(0xd020, 0);
 
   dma_init();
-  map_and_init_diskio();
+  map_diskio();
+  diskio_init_entry();
+  unmap_all();
 
   //gfx_init();
 }

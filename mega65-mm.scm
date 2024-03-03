@@ -11,9 +11,7 @@
                 (section stack) 
         )
 
-        ; The runtime code will be loaded to 0x200, the load address is only here to
-        ; put it into the resulting raw file. These two bytes will not be loaded 
-        ; into memory.
+        ; The runtime code will be loaded to 0x200
         (memory runtime (address (#x200 . #x1fff))
                 (section
                         code
@@ -34,6 +32,7 @@
                 )
         )
 
+        ; memory for init program (will be discarded once executed)
         (memory init (address (#x4000 . #x47ff))
                 (scatter-to init_copy)
                 (section 
@@ -42,19 +41,21 @@
                 )
         )
 
+        ; temporary memory for init program (will be discarded when init is done)
         (memory bssram-init (address (#x4800 . #x4fff))
                 (section 
                         bss_init
                 )
         )
 
-        ; memory for main program
+        ; memory for main program (loaded after init is done)
         (memory main (address (#x2000 . #xcfff))
                 (section
                         code_main
                 )
         )
 
+        ; memory for main bss
         (memory bssram-main (address (#xe000 . #xfff9))
                 (section 
                         (zdata (#xe000 . #xefff))
@@ -62,7 +63,7 @@
                 )
         )
 
-        (memory banked-code-0 (address (#x2000 . #x3dff)) 
+        (memory banked-code-0 (address (#x2000 . #x37ff)) 
                 (scatter-to bank1_2000)
                 (section
                         code_diskio
@@ -71,8 +72,8 @@
                 )
         )
 
-        (memory banked-bss-0 (address (#x3e00 . #x3fff)) 
-                (scatter-to bank1_3e00)
+        (memory banked-bss-0 (address (#x3800 . #x3fff)) 
+                (scatter-to bank1_3800)
                 (section
                         bss_diskio
                 )
@@ -95,7 +96,7 @@
         (memory m1-1 (address (#x12000 . #x13fff))
                 (section 
                         (bank1_2000 #x12000)
-                        (bank1_3e00 #x13e00)
+                        (bank1_3800 #x13800)
                 )
         )
 

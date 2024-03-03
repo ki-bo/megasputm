@@ -28,10 +28,3 @@ void map_diskio(void)
          :                 /* no input operands */
          : "a","x","y","z" /* clobber list */);
 }
-
-void map_and_init_diskio(void)
-{
-  map_diskio();
-  diskio_init_entry();
-  unmap_all();
-}

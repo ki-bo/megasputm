@@ -2,6 +2,7 @@
 #include "dma.h"
 #include "error.h"
 #include "map.h"
+#include "script.h"
 #include "util.h"
 #include <stdint.h>
 #include <string.h>
@@ -11,6 +12,37 @@
 // Use the bank_diskio() before calling any functions in this file
 // Use unbank_diskio() to restore the previous bank
 
+#pragma clang section bss="bss_init"
+
+/**
+ * @brief Temporary storage for the index file contents
+ *
+ * The index is in file 00.lfl and contains room numbers (=file numbers) and
+ * offsets for each resource within that file.
+ *
+ * We put this into bss_init so it won't be taking up space after the init
+ * routine is finished.
+ *
+ * @note BSS section bss_init
+ */
+static struct {
+  uint16_t magic_number;
+  uint16_t num_global_game_objects;
+  uint8_t global_game_objects[780];
+  uint8_t num_room_resources;
+  uint8_t room_disk_num[61];
+  uint16_t room_offset[61];
+  uint8_t num_costume_resources;
+  uint8_t costume_room[24];
+  uint16_t costume_offset[24];
+  uint8_t num_script_resources;
+  uint8_t script_room[171];
+  uint16_t script_offset[171];
+  uint8_t num_sound_resources;
+  uint8_t sound_room[66];
+  uint16_t sound_offset[66];
+} lfl_index_file_contents;
+
 #pragma clang section bss="bss_diskio"
 
 static uint8_t track_list[54];
@@ -18,6 +50,26 @@ static uint8_t sector_list[54];
 static uint8_t current_track;
 static uint8_t file_track;
 static uint8_t file_block;
+
+/*
+ * The index is in file 00.lfl and contains room numbers (=file numbers) and
+ * offsets for each resource within that file. We cache this in memory to
+ * speed up access to resources.
+ * The numbers are hard-coded for the Maniac Mansion (Scumm V2) game.
+ */
+static struct {
+  uint8_t room_disk_num[61];
+  uint16_t room_offset[61];
+  
+  uint8_t costume_room[24];
+  uint16_t costume_offset[24];
+  
+  uint8_t script_room[171];
+  uint16_t script_offset[171];
+
+  uint8_t sound_room[66];
+  uint16_t sound_offset[66];
+} lfl_index;
 
 static void prepare_drive(void);
 static void wait_for_busy_clear(void);
@@ -77,9 +129,24 @@ enum
   FDC_CMD_READ_SECTOR = 0x40
 };
 
+// Debug functions
 static void read_whole_track(uint8_t track);
 static void scan_sector_order(uint8_t track, uint8_t side);
 
+/**
+ * @brief Searches for a file in the directory.
+ *
+ * The function will provide start track and sector of the file in the static
+ * variables file_track and file_block. If the file is not found, file_track
+ * will be set to 0.
+ *
+ * @note The drive needs to be ready before calling this function. Use
+ *       prepare_drive() to do that.
+ *
+ * @param filename Null-terminated string with the filename
+ *
+ * @note Code section code_diskio
+ */
 static void search_file(const char *filename);
 
 /**
@@ -91,6 +158,8 @@ static void search_file(const char *filename);
  *
  * @param track Logical track number (1-80)
  * @param block Logical block number (0-39)
+ *
+ * @note Code section code_diskio
  */
 static void load_block(uint8_t track, uint8_t block);
 
@@ -99,12 +168,31 @@ static void read_error(void);
 static void led_and_motor_off(void);
 
 /**
- * @brief Reads the directory block in memory at buffer
+ * @brief Loads the index from disk into memory.
+ *
+ * The index is in file 00.lfl and contains room numbers (=file numbers) and
+ * offsets for each resource within that file. We cache this in memory to
+ * speed up access to resources.
+ *
+ * @note Code section code_init
+ */
+static void load_index(void);
+
+/**
+ * @brief Parses lfl file entries in the FDC buffer and caches them
+ * 
+ * The function assumes a directory block has been loaded into the FDC buffer.
+ * It will call read_lfl_file_entry() for each file entry in the buffer and
+ * cache the track and block numbers for each valid lfl file entry.
+ * Start track and sector of the file in the static variables file_track and
+ * file_block.
  * 
  * The directory block contains up to eight file entries. Each file entry is 32
  * bytes long. If there are more blocks to read in the directory, the function will
  * automatically load the next block and return 1. If there are no more
  * blocks to read, the function will return 0.
+ *
+ * @note Code section code_init
  *
  * @return uint8_t 0 if there are no more blocks to read, 1 otherwise
  */
@@ -121,9 +209,11 @@ static uint8_t read_next_directory_block(void);
  *       as the function will stop reading when it encounters the first invalid
  *       byte.
  *
+ * @note Code section code_init
+ *
  * @return uint8_t The number of bytes actually read from the sector buffer
  */
-static uint8_t read_file_entry(void);
+static uint8_t read_lfl_file_entry(void);
 
 
 
@@ -158,6 +248,8 @@ void diskio_init_entry(void)
   debug_msg("first block loaded");
   while (read_next_directory_block() != 0);
   
+  load_index();
+
   led_and_motor_off();
 }
 
@@ -168,7 +260,7 @@ static uint8_t read_next_directory_block()
   uint8_t next_track = FDC.data;
   uint8_t next_block = FDC.data;
   for (uint8_t i = 0; i < 8; ++i) {
-    uint8_t skip = 32 - read_file_entry();
+    uint8_t skip = 32 - read_lfl_file_entry();
     for (uint8_t j = 0; j < skip; ++j) {
       FDC.data;
     }
@@ -183,7 +275,7 @@ static uint8_t read_next_directory_block()
 
 //-----------------------------------------------------------------------------------------------
 
-uint8_t read_file_entry()
+static uint8_t read_lfl_file_entry()
 {
   uint8_t i = 1;
   uint8_t tmp;
@@ -235,6 +327,52 @@ uint8_t read_file_entry()
   return i;
 }
 
+//-----------------------------------------------------------------------------------------------
+
+static void load_index(void)
+{
+  uint8_t bytes_left_in_block;
+  file_track = track_list[0];
+  file_block = sector_list[0];
+  uint8_t *address = (uint8_t *)&lfl_index_file_contents;
+
+  while (file_track != 0) {
+    load_block(file_track, file_block);
+    file_track = FDC.data;
+    file_block = FDC.data;
+    if (file_track == 0) {
+      bytes_left_in_block = file_block - 1;
+    }
+    else {
+      bytes_left_in_block = 254;
+    }
+
+    while (bytes_left_in_block-- != 0) {
+      *address = FDC.data ^ 0xff;
+      ++address;
+    }
+  }
+
+  memcpy(&global_game_objects, &lfl_index_file_contents.global_game_objects, sizeof(lfl_index_file_contents.global_game_objects));
+  for (uint8_t i = 0; i < sizeof(lfl_index.room_disk_num); ++i) {
+    lfl_index.room_disk_num[i] = lfl_index_file_contents.room_disk_num[i];
+    lfl_index.room_offset[i] = lfl_index_file_contents.room_offset[i];
+  }
+  for (uint8_t i = 0; i < sizeof(lfl_index.costume_room); ++i) {
+    lfl_index.costume_room[i] = lfl_index_file_contents.costume_room[i];
+    lfl_index.costume_offset[i] = lfl_index_file_contents.costume_offset[i];
+  }
+  for (uint8_t i = 0; i < sizeof(lfl_index.script_room); ++i) {
+    lfl_index.script_room[i] = lfl_index_file_contents.script_room[i];
+    lfl_index.script_offset[i] = lfl_index_file_contents.script_offset[i];
+  }
+  for (uint8_t i = 0; i < sizeof(lfl_index.sound_room); ++i) {
+    lfl_index.sound_room[i] = lfl_index_file_contents.sound_room[i];
+    lfl_index.sound_offset[i] = lfl_index_file_contents.sound_offset[i];
+  }
+}
+
+
 // ************************************************************************************************
 // code_diskio functions
 // ************************************************************************************************
@@ -268,6 +406,7 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
 
   DMA.addrbank = 1;
   DMA.addrmsb = MSB(&dmalist_copy);
+  dmalist_copy.count = 254;
 
   while (file_track != 0) {
     debug_out("Loading track %d, block %d", file_track, file_block);
@@ -563,12 +702,12 @@ static void load_block(uint8_t track, uint8_t block)
     FDC.command = FDC_CMD_READ_SECTOR;
 
     // RNF or CRC flags indicate an error (RNF = not found, CRC = data error)
-    // DRQ and EQ flags indicate that the sector was completely read
+    // DRQ and EQ flags both set indicates that the sector was completely read
     // We need to make sure the CPU read pointer is reset to the beginning of the sector buffer
     // (we made sure to disable SWAP first, otherwise the CPU read pointer will be reset to the
     // middle of the sector buffer and EQ won't get set)
     //
-    // NOTE: While this is true for real drives, seems the FDC int the MEGA65 does not set EQ
+    // NOTE: While this is true for real drives, seems the FDC in the MEGA65 does not set EQ
     //       when the CPU read pointer is reset to the beginning of the sector buffer and
     //       disk images are used. So, we dont check for EQ when the sector is read.
     //       Usually, when BUSY is cleared, the status should report DRQ and EQ set.
