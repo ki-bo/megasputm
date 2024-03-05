@@ -61,7 +61,7 @@ void unmap_ds(void)
 
 //-----------------------------------------------------------------------------------------------
 
-void map_diskio(void)
+void map_cs_diskio(void)
 {
   map_regs.a = 0x00;
   map_regs.x = 0x21;
@@ -75,7 +75,7 @@ void map_diskio(void)
 
 //-----------------------------------------------------------------------------------------------
 
-void map_gfx(void)
+void map_cs_gfx(void)
 {
   map_regs.a = 0x20;
   map_regs.x = 0x21;
@@ -88,7 +88,7 @@ void map_gfx(void)
 
 //-----------------------------------------------------------------------------------------------
 
-void map_resource(uint8_t res_page)
+void map_ds_resource(uint8_t res_page)
 {
   // map offset: 0x50000 + page*256 - 0x8000
   map_regs.y = res_page + 0x80;

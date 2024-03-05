@@ -18,7 +18,7 @@ __task void main_entry(void)
 __task void main(void) 
 {
   global_init();
-  map_diskio();
+  map_cs_diskio();
   diskio_load_file("M01", (uint8_t __far *)(0x2000));
   unmap_all();
   main_entry();

@@ -568,6 +568,8 @@ void diskio_continue_resource_loading(void)
   }
 
   POKE(0xd680, 0x82); // disable FDC buffer at 0xde00
+
+  led_and_motor_off();
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -824,7 +826,7 @@ static void load_block(uint8_t track, uint8_t block)
   const int8_t __far *cache_block = FAR_I8_PTR(DISK_CACHE + cache_offset);
 
   ++physical_sector;
-  if (block > 10) {
+  if (physical_sector > 10) {
     physical_sector -= 10;
     side = 1;
   }

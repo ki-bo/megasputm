@@ -33,7 +33,7 @@ uint8_t res_provide(uint8_t type, uint8_t id)
 
   uint16_t chunk_size = start_resource_loading(type, id);
   uint8_t page = 0;
-  map_resource(page);
+  map_ds_resource(page);
   continue_resource_loading();
   return 0;
 }
@@ -41,7 +41,7 @@ uint8_t res_provide(uint8_t type, uint8_t id)
 #pragma clang section text="code"
 static uint16_t start_resource_loading(uint8_t type, uint8_t id)
 {
-  map_diskio();
+  map_cs_diskio();
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
   unmap_cs();
   return chunk_size;
@@ -49,7 +49,7 @@ static uint16_t start_resource_loading(uint8_t type, uint8_t id)
 
 static void continue_resource_loading(void)
 {
-  map_diskio();
+  map_cs_diskio();
   diskio_continue_resource_loading();
   unmap_cs();
 }

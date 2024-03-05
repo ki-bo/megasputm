@@ -13,7 +13,7 @@ void global_init(void)
   POKE16(0xd020, 0);
 
   dma_init();
-  map_diskio();
+  map_cs_diskio();
   diskio_init_entry();
   unmap_all();
   res_init();
