@@ -25,7 +25,7 @@ __task void main_entry(void)
   res_provide(RES_TYPE_SCRIPT | RES_LOCKED_MASK, start_script, hint);
   while(1) {
     check_motor_off();
-    POKE(0xd020, 5);
+    POKE(0xd020, 2);
   }
 }
 

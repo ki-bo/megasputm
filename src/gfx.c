@@ -1,11 +1,17 @@
 #include "gfx.h"
+#include "io.h"
 #include "util.h"
 #include <mega65.h>
 
-#define SCREEN_RAM 0xd000
+#define SCREEN_RAM 0x2a000
+#define COLRAM 0xff80800UL
 #define BG_BITMAP 0x40000ul
 #define FRAMECOUNT (*(volatile uint8_t *)0xd7fa)
 
+/**
+ * @defgroup gfx_init GFX Init Functions
+ * @{
+ */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 const char palette_red[16] = {
   0x0, 0x0, 0x0, 0x0,  0xa, 0xa, 0xa, 0xa,  0x5, 0x5, 0x5, 0x5,  0xf, 0xf, 0xf, 0xf
@@ -17,30 +23,17 @@ const char palette_blue[16] = {
   0x0, 0xa, 0x0, 0xa,  0x0, 0xa, 0x0, 0xa,  0x5, 0xf, 0x5, 0xf,  0x5, 0xf, 0x5, 0xf
 };
 
-//*****************************************************************************
-// Private functions
-//*****************************************************************************
-static void fade_out(void);
-
-//*****************************************************************************
-// Function definitions, init
-//*****************************************************************************
 void gfx_init()
 {
-  fade_out();
+  VICIV.palsel = 0x00; // select and map palette 0
+  VICIV.ctrla |= 0x04; // enable RAM palette
+  VICIV.ctrlb = VIC4_VFAST_MASK;
+  VICIV.ctrlc &= ~VIC4_FCLRLO_MASK;
+  VICIV.ctrlc |= VIC4_FCLRHI_MASK | VIC4_CHR16_MASK;
 
-  VICIV.scrnptr = (uint32_t)SCREEN_RAM;
-  VICIV.bordercol = COLOR_BLACK;
-  VICIV.screencol = COLOR_BLACK;
-  VICIV.colptr = 0x800;
+  memset_far(FAR_U8_PTR(BG_BITMAP), 0, 0xffff);
 
-  VICIV.palsel = 0xff; // select and map palette 3
-  uint8_t i = 15;
-  memcpy((void *)PALETTE.red, palette_red, sizeof(palette_red));
-  memcpy((void *)PALETTE.green, palette_green, sizeof(palette_green));
-  memcpy((void *)PALETTE.blue, palette_blue, sizeof(palette_blue));
-
-  uint16_t *screen = (uint16_t *)SCREEN_RAM;
+  __auto_type screen = FAR_U16_PTR(SCREEN_RAM);
   uint16_t char_data = BG_BITMAP / 64;
   for (uint8_t x = 0; x < 40; ++x) {
     for (uint8_t y = 0; y < 16; ++y) {
@@ -49,35 +42,20 @@ void gfx_init()
     }
     screen -= 639;
   }
-}
 
-//-----------------------------------------------------------------------------
+  VICIV.scrnptr = (uint32_t)SCREEN_RAM;
+  VICIV.bordercol = COLOR_BLACK;
+  VICIV.screencol = COLOR_BLACK;
+  VICIV.colptr = 0x800;
 
-static void fade_out(void)
-{
-  uint8_t all_zero = 0;
-
-  while (!all_zero) {
-    all_zero = 1;
-    uint8_t i = 0;
-    do {
-      if (PALETTE.red[i] > 0) {
-        --PALETTE.red[i];
-        all_zero = 0;
-      }
-      if (PALETTE.green[i] > 0) {
-        --PALETTE.green[i];
-        all_zero = 0;
-      }
-      if (PALETTE.blue[i] > 0) {
-        --PALETTE.blue[i];
-        all_zero = 0;
-      }
-    }
-    while (++i != 0);
-    uint8_t cur_frame = FRAMECOUNT;
-    while (cur_frame == FRAMECOUNT) {}
+  int8_t i = 15;
+  do {
+    PALETTE.red[i] = palette_red[i];
+    PALETTE.green[i] = palette_green[i];
+    PALETTE.blue[i] = palette_blue[i];
   }
+  while (--i >= 0);
+
 }
 
 //*****************************************************************************

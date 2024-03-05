@@ -10,13 +10,11 @@
 
 void global_init(void)
 {
-  POKE16(0xd020, 0);
-
   dma_init();
   map_cs_diskio();
   diskio_init();
-  unmap_all();
+  map_cs_gfx();
+  gfx_init();
+  unmap_cs();
   res_init();
-
-  //gfx_init();
 }

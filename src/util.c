@@ -153,3 +153,21 @@ void *memset(void *s, int c, size_t n)
 
   return s;
 }
+
+void __far *memset_far(void __far *s, int c, size_t n)
+{
+  static dmalist_t dmalist_fill = {
+    .command = 0x03,      // DMA fill command
+  };
+
+  dmalist_fill.count     = n;
+  dmalist_fill.fill_byte = LSB(c);
+  dmalist_fill.dst_addr  = LSB16(s);
+  dmalist_fill.dst_bank  = BANK(s);
+
+  DMA.addrbank    = 0;
+  DMA.addrmsb     = MSB(&dmalist_fill);
+  DMA.addrlsbtrig = LSB(&dmalist_fill);
+
+  return s;
+}

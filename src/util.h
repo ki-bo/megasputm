@@ -33,17 +33,19 @@
 #define NEAR_VU32_PTR(X) ((volatile uint32_t *)(X))
 #define NEAR_VI32_PTR(X) ((volatile int32_t *)(X))
 
-#define FAR_U8_PTR(X) ((__far uint8_t *)(X))
-#define FAR_I8_PTR(X) ((__far int8_t *)(X))
+#define FAR_U8_PTR(X) ((uint8_t __far *)(X))
+#define FAR_I8_PTR(X) ((int8_t __far *)(X))
+#define FAR_U16_PTR(X) ((uint16_t __far *)(X))
+#define FAR_I16_PTR(X) ((int16_t __far *)(X))
 
-#define FAR_VU8_PTR(X) ((__far volatile uint8_t *)(X))
-#define FAR_VI8_PTR(X) ((__far volatile int8_t *)(X))
+#define FAR_VU8_PTR(X) ((volatile uint8_t __far *)(X))
+#define FAR_VI8_PTR(X) ((volatile int8_t __far *)(X))
 
-#define HUGE_U8_PTR(X) ((__huge uint8_t *)(X))
-#define HUGE_I8_PTR(X) ((__huge int8_t *)(X))
+#define HUGE_U8_PTR(X) ((uint8_t __huge *)(X))
+#define HUGE_I8_PTR(X) ((int8_t __huge *)(X))
 
-#define HUGE_VU8_PTR(X) ((__huge volatile uint8_t *)(X))
-#define HUGE_VI8_PTR(X) ((__huge volatile int8_t *)(X))
+#define HUGE_VU8_PTR(X) ((volatile uint8_t __huge *)(X))
+#define HUGE_VI8_PTR(X) ((volatile int8_t __huge *)(X))
 
 #define LSB(X)   ((uint8_t)((uint8_t)(X)))
 #define MSB(X)   ((uint8_t)((uint16_t)(X) >> 8))
@@ -84,5 +86,6 @@ void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n);
 void __far *memcpy_far(void __far *dest, const void __far *src, size_t n);
 void memcpy_to_io(void __far *dest, const void *src, size_t n);
 void *memset(void *s, int c, size_t n);
+void __far *memset_far(void __far *s, int c, size_t n);
 
 #endif // __UTIL_H

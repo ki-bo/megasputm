@@ -25,8 +25,7 @@ nextLine:	.word 0             ; end of program
 
 		.section startup, root, noreorder
 __program_start:
-		jsr load_runtime
-		jsr relocate_init
+		jsr load_runtime_and_diskio
 		lda #65						; set 40 MHz
 		sta 0
 		lda #0x35					; all RAM + I/O (C64 style banking)
@@ -40,8 +39,11 @@ __program_start:
     		;trb 0xd68b
     		;tsb 0xd6a1
 
-		lda #0						; disable C64 ROM banking
+		lda #4						; disable C64 ROM banking
 		sta 0xd030					; (C65/VIC-III style banking)
+		lda #2						; write enable banks 2 and 3
+		sta 0xd641
+		clv
 		ldx #.byte0(.sectionEnd stack)			; set stack high/low
 		txs
 		ldy #.byte1(.sectionEnd stack)
@@ -131,7 +133,7 @@ __low_level_init:
 ;;; ***************************************************************************
 
 		.section startup, root, noreorder
-load_runtime:
+load_runtime_and_diskio:
 		lda reloc_source_runtime
 		sta file_load_address
 		lda reloc_source_runtime+1
@@ -146,7 +148,6 @@ load_runtime:
 		sbc reloc_source_runtime+1
 		sta reloc_size_runtime+1
 
-load_diskio:
 		; load diskio code to 0x12000
 		lda #0x00
 		sta file_load_address
@@ -160,6 +161,41 @@ load_diskio:
 		jsr load_file
 
 		sei
+		; fade out screen
+		ldy #0
+loop1$:		ldx #0
+		ldz #1
+loop2$:		lda 0xd100,x
+		beq green$
+		dec 0xd100,x
+		ldz #0
+green$:		lda 0xd200,x
+		beq blue$
+		dec 0xd200,x
+		ldz #0
+blue$:		lda 0xd300,x
+		beq nextidx$
+		dec 0xd300,x
+		ldz #0
+nextidx$:
+		inx
+		bne loop2$
+exit$:		tza
+		bne done$
+		lda 0xd7fa
+frameloop$:	cmp 0xd7fa
+		beq frameloop$
+		iny
+		bne loop1$
+done$:		ldy #30
+frameloop2$:	lda 0xd7fa
+frameloop3$:	cmp 0xd7fa
+		beq frameloop3$
+		dey
+		bne frameloop2$
+
+relocate_runtime:
+		; move runtime to 0x0200
 		lda #1
 		trb 0xd703		; disable F018B mode
 		sta 0xd707
@@ -174,7 +210,6 @@ reloc_source_runtime:
 		.byte 0			; destination bank
 		.byte 0			; cmd high
 		.byte 0			; modulo / ignored
-		rts
 
 relocate_init:
 		sta 0xd707
