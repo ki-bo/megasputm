@@ -14,13 +14,14 @@ debug_xemu: mm.d81
 
 # Common source files
 ASM_SRCS = startup.s
-C_SRCS = main.c   \
-         diskio.c \
-		 dma.c    \
-		 gfx.c    \
-		 init.c   \
-		 map.c    \
-		 script.c \
+C_SRCS = main.c         \
+         diskio.c       \
+		 dma.c          \
+		 gfx.c          \
+		 init.c         \
+		 map.c          \
+		 resource.c     \
+		 script.c       \
 		 util.c
 
 # Object files

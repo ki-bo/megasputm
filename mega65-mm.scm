@@ -52,6 +52,8 @@
         (memory main (address (#x2000 . #xcfff))
                 (section
                         code_main
+                        cdata_main
+                        data_main
                 )
         )
 

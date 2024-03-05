@@ -2,12 +2,14 @@
 #include "diskio.h"
 #include "init.h"
 #include "map.h"
+#include "resource.h"
 #include "util.h"
 
 #pragma clang section text="code_main"
 
 __task void main_entry(void)
 {
+  res_provide(RES_TYPE_SCRIPT, 1);
   while(1) POKE(0xd020, 5);
 }
 

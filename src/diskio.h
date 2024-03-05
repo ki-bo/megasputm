@@ -24,6 +24,10 @@ void diskio_init_entry(void);
  */
 void diskio_load_file(const char *filename, uint8_t __far *address);
 
+uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id);
+
+void diskio_continue_resource_loading(void);
+
 /**
  * @brief Loads a room from disk into memory.
  *

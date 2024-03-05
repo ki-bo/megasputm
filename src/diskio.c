@@ -2,6 +2,7 @@
 #include "dma.h"
 #include "error.h"
 #include "map.h"
+#include "resource.h"
 #include "script.h"
 #include "util.h"
 #include <stdint.h>
@@ -9,8 +10,6 @@
 #include <stdio.h>
 
 // The diskio functions are banked in when used
-// Use the bank_diskio() before calling any functions in this file
-// Use unbank_diskio() to restore the previous bank
 
 #pragma clang section bss="bss_init"
 
@@ -33,23 +32,28 @@ static struct {
   uint8_t room_disk_num[61];
   uint16_t room_offset[61];
   uint8_t num_costume_resources;
-  uint8_t costume_room[24];
-  uint16_t costume_offset[24];
+  uint8_t costume_room[40];
+  uint16_t costume_offset[40];
   uint8_t num_script_resources;
-  uint8_t script_room[171];
-  uint16_t script_offset[171];
+  uint8_t script_room[179];
+  uint16_t script_offset[179];
   uint8_t num_sound_resources;
-  uint8_t sound_room[66];
-  uint16_t sound_offset[66];
+  uint8_t sound_room[120];
+  uint16_t sound_offset[120];
 } lfl_index_file_contents;
 
-#pragma clang section bss="bss_diskio"
+#pragma clang section data="data_diskio" bss="bss_diskio"
 
-static uint8_t track_list[54];
-static uint8_t sector_list[54];
+static uint8_t room_track_list[54];
+static uint8_t room_block_list[54];
 static uint8_t current_track;
-static uint8_t file_track;
-static uint8_t file_block;
+static uint8_t last_physical_track;
+static uint8_t last_physical_sector;
+static uint8_t last_side;
+static uint8_t next_track;
+static uint8_t next_block;
+static uint8_t cur_block_read_ptr;
+static uint16_t cur_chunk_size;
 
 /*
  * The index is in file 00.lfl and contains room numbers (=file numbers) and
@@ -61,14 +65,14 @@ static struct {
   uint8_t room_disk_num[61];
   uint16_t room_offset[61];
   
-  uint8_t costume_room[24];
-  uint16_t costume_offset[24];
+  uint8_t costume_room[40];
+  uint16_t costume_offset[40];
   
-  uint8_t script_room[171];
-  uint16_t script_offset[171];
+  uint8_t script_room[179];
+  uint16_t script_offset[179];
 
-  uint8_t sound_room[66];
-  uint16_t sound_offset[66];
+  uint8_t sound_room[120];
+  uint16_t sound_offset[120];
 } lfl_index;
 
 static void prepare_drive(void);
@@ -140,7 +144,7 @@ static void scan_sector_order(uint8_t track, uint8_t side);
  * @brief Searches for a file in the directory.
  *
  * The function will provide start track and sector of the file in the static
- * variables file_track and file_block. If the file is not found, file_track
+ * variables next_track and next_block. If the file is not found, next_track
  * will be set to 0.
  *
  * @note The drive needs to be ready before calling this function. Use
@@ -200,8 +204,8 @@ static void invalidate_disk_cache(void);
  * The function assumes a directory block has been loaded into the FDC buffer.
  * It will call read_lfl_file_entry() for each file entry in the buffer and
  * cache the track and block numbers for each valid lfl file entry.
- * Start track and sector of the file in the static variables file_track and
- * file_block.
+ * Start track and sector of the file in the static variables room_track_list and
+ * room_block_list.
  * 
  * The directory block contains up to eight file entries. Each file entry is 32
  * bytes long. If there are more blocks to read in the directory, the function will
@@ -218,7 +222,7 @@ static uint8_t read_next_directory_block(void);
  * @brief Reads bytes from the sector buffer and parses them into a file entry.
  * 
  * The function reads bytes from the sector buffer and parses one file entry into
- * track_list and sector_list. The function returns the number of bytes actually
+ * room_track_list and room_block_list. The function returns the number of bytes actually
  * read from the sector buffer.
  * 
  * @note The number of bytes actually read from the sector buffer can vary, 
@@ -231,8 +235,7 @@ static uint8_t read_next_directory_block(void);
  */
 static uint8_t read_lfl_file_entry(void);
 
-
-
+static void seek_to(uint16_t offset);
 
 
 // ************************************************************************************************
@@ -244,9 +247,10 @@ static uint8_t read_lfl_file_entry(void);
 
 void diskio_init_entry(void)
 {
-  memset(track_list, 0, sizeof(track_list));
-  memset(sector_list, 0, sizeof(sector_list));
+  memset(room_track_list, 0, sizeof(room_track_list));
+  memset(room_block_list, 0, sizeof(room_block_list));
   invalidate_disk_cache();
+  last_physical_track = 255;
 
   *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
   prepare_drive();
@@ -336,8 +340,8 @@ static uint8_t read_lfl_file_entry()
   }
 
   // all checks passed, we found a valid xx.lfl file with xx being the room number
-  track_list[room_number] = file_track;
-  sector_list[room_number] = file_block;
+  room_track_list[room_number] = file_track;
+  room_block_list[room_number] = file_block;
 
   return i;
 }
@@ -347,16 +351,16 @@ static uint8_t read_lfl_file_entry()
 static void load_index(void)
 {
   uint8_t bytes_left_in_block;
-  file_track = track_list[0];
-  file_block = sector_list[0];
+  next_track = room_track_list[0];
+  next_block = room_block_list[0];
   uint8_t *address = (uint8_t *)&lfl_index_file_contents;
 
-  while (file_track != 0) {
-    load_block(file_track, file_block);
-    file_track = FDC.data;
-    file_block = FDC.data;
-    if (file_track == 0) {
-      bytes_left_in_block = file_block - 1;
+  while (next_track != 0) {
+    load_block(next_track, next_block);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    if (next_track == 0) {
+      bytes_left_in_block = next_block - 1;
     }
     else {
       bytes_left_in_block = 254;
@@ -391,12 +395,12 @@ static void load_index(void)
 
 static void invalidate_disk_cache(void)
 {
-  uint8_t __far *ptr = FAR_U8_PTR(DISK_CACHE);
+  int8_t __huge *ptr = HUGE_I8_PTR(DISK_CACHE);
 
-  for (uint16_t block = 0; block < 20 * 80; ++block) {
-    *ptr = 0xff;
-    // workaround for bug in compiler, should be: ptr += 512UL;
-    ptr = FAR_U8_PTR((uint32_t)ptr + 512UL);
+  for (uint16_t sector = 0; sector < 20 * 80; ++sector) {
+    *ptr = -1; // mark cache sector as unused
+    // ptr += 0x200;  <-- this is the original code, but results in "internal error: labeling failed"
+    ptr = ptr + 0x200;
   }
 }
 
@@ -425,39 +429,39 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
 
   search_file(filename);
   
-  if (file_track == 0) {
+  if (next_track == 0) {
     led_and_motor_off();
     fatal_error(ERR_FILE_NOT_FOUND);
   }
 
-  DMA.addrbank = 1;
-  DMA.addrmsb = MSB(&dmalist_copy);
   dmalist_copy.count = 254;
 
-  while (file_track != 0) {
-    load_block(file_track, file_block);
-    dmalist_copy.src_addr = file_block % 2 == 0 ? 0x6c02 : 0x6d02;
+  while (next_track != 0) {
+    load_block(next_track, next_block);
+    dmalist_copy.src_addr = next_block % 2 == 0 ? 0x6c02 : 0x6d02;
 
-    file_track = FDC.data;
-    file_block = FDC.data;
+    next_track = FDC.data;
+    next_block = FDC.data;
 
-    if (file_track == 0) {
-      dmalist_copy.count = file_block - 1;
+    if (next_track == 0) {
+      dmalist_copy.count = next_block - 1;
     }
     dmalist_copy.dst_addr = (uint16_t)address;
     dmalist_copy.dst_bank = BANK(address);
-    DMA.etrig = LSB(&dmalist_copy);
+    dma_trigger_far_ext(UNBANKED_PTR(&dmalist_copy));
     address += 254;
   }
   
   led_and_motor_off();
 }
 
+//-----------------------------------------------------------------------------------------------
+
 void diskio_load_room(uint8_t room, __far uint8_t *address)
 {
   prepare_drive();
-  uint8_t next_track = track_list[room];
-  uint8_t next_block = sector_list[room];
+  next_track = room_track_list[room];
+  next_block = room_block_list[room];
   uint8_t payload_size = 254;
 
   while (next_track != 0) {
@@ -474,6 +478,96 @@ void diskio_load_room(uint8_t room, __far uint8_t *address)
   }
   
   led_and_motor_off();
+}
+
+//-----------------------------------------------------------------------------------------------
+
+uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
+{
+  prepare_drive();
+  uint8_t room_id = 0;
+  uint16_t offset;
+
+  switch (type) {
+    case RES_TYPE_ROOM:
+      room_id = lfl_index.room_disk_num[id];
+      offset = lfl_index.room_offset[id];
+      break;
+    case RES_TYPE_COSTUME:
+      room_id = lfl_index.costume_room[id];
+      offset = lfl_index.costume_offset[id];
+      break;
+    case RES_TYPE_SCRIPT:
+      room_id = lfl_index.script_room[id];
+      offset = lfl_index.script_offset[id];
+      break;
+    case RES_TYPE_SOUND:
+      room_id = lfl_index.sound_room[id];
+      offset = lfl_index.sound_offset[id];
+      break;
+  }
+
+  if (room_id == 0) {
+    led_and_motor_off();
+    fatal_error(ERR_RESOURCE_NOT_FOUND);
+  }
+
+  load_block(room_track_list[room_id], room_block_list[room_id]);
+  next_track = FDC.data;
+  next_block = FDC.data;
+  cur_block_read_ptr = 0;
+
+  seek_to(offset);
+  cur_chunk_size = FDC.data ^ 0xff;
+  ++cur_block_read_ptr;
+  if (cur_block_read_ptr == 254) {
+    load_block(next_track, next_block);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    cur_block_read_ptr = 0;
+  }
+  cur_chunk_size |= (FDC.data ^ 0xff) << 8;
+  ++cur_block_read_ptr;
+
+  return cur_chunk_size;
+}
+
+//-----------------------------------------------------------------------------------------------
+
+void diskio_continue_resource_loading(void)
+{
+  POKE(0xd680, 0x81); // enable FDC buffer at 0xde00
+
+  if (cur_chunk_size > 0x4000) {
+    fatal_error(ERR_RESOURCE_TOO_LARGE);
+  }
+
+  uint8_t *target_ptr = NEAR_U8_PTR(0x8000);
+
+  while (cur_chunk_size != 0) {
+    uint8_t bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
+    bytes_left_in_block -= cur_block_read_ptr;
+    uint8_t *src_ptr = NEAR_U8_PTR(last_side ? 0xdf02 : 0xde02);
+    src_ptr += cur_block_read_ptr;
+    
+    uint8_t bytes_to_read = min(cur_chunk_size, bytes_left_in_block);
+    for (uint8_t i = 0; i < bytes_to_read; ++i) {
+      target_ptr[i] = src_ptr[i] ^ 0xff;
+    }
+    
+    cur_chunk_size -= bytes_to_read;
+
+    if (cur_chunk_size != 0) {
+      load_block(next_track, next_block);
+      next_track = FDC.data;
+      next_block = FDC.data;
+      cur_block_read_ptr = 0;
+      target_ptr += bytes_to_read;
+    }
+
+  }
+
+  POKE(0xd680, 0x82); // disable FDC buffer at 0xde00
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -613,8 +707,10 @@ static void read_whole_track(uint8_t track)
 
 static void search_file(const char *filename)
 {
-  uint8_t next_track = 40;
-  uint8_t next_block = 3;
+  uint8_t file_track;
+  uint8_t file_block;
+  next_track = 40;
+  next_block = 3;
 
   while (next_track != 0)
   {
@@ -671,12 +767,14 @@ static void search_file(const char *filename)
         continue;
       }
 
+      // file found, set next_track and next_block for reading it
+      next_track = file_track;
+      next_block = file_block;
       return;
     }
   }
 
-  // file not found
-  file_track = 0;
+  // file not found, next_track is 0
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -716,18 +814,14 @@ static void load_block(uint8_t track, uint8_t block)
     fatal_error(ERR_INVALID_DISK_LOCATION);
   }
 
-
-  static uint8_t last_physical_track = 255;
-  static uint8_t last_physical_sector;
-  static uint8_t last_side;
   uint8_t physical_sector;
   uint8_t side;
 
   physical_sector = block / 2;
   --track; // logical track numbers are 1-80, physical track numbers are 0-79
 
-  const uint32_t cache_offset = ((uint32_t)track * 20UL + (uint32_t)physical_sector) * 512UL;
-  const uint8_t __far *cache_block = FAR_U8_PTR(DISK_CACHE + cache_offset);
+  const uint32_t cache_offset = (uint32_t)(track * 20 + physical_sector) * 512UL;
+  const int8_t __far *cache_block = FAR_I8_PTR(DISK_CACHE + cache_offset);
 
   ++physical_sector;
   if (block > 10) {
@@ -740,7 +834,7 @@ static void load_block(uint8_t track, uint8_t block)
 
   FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
 
-  if (*cache_block != 0xff) {
+  if (*cache_block >= 0) {
     // block is in cache
     dmalist_copy_from_cache.src_addr = LSB16(cache_block);
     dmalist_copy_from_cache.src_bank = BANK(cache_block);
@@ -826,3 +920,28 @@ static void led_and_motor_off(void)
 {
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
 }
+
+//-----------------------------------------------------------------------------------------------
+
+static void seek_to(uint16_t offset)
+{
+  uint8_t bytes_left_in_block = (next_track == 0) ? next_block - 1 : 254;
+  bytes_left_in_block -= cur_block_read_ptr;
+
+  while (bytes_left_in_block <= offset) {
+    load_block(next_track, next_block);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    offset -= bytes_left_in_block;
+    bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
+    cur_block_read_ptr = 0;
+  }
+
+  cur_block_read_ptr += offset;
+
+  while (offset-- != 0) {
+    FDC.data;
+  }
+}
+
+//-----------------------------------------------------------------------------------------------
