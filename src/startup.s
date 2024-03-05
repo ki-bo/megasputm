@@ -42,7 +42,7 @@ __program_start:
 
 		lda #0						; disable C64 ROM banking
 		sta 0xd030					; (C65/VIC-III style banking)
-		ldx #.byte0(.sectionEnd stack)			; set stack hich/low
+		ldx #.byte0(.sectionEnd stack)			; set stack high/low
 		txs
 		ldy #.byte1(.sectionEnd stack)
 		tys

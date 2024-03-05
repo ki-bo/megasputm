@@ -14,7 +14,7 @@ void global_init(void)
 
   dma_init();
   map_cs_diskio();
-  diskio_init_entry();
+  diskio_init();
   unmap_all();
   res_init();
 

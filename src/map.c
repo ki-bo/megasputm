@@ -1,6 +1,9 @@
 #include "map.h"
 #include "diskio.h"
+#include "resource.h"
 #include "util.h"
+
+static inline void apply_map(void);
 
 #pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
 
@@ -26,11 +29,7 @@ void map_init(void)
 void unmap_all(void)
 {
   map_regs.quad = 0;
-  __asm (" map\n"
-         " eom"
-         :                     /* no output operands */
-         : "Kq"(map_regs.quad) /* input operands */
-         :                     /* clobber list */);
+  apply_map();
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -39,11 +38,7 @@ void unmap_cs(void)
 {
   map_regs.a = 0;
   map_regs.x = 0;
-  __asm (" map\n"
-         " eom"
-         :                     /* no output operands */
-         : "Kq"(map_regs.quad) /* input operands */
-         :                     /* clobber list */);
+  apply_map();
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -52,11 +47,7 @@ void unmap_ds(void)
 {
   map_regs.y = 0;
   map_regs.z = 0;
-  __asm (" map\n"
-         " eom"
-         :                     /* no output operands */
-         : "Kq"(map_regs.quad) /* input operands */
-         :                     /* clobber list */);
+  apply_map();
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -65,12 +56,7 @@ void map_cs_diskio(void)
 {
   map_regs.a = 0x00;
   map_regs.x = 0x21;
-
-  __asm (" map\n"
-         " eom"
-         :                     /* no output operands */
-         : "Kq"(map_regs.quad) /* input operands */
-         :                     /* clobber list */);
+  apply_map();
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -79,29 +65,28 @@ void map_cs_gfx(void)
 {
   map_regs.a = 0x20;
   map_regs.x = 0x21;
-  __asm (" map\n"
-         " eom"
-         :                     /* no output operands */
-         : "Kq"(map_regs.quad) /* no input operands */
-         :                     /* clobber list */);
-}
+  apply_map();}
 
 //-----------------------------------------------------------------------------------------------
 
 void map_ds_resource(uint8_t res_page)
 {
   // map offset: 0x50000 + page*256 - 0x8000
-  map_regs.y = res_page + 0x80;
-  if ((int8_t)res_page < 0) {
-    map_regs.z = 0x35;
-  }
-  else {
-    map_regs.z = 0x34;
-  }
+  uint16_t offset = 0x3000 + (RESOURCE_MEMORY / 256) + res_page - 0x80;
+  map_regs.y = LSB(offset);
+  map_regs.z = MSB(offset);
+  apply_map();
+}
 
+//-----------------------------------------------------------------------------------------------
+
+static inline void apply_map(void)
+{
   __asm (" map\n"
          " eom"
          :                     /* no output operands */
          : "Kq"(map_regs.quad) /* input operands */
          :                     /* clobber list */);
 }
+
+//-----------------------------------------------------------------------------------------------

@@ -65,7 +65,7 @@
     _a < _b ? _a : _b;       \
 })
 
-void fatal_error(enum errorcode_t error);
+void fatal_error(error_code_t error);
 void fatal_error_str(const char *message);
 
 #if 1

@@ -8,7 +8,7 @@
 
 char msg[80];
 
-void fatal_error(enum errorcode_t error)
+void fatal_error(error_code_t error)
 {
   debug_out("Fatal error: %d", error);
   while (1) POKE(0xd020, 2);
@@ -45,7 +45,7 @@ void debug_msg(char* msg)
 void *memcpy(void *dest, const void *src, size_t n)
 {
   static dmalist_t dmalist_copy = {
-    .command = 0x00,      //!< DMA copy command
+    .command = 0x00,      // DMA copy command
     .count = 0x0000,
     .src_addr = 0x0000,
     .src_bank = 0x00,
@@ -67,7 +67,7 @@ void *memcpy(void *dest, const void *src, size_t n)
 void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n)
 {
   static dmalist_t dmalist_copy = {
-    .command = 0x00,      //!< DMA copy command
+    .command = 0x00,      // DMA copy command
     .count = 0x0000,
     .src_addr = 0x0000,
     .src_bank = 0x00,
@@ -90,7 +90,7 @@ void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n)
 void __far *memcpy_far(void __far *dest, const void __far *src, size_t n)
 {
   static dmalist_t dmalist_copy = {
-    .command = 0x00,      //!< DMA copy command
+    .command = 0x00,      // DMA copy command
     .count = 0x0000,
     .src_addr = 0x0000,
     .src_bank = 0x00,
@@ -117,7 +117,7 @@ void memcpy_to_io(__far void *dest, const void *src, size_t n)
     .opt_token = 0x81,
     .opt_arg = 0xff,
     .end_of_options = 0x00,
-    .command = 0x00,      //!< DMA copy command
+    .command = 0x00,      // DMA copy command
     .count = 0x0000,
     .src_addr = 0x0000,
     .src_bank = 0x00,
@@ -138,7 +138,7 @@ void memcpy_to_io(__far void *dest, const void *src, size_t n)
 void *memset(void *s, int c, size_t n)
 {
   static dmalist_t dmalist_fill = {
-    .command = 0x03,      //!< DMA fill command
+    .command = 0x03,      // DMA fill command
     .src_bank = 0x00,
     .dst_bank = 0x00
   };

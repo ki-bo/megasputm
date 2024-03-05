@@ -1,6 +1,7 @@
 #include "diskio.h"
 #include "dma.h"
 #include "error.h"
+#include "io.h"
 #include "map.h"
 #include "resource.h"
 #include "script.h"
@@ -22,7 +23,7 @@
  * We put this into bss_init so it won't be taking up space after the init
  * routine is finished.
  *
- * @note BSS section bss_init
+ * BSS section: bss_init
  */
 static struct {
   uint16_t magic_number;
@@ -44,22 +45,13 @@ static struct {
 
 #pragma clang section data="data_diskio" bss="bss_diskio"
 
-static uint8_t room_track_list[54];
-static uint8_t room_block_list[54];
-static uint8_t current_track;
-static uint8_t last_physical_track;
-static uint8_t last_physical_sector;
-static uint8_t last_side;
-static uint8_t next_track;
-static uint8_t next_block;
-static uint8_t cur_block_read_ptr;
-static uint16_t cur_chunk_size;
-
 /*
  * The index is in file 00.lfl and contains room numbers (=file numbers) and
  * offsets for each resource within that file. We cache this in memory to
  * speed up access to resources.
  * The numbers are hard-coded for the Maniac Mansion (Scumm V2) game.
+ *
+ * BSS section: bss_diskio
  */
 static struct {
   uint8_t room_disk_num[61];
@@ -75,8 +67,19 @@ static struct {
   uint16_t sound_offset[120];
 } lfl_index;
 
-static void prepare_drive(void);
-static void wait_for_busy_clear(void);
+static uint8_t room_track_list[54];
+static uint8_t room_block_list[54];
+static uint8_t current_track;
+static uint8_t last_physical_track;
+static uint8_t last_physical_sector;
+static uint8_t last_side;
+static uint8_t next_track;
+static uint8_t next_block;
+static uint8_t cur_block_read_ptr;
+static uint16_t cur_chunk_size;
+static uint8_t drive_ready;
+static uint8_t last_drive_access_frame;
+static uint8_t drive_in_use;
 
 typedef struct __f011 {
   uint8_t fdc_control;
@@ -96,7 +99,7 @@ typedef struct __f011 {
 #define DISK_CACHE 0x8000000UL
 #define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x10000UL))
 
-enum
+enum fdc_status_mask_t
 {
   /** Drive select (0 to 7). Internal drive is 0. Second floppy drive on internal cable 
       is 1. Other values reserved for C1565 external drive interface. */
@@ -127,7 +130,7 @@ enum
   FDC_RDREQ_MASK = 0x8000
 };
 
-enum
+enum fdc_command_t
 {
   FDC_CMD_CLR_BUFFER_PTRS = 0x01,
   FDC_CMD_STEP_OUT = 0x10,
@@ -136,67 +139,66 @@ enum
   FDC_CMD_READ_SECTOR = 0x40
 };
 
-// Debug functions
-static void read_whole_track(uint8_t track);
-static void scan_sector_order(uint8_t track, uint8_t side);
+// Private init functions
+static uint8_t read_next_directory_block(void);
+static uint8_t read_lfl_file_entry(void);
+static void load_index(void);
+static void invalidate_disk_cache(void);
 
-/**
- * @brief Searches for a file in the directory.
- *
- * The function will provide start track and sector of the file in the static
- * variables next_track and next_block. If the file is not found, next_track
- * will be set to 0.
- *
- * @note The drive needs to be ready before calling this function. Use
- *       prepare_drive() to do that.
- *
- * @param filename Null-terminated string with the filename
- *
- * @note Code section code_diskio
- */
+// Private disk I/O functions
+static void wait_for_busy_clear(void);
+static void step_to_track(uint8_t track);
 static void search_file(const char *filename);
-
-/**
- * @brief Loads a sector from the floppy disk into the floppy buffer.
- * 
- * As sectors in 1581 format are 512 bytes, they always contain two logical
- * blocks. This function loads the sector containing the specified block into
- * the floppy buffer. 
- *
- * @param track Logical track number (1-80)
- * @param block Logical block number (0-39)
- *
- * @note Code section code_diskio
- */
+static void seek_to(uint16_t offset);
 static void load_block(uint8_t track, uint8_t block);
-
-static void read_error(void);
-
+static void prepare_drive(void);
+static void acquire_drive(void);
+static void release_drive(void);
+static void read_error(error_code_t error_code);
 static void led_and_motor_off(void);
 
 /**
- * @brief Loads the index from disk into memory.
- *
- * The index is in file 00.lfl and contains room numbers (=file numbers) and
- * offsets for each resource within that file. We cache this in memory to
- * speed up access to resources.
- *
- * @note Code section code_init
+ * @defgroup diskio_init Init Functions
+ * @{
  */
-static void load_index(void);
+#pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
- * @brief Marks all blocks in disk cache as not-available
+ * @brief Initialises the diskio module.
  *
- * Disk cache is in attic ram, starting at 0x8000000. Each physical sector
- * is 512 bytes long. The cache can hold 20*80=1600 sectors.
- * The first two bytes of each block are used to store the track and block
- * number of the next block. Legal values are only 0-80 for the track
- * number (0 = last block). Therefore, we use the unsused value 0xff to mark 
- * a sector as not available (such a value should never occur on the disk
- * for the 'next track' byte).
+ * This function must be called before any other diskio function.
+ * It reads the start tracks and sectors of each room from the disk
+ * directory and caches them in memory.
+ * 
+ * Code section: code_init
  */
-static void invalidate_disk_cache(void);
+void diskio_init(void)
+{
+  memset(room_track_list, 0, sizeof(room_track_list));
+  memset(room_block_list, 0, sizeof(room_block_list));
+  invalidate_disk_cache();
+  last_physical_track = 255;
+  drive_ready = 0;
+  drive_in_use = 0;
+
+  *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
+  prepare_drive();
+
+  while (!(FDC.status & FDC_TK0_MASK)) {
+    // not yet on track 0, so step outwards
+    FDC.command = FDC_CMD_STEP_OUT;
+    wait_for_busy_clear();
+  }
+  current_track = 0;
+
+  // Loading file list in the directory, starting at track 40, block 3
+  load_block(40, 3);
+  while (read_next_directory_block() != 0);
+  
+  load_index();
+
+  release_drive();
+}
 
 /**
  * @brief Parses lfl file entries in the FDC buffer and caches them
@@ -212,68 +214,11 @@ static void invalidate_disk_cache(void);
  * automatically load the next block and return 1. If there are no more
  * blocks to read, the function will return 0.
  *
- * @note Code section code_init
+ * Code section: code_init
+ * Private function
  *
  * @return uint8_t 0 if there are no more blocks to read, 1 otherwise
  */
-static uint8_t read_next_directory_block(void);
-
-/**
- * @brief Reads bytes from the sector buffer and parses them into a file entry.
- * 
- * The function reads bytes from the sector buffer and parses one file entry into
- * room_track_list and room_block_list. The function returns the number of bytes actually
- * read from the sector buffer.
- * 
- * @note The number of bytes actually read from the sector buffer can vary, 
- *       as the function will stop reading when it encounters the first invalid
- *       byte.
- *
- * @note Code section code_init
- *
- * @return uint8_t The number of bytes actually read from the sector buffer
- */
-static uint8_t read_lfl_file_entry(void);
-
-static void seek_to(uint16_t offset);
-
-
-// ************************************************************************************************
-// code_init functions
-// ************************************************************************************************
-#pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
-
-//-----------------------------------------------------------------------------------------------
-
-void diskio_init_entry(void)
-{
-  memset(room_track_list, 0, sizeof(room_track_list));
-  memset(room_block_list, 0, sizeof(room_block_list));
-  invalidate_disk_cache();
-  last_physical_track = 255;
-
-  *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
-  prepare_drive();
-
-  while (!(FDC.status & FDC_TK0_MASK)) {
-    // not yet on track 0, so step outwards
-    FDC.command = FDC_CMD_STEP_OUT;
-    wait_for_busy_clear();
-  }
-  current_track = 0;
-
-  // Loading file list in the directory, starting at track 40, block 3
-  POKE(0xd020,0);
-  load_block(40, 3);
-  while (read_next_directory_block() != 0);
-  
-  load_index();
-
-  led_and_motor_off();
-}
-
-//-----------------------------------------------------------------------------------------------
-
 static uint8_t read_next_directory_block() 
 {
   uint8_t next_track = FDC.data;
@@ -292,8 +237,22 @@ static uint8_t read_next_directory_block()
   return 1;
 }
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Reads bytes from the sector buffer and parses them into a file entry.
+ * 
+ * The function reads bytes from the sector buffer and parses one file entry into
+ * room_track_list and room_block_list. The function returns the number of bytes actually
+ * read from the sector buffer.
+ * 
+ * @note The number of bytes actually read from the sector buffer can vary, 
+ *       as the function will stop reading when it encounters the first invalid
+ *       byte.
+ *
+ * Code section: code_init
+ * Private function
+ *
+ * @return uint8_t The number of bytes actually read from the sector buffer
+ */
 static uint8_t read_lfl_file_entry()
 {
   uint8_t i = 1;
@@ -346,8 +305,16 @@ static uint8_t read_lfl_file_entry()
   return i;
 }
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Loads the index from disk into memory.
+ *
+ * The index is in file 00.lfl and contains room numbers (=file numbers) and
+ * offsets for each resource within that file. We cache this in memory to
+ * speed up access to resources.
+ *
+ * Code section: code_init
+ * Private function
+ */
 static void load_index(void)
 {
   uint8_t bytes_left_in_block;
@@ -391,8 +358,20 @@ static void load_index(void)
   }
 }
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Marks all blocks in disk cache as not-available
+ *
+ * Disk cache is in attic ram, starting at 0x8000000. Each physical sector
+ * is 512 bytes long. The cache can hold 20*80=1600 sectors.
+ * The first two bytes of each block are used to store the track and block
+ * number of the next block. Legal values are only 0-80 for the track
+ * number (0 = last block). Therefore, we use the unsused value 0xff to mark 
+ * a sector as not available (such a value should never occur on the disk
+ * for the 'next track' byte).
+ *
+ * Code section: code_init
+ * Private function
+ */
 static void invalidate_disk_cache(void)
 {
   int8_t __huge *ptr = HUGE_I8_PTR(DISK_CACHE);
@@ -404,20 +383,54 @@ static void invalidate_disk_cache(void)
   }
 }
 
-// ************************************************************************************************
-// code_diskio functions
-// ************************************************************************************************
-#pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
+/** @} */ // end of diskio_init
 
 //-----------------------------------------------------------------------------------------------
 
+/**
+ * @defgroup diskio_public Disk I/O Public Functions
+ * @{
+ */
+#pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
+
+/**
+ * @brief Checks whether drive motor should be turned off
+ * 
+ * The function will check whether the drive has been accessed within the last 60 frames.
+ * If not, it will turn off the drive motor and LED.
+ * The function should be called regularly (several times per second) from the main loop, 
+ * so the frame counter used for the check is correctly evaluated.
+ *
+ * Code section: code_diskio
+ */
+void diskio_check_motor_off(void)
+{
+  if (!drive_ready || drive_in_use) {
+    return;
+  }
+  uint8_t cur_frame = FRAMECOUNT;
+  uint8_t elapsed_frames = cur_frame - last_drive_access_frame;
+  if (elapsed_frames < 60) {
+    return;
+  }
+  led_and_motor_off();
+}
+
+/**
+ * @brief Loads a file from disk into memory.
+ * 
+ * @param filename Null-terminated string containing the filename to load.
+ * @param address Far pointer address in memory to load the file to.
+ *
+ * Code section: code_diskio
+ */
 void diskio_load_file(const char *filename, uint8_t __far *address)
 {
   static dmalist_single_option_t dmalist_copy = {
     .opt_token = 0x80,
     .opt_arg = 0xff,
     .end_of_options = 0x00,
-    .command = 0x00,      //!< DMA copy command
+    .command = 0x00,      // DMA copy command
     .count = 0x00fe,
     .src_addr = 0x6c02,
     .src_bank = 0x0d,
@@ -425,7 +438,7 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
     .dst_bank = 0x00
   };
 
-  prepare_drive();
+  acquire_drive();
 
   search_file(filename);
   
@@ -452,14 +465,21 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
     address += 254;
   }
   
-  led_and_motor_off();
+  release_drive();
 }
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Loads a room from disk into memory.
+ *
+ * @param room The room number to load.
+ * @param address The address in memory to load the room to.
+ *
+ * Code section: code_diskio
+ */
 void diskio_load_room(uint8_t room, __far uint8_t *address)
 {
-  prepare_drive();
+  acquire_drive();
+
   next_track = room_track_list[room];
   next_block = room_block_list[room];
   uint8_t payload_size = 254;
@@ -477,14 +497,33 @@ void diskio_load_room(uint8_t room, __far uint8_t *address)
     }
   }
   
-  led_and_motor_off();
+  release_drive();
 }
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Starts loading a resource from disk into memory.
+ *
+ * The function will start loading a resource from disk into memory. The resource
+ * type and id are passed as parameters. The function will return the size of the
+ * resource in bytes. The actual loading of the resource data into memory is done
+ * by diskio_continue_resource_loading().
+ *
+ * Use this function to seek to the start of a resource and get its size. 
+ * Memory needs to be allocated for the resource and the resource memory be
+ * mapped to DEFAULT_RESOURCE_ADDRESS. Then call diskio_continue_resource_loading()
+ * to load the resource data into memory.
+ *
+ * @param type The resource type (RES_TYPE_ROOM, RES_TYPE_COSTUME, RES_TYPE_SCRIPT, RES_TYPE_SOUND)
+ * @param id The resource id
+ *
+ * @return uint16_t The size of the resource in bytes
+ *
+ * Code section: code_diskio
+ */
 uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
 {
-  prepare_drive();
+  acquire_drive();
+
   uint8_t room_id = 0;
   uint16_t offset;
 
@@ -532,17 +571,28 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   return cur_chunk_size;
 }
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Continues loading a resource from disk into memory.
+ *
+ * The function will continue loading a resource from disk into memory. The resource
+ * data is loaded into memory starting at DEFAULT_RESOURCE_ADDRESS. The size of the
+ * resource data is passed as a parameter. The function will load the resource data
+ * into memory and return when the resource data has been completely loaded.
+ *
+ * You need to call diskio_start_resource_loading() before calling this function.
+ *
+ * @param size The size of the resource in bytes
+ *
+ * Code section: code_diskio
+ */
 void diskio_continue_resource_loading(void)
 {
   POKE(0xd680, 0x81); // enable FDC buffer at 0xde00
 
-  if (cur_chunk_size > 0x4000) {
-    fatal_error(ERR_RESOURCE_TOO_LARGE);
-  }
-
   uint8_t *target_ptr = NEAR_U8_PTR(0x8000);
+  *(uint16_t *)target_ptr = cur_chunk_size;
+  target_ptr += 2;
+  cur_chunk_size -= 2;
 
   while (cur_chunk_size != 0) {
     uint8_t bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
@@ -569,28 +619,37 @@ void diskio_continue_resource_loading(void)
 
   POKE(0xd680, 0x82); // disable FDC buffer at 0xde00
 
-  led_and_motor_off();
+  release_drive();
 }
+
+/** @} */ // end of diskio_public
 
 //-----------------------------------------------------------------------------------------------
 
-static void prepare_drive(void)
-{
-  *NEAR_U8_PTR(0xd696) &= 0x7f; // disable auto-tune
-  FDC.fdc_control |= FDC_MOTOR_MASK | FDC_LED_MASK; // enable LED and motor
-  FDC.command = FDC_CMD_SPINUP;
-  wait_for_busy_clear();
-}
+/**
+ * @defgroup diskio_private Disk I/O Private Functions
+ * @{
+ */
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Waits until the FDC busy flag is cleared
+ *
+ * Code section: code_diskio
+ * Private function
+ */
 inline static void wait_for_busy_clear(void)
 {
   while (FDC.status & FDC_BUSY_MASK);
 }
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Moves the floppy drive head to the provided track
+ * 
+ * @param track Physical track number (0-79)
+ *
+ * Code section: code_diskio
+ * Private function
+ */
 static void step_to_track(uint8_t track)
 {
   while (track != current_track) {
@@ -607,106 +666,22 @@ static void step_to_track(uint8_t track)
   }
 }
 
-//-----------------------------------------------------------------------------------------------
-
-static void scan_sector_order(uint8_t track, uint8_t side)
-{
-  --track;
-
-  step_to_track(track);
-
-  if (side == 0) {
-    FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
-  }
-  else {
-    FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
-  }
-
-  uint8_t cur_sector = *NEAR_VU8_PTR(0xd6a4);
-  while (cur_sector == *NEAR_VU8_PTR(0xd6a4));
-  cur_sector = *NEAR_VU8_PTR(0xd6a4);
-  while (cur_sector == *NEAR_VU8_PTR(0xd6a4));
-  cur_sector = *NEAR_VU8_PTR(0xd6a4);
-  uint8_t num_sectors_read = 0;
-  uint8_t sectors[20];
-
-  while (num_sectors_read < 20) {
-    if (cur_sector != *NEAR_VU8_PTR(0xd6a4)) {
-      // sector has been read
-      cur_sector = *NEAR_VU8_PTR(0xd6a4);
-      sectors[num_sectors_read] = cur_sector;
-      ++num_sectors_read;
-    }
-  }
-
-  //debug_out("%02d %02d %02d %02d %02d %02d %02d %02d %02d %02d", sectors[0], sectors[1], sectors[2], sectors[3], sectors[4], sectors[5], sectors[6], sectors[7], sectors[8], sectors[9]);
-  //debug_out("%02d %02d %02d %02d %02d %02d %02d %02d %02d %02d", sectors[10], sectors[11], sectors[12], sectors[13], sectors[14], sectors[15], sectors[16], sectors[17], sectors[18], sectors[19]);
-  //debug_out("\n");
-
-}
-
-//-----------------------------------------------------------------------------------------------
-
-static void read_whole_track(uint8_t track)
-{
-  static uint8_t sectors_read[40];
-  static dmalist_t dmalist = {
-    .command = 0x00,      //!< DMA copy command
-    .count = 0x0200,
-    .src_addr = 0xde00,
-    .src_bank = 0x80,     //!< enable I/O to read from $de00
-    .dst_addr = 0x0000,
-    .dst_bank = 0x04
-  };
-
-  int8_t num_sectors_left;
-
-  step_to_track(track);
-  *NEAR_U8_PTR(0xd6a1) |= 0x02; // enable TARGANY
-
-  FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
-  int8_t sector_side_offset = 0;
-
-  for (uint8_t side = 0; side < 2; ++side) {
-    memset(sectors_read, 0, sizeof(sectors_read));
-    num_sectors_left = 20;
-    FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
-
-    while (num_sectors_left > 0) {
-
-      *NEAR_U8_PTR(0xd6a1) |= 0x02; // enable TARGANY
-      FDC.command = FDC_CMD_READ_SECTOR;
-      //while(!(FDC.status & FDC_RDREQ_MASK)) POKE(0xd021, PEEK(0xd021) + 1);
-      wait_for_busy_clear();
-      while(!(FDC.status & (FDC_DRQ_MASK | FDC_EQ_MASK))) POKE(0xd020, PEEK(0xd020) + 1);
-      
-      uint8_t sector = FDC.sector + sector_side_offset - 1;
-
-      if (sectors_read[sector] == 0) {
-        sectors_read[sector] = 1;
-        --num_sectors_left;
-        dmalist.dst_addr = sector * 512;
-        dma_trigger(&dmalist);
-      }
-
-
-      // RNF or CRC error flag check
-      if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-        // error
-        read_error();
-      }
-    }
-
-    sector_side_offset = 20;
-    POKE(0xd020, 1);
-    FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 0
-
-  }
-    POKE(0xd020, 0);
-}
-
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Searches for a file in the directory.
+ *
+ * The function will provide start track and sector of the file in the static
+ * variables next_track and next_block. If the file is not found, next_track
+ * will be set to 0.
+ *
+ * 
+ * @note The drive needs to be ready before calling this function. Use
+ *       prepare_drive() to do that.
+ *
+ * @param filename Null-terminated string with the filename
+ *
+ * Code section: code_diskio
+ * Private function
+ */
 static void search_file(const char *filename)
 {
   uint8_t file_track;
@@ -779,8 +754,71 @@ static void search_file(const char *filename)
   // file not found, next_track is 0
 }
 
-//-----------------------------------------------------------------------------------------------
+/**
+ * @brief Seeks forward to a specific offset in the file
+ *
+ * The function will seek forward to the specified offset in the file, relative
+ * to the current read position. The function will update the current read
+ * position accordingly. The current track and block need to be loaded into the
+ * FDC buffer before calling this function and next_track and next_block need to
+ * be set to the next track and block after the current one.
+ * cur_block_read_ptr needs to be set to the current read position in the block.
+ *
+ * When returning from this function, the data at the file read position will be
+ * in the FDC buffer and cur_block_read_ptr will be set.
+ * 
+ * FDC.data can be used to continue reading bytes at the current read position.
+ * 
+ * @note cur_block_read_ptr is relative to the third byte of the block on disk, as
+ *       the first two bytes are used to store the next track and block number.
+ *
+ * @param offset Offset in bytes relative to the current read position
+ *
+ * Code section: code_diskio
+ * Private function
+ */
+static void seek_to(uint16_t offset)
+{
+  uint8_t bytes_left_in_block = (next_track == 0) ? next_block - 1 : 254;
+  bytes_left_in_block -= cur_block_read_ptr;
 
+  while (bytes_left_in_block <= offset) {
+    load_block(next_track, next_block);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    offset -= bytes_left_in_block;
+    bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
+    cur_block_read_ptr = 0;
+  }
+
+  cur_block_read_ptr += offset;
+
+  while (offset-- != 0) {
+    FDC.data;
+  }
+}
+
+/**
+ * @brief Loads a sector from disk cache or floppy disk into the floppy buffer
+ *
+ * The function will load a block from the disk cache or floppy disk into the
+ * floppy buffer. The data of the block will be available in the floppy buffer
+ * after the function returns. If the block is in the disk cache, the function
+ * will load the block from the cache into the FDC buffer. If the block is not
+ * in the cache, the function will read the block from the floppy disk into the
+ * FDC buffer and store it in the cache.
+ *
+ * As sectors in 1581 format are 512 bytes, they always contain two logical
+ * blocks. This function loads the sector containing the specified block into
+ * the floppy buffer. Therefore, a second block is always implicitly
+ * loaded into the floppy buffer as well.
+ *
+ * @param track Logical track number (1-80)
+ * @param block Logical block number (0-39)
+ *
+ * Code section: code_diskio
+ * Private function
+ */
 static void load_block(uint8_t track, uint8_t block)
 {
   static dmalist_two_options_t dmalist_copy_from_cache = {
@@ -789,7 +827,7 @@ static void load_block(uint8_t track, uint8_t block)
     .opt_token2 = 0x81,
     .opt_arg2 = 0xff,
     .end_of_options = 0x00,
-    .command = 0x00,      //!< DMA copy command
+    .command = 0x00,      // DMA copy command
     .count = 0x0200,
     .src_addr = 0x0000,
     .src_bank = 0x00,
@@ -803,7 +841,7 @@ static void load_block(uint8_t track, uint8_t block)
     .opt_token2 = 0x81,
     .opt_arg2 = 0x80,
     .end_of_options = 0x00,
-    .command = 0x00,      //!< DMA copy command
+    .command = 0x00,      // DMA copy command
     .count = 0x0200,
     .src_addr = 0x6c00,
     .src_bank = 0x0d,
@@ -846,6 +884,7 @@ static void load_block(uint8_t track, uint8_t block)
     last_side = side;
   }
   else {
+    prepare_drive();
     // block is not in cache - need to read it from disk
 
     if (physical_sector != last_physical_sector || track != last_physical_track || side != last_side) {
@@ -879,14 +918,16 @@ static void load_block(uint8_t track, uint8_t block)
       //       We just rely on the data being in the buffer once BUSY is cleared.
       while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
       if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
-        read_error();
+        debug_out("unable to find track %d, sector %d, side %d\n", track, physical_sector, side);
+        read_error(ERR_SECTOR_NOT_FOUND);
       }
 
       wait_for_busy_clear(); // sector reading to buffer completed when BUSY is cleared
 
       //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
       if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-        read_error();
+        debug_out("FDC status: %04x", FDC.status)
+        read_error(ERR_SECTOR_DATA_CORRUPT);
       }
 
       // copy the sector to the cache
@@ -897,6 +938,8 @@ static void load_block(uint8_t track, uint8_t block)
       last_physical_track = track;
       last_physical_sector = physical_sector;
       last_side = side;
+
+      last_drive_access_frame = FRAMECOUNT;
     }
   }
 
@@ -908,42 +951,88 @@ static void load_block(uint8_t track, uint8_t block)
   }
 }
 
-//-----------------------------------------------------------------------------------------------
-
-static void read_error(void)
+/**
+ * @brief Makes sure the motor and led of the drive are ready
+ *
+ * The function will make sure the motor and LED of the drive are ready. If the
+ * drive is not ready, the function will enable the motor and LED and spin up
+ * the drive. It will block until the drive reports the motor completed
+ * spinning up.
+ * 
+ * If the drive is already ready, the function will return immediately.
+ *
+ * @note The function implicitly calls acquire_drive()
+ *
+ * Code section: code_diskio
+ * Private function
+ */
+static void prepare_drive(void)
 {
-  led_and_motor_off();
-  fatal_error(ERR_SECTOR_READ_FAILED);
+  if (drive_ready) {
+    return;
+  }
+  *NEAR_U8_PTR(0xd696) &= 0x7f; // disable auto-tune
+  FDC.fdc_control |= FDC_MOTOR_MASK | FDC_LED_MASK; // enable LED and motor
+  FDC.command = FDC_CMD_SPINUP;
+  wait_for_busy_clear();
+  drive_ready = 1;
+  acquire_drive();
 }
 
-//-----------------------------------------------------------------------------------------------
+/**
+ * @brief Marks the drive as currently being used.
+ *
+ * This prevents the drive motor from being turned off by diskio_check_motor_off().
+ *
+ * Code section: code_diskio
+ * Private function
+ */
+static void acquire_drive(void)
+{
+  drive_in_use = 1;
+}
 
+/**
+ * @brief Release the drive again after it has been used
+ * 
+ * The motor will not turn off immediately when calling this function, but
+ * only after 60 frames have passed without the drive being accessed.
+ * This prevents continuous spinning up and down of the drive when multiple
+ * disk I/O operations are performed in quick succession.
+ *
+ * The main loop will regularly call diskio_check_motor_off() to turn off the
+ * drive motor when it has not been accessed for 60 video frames.
+ *
+ * Code section: code_diskio
+ * Private function
+ */
+static void release_drive(void)
+{
+  drive_in_use = 0;
+}
+
+/**
+ * @brief Aborts the current disk I/O operation and reports a fatal error
+ * 
+ * @param error_code The error code to be reported via fatal_error()
+ *
+ * Code section: code_diskio
+ * Private function
+ */
+static void read_error(error_code_t error_code)
+{
+  led_and_motor_off();
+  fatal_error(error_code);
+}
+
+/**
+ * @brief Turns off the drive motor and LED
+ *
+ * Code section: code_diskio
+ * Private function
+ */
 static void led_and_motor_off(void)
 {
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
+  drive_ready = 0;
 }
-
-//-----------------------------------------------------------------------------------------------
-
-static void seek_to(uint16_t offset)
-{
-  uint8_t bytes_left_in_block = (next_track == 0) ? next_block - 1 : 254;
-  bytes_left_in_block -= cur_block_read_ptr;
-
-  while (bytes_left_in_block <= offset) {
-    load_block(next_track, next_block);
-    next_track = FDC.data;
-    next_block = FDC.data;
-    offset -= bytes_left_in_block;
-    bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
-    cur_block_read_ptr = 0;
-  }
-
-  cur_block_read_ptr += offset;
-
-  while (offset-- != 0) {
-    FDC.data;
-  }
-}
-
-//-----------------------------------------------------------------------------------------------
