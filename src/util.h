@@ -84,7 +84,6 @@ void debug_msg(char* msg);
 void *memcpy(void *dest, const void *src, size_t n);
 void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n);
 void __far *memcpy_far(void __far *dest, const void __far *src, size_t n);
-void memcpy_to_io(void __far *dest, const void *src, size_t n);
 void *memset(void *s, int c, size_t n);
 void __far *memset_far(void __far *s, int c, size_t n);
 

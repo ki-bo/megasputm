@@ -41,133 +41,66 @@ void debug_msg(char* msg)
                  : "a" /* clobber list */);
 }
 
-
 void *memcpy(void *dest, const void *src, size_t n)
 {
-  static dmalist_t dmalist_copy = {
-    .command = 0x00,      // DMA copy command
-    .count = 0x0000,
-    .src_addr = 0x0000,
-    .src_bank = 0x00,
-    .dst_addr = 0x0000,
-    .dst_bank = 0x00
-  };
-
-  dmalist_copy.count    = n;
-  dmalist_copy.src_addr = (uint16_t)src;
-  dmalist_copy.dst_addr = (uint16_t)dest;
-
-  DMA.addrbank    = 0;
-  DMA.addrmsb     = MSB(&dmalist_copy);
-  DMA.addrlsbtrig = LSB(&dmalist_copy);
-
+  global_dma_list.command  = 0;      // DMA copy command
+  global_dma_list.count    = n;
+  global_dma_list.src_addr = (uint16_t)src;
+  global_dma_list.src_bank = 0;
+  global_dma_list.dst_addr = (uint16_t)dest;
+  global_dma_list.dst_bank = 0;
+  dma_trigger(&global_dma_list);
   return dest;
 }
 
 void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n)
 {
-  static dmalist_t dmalist_copy = {
-    .command = 0x00,      // DMA copy command
-    .count = 0x0000,
-    .src_addr = 0x0000,
-    .src_bank = 0x00,
-    .dst_addr = 0x0000,
-    .dst_bank = 0x00
-  };
-
-  dmalist_copy.count    = n;
-  dmalist_copy.src_addr = (uint16_t)src;
-  dmalist_copy.dst_bank = BANK(dest);
-  dmalist_copy.dst_addr = (uint16_t)dest;
-
-  DMA.addrbank = 0;
-  DMA.addrmsb  = MSB(&dmalist_copy);
-  DMA.etrig    = LSB(&dmalist_copy); 
-
+  global_dma_list.command  = 0;      // DMA copy command
+  global_dma_list.count    = n;
+  global_dma_list.src_addr = (uint16_t)src;
+  global_dma_list.src_bank = 0;
+  global_dma_list.dst_addr = (uint16_t)dest;
+  global_dma_list.dst_bank = BANK(dest);
+  dma_trigger(&global_dma_list);
   return dest; 
 }
 
 void __far *memcpy_far(void __far *dest, const void __far *src, size_t n)
 {
-  static dmalist_t dmalist_copy = {
-    .command = 0x00,      // DMA copy command
-    .count = 0x0000,
-    .src_addr = 0x0000,
-    .src_bank = 0x00,
-    .dst_addr = 0x0000,
-    .dst_bank = 0x00
-  };
-
-  dmalist_copy.count    = n;
-  dmalist_copy.src_bank = BANK(src);
-  dmalist_copy.src_addr = (uint16_t)src;
-  dmalist_copy.dst_bank = BANK(dest);
-  dmalist_copy.dst_addr = (uint16_t)dest;
-
-  DMA.addrbank = 0;
-  DMA.addrmsb  = MSB(&dmalist_copy);
-  DMA.etrig    = LSB(&dmalist_copy); 
-
+  global_dma_list_opt2.opt_token1 = 0x80;
+  global_dma_list_opt2.opt_arg1   = MB(src);
+  global_dma_list_opt2.opt_token2 = 0x81;
+  global_dma_list_opt2.opt_arg2   = MB(dest);
+  global_dma_list_opt2.command    = 0;      // DMA copy command
+  global_dma_list_opt2.count      = n;
+  global_dma_list_opt2.src_addr   = LSB16(src);
+  global_dma_list_opt2.src_bank   = BANK(src);
+  global_dma_list_opt2.dst_addr   = LSB16(dest);
+  global_dma_list_opt2.dst_bank   = BANK(dest);
+  dma_trigger_ext(&global_dma_list_opt2);
   return dest; 
-}
-
-void memcpy_to_io(__far void *dest, const void *src, size_t n)
-{
-  static dmalist_single_option_t dmalist_copy = {
-    .opt_token = 0x81,
-    .opt_arg = 0xff,
-    .end_of_options = 0x00,
-    .command = 0x00,      // DMA copy command
-    .count = 0x0000,
-    .src_addr = 0x0000,
-    .src_bank = 0x00,
-    .dst_addr = 0x0000,
-    .dst_bank = 0x00
-  };
-
-  dmalist_copy.count    = n;
-  dmalist_copy.src_addr = (uint16_t)src;
-  dmalist_copy.dst_bank = BANK(dest);
-  dmalist_copy.dst_addr = (uint16_t)dest;
-
-  DMA.addrbank = 0;
-  DMA.addrmsb  = MSB(&dmalist_copy);
-  DMA.etrig    = LSB(&dmalist_copy);
 }
 
 void *memset(void *s, int c, size_t n)
 {
-  static dmalist_t dmalist_fill = {
-    .command = 0x03,      // DMA fill command
-    .src_bank = 0x00,
-    .dst_bank = 0x00
-  };
-
-  dmalist_fill.count     = n;
-  dmalist_fill.fill_byte = c & 0xff;
-  dmalist_fill.dst_addr  = (uint16_t)s;
-
-  DMA.addrbank    = 0;
-  DMA.addrmsb     = MSB(&dmalist_fill);
-  DMA.addrlsbtrig = LSB(&dmalist_fill);
-
+  global_dma_list.command   = 0x03;      // DMA fill command
+  global_dma_list.count     = n;
+  global_dma_list.fill_byte = LSB(c);
+  global_dma_list.dst_addr  = LSB16(s);
+  global_dma_list.dst_bank  = 0;
+  dma_trigger(&global_dma_list);
   return s;
 }
 
 void __far *memset_far(void __far *s, int c, size_t n)
 {
-  static dmalist_t dmalist_fill = {
-    .command = 0x03,      // DMA fill command
-  };
-
-  dmalist_fill.count     = n;
-  dmalist_fill.fill_byte = LSB(c);
-  dmalist_fill.dst_addr  = LSB16(s);
-  dmalist_fill.dst_bank  = BANK(s);
-
-  DMA.addrbank    = 0;
-  DMA.addrmsb     = MSB(&dmalist_fill);
-  DMA.addrlsbtrig = LSB(&dmalist_fill);
-
+  global_dma_list_opt1.opt_token = 0x81;
+  global_dma_list_opt1.opt_arg   = MB(s);
+  global_dma_list_opt1.command   = 0x03;      // DMA fill command
+  global_dma_list_opt1.count     = n;
+  global_dma_list_opt1.fill_byte = LSB(c);
+  global_dma_list_opt1.dst_addr  = LSB16(s);
+  global_dma_list_opt1.dst_bank  = BANK(s);
+  dma_trigger_ext(&global_dma_list_opt1);
   return s;
 }

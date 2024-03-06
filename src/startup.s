@@ -124,7 +124,7 @@ __low_level_init:
 ;;; load_runtime - load runtime sections from disk into memory
 ;;;
 ;;; This routine loads the runtime code into memory at $200, and the diskio
-;;; code into memory at $14002. The runtime is temporarily loaded to $8000, 
+;;; code into memory at $12000. The runtime is temporarily loaded to $8000, 
 ;;; and then copied to its final destination.
 ;;;
 ;;; Will disable interrupts before the runtime is copied to $200, and will
@@ -162,7 +162,7 @@ load_runtime_and_diskio:
 
 		sei
 		; fade out screen
-		ldy #0
+		ldy #60
 loop1$:		ldx #0
 		ldz #1
 loop2$:		lda 0xd100,x
@@ -185,7 +185,7 @@ exit$:		tza
 		lda 0xd7fa
 frameloop$:	cmp 0xd7fa
 		beq frameloop$
-		iny
+		dey
 		bne loop1$
 done$:		ldy #30
 frameloop2$:	lda 0xd7fa

@@ -67,11 +67,29 @@ typedef struct
     uint8_t dst_bank;        // Destination bank and flags
 } dmalist_two_options_t;
 
+extern dmalist_t               global_dma_list;
+extern dmalist_single_option_t global_dma_list_opt1;
+extern dmalist_two_options_t   global_dma_list_opt2;
+
 void dma_init(void);
 
 inline void dma_trigger(void *dma_list)
 {
   DMA.addrbank    = 0;
+  DMA.addrmsb     = MSB(dma_list);
+  DMA.addrlsbtrig = LSB(dma_list);
+}
+
+inline void dma_trigger_ext(void *dma_list)
+{
+  DMA.addrbank = 0;
+  DMA.addrmsb  = MSB(dma_list);
+  DMA.etrig    = LSB(dma_list);
+}
+
+inline void dma_trigger_far(void __far *dma_list)
+{
+  DMA.addrbank    = BANK(dma_list);
   DMA.addrmsb     = MSB(dma_list);
   DMA.addrlsbtrig = LSB(dma_list);
 }

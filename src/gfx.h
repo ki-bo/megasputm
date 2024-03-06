@@ -3,11 +3,7 @@
 
 #include <stdint.h>
 
-/**
- * @brief Initialises the gfx module.
- *
- * This function must be called before any other gfx function.
- */
 void gfx_init(void);
+uint8_t wait_for_raster_irq(void);
 
 #endif // __GFX_H
