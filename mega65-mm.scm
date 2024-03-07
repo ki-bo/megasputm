@@ -3,8 +3,9 @@
         (block stack (size #x100)) 
         (block cstack (size #xffa))
 
-        (memory zeropage (address (#x2 . #x7f))  (qualifier zpage)
-	        (section (registers #x2))
+        (memory zeropage (address (#x2 . #xff))  (qualifier zpage)
+	        (section (registers (#x2. #x7f)))
+                (section zzpage)
         )
     
         (memory stackpage (address (#x100 . #x1ff)) 
@@ -49,7 +50,7 @@
         )
 
         ; memory for main program (loaded after init is done)
-        (memory main (address (#x2000 . #xcfff))
+        (memory main (address (#x4000 . #x7fff))
                 (section
                         code_main
                         cdata_main

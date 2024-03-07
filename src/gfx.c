@@ -3,6 +3,7 @@
 #include "util.h"
 #include <calypsi/intrinsics6502.h>
 #include <mega65.h>
+#include <stdint.h>
 
 #define SCREEN_RAM 0x2a000
 #define COLRAM 0xff80800UL
@@ -87,7 +88,7 @@ void setup_irq(void)
   CIA1.icr; // volatile reads will ack pending irqs
   CIA2.icr;
 
-  ETHERNET.ctrl1 &= ~(ETH_RXQEN_MASK | ETH_TXQEN_MASK); // dsiable ethernet interrupts
+  //ETHERNET.ctrl1 &= ~(ETH_RXQEN_MASK | ETH_TXQEN_MASK); // dsiable ethernet interrupts
 
   __enable_interrupts();
 }
@@ -104,16 +105,9 @@ void gfx_test()
 
 #pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
 
-uint8_t raster_irq_counter = 0;
+volatile uint8_t raster_irq_counter = 0;
 
-__attribute__((interrupt()))
-static void raster_irq ()
-{
-  ++raster_irq_counter;
-  VICIV.irr = VICIV.irr; // ack interrupt
-}
-
-uint8_t wait_for_raster_irq(void)
+uint8_t wait_for_jiffy_timer(void)
 {
   uint8_t counter = 0;
   while (counter == 0) {
@@ -123,4 +117,24 @@ uint8_t wait_for_raster_irq(void)
     __enable_interrupts();
   }
   return counter;
+}
+
+uint8_t wait_for_next_frame(void)
+{
+  __disable_interrupts();
+  uint8_t counter = raster_irq_counter;
+  __enable_interrupts();
+  while (counter == raster_irq_counter);
+  __disable_interrupts();
+  counter = raster_irq_counter;
+  raster_irq_counter = 0;
+  __enable_interrupts();
+  return counter;
+}
+
+__attribute__((interrupt()))
+static void raster_irq ()
+{
+  ++raster_irq_counter;
+  VICIV.irr = VICIV.irr; // ack interrupt
 }

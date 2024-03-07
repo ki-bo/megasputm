@@ -4,11 +4,9 @@
 #include "io.h"
 #include "map.h"
 #include "resource.h"
-#include "script.h"
 #include "util.h"
+#include "vm.h"
 #include <stdint.h>
-#include <string.h>
-#include <stdio.h>
 
 // The diskio functions are banked in when used
 

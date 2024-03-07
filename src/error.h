@@ -9,6 +9,9 @@ typedef enum {
     ERR_RESOURCE_NOT_FOUND = 5,
     ERR_RESOURCE_TOO_LARGE = 6,
     ERR_OUT_OF_RESOURCE_MEMORY = 7,
+    ERR_OUT_OF_SCRIPT_SLOTS = 8,
+    ERR_UNKNOWN_OPCODE = 9,
+    ERR_VARIDX_OUT_OF_RANGE = 10,
 } error_code_t;
 
 #endif // __ERROR_H__

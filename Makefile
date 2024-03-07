@@ -45,7 +45,7 @@ runtime.raw:  $(OBJS) mega65-mm.scm
 
 mm.d81: runtime.raw
 	cp gamedata/MM.D81 mm.d81
-	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write main.raw m01 -write m1-1.raw m11
+	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write main.raw m01 -write m1-1.raw m11 -write m1-2.raw m12
 
 clean:
 	-rm -rf obj
