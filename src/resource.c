@@ -14,6 +14,7 @@ uint8_t page_res_index[256];
 // Private resource functions
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages);
 static uint8_t defragment_memory(void);
+static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint);
 
 // Private wrapper functions
 static uint16_t start_resource_loading(uint8_t type, uint8_t id);
@@ -95,17 +96,55 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
   }
   while(i != hint);
 
+  debug_out("Loading resource type %d id %d", type_and_flags & RES_TYPE_MASK, id);
+
   uint16_t chunk_size = start_resource_loading(type_and_flags & RES_TYPE_MASK, id);
-  
+  debug_out("  Size: %d", chunk_size);
+
   if (chunk_size > MAX_RESOURCE_SIZE) {
     fatal_error(ERR_RESOURCE_TOO_LARGE);
   }
   uint8_t page = allocate(type_and_flags, id, (chunk_size + 255) / 256);
+  uint16_t ds_save = map_get_ds();
   map_ds_resource(page);
   continue_resource_loading();
+  map_set_ds(ds_save);
   return 0;
 }
 
+void res_lock(uint8_t type, uint8_t id, uint8_t hint)
+{
+  uint8_t new_type = type | RES_LOCKED_MASK;
+  update_flags(new_type, id, hint);
+}
+
+void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
+{
+  uint8_t new_type = type & ~RES_LOCKED_MASK;
+  update_flags(new_type, id, hint);
+}
+
+static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint)
+{
+  uint8_t type = type_and_flags & RES_TYPE_MASK;
+  uint8_t found = 0;
+  uint8_t i = hint;
+  do {
+    if (page_res_index[i] == id && page_res_type[i] == type) {
+      page_res_type[i] = type_and_flags;
+      found = 1;
+    }
+    else if (found) {
+      // current page does not match, but we already had matching pages before.
+      // this means we reached the end of the resource's pages and can stop.
+      break;
+    }
+  }
+  while (++i != hint);
+}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type"
 /**
  * @brief Allocates memory for the specified resource
  * 
@@ -127,8 +166,7 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
  */
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type"
+
 
   uint8_t cur_size = 0;
   uint8_t block_idx = 0;
@@ -165,12 +203,9 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
   }
 
   // todo: free unlocked memory at this point and defragment memory
-
   fatal_error(ERR_OUT_OF_RESOURCE_MEMORY);
-
-  return 0; // dummy return to avoid compiler warning
-#pragma clang diagnostic pop
 }
+#pragma clang diagnostic pop
 
 /**
  * @brief Defragments resource memory

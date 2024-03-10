@@ -71,6 +71,7 @@ static uint8_t current_track;
 static uint8_t last_physical_track;
 static uint8_t last_physical_sector;
 static uint8_t last_side;
+static uint8_t last_block;
 static uint8_t next_track;
 static uint8_t next_block;
 static uint8_t cur_block_read_ptr;
@@ -595,7 +596,7 @@ void diskio_continue_resource_loading(void)
   while (cur_chunk_size != 0) {
     uint8_t bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
     bytes_left_in_block -= cur_block_read_ptr;
-    uint8_t *src_ptr = NEAR_U8_PTR(last_side ? 0xdf02 : 0xde02);
+    uint8_t *src_ptr = NEAR_U8_PTR(last_block % 2 == 0 ? 0xde02 : 0xdf02);
     src_ptr += cur_block_read_ptr;
     
     uint8_t bytes_to_read = min(cur_chunk_size, bytes_left_in_block);
@@ -880,6 +881,7 @@ static void load_block(uint8_t track, uint8_t block)
     last_physical_track = track;
     last_physical_sector = physical_sector;
     last_side = side;
+    last_block = block;
   }
   else {
     prepare_drive();
@@ -939,6 +941,7 @@ static void load_block(uint8_t track, uint8_t block)
 
       last_drive_access_frame = FRAMECOUNT;
     }
+    last_block = block;
   }
 
   if (block & 1) {

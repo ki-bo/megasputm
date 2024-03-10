@@ -8,9 +8,14 @@
 
 // private functions
 static inline uint16_t read_var(uint8_t var);
+static inline uint8_t read_var8(uint8_t var);
 static inline void write_var(uint8_t var, uint16_t value);
 static uint8_t read_byte(void);
 static uint16_t read_word(void);
+static uint8_t resolve_var_param(void);
+static uint8_t resolve_next_param8(void);
+static uint16_t resolve_next_param16(void);
+static void read_null_terminated_string(char *dest);
 static void actor_ops(void);
 static void print(void);
 static void resource_cmd(void);
@@ -22,10 +27,12 @@ static void cutscene(void);
 static void cursor_cmd(void);
 static void load_room(void);
 static void print_ego(void);
+static void unimplemented_opcode(void);
 
 #pragma clang section bss="zzpage"
 
 static uint8_t __attribute__((zpage)) opcode;
+static uint8_t __attribute__((zpage)) param_mask;
 static uint8_t * __attribute__((zpage)) pc;
 
 #pragma clang section bss="zdata"
@@ -36,6 +43,10 @@ void (*opcode_jump_table[128])(void);
 
 void script_init(void)
 {
+  for (uint8_t i = 0; i < 128; i++) {
+    opcode_jump_table[i] = &unimplemented_opcode;
+  }
+
   opcode_jump_table[0x0c] = &resource_cmd;
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &print;
@@ -79,6 +90,7 @@ uint8_t script_run(uint8_t proc_id)
   pc = NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS) + proc_pc[proc_id];
   while(1) {
     opcode = read_byte();
+    param_mask = opcode & 0xe0;
     exec_opcode(opcode);
   }
 }
@@ -88,23 +100,31 @@ static inline uint16_t read_var(uint8_t var)
   volatile uint16_t value;
   // Problem: the sta instructions get optimized away, although we added volatile.
   // If we remove the volatile keyword, then even the whole function will be optimized away...
-  __asm volatile(" lda variables_lo, x\n"
-                 " sta %0\n"
-                 " lda variables_hi, x\n"
-                 " sta %0+1\n"
-                 : "=Kzp16" (value)
-                 : "Kx" (var)
-                 : "a");
+  value = variables_lo[var];
+  value |= (variables_hi[var] << 8);
+  // __asm volatile(" lda variables_lo, x\n"
+  //                " sta %0\n"
+  //                " lda variables_hi, x\n"
+  //                " sta %0+1\n"
+  //                : "=Kzp16" (value)
+  //                : "Kx" (var)
+  //                : "a");
   return value;
 }
+
+static inline uint8_t read_var8(uint8_t var)
+{
+  return variables_lo[var];
+}
+
 
 static inline void write_var(uint8_t var, uint16_t value)
 {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-value"
   // Need to do this as otherwise those variables are not visible to the inline assembly
-  variables_lo;
-  variables_hi;
+  //variables_lo;
+  //variables_hi;
 #pragma clang diagnostic pop
 
   // variables_lo[var] = LSB(value);
@@ -154,7 +174,7 @@ static uint16_t read_word(void)
                  " inw pc"
                  : "=Kzp16" (value)
                  :
-                 : "y");
+                 : "a", "y");
 
   return value;
 }
@@ -163,16 +183,83 @@ static uint8_t resolve_var_param()
 {
   uint8_t param = read_byte();
   if (opcode & 0x80) {
-    return read_var(param);
+    return read_var8(param);
   }
   else {
     return param;
   }
 }
 
+static uint8_t resolve_next_param8(void)
+{
+  uint8_t param;
+  if (opcode & param_mask) {
+    param = read_var8(read_byte());
+  }
+  else {
+    param = read_byte();
+  }
+  param_mask >>= 1;
+  return param;
+}
+
+static uint16_t resolve_next_param16(void)
+{
+  uint16_t param;
+  if (opcode & param_mask) {
+    param = read_var(read_byte());
+  }
+  else {
+    param = read_word();
+  }
+  param_mask >>= 1;
+  return param;
+}
+
+static void read_null_terminated_string(char *dest)
+{
+  uint8_t num_chars = 0;
+  char c;
+  while ((c = read_byte())) {
+    if (num_chars < ACTOR_NAME_LEN - 1) {
+      *dest++ = c;
+      ++num_chars;
+    }
+  }
+  *dest = 0;
+}
+
+/**
+ * @brief Opcode 0x13: Actor ops
+ * 
+ * Variant opcodes: 0x53, 0x93, 0xD3
+ */
 static void actor_ops(void)
 {
   debug_msg("Actor ops");
+  uint8_t actor_id   = resolve_next_param8();
+  uint8_t param      = resolve_next_param8();
+  uint8_t sub_opcode = read_byte();
+
+  switch (sub_opcode) {
+    case 0x01:
+      actor_sounds[actor_id] = param;
+      break;
+    case 0x02:
+      actor_palette_idx[actor_id] = read_byte();
+      actor_palette_colors[actor_id] = param;
+      break;
+    case 0x03:
+      read_null_terminated_string(actor_names[actor_id]);
+      debug_out("Actor name: %s", actor_names[actor_id]);
+      break;
+    case 0x04:
+      actor_costumes[actor_id] = param;
+      break;
+    case 0x05:
+      actor_talk_colors[actor_id] = param;
+      break;
+  }
 }
 
 static void print(void)
@@ -183,6 +270,26 @@ static void print(void)
 static void resource_cmd(void)
 {
   debug_msg("Resource cmd");
+  uint8_t resource_id = resolve_next_param8();
+  uint8_t sub_opcode = read_byte();
+
+  switch (sub_opcode) {
+    case 0x31:
+      res_provide(RES_TYPE_ROOM, resource_id, 0);
+      break;
+    case 0x51:
+      res_provide(RES_TYPE_SCRIPT, resource_id, 0);
+      break;
+    case 0x53:
+      res_lock(RES_TYPE_SCRIPT, resource_id, 0);
+      break;
+    case 0x61:
+      res_provide(RES_TYPE_SOUND, resource_id, 0);
+      break;
+    case 0x63:
+      res_lock(RES_TYPE_SOUND, resource_id, 0);
+      break;
+  }
 }
 
 /**
@@ -192,11 +299,9 @@ static void resource_cmd(void)
  */
 static void assign(void)
 {
+  debug_msg("Assign");
   uint8_t var_idx = read_byte();
-  if (opcode & 0x80) {
-    var_idx = read_var(var_idx);
-  }
-  write_var(var_idx, read_word());
+  write_var(var_idx, resolve_next_param16());
 }
 
 /**
@@ -216,8 +321,9 @@ static void delay(void)
 static void subtract(void)
 {
   debug_msg("Subtract");
+  uint8_t var_idx = read_byte();
+  write_var(var_idx, resolve_next_param16() - read_word());
 }
-
 
 static void cutscene(void)
 {
@@ -231,11 +337,15 @@ static void cutscene(void)
 static void add(void)
 {
   debug_msg("Add");
+  uint8_t var_idx = read_byte();
+  write_var(var_idx, resolve_next_param16() + read_word());
 }
 
 static void cursor_cmd(void)
 {
   debug_msg("Cursor cmd");
+  state_cursor = read_byte();
+  state_iface  = read_byte();
 }
 
 static void load_room(void)
@@ -246,4 +356,10 @@ static void load_room(void)
 static void print_ego(void)
 {
   debug_msg("Print ego");
+}
+
+static void unimplemented_opcode(void)
+{
+  debug_out("Unimplemented opcode: %02x at %04x", opcode, (uint16_t)(pc - 1));
+  fatal_error(ERR_UNKNOWN_OPCODE);
 }

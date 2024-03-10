@@ -1,7 +1,7 @@
 (define memories
 '(
         (block stack (size #x100)) 
-        (block cstack (size #xffa))
+        (block cstack (size #x7fa))
 
         (memory zeropage (address (#x2 . #xff))  (qualifier zpage)
 	        (section (registers (#x2. #x7f)))
@@ -61,8 +61,8 @@
         ; memory for main bss
         (memory bssram-main (address (#xe000 . #xfff9))
                 (section 
-                        (zdata (#xe000 . #xefff))
-                        (cstack (#xf000 . #xfff9))
+                        (zdata (#xe000 . #xf7ff))
+                        (cstack (#xf800 . #xfff9))
                 )
         )
 

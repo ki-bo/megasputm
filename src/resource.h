@@ -22,5 +22,7 @@ enum res_type_flags_t {
 
 void res_init(void);
 uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint);
+void res_lock(uint8_t type, uint8_t id, uint8_t hint);
+void res_unlock(uint8_t type, uint8_t id, uint8_t hint);
 
 #endif // __RESOURCE_H

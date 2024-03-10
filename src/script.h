@@ -9,6 +9,7 @@ enum script_return_t {
     SCRIPT_BLOCKED = 2,
 };
 
+void script_init(void);
 uint8_t script_run(uint8_t script_id);
 
 #endif // __SCRIPT_H

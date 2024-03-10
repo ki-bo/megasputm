@@ -73,6 +73,11 @@ void map_cs_gfx(void);
  */
 void map_ds_resource(uint8_t res_page);
 
+uint16_t map_get_cs(void);
+uint16_t map_get_ds(void);
+void map_set_cs(uint16_t map_reg);
+void map_set_ds(uint16_t map_reg);
+
 /** @} */ // end of map
 
 #endif // __MAP_H

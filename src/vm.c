@@ -19,6 +19,17 @@ enum {
 uint8_t global_game_objects[780];
 uint8_t variables_lo[256];
 uint8_t variables_hi[256];
+
+uint8_t actor_sounds[NUM_ACTORS];
+uint8_t actor_palette_idx[NUM_ACTORS];
+uint8_t actor_palette_colors[NUM_ACTORS];
+char    actor_names[NUM_ACTORS][ACTOR_NAME_LEN];
+uint8_t actor_costumes[NUM_ACTORS];
+uint8_t actor_talk_colors[NUM_ACTORS];
+
+uint8_t state_cursor;
+uint8_t state_iface;
+
 uint8_t jiffy_counter;
 uint8_t proc_state[NUM_SCRIPT_SLOTS];
 uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
