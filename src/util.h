@@ -43,6 +43,8 @@
 
 #define HUGE_U8_PTR(X) ((uint8_t __huge *)(X))
 #define HUGE_I8_PTR(X) ((int8_t __huge *)(X))
+#define HUGE_U16_PTR(X) ((uint16_t __huge *)(X))
+#define HUGE_I16_PTR(X) ((int16_t __huge *)(X))
 
 #define HUGE_VU8_PTR(X) ((volatile uint8_t __huge *)(X))
 #define HUGE_VI8_PTR(X) ((volatile int8_t __huge *)(X))
@@ -50,7 +52,6 @@
 #define LSB(X)   ((uint8_t)((uint8_t)(X)))
 #define MSB(X)   ((uint8_t)((uint16_t)(X) >> 8))
 #define LSB16(X) ((uint16_t)(X))
-#define MB(X)    ((uint8_t)((uintptr_t)(X) >> 16))
 #define BANK(X)  ((uint8_t)(((uint8_t)((uintptr_t)(X) >> 16)) & 0x0f))
 
 #define max(a,b)             \
@@ -83,8 +84,8 @@ void debug_msg(char* msg);
 // Memory functions (overloaded using DMA functionality)
 void *memcpy(void *dest, const void *src, size_t n);
 void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n);
-void __far *memcpy_far(void __far *dest, const void __far *src, size_t n);
+void __far *memcpy_bank(void __far *dest, const void __far *src, size_t n);
 void *memset(void *s, int c, size_t n);
-void __far *memset_far(void __far *s, int c, size_t n);
+void __far *memset_bank(void __far *s, int c, size_t n);
 
 #endif // __UTIL_H

@@ -37,6 +37,7 @@ uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
 // Private functions
 static void load_script(uint8_t script_id);
+static uint8_t wait_for_jiffy(void);
 
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
@@ -60,10 +61,13 @@ __task void vm_mainloop(void)
 
   load_script(1);
 
+  wait_for_jiffy(); // this resets the elapsed jiffies timer
+
   while(1) {
     map_cs_diskio();
     diskio_check_motor_off();
     unmap_cs();
+    uint8_t elapsed_jiffies = wait_for_jiffy();
 
     for (int i = 0; i < NUM_SCRIPT_SLOTS; i++)
     {
@@ -73,6 +77,20 @@ __task void vm_mainloop(void)
       }
     }
   }
+}
+
+void vm_switch_room(uint8_t res_slot)
+{
+  map_ds_resource(res_slot);
+  uint8_t *data_ptr = NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS + 4);
+  uint16_t width = *NEAR_U16_PTR(data_ptr);
+  data_ptr += 6;
+  uint16_t bg_data_offset = *NEAR_U16_PTR(data_ptr);
+
+  map_cs_gfx();
+  //gfx_fade_out();
+  gfx_decode_bg_image(NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS + bg_data_offset), width);
+  unmap_cs();
 }
 
 static void load_script(uint8_t script_id)
@@ -97,8 +115,10 @@ static void load_script(uint8_t script_id)
   res_provide(RES_TYPE_SCRIPT | RES_LOCKED_MASK, script_id, 0);
 }
 
-uint8_t vm_wait_for_jiffy(void)
+static uint8_t wait_for_jiffy(void)
 {
-  uint8_t num_jiffies_elapsed = wait_for_jiffy_timer();
+  map_cs_gfx();
+  uint8_t num_jiffies_elapsed = gfx_wait_for_jiffy_timer();
+  unmap_cs();
   return num_jiffies_elapsed;
 }

@@ -79,15 +79,10 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
 {
   uint8_t i = hint;
   do {
-    if(page_res_index[i] == id && page_res_type[i] == (type_and_flags | RES_TYPE_MASK)) {
+    if(page_res_index[i] == id && page_res_type[i] == (type_and_flags & RES_TYPE_MASK)) {
       if (type_and_flags != page_res_type[i]) {
         // resource is available, but need to update flags
-        uint8_t j = i;
-        do {
-          page_res_type[j] = type_and_flags;
-          ++j;
-        }
-        while (page_res_index[j] == id && page_res_type[j] == (type_and_flags | RES_TYPE_MASK));
+        update_flags(type_and_flags, id, i);
       }
       debug_out("Found resource %d at page %d", id, i);
       return i;
@@ -109,7 +104,7 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
   map_ds_resource(page);
   continue_resource_loading();
   map_set_ds(ds_save);
-  return 0;
+  return page;
 }
 
 void res_lock(uint8_t type, uint8_t id, uint8_t hint)

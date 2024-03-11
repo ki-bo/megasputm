@@ -5,7 +5,7 @@
 
 #define MAX_RESOURCE_SIZE        0x4000
 #define DEFAULT_RESOURCE_ADDRESS 0x8000
-#define RESOURCE_MEMORY          0x50000UL
+#define RESOURCE_MEMORY          0x18000UL
 
 enum res_type_t {
     RES_TYPE_NONE = 0,

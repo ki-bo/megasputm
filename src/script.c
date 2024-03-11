@@ -230,6 +230,35 @@ static void read_null_terminated_string(char *dest)
 }
 
 /**
+ * @brief Opcode 0x0c: Resource cmd
+ * 
+ */
+static void resource_cmd(void)
+{
+  debug_msg("Resource cmd");
+  uint8_t resource_id = resolve_next_param8();
+  uint8_t sub_opcode = read_byte();
+
+  switch (sub_opcode) {
+    case 0x31:
+      res_provide(RES_TYPE_ROOM, resource_id, 0);
+      break;
+    case 0x51:
+      res_provide(RES_TYPE_SCRIPT, resource_id, 0);
+      break;
+    case 0x53:
+      res_lock(RES_TYPE_SCRIPT, resource_id, 0);
+      break;
+    case 0x61:
+      res_provide(RES_TYPE_SOUND, resource_id, 0);
+      break;
+    case 0x63:
+      res_lock(RES_TYPE_SOUND, resource_id, 0);
+      break;
+  }
+}
+
+/**
  * @brief Opcode 0x13: Actor ops
  * 
  * Variant opcodes: 0x53, 0x93, 0xD3
@@ -265,31 +294,6 @@ static void actor_ops(void)
 static void print(void)
 {
   debug_msg("Print");
-}
-
-static void resource_cmd(void)
-{
-  debug_msg("Resource cmd");
-  uint8_t resource_id = resolve_next_param8();
-  uint8_t sub_opcode = read_byte();
-
-  switch (sub_opcode) {
-    case 0x31:
-      res_provide(RES_TYPE_ROOM, resource_id, 0);
-      break;
-    case 0x51:
-      res_provide(RES_TYPE_SCRIPT, resource_id, 0);
-      break;
-    case 0x53:
-      res_lock(RES_TYPE_SCRIPT, resource_id, 0);
-      break;
-    case 0x61:
-      res_provide(RES_TYPE_SOUND, resource_id, 0);
-      break;
-    case 0x63:
-      res_lock(RES_TYPE_SOUND, resource_id, 0);
-      break;
-  }
 }
 
 /**
@@ -351,6 +355,9 @@ static void cursor_cmd(void)
 static void load_room(void)
 {
   debug_msg("Load room");
+  uint8_t room_no = read_byte();
+  uint8_t res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
+  vm_switch_room(res_slot);
 }
 
 static void print_ego(void)

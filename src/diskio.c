@@ -528,8 +528,8 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
 
   switch (type) {
     case RES_TYPE_ROOM:
-      room_id = lfl_index.room_disk_num[id];
-      offset = lfl_index.room_offset[id];
+      room_id = id;
+      offset = 0;
       break;
     case RES_TYPE_COSTUME:
       room_id = lfl_index.costume_room[id];
@@ -586,8 +586,6 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
  */
 void diskio_continue_resource_loading(void)
 {
-  POKE(0xd680, 0x81); // enable FDC buffer at 0xde00
-
   uint8_t *target_ptr = NEAR_U8_PTR(0x8000);
   *(uint16_t *)target_ptr = cur_chunk_size;
   target_ptr += 2;
@@ -596,12 +594,10 @@ void diskio_continue_resource_loading(void)
   while (cur_chunk_size != 0) {
     uint8_t bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
     bytes_left_in_block -= cur_block_read_ptr;
-    uint8_t *src_ptr = NEAR_U8_PTR(last_block % 2 == 0 ? 0xde02 : 0xdf02);
-    src_ptr += cur_block_read_ptr;
     
     uint8_t bytes_to_read = min(cur_chunk_size, bytes_left_in_block);
     for (uint8_t i = 0; i < bytes_to_read; ++i) {
-      target_ptr[i] = src_ptr[i] ^ 0xff;
+      target_ptr[i] = FDC.data ^ 0xff;
     }
     
     cur_chunk_size -= bytes_to_read;
@@ -615,8 +611,6 @@ void diskio_continue_resource_loading(void)
     }
 
   }
-
-  POKE(0xd680, 0x82); // disable FDC buffer at 0xde00
 
   release_drive();
 }

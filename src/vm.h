@@ -37,5 +37,6 @@ extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
 void vm_init(void);
 __task void vm_mainloop(void);
+void vm_switch_room(uint8_t res_slot);
 
 #endif // __VM_H
