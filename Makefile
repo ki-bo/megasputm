@@ -40,7 +40,7 @@ obj/%.o: %.c
 	@mkdir -p obj
 	$(CC) $(CC_FLAGS) $(DEP_FLAGS) -c $< -o $@
 
-runtime.raw:  $(OBJS) mega65-mm.scm
+runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
 mm.d81: runtime.raw

@@ -2,7 +2,6 @@
 #include "io.h"
 #include "resource.h"
 #include "util.h"
-#include <calypsi/intrinsics6502.h>
 #include <mega65.h>
 #include <stdint.h>
 
@@ -40,6 +39,7 @@ static void raster_irq(void);
  */
 void gfx_init()
 {
+  VICIV.sdbdrwd_msb &= ~VIC4_HOTREG_MASK;
   VICIV.palsel = 0x00; // select and map palette 0
   VICIV.ctrla |= 0x04; // enable RAM palette
   VICIV.ctrlb = VIC4_VFAST_MASK;
@@ -51,24 +51,13 @@ void gfx_init()
 
   __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
   __auto_type colram_ptr = FAR_U16_PTR(COLRAM);
-  uint16_t char_data = BG_BITMAP / 64;
 
   for (uint16_t i = 0; i < 1000; ++i) {
     *screen_ptr++ = 0x0020;
     *colram_ptr++ = 0x0f00;
   }
 
-  // Fill chars with initial fcm pattern starting at 3rd row (offset 80 chars/words)
-  screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 80;
-  colram_ptr = FAR_U16_PTR(COLRAM) + 80;
-
-  for (uint8_t x = 0; x < 40; ++x) {
-    for (uint8_t y = 0; y < 16; ++y) {
-      *screen_ptr = char_data++;
-      screen_ptr += 40;
-    }
-    screen_ptr -= 639;
-  }
+  gfx_fade_in();
 
   VICIV.scrnptr = (uint32_t)SCREEN_RAM; // implicitly sets CHRCOUNT(9..8) to 0
   VICIV.bordercol = COLOR_BLACK;
@@ -134,6 +123,20 @@ void gfx_fade_out(void)
     ++screen_ptr;
   }
   while (--num_chars != 0);
+}
+
+void gfx_fade_in(void)
+{
+  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 80;
+  uint16_t char_data = BG_BITMAP / 64;
+
+  for (uint8_t x = 0; x < 40; ++x) {
+    for (uint8_t y = 0; y < 16; ++y) {
+      *screen_ptr = char_data++;
+      screen_ptr += 40;
+    }
+    screen_ptr -= 639;
+  }
 }
 
 uint8_t gfx_wait_for_jiffy_timer(void)

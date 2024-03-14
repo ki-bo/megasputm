@@ -9,16 +9,10 @@
 
 #pragma clang section bss="zdata"
 
-enum {
-  PROC_STATE_FREE,
-  PROC_STATE_RUNNING,
-  PROC_STATE_WAITING,
-  PROC_STATE_DEAD
-};
-
 uint8_t global_game_objects[780];
 uint8_t variables_lo[256];
 uint8_t variables_hi[256];
+char sentence[256];
 
 uint8_t actor_sounds[NUM_ACTORS];
 uint8_t actor_palette_idx[NUM_ACTORS];
@@ -26,14 +20,17 @@ uint8_t actor_palette_colors[NUM_ACTORS];
 char    actor_names[NUM_ACTORS][ACTOR_NAME_LEN];
 uint8_t actor_costumes[NUM_ACTORS];
 uint8_t actor_talk_colors[NUM_ACTORS];
+uint8_t actor_talking;
 
 uint8_t state_cursor;
 uint8_t state_iface;
 
+uint8_t active_script_slot;
 uint8_t jiffy_counter;
 uint8_t proc_state[NUM_SCRIPT_SLOTS];
 uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 uint16_t proc_pc[NUM_SCRIPT_SLOTS];
+int32_t proc_wait_timer[NUM_SCRIPT_SLOTS];
 
 // Private functions
 static void load_script(uint8_t script_id);
@@ -43,9 +40,10 @@ static uint8_t wait_for_jiffy(void);
 
 void vm_init(void)
 {
-  for (int i = 0; i < NUM_SCRIPT_SLOTS; i++)
+  for (active_script_slot = 0; active_script_slot < NUM_SCRIPT_SLOTS; ++active_script_slot)
   {
-    proc_state[i] = PROC_STATE_FREE;
+    proc_state[active_script_slot] = PROC_STATE_FREE;
+    proc_wait_timer[active_script_slot] = 0;
   }
 }
 
@@ -63,20 +61,36 @@ __task void vm_mainloop(void)
 
   wait_for_jiffy(); // this resets the elapsed jiffies timer
 
-  while(1) {
+  while (1) {
     map_cs_diskio();
     diskio_check_motor_off();
     unmap_cs();
     uint8_t elapsed_jiffies = wait_for_jiffy();
 
-    for (int i = 0; i < NUM_SCRIPT_SLOTS; i++)
+    for (active_script_slot = 0; 
+         active_script_slot < NUM_SCRIPT_SLOTS;
+         ++active_script_slot)
     {
-      if (proc_state[i] == PROC_STATE_RUNNING)
+      if (proc_state[active_script_slot] == PROC_STATE_WAITING)
       {
-        script_run(i);
+        proc_wait_timer[active_script_slot] += elapsed_jiffies;
+        uint8_t timer_msb = (uint8_t)((uintptr_t)(proc_wait_timer[active_script_slot]) >> 24);
+        if (timer_msb == 0)
+        {
+          proc_state[active_script_slot] = PROC_STATE_RUNNING;
+        }
+      }
+      if (proc_state[active_script_slot] == PROC_STATE_RUNNING)
+      {
+        script_run(active_script_slot);
       }
     }
   }
+}
+
+uint8_t vm_get_active_proc_state(void)
+{
+  return proc_state[active_script_slot];
 }
 
 void vm_switch_room(uint8_t res_slot)
@@ -90,19 +104,49 @@ void vm_switch_room(uint8_t res_slot)
   map_cs_gfx();
   //gfx_fade_out();
   gfx_decode_bg_image(NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS + bg_data_offset), width);
+  //gfx_fade_in();
   unmap_cs();
+
+  // restore respource mapping of running script again
+  map_ds_resource(proc_res_slot[active_script_slot]);
+}
+
+void vm_actor_start_talking(uint8_t actor_id)
+{
+  actor_talking = actor_id;
+  map_cs_gfx();
+  unmap_cs();
+}
+
+/**
+ * @brief Delays the currently active script
+ *
+ * Initializes the delay timer for the currently active script. Note that the timer
+ * is actually counting up, so the script will provide a negative number of ticks
+ * as parameter to this function.
+ *
+ * The scheduler will suspend execution of the currently active process until the
+ * timer becomes positive.
+ *
+ * The process state will be set to PROC_STATE_WAITING when this function returns.
+ * 
+ * @param timer_value The negative amount of ticks to suspend
+ */
+void vm_set_script_wait_timer(int32_t negative_ticks)
+{
+  proc_state[active_script_slot] = PROC_STATE_WAITING;
+  proc_wait_timer[active_script_slot] = negative_ticks;
 }
 
 static void load_script(uint8_t script_id)
 {
-  uint8_t slot = 0;
-  for (int i = 0; i < NUM_SCRIPT_SLOTS; i++)
+  uint8_t slot;
+  for (slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
-    if (proc_state[i] == PROC_STATE_FREE)
+    if (proc_state[slot] == PROC_STATE_FREE)
     {
-      slot = i;
-      proc_state[i] = PROC_STATE_RUNNING;
-      proc_pc[i] = 4; // skipping script header directly to first opcode
+      proc_state[slot] = PROC_STATE_RUNNING;
+      proc_pc[slot] = 4; // skipping script header directly to first opcode
       break;
     }
   }

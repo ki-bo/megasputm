@@ -2,6 +2,7 @@
 #define __UTIL_H
 
 #include "error.h"
+#include <calypsi/intrinsics6502.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>

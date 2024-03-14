@@ -12,6 +12,7 @@ static inline uint8_t read_var8(uint8_t var);
 static inline void write_var(uint8_t var, uint16_t value);
 static uint8_t read_byte(void);
 static uint16_t read_word(void);
+static uint32_t read_24bits(void);
 static uint8_t resolve_var_param(void);
 static uint8_t resolve_next_param8(void);
 static uint16_t resolve_next_param16(void);
@@ -88,27 +89,21 @@ uint8_t script_run(uint8_t proc_id)
 {
   map_ds_resource(proc_res_slot[proc_id]);
   pc = NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS) + proc_pc[proc_id];
-  while(1) {
+  while (vm_get_active_proc_state() == PROC_STATE_RUNNING) {
     opcode = read_byte();
     param_mask = opcode & 0xe0;
     exec_opcode(opcode);
   }
+
+  proc_pc[proc_id] = (uint16_t)(pc - NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS));
+
+  return 0;
 }
 
 static inline uint16_t read_var(uint8_t var)
 {
   volatile uint16_t value;
-  // Problem: the sta instructions get optimized away, although we added volatile.
-  // If we remove the volatile keyword, then even the whole function will be optimized away...
-  value = variables_lo[var];
-  value |= (variables_hi[var] << 8);
-  // __asm volatile(" lda variables_lo, x\n"
-  //                " sta %0\n"
-  //                " lda variables_hi, x\n"
-  //                " sta %0+1\n"
-  //                : "=Kzp16" (value)
-  //                : "Kx" (var)
-  //                : "a");
+  value = variables_lo[var] | (variables_hi[var] << 8);
   return value;
 }
 
@@ -120,13 +115,6 @@ static inline uint8_t read_var8(uint8_t var)
 
 static inline void write_var(uint8_t var, uint16_t value)
 {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-value"
-  // Need to do this as otherwise those variables are not visible to the inline assembly
-  //variables_lo;
-  //variables_hi;
-#pragma clang diagnostic pop
-
   // variables_lo[var] = LSB(value);
   // variables_hi[var] = MSB(value);
   __asm volatile(" lda %[val]\n"
@@ -165,16 +153,41 @@ static uint16_t read_word(void)
 
   // value = *NEAR_U16_PTR(pc);
   // pc += 2;
-  __asm volatile(" ldy #0\n"
-                 " lda (pc),y\n"
-                 " sta %0\n"
-                 " inw pc\n"
-                 " lda (pc),y\n"
-                 " sta %0+1\n"
-                 " inw pc"
-                 : "=Kzp16" (value)
-                 :
-                 : "a", "y");
+  __asm (" ldy #0\n"
+         " lda (pc),y\n"
+         " sta %0\n"
+         " inw pc\n"
+         " lda (pc),y\n"
+         " sta %0+1\n"
+         " inw pc"
+         : "=Kzp16" (value)
+         :
+         : "a", "y");
+
+  return value;
+}
+
+static int32_t read_int24(void)
+{
+  int32_t value;
+
+  __asm (" ldz #0\n"
+         " ldq (pc),z\n"
+         " sta %0\n"
+         " stx %0+1\n"
+         " sty %0+2\n"
+         " ldz #0\n"
+         " tya\n"
+         " bpl positive\n"
+         " dez\n"
+         "positive:\n"
+         " stz %0+3\n"
+         " inw pc\n"
+         " inw pc\n"
+         " inw pc\n"
+         : "=Kzp32" (value)
+         :
+         : "a", "x", "y", "z");
 
   return value;
 }
@@ -193,7 +206,8 @@ static uint8_t resolve_var_param()
 static uint8_t resolve_next_param8(void)
 {
   uint8_t param;
-  if (opcode & param_mask) {
+  uint8_t masked_opcode = opcode & param_mask;
+  if (masked_opcode) {
     param = read_var8(read_byte());
   }
   else {
@@ -206,7 +220,8 @@ static uint8_t resolve_next_param8(void)
 static uint16_t resolve_next_param16(void)
 {
   uint16_t param;
-  if (opcode & param_mask) {
+  uint8_t masked_opcode = opcode & param_mask;
+  if (masked_opcode) {
     param = read_var(read_byte());
   }
   else {
@@ -218,12 +233,27 @@ static uint16_t resolve_next_param16(void)
 
 static void read_null_terminated_string(char *dest)
 {
+  char c;
+  while ((c = read_byte())) {
+    *dest++ = c;
+  }
+  *dest = 0;
+}
+
+static void read_encoded_string_null_terminated(char *dest)
+{
   uint8_t num_chars = 0;
   char c;
   while ((c = read_byte())) {
-    if (num_chars < ACTOR_NAME_LEN - 1) {
-      *dest++ = c;
-      ++num_chars;
+    if (c & 0x80) {
+      *dest = c;
+      ++dest;
+      *dest = ' ';
+      ++dest;
+    }
+    else {
+      *dest = c;
+      ++dest;
     }
   }
   *dest = 0;
@@ -280,7 +310,6 @@ static void actor_ops(void)
       break;
     case 0x03:
       read_null_terminated_string(actor_names[actor_id]);
-      debug_out("Actor name: %s", actor_names[actor_id]);
       break;
     case 0x04:
       actor_costumes[actor_id] = param;
@@ -294,6 +323,9 @@ static void actor_ops(void)
 static void print(void)
 {
   debug_msg("Print");
+  uint8_t actor_id = resolve_next_param8();
+  read_encoded_string_null_terminated(sentence);
+  vm_actor_start_talking(actor_id);
 }
 
 /**
@@ -311,10 +343,15 @@ static void assign(void)
 /**
  * @brief Opcode 0x2E: Delay
  * 
+ * Reads 24 bits of ticks value for the wait timer. Note that the amount
+ * of ticks that the script should pause actually needs to be calculated by
+ * ticks_to_wait = 0xffffff - param_value.
  */
 static void delay(void)
 {
   debug_msg("Delay");
+  int32_t negative_ticks = read_int24();
+  vm_set_script_wait_timer(negative_ticks);
 }
 
 /**

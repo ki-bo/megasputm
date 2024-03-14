@@ -2,6 +2,7 @@
 #include "init.h"
 #include "map.h"
 #include "vm.h"
+#include "util.h"
 
 #pragma clang section text="code"
 
@@ -23,9 +24,8 @@ __task void main(void)
   // Use diskio module to load the main code to section code_main at 0x2000
   map_cs_diskio();
   diskio_load_file("M01", (uint8_t __far *)(0x4000));  // load main code
-  diskio_load_file("M12", (uint8_t __far *)(0x14000)); // load gfx code
-  unmap_all();
-  
+  unmap_cs();
+
   // switch to real drive
   //*(uint8_t *)(0xd68b) &= ~1;
   //*(uint8_t *)(0xd6a1) |= 1;

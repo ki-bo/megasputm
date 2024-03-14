@@ -84,17 +84,13 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
         // resource is available, but need to update flags
         update_flags(type_and_flags, id, i);
       }
-      debug_out("Found resource %d at page %d", id, i);
       return i;
     }
     i++;
   }
   while(i != hint);
 
-  debug_out("Loading resource type %d id %d", type_and_flags & RES_TYPE_MASK, id);
-
   uint16_t chunk_size = start_resource_loading(type_and_flags & RES_TYPE_MASK, id);
-  debug_out("  Size: %d", chunk_size);
 
   if (chunk_size > MAX_RESOURCE_SIZE) {
     fatal_error(ERR_RESOURCE_TOO_LARGE);
