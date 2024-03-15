@@ -217,7 +217,7 @@ static void read_encoded_string_null_terminated(char *dest)
   char c;
   while ((c = read_byte())) {
     if (c & 0x80) {
-      *dest = c;
+      *dest = c & 0x7f;
       ++dest;
       *dest = ' ';
       ++dest;
@@ -295,7 +295,7 @@ static void print(void)
 {
   debug_msg("Print");
   uint8_t actor_id = resolve_next_param8();
-  read_encoded_string_null_terminated(sentence);
+  read_encoded_string_null_terminated(dialog_buffer);
   vm_actor_start_talking(actor_id);
 }
 

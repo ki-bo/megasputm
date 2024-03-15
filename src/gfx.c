@@ -1,4 +1,5 @@
 #include "gfx.h"
+#include "charset.h"
 #include "input.h"
 #include "io.h"
 #include "map.h"
@@ -137,6 +138,9 @@ void gfx_init()
   VICIV.spr_hgten = 0x03;                                       // enable variable height for sprites 0 and 1
   VICIV.spr_hght = 16;                                          // 16 pixels high
   VICIV.spr_x64en = 0x01;                                       // enable 8 bytes per row for sprite 0
+
+  // charset & spr16 enable
+  VICIV.charptr = CHARSET;                                      // will overwrite SPREN16, so set this first
   VICIV.spr_16en = 0x01;                                        // enable 16 colors for sprite 0
   // 16 bit sprite pointers
   uint8_t rasline0_save = VICIV.rasline0;
@@ -211,7 +215,7 @@ static void raster_irq ()
 
 void gfx_start(void)
 {
-    VICII.ctrl1 |= 0x10; // enable video output
+    VICII.ctrl1 = 0x1b; // enable video output
     __enable_interrupts();
 }
 
@@ -343,4 +347,35 @@ void update_cursor()
       cursor_color_index = 0;
     }
   }
+}
+
+uint8_t gfx_print_dialog(uint8_t color, const char *text)
+{
+  uint8_t num_chars = 0;
+  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
+  uint8_t done = 0;
+  for (uint8_t i = 0; i < 80; ++i) {
+    if (done) {
+      *screen_ptr = 0x0020;
+    }
+    else {
+      char c = text[i];
+      if (c == '\0') {
+        done = 1;
+        c = ' ';
+      }
+      else if (c == 1) {
+        for (; i < 40; ++i) {
+          *screen_ptr = 0x0020;
+          ++screen_ptr;
+        }
+        continue;
+      }
+      *screen_ptr = (uint16_t)c;
+      ++num_chars;
+      ++screen_ptr;
+    }
+  }
+
+  return num_chars;
 }

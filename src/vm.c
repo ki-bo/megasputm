@@ -12,7 +12,7 @@
 uint8_t global_game_objects[780];
 uint8_t variables_lo[256];
 uint8_t variables_hi[256];
-char sentence[256];
+char dialog_buffer[256];
 
 uint8_t actor_sounds[NUM_ACTORS];
 uint8_t actor_palette_idx[NUM_ACTORS];
@@ -26,6 +26,8 @@ uint8_t state_iface;
 
 uint8_t active_script_slot;
 uint8_t jiffy_counter;
+uint8_t dialog_speed = 6;
+uint16_t dialog_timer;
 uint8_t proc_state[NUM_SCRIPT_SLOTS];
 uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 uint16_t proc_pc[NUM_SCRIPT_SLOTS];
@@ -38,6 +40,7 @@ uint8_t cs_iface_state;
 
 
 // Private functions
+static void process_dialog(uint8_t jiffies_elapsed);
 static void load_script(uint8_t script_id);
 static uint8_t wait_for_jiffy(void);
 
@@ -69,6 +72,7 @@ __task void vm_mainloop(void)
   load_script(1);
 
   wait_for_jiffy(); // this resets the elapsed jiffies timer
+  dialog_timer = 0;
 
   while (1) {
     map_cs_diskio();
@@ -88,6 +92,8 @@ __task void vm_mainloop(void)
         {
           proc_state[active_script_slot] = PROC_STATE_RUNNING;
         }
+
+        process_dialog(elapsed_jiffies);
       }
       if (proc_state[active_script_slot] == PROC_STATE_RUNNING)
       {
@@ -152,8 +158,33 @@ void vm_start_cutscene(void)
 void vm_actor_start_talking(uint8_t actor_id)
 {
   actor_talking = actor_id;
+  uint8_t talk_color = actor_id != 0xff ? actor_talk_colors[actor_id] : 0x0f;
   map_cs_gfx();
+  uint8_t num_chars = gfx_print_dialog(talk_color, dialog_buffer);
   unmap_cs();
+  dialog_timer = (uint16_t)num_chars * (uint16_t)dialog_speed;
+}
+
+static void process_dialog(uint8_t jiffies_elapsed)
+{
+  if (dialog_timer == 0)
+  {
+    return;
+  }
+
+  if (dialog_timer >= jiffies_elapsed)
+  {
+    dialog_timer -= jiffies_elapsed;
+  }
+  else
+  {
+    dialog_timer = 0;
+  }
+
+  if (!dialog_timer) {
+    actor_talking = 0xff;
+    gfx_print_dialog(0xff, "\0");
+  }
 }
 
 static void load_script(uint8_t script_id)

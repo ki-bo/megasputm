@@ -28,7 +28,7 @@ enum {
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];
-extern char sentence[256];
+extern char dialog_buffer[256];
 
 extern uint8_t actor_sounds[NUM_ACTORS];
 extern uint8_t actor_palette_idx[NUM_ACTORS];

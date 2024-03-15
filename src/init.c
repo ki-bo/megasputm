@@ -1,10 +1,11 @@
 #include "init.h"
-#include "util.h"
+#include "charset.h"
 #include "dma.h"
 #include "diskio.h"
 #include "gfx.h"
 #include "input.h"
 #include "map.h"
+#include "util.h"
 #include "resource.h"
 #include "script.h"
 #include "vm.h"
@@ -16,10 +17,16 @@ void global_init(void)
   // configure dma
   dma_init();
 
+  // prepare charset
+  charset_init();
+
+
   // init diskio module
   map_cs_diskio();
   diskio_init();
 
+  // init charset
+  
   // init gfx module  
   diskio_load_file("M12", (uint8_t __far *)(0x14000)); // load gfx code
   map_cs_gfx();
@@ -28,7 +35,6 @@ void global_init(void)
 
   // init input module
   input_init();
-
 
   // init main engine code
   res_init();
