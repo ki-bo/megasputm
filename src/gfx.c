@@ -1,7 +1,10 @@
 #include "gfx.h"
+#include "input.h"
 #include "io.h"
+#include "map.h"
 #include "resource.h"
 #include "util.h"
+#include "vm.h"
 #include <mega65.h>
 #include <stdint.h>
 
@@ -9,6 +12,10 @@
 #define COLRAM 0xff80800UL
 #define BG_BITMAP 0x28000
 #define FRAMECOUNT (*(volatile uint8_t *)0xd7fa)
+#define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
+#define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
+
+//-----------------------------------------------------------------------------------------------
 
 /**
  * @defgroup gfx_init GFX Init Functions
@@ -25,10 +32,60 @@ const char palette_blue[16] = {
   0x0, 0xa, 0x0, 0xa,  0x0, 0xa, 0x0, 0xa,  0x5, 0xf, 0x5, 0xf,  0x5, 0xf, 0x5, 0xf
 };
 
+//-----------------------------------------------------------------------------------------------
+
+#pragma clang section rodata="cdata_gfx" bss="bss_gfx"
+__attribute__((aligned(64))) static const uint8_t cursor_snail[] = {
+  0x11,0x11,0x11,0x10,0x00,0x00,0x01,0x11,
+  0x11,0x11,0x11,0x06,0x66,0x66,0x60,0x11,
+  0x11,0x11,0x10,0x66,0x06,0x00,0x66,0x01,
+  0x11,0xf1,0x06,0x60,0x66,0x66,0x06,0x60,
+  0xf1,0x1f,0x06,0x06,0x60,0x06,0x60,0x60,
+  0x1f,0x1f,0x06,0x06,0x66,0x60,0x60,0x60,
+  0x1f,0x1f,0x06,0x06,0x06,0x60,0x60,0x60,
+  0x1f,0x1f,0x06,0x66,0x06,0x06,0x66,0x60,
+  0x1f,0xff,0x06,0x06,0x66,0x66,0x06,0x60,
+  0xf6,0xff,0x06,0x60,0x60,0x00,0x66,0x01,
+  0xff,0xff,0x06,0x60,0x66,0x66,0x60,0x11,
+  0x11,0xff,0xf0,0x66,0x00,0x60,0x66,0x01,
+  0x11,0xff,0xff,0x06,0x66,0x66,0x60,0x01,
+  0x11,0x1f,0xff,0xf0,0x00,0x00,0x0f,0x11,
+  0x11,0x11,0xff,0xff,0xff,0xff,0xff,0xf1,
+  0x11,0x11,0x1f,0xff,0xff,0xff,0xff,0xff,
+};
+
+__attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
+  0b00000001,0b00000000,0b00000000,
+  0b00000001,0b00000000,0b00000000,
+  0b00000101,0b01000000,0b00000000,
+  0b00000011,0b10000000,0b00000000,
+  0b00000001,0b00000000,0b00000000,
+  0b00100000,0b00001000,0b00000000,
+  0b00010000,0b00010000,0b00000000,
+  0b11111000,0b00111110,0b00000000,
+  0b00010000,0b00010000,0b00000000,
+  0b00100000,0b00001000,0b00000000,
+  0b00000001,0b00000000,0b00000000,
+  0b00000011,0b10000000,0b00000000,
+  0b00000101,0b01000000,0b00000000,
+  0b00000001,0b00000000,0b00000000,
+  0b00000001,0b00000000,0b00000000,
+  0b00000000,0b00000000,0b00000000,
+}; 
+
+//-----------------------------------------------------------------------------------------------
+
+__attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
+
+//-----------------------------------------------------------------------------------------------
+
 // Private init functions
 static void setup_irq(void);
 // Private interrupt function
 static void raster_irq(void);
+static void update_cursor(void);
+
+//-----------------------------------------------------------------------------------------------
 
 /**
  * @brief Initialises the gfx module.
@@ -40,6 +97,7 @@ static void raster_irq(void);
 void gfx_init()
 {
   VICIV.sdbdrwd_msb &= ~VIC4_HOTREG_MASK;
+  VICII.ctrl1 &= ~0x10; // disable video output
   VICIV.palsel = 0x00; // select and map palette 0
   VICIV.ctrla |= 0x04; // enable RAM palette
   VICIV.ctrlb = VIC4_VFAST_MASK;
@@ -66,17 +124,38 @@ void gfx_init()
   VICIV.chrcount = 40; // 40 chars per row
   VICIV.linestep = 80; // 80 bytes per row (2 bytes per char)
 
-
-  int8_t i = 15;
-  do {
+  // setup EGA palette
+  for (uint8_t i = 0; i < 16; ++i) {
     PALETTE.red[i] = palette_red[i];
     PALETTE.green[i] = palette_green[i];
     PALETTE.blue[i] = palette_blue[i];
   }
-  while (--i >= 0);
+
+  // setup cursors / sprites
+  
+  VICIV.ctrlc &= ~VIC4_SPR_H640_MASK;                           // no sprite H640 mode
+  VICIV.spr_hgten = 0x03;                                       // enable variable height for sprites 0 and 1
+  VICIV.spr_hght = 16;                                          // 16 pixels high
+  VICIV.spr_x64en = 0x01;                                       // enable 8 bytes per row for sprite 0
+  VICIV.spr_16en = 0x01;                                        // enable 16 colors for sprite 0
+  // 16 bit sprite pointers
+  uint8_t rasline0_save = VICIV.rasline0;
+  VICIV.spr_ptradr = (uint32_t)UNBANKED_PTR(sprite_pointers);
+  VICIV.spr_ptradr_bnk |= 0x80;                                 // enable 16 bit sprite pointers (SPRPTR16)
+  VICIV.rasline0 = rasline0_save;
+  
+  VICIV.spr_yadj = 0x00;                                        // no vertical adjustment
+  VICIV.spr_enalpha = 0x00;                                     // no alpha blending
+  VICIV.spr_env400 = 0x00;                                      // no V400 mode
+  VICIV.spr0_color = 0x01;                                      // set transparent color for sprite 0
+
+  sprite_pointers[0] = UNBANKED_SPR_PTR(cursor_snail);
+  sprite_pointers[1] = UNBANKED_SPR_PTR(cursor_cross);
 
   setup_irq();
 }
+
+//-----------------------------------------------------------------------------------------------
 
 void setup_irq(void)
 {
@@ -94,24 +173,47 @@ void setup_irq(void)
 
   //ETHERNET.ctrl1 &= ~(ETH_RXQEN_MASK | ETH_TXQEN_MASK); // dsiable ethernet interrupts
 
-  __enable_interrupts();
+
 }
+
+//-----------------------------------------------------------------------------------------------
 
 #pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
 
+//-----------------------------------------------------------------------------------------------
+
 volatile uint8_t raster_irq_counter = 0;
+
+//-----------------------------------------------------------------------------------------------
 
 __attribute__((interrupt()))
 static void raster_irq ()
 {
   ++raster_irq_counter;
+
+  input_update();
+
+  uint32_t map_save = map_get();
+  map_cs_gfx();
+  update_cursor();
+
+  map_set(map_save);     // restore MAP
+  
   VICIV.irr = VICIV.irr; // ack interrupt
 }
+
+//-----------------------------------------------------------------------------------------------
 
 //*****************************************************************************
 // Function definitions, code_gfx
 //*****************************************************************************
 #pragma clang section text="code_gfx" rodata="cdata_gfx" data="data_gfx" bss="bss_gfx"
+
+void gfx_start(void)
+{
+    VICII.ctrl1 |= 0x10; // enable video output
+    __enable_interrupts();
+}
 
 void gfx_fade_out(void)
 {
@@ -197,10 +299,48 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
       y = 0;
       ++x;
       dst = dst + 1;
-      if (!(x & 0x07)) {
+      if (!(LSB(x) & 0x07)) {
         dst = dst + (8 * (uint16_t)(height - 1));
       }
     }
   } 
   while (x != width);
+}
+
+void update_cursor()
+{
+  uint8_t cursor_state = vm_read_var8(VAR_CURSOR_STATE);
+  if (!(cursor_state & 0x01)) {
+    VICII.spr_ena = 0x00;
+    return;
+  }
+
+  uint16_t spr_pos_x = input_cursor_x * 2 - HOTSPOT_OFFSET_X;
+  uint8_t  spr_pos_y = input_cursor_y - HOTSPOT_OFFSET_Y;
+  if (cursor_state & 0x02) {
+    VICII.spr_ena  = 0x02;
+    VICII.spr1_x   = LSB(spr_pos_x);
+    VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x02;
+    VICII.spr1_y   = spr_pos_y;
+  }
+  else {
+    VICII.spr_ena  = 0x01;
+    VICII.spr0_x   = LSB(spr_pos_x);
+    VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x01;
+    VICII.spr0_y   = spr_pos_y;
+  }
+
+
+  static const uint8_t cursor_color_rotate[] = { 8, 7, 15, 7 };
+  static uint8_t cursor_color_index = 0;
+  static uint8_t wait_frames = 8;
+
+  VICII.spr1_color = cursor_color_rotate[cursor_color_index];
+  if (--wait_frames == 0) {
+    wait_frames = 8;
+    ++cursor_color_index;
+    if (cursor_color_index == sizeof(cursor_color_rotate)) {
+      cursor_color_index = 0;
+    }
+  }
 }

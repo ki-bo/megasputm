@@ -7,9 +7,6 @@
 #include <stdint.h>
 
 // private functions
-static inline uint16_t read_var(uint8_t var);
-static inline uint8_t read_var8(uint8_t var);
-static inline void write_var(uint8_t var, uint16_t value);
 static uint8_t read_byte(void);
 static uint16_t read_word(void);
 static uint32_t read_24bits(void);
@@ -100,32 +97,6 @@ uint8_t script_run(uint8_t proc_id)
   return 0;
 }
 
-static inline uint16_t read_var(uint8_t var)
-{
-  volatile uint16_t value;
-  value = variables_lo[var] | (variables_hi[var] << 8);
-  return value;
-}
-
-static inline uint8_t read_var8(uint8_t var)
-{
-  return variables_lo[var];
-}
-
-
-static inline void write_var(uint8_t var, uint16_t value)
-{
-  // variables_lo[var] = LSB(value);
-  // variables_hi[var] = MSB(value);
-  __asm volatile(" lda %[val]\n"
-                 " sta variables_lo, x\n"
-                 " lda %[val]+1\n"
-                 " sta variables_hi, x"
-                 :
-                 : "Kx" (var), [val]"Kzp16" (value)
-                 : "a");
-}
-
 /**
  * @brief Reads a byte from the script.
  *
@@ -196,7 +167,7 @@ static uint8_t resolve_var_param()
 {
   uint8_t param = read_byte();
   if (opcode & 0x80) {
-    return read_var8(param);
+    return vm_read_var8(param);
   }
   else {
     return param;
@@ -208,7 +179,7 @@ static uint8_t resolve_next_param8(void)
   uint8_t param;
   uint8_t masked_opcode = opcode & param_mask;
   if (masked_opcode) {
-    param = read_var8(read_byte());
+    param = vm_read_var8(read_byte());
   }
   else {
     param = read_byte();
@@ -222,7 +193,7 @@ static uint16_t resolve_next_param16(void)
   uint16_t param;
   uint8_t masked_opcode = opcode & param_mask;
   if (masked_opcode) {
-    param = read_var(read_byte());
+    param = vm_read_var(read_byte());
   }
   else {
     param = read_word();
@@ -337,7 +308,7 @@ static void assign(void)
 {
   debug_msg("Assign");
   uint8_t var_idx = read_byte();
-  write_var(var_idx, resolve_next_param16());
+  vm_write_var(var_idx, resolve_next_param16());
 }
 
 /**
@@ -363,12 +334,13 @@ static void subtract(void)
 {
   debug_msg("Subtract");
   uint8_t var_idx = read_byte();
-  write_var(var_idx, resolve_next_param16() - read_word());
+  vm_write_var(var_idx, resolve_next_param16() - read_word());
 }
 
 static void cutscene(void)
 {
   debug_msg("Cutscene");
+  vm_start_cutscene();
 }
 
 /**
@@ -379,14 +351,14 @@ static void add(void)
 {
   debug_msg("Add");
   uint8_t var_idx = read_byte();
-  write_var(var_idx, resolve_next_param16() + read_word());
+  vm_write_var(var_idx, resolve_next_param16() + read_word());
 }
 
 static void cursor_cmd(void)
 {
   debug_msg("Cursor cmd");
-  state_cursor = read_byte();
-  state_iface  = read_byte();
+  vm_write_var(VAR_CURSOR_STATE, read_byte());
+  state_iface = read_byte();
 }
 
 static void load_room(void)
@@ -394,7 +366,7 @@ static void load_room(void)
   debug_msg("Load room");
   uint8_t room_no = read_byte();
   uint8_t res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
-  vm_switch_room(res_slot);
+  vm_switch_room(room_no, res_slot);
 }
 
 static void print_ego(void)

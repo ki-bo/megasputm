@@ -22,7 +22,6 @@ uint8_t actor_costumes[NUM_ACTORS];
 uint8_t actor_talk_colors[NUM_ACTORS];
 uint8_t actor_talking;
 
-uint8_t state_cursor;
 uint8_t state_iface;
 
 uint8_t active_script_slot;
@@ -31,6 +30,12 @@ uint8_t proc_state[NUM_SCRIPT_SLOTS];
 uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 int32_t proc_wait_timer[NUM_SCRIPT_SLOTS];
+
+// cutscene backup data
+uint8_t cs_room;
+uint8_t cs_cursor_state;
+uint8_t cs_iface_state;
+
 
 // Private functions
 static void load_script(uint8_t script_id);
@@ -56,6 +61,10 @@ __task void vm_mainloop(void)
         : /* no output operands */
         : /* no input operands */
         : "x" /* clobber list */);
+
+  map_cs_gfx();
+  gfx_start();
+  unmap_cs();
 
   load_script(1);
 
@@ -93,7 +102,7 @@ uint8_t vm_get_active_proc_state(void)
   return proc_state[active_script_slot];
 }
 
-void vm_switch_room(uint8_t res_slot)
+void vm_switch_room(uint8_t room_no, uint8_t res_slot)
 {
   map_ds_resource(res_slot);
   uint8_t *data_ptr = NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS + 4);
@@ -102,20 +111,15 @@ void vm_switch_room(uint8_t res_slot)
   uint16_t bg_data_offset = *NEAR_U16_PTR(data_ptr);
 
   map_cs_gfx();
-  //gfx_fade_out();
+  gfx_fade_out();
   gfx_decode_bg_image(NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS + bg_data_offset), width);
-  //gfx_fade_in();
+  gfx_fade_in();
   unmap_cs();
+
+  vm_write_var(VAR_ROOM_NO, room_no);
 
   // restore respource mapping of running script again
   map_ds_resource(proc_res_slot[active_script_slot]);
-}
-
-void vm_actor_start_talking(uint8_t actor_id)
-{
-  actor_talking = actor_id;
-  map_cs_gfx();
-  unmap_cs();
 }
 
 /**
@@ -136,6 +140,20 @@ void vm_set_script_wait_timer(int32_t negative_ticks)
 {
   proc_state[active_script_slot] = PROC_STATE_WAITING;
   proc_wait_timer[active_script_slot] = negative_ticks;
+}
+
+void vm_start_cutscene(void)
+{
+  cs_room = vm_read_var8(VAR_ROOM_NO);
+  cs_cursor_state = vm_read_var8(VAR_CURSOR_STATE);
+  cs_iface_state = state_iface;
+}
+
+void vm_actor_start_talking(uint8_t actor_id)
+{
+  actor_talking = actor_id;
+  map_cs_gfx();
+  unmap_cs();
 }
 
 static void load_script(uint8_t script_id)

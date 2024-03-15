@@ -3,6 +3,7 @@
 #include "dma.h"
 #include "diskio.h"
 #include "gfx.h"
+#include "input.h"
 #include "map.h"
 #include "resource.h"
 #include "script.h"
@@ -24,6 +25,9 @@ void global_init(void)
   map_cs_gfx();
   gfx_init();
   unmap_cs();
+
+  // init input module
+  input_init();
 
 
   // init main engine code

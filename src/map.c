@@ -2,6 +2,7 @@
 #include "diskio.h"
 #include "resource.h"
 #include "util.h"
+#include <stdint.h>
 
 static inline void apply_map(void);
 
@@ -26,6 +27,13 @@ void map_init(void)
 
 //-----------------------------------------------------------------------------------------------
 
+uint32_t map_get(void)
+{
+  return map_regs.quad;    
+}
+
+//-----------------------------------------------------------------------------------------------
+
 uint16_t map_get_cs(void)
 {
   return (map_regs.x << 8) | map_regs.a;
@@ -36,6 +44,14 @@ uint16_t map_get_cs(void)
 uint16_t map_get_ds(void)
 {
   return (map_regs.z << 8) | map_regs.y;
+}
+
+//-----------------------------------------------------------------------------------------------
+
+void map_set(uint32_t map_reg)
+{
+  map_regs.quad = map_reg;
+  apply_map();
 }
 
 //-----------------------------------------------------------------------------------------------

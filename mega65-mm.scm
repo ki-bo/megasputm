@@ -87,6 +87,7 @@
                 (section
                         code_gfx
                         cdata_gfx
+                        data_gfx
                 )
         )
 

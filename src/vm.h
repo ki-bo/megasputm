@@ -16,8 +16,10 @@ enum {
 
 enum {
     VAR_EGO = 0,
+    VAR_ROOM_NO = 4,
     VAR_MACHINE_SPEED = 6,
-    VAR_NUM_ACTOR = 11,
+    VAR_NUM_ACTORS = 11,
+    VAR_CURSOR_STATE = 21,
     VAR_TIMER_NEXT = 25,
     VAR_BACKUP_VERB = 38,
     VAR_CUTSCENEEXIT_KEY = 40,
@@ -36,7 +38,6 @@ extern uint8_t actor_costumes[NUM_ACTORS];
 extern uint8_t actor_talk_colors[NUM_ACTORS];
 extern uint8_t actor_talking;
 
-extern uint8_t state_cursor;
 extern uint8_t state_iface;
 
 extern uint8_t jiffy_counter;
@@ -47,9 +48,35 @@ extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 void vm_init(void);
 __task void vm_mainloop(void);
 uint8_t vm_get_active_proc_state(void);
-void vm_switch_room(uint8_t res_slot);
+void vm_switch_room(uint8_t room_no, uint8_t res_slot);
 void vm_set_script_wait_timer(int32_t negative_ticks);
+void vm_start_cutscene(void);
 void vm_actor_start_talking(uint8_t actor_id);
 
+inline uint16_t vm_read_var(uint8_t var)
+{
+  volatile uint16_t value;
+  value = variables_lo[var] | (variables_hi[var] << 8);
+  return value;
+}
+
+inline uint8_t vm_read_var8(uint8_t var)
+{
+  return variables_lo[var];
+}
+
+
+inline void vm_write_var(uint8_t var, uint16_t value)
+{
+  // variables_lo[var] = LSB(value);
+  // variables_hi[var] = MSB(value);
+  __asm volatile(" lda %[val]\n"
+                 " sta variables_lo, x\n"
+                 " lda %[val]+1\n"
+                 " sta variables_hi, x"
+                 :
+                 : "Kx" (var), [val]"Kzp16" (value)
+                 : "a");
+}
 
 #endif // __VM_H
