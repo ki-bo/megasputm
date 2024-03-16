@@ -39,6 +39,7 @@
                 (section 
                         code_init
                         cdata_init
+                        data_init
                 )
         )
 

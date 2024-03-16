@@ -1,8 +1,7 @@
 #ifndef __CHARSET_H
 #define __CHARSET_H
 
-#define CHARSET 0x11800UL
-
+// code_init functions
 void charset_init(void);
 
 #endif // __CHARSET_H

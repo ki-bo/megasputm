@@ -1,5 +1,5 @@
 #include "gfx.h"
-#include "charset.h"
+#include "dma.h"
 #include "input.h"
 #include "io.h"
 #include "map.h"
@@ -8,6 +8,8 @@
 #include "vm.h"
 #include <mega65.h>
 #include <stdint.h>
+
+//-----------------------------------------------------------------------------------------------
 
 #define SCREEN_RAM 0x10000
 #define COLRAM 0xff80800UL
@@ -18,11 +20,7 @@
 
 //-----------------------------------------------------------------------------------------------
 
-/**
- * @defgroup gfx_init GFX Init Functions
- * @{
- */
-#pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
+#pragma clang section rodata="cdata_init"
 const char palette_red[16] = {
   0x0, 0x0, 0x0, 0x0,  0xa, 0xa, 0xa, 0xa,  0x5, 0x5, 0x5, 0x5,  0xf, 0xf, 0xf, 0xf
 };
@@ -85,8 +83,15 @@ static void setup_irq(void);
 // Private interrupt function
 static void raster_irq(void);
 static void update_cursor(void);
+static void set_dialog_color(uint8_t color);
 
 //-----------------------------------------------------------------------------------------------
+
+/**
+ * @defgroup gfx_init GFX Init Functions
+ * @{
+ */
+#pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
  * @brief Initialises the gfx module.
@@ -98,12 +103,12 @@ static void update_cursor(void);
 void gfx_init()
 {
   VICIV.sdbdrwd_msb &= ~VIC4_HOTREG_MASK;
-  VICII.ctrl1 &= ~0x10; // disable video output
-  VICIV.palsel = 0x00; // select and map palette 0
-  VICIV.ctrla |= 0x04; // enable RAM palette
-  VICIV.ctrlb = VIC4_VFAST_MASK;
-  VICIV.ctrlc &= ~VIC4_FCLRLO_MASK;
-  VICIV.ctrlc |= VIC4_FCLRHI_MASK | VIC4_CHR16_MASK;
+  VICII.ctrl1       &= ~0x10; // disable video output
+  VICIV.palsel       = 0x00; // select and map palette 0
+  VICIV.ctrla       |= 0x04; // enable RAM palette
+  VICIV.ctrlb        = VIC4_VFAST_MASK;
+  VICIV.ctrlc       &= ~VIC4_FCLRLO_MASK;
+  VICIV.ctrlc       |= VIC4_FCLRHI_MASK | VIC4_CHR16_MASK;
 
   memset_bank(FAR_U8_PTR(BG_BITMAP), 0, 0 /* 0 means 64kb */);
   memset_bank(FAR_U8_PTR(COLRAM), 0, 2000);
@@ -118,40 +123,42 @@ void gfx_init()
 
   gfx_fade_in();
 
-  VICIV.scrnptr = (uint32_t)SCREEN_RAM; // implicitly sets CHRCOUNT(9..8) to 0
+  VICIV.scrnptr   = (uint32_t)SCREEN_RAM; // implicitly sets CHRCOUNT(9..8) to 0
   VICIV.bordercol = COLOR_BLACK;
   VICIV.screencol = COLOR_BLACK;
-  VICIV.colptr = 0x800;
-  VICIV.chrcount = 40; // 40 chars per row
-  VICIV.linestep = 80; // 80 bytes per row (2 bytes per char)
+  VICIV.colptr    = 0x800;
+  VICIV.chrcount  = 40; // 40 chars per row
+  VICIV.linestep  = 80; // 80 bytes per row (2 bytes per char)
 
   // setup EGA palette
   for (uint8_t i = 0; i < 16; ++i) {
-    PALETTE.red[i] = palette_red[i];
+    PALETTE.red[i]   = palette_red[i];
     PALETTE.green[i] = palette_green[i];
-    PALETTE.blue[i] = palette_blue[i];
+    PALETTE.blue[i]  = palette_blue[i];
   }
 
   // setup cursors / sprites
-  
-  VICIV.ctrlc &= ~VIC4_SPR_H640_MASK;                           // no sprite H640 mode
-  VICIV.spr_hgten = 0x03;                                       // enable variable height for sprites 0 and 1
-  VICIV.spr_hght = 16;                                          // 16 pixels high
-  VICIV.spr_x64en = 0x01;                                       // enable 8 bytes per row for sprite 0
+  VICII.spr_bg_prio     = 0;                                       // sprites have priority over background
+  VICII.spr_exp_x       = 0;                                       // no sprite expansion X
+  VICII.spr_exp_y       = 0;                                       // no sprite expansion Y
+  VICIV.ctrlc          &= ~VIC4_SPR_H640_MASK;                     // no sprite H640 mode
+  VICIV.spr_hgten       = 0x03;                                    // enable variable height for sprites 0 and 1
+  VICIV.spr_hght        = 16;                                      // 16 pixels high
+  VICIV.spr_x64en       = 0x01;                                    // enable 8 bytes per row for sprite 0
 
   // charset & spr16 enable
-  VICIV.charptr = CHARSET;                                      // will overwrite SPREN16, so set this first
-  VICIV.spr_16en = 0x01;                                        // enable 16 colors for sprite 0
+  VICIV.charptr         = 0x1000UL;                                // will overwrite SPREN16, so set this first
+  VICIV.spr_16en        = 0x01;                                    // enable 16 colors for sprite 0
   // 16 bit sprite pointers
   uint8_t rasline0_save = VICIV.rasline0;
-  VICIV.spr_ptradr = (uint32_t)UNBANKED_PTR(sprite_pointers);
-  VICIV.spr_ptradr_bnk |= 0x80;                                 // enable 16 bit sprite pointers (SPRPTR16)
-  VICIV.rasline0 = rasline0_save;
+  VICIV.spr_ptradr      = (uint32_t)UNBANKED_PTR(sprite_pointers);
+  VICIV.spr_ptradr_bnk |= 0x80;                                    // enable 16 bit sprite pointers (SPRPTR16)
+  VICIV.rasline0        = rasline0_save;
   
-  VICIV.spr_yadj = 0x00;                                        // no vertical adjustment
-  VICIV.spr_enalpha = 0x00;                                     // no alpha blending
-  VICIV.spr_env400 = 0x00;                                      // no V400 mode
-  VICIV.spr0_color = 0x01;                                      // set transparent color for sprite 0
+  VICIV.spr_yadj        = 0x00;                                    // no vertical adjustment
+  VICIV.spr_enalpha     = 0x00;                                    // no alpha blending
+  VICIV.spr_env400      = 0x00;                                    // no V400 mode
+  VICIV.spr0_color      = 0x01;                                    // set transparent color for sprite 0
 
   sprite_pointers[0] = UNBANKED_SPR_PTR(cursor_snail);
   sprite_pointers[1] = UNBANKED_SPR_PTR(cursor_cross);
@@ -161,6 +168,11 @@ void gfx_init()
 
 //-----------------------------------------------------------------------------------------------
 
+/**
+ * @brief Setup interrupt routine for the raster interrupt.
+ * 
+ * Code section: code_init
+ */
 void setup_irq(void)
 {
   *NEAR_U16_PTR(0xfffe) = (uint16_t)&raster_irq;
@@ -174,22 +186,28 @@ void setup_irq(void)
   CIA2.icr = 0x7f; // disable CIA2 interrupts
   CIA1.icr; // volatile reads will ack pending irqs
   CIA2.icr;
-
-  //ETHERNET.ctrl1 &= ~(ETH_RXQEN_MASK | ETH_TXQEN_MASK); // dsiable ethernet interrupts
-
-
 }
 
+/** @} */ // gfx_init
+
 //-----------------------------------------------------------------------------------------------
 
+/**
+ * @defgroup gfx_runtime GFX Functions in code segment
+ * @{
+ */
 #pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
 
-//-----------------------------------------------------------------------------------------------
-
+/// Counter increased every frame by a raster interrupt
 volatile uint8_t raster_irq_counter = 0;
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Raster interrupt routine.
+ * 
+ * This function is called every frame.
+ *
+ * Code section: code
+ */
 __attribute__((interrupt()))
 static void raster_irq ()
 {
@@ -206,19 +224,33 @@ static void raster_irq ()
   VICIV.irr = VICIV.irr; // ack interrupt
 }
 
+/** @} */ // gfx_runtime
+
 //-----------------------------------------------------------------------------------------------
 
-//*****************************************************************************
-// Function definitions, code_gfx
-//*****************************************************************************
+/**
+ * @defgroup gfx_public GFX Public Functions 
+ */
 #pragma clang section text="code_gfx" rodata="cdata_gfx" data="data_gfx" bss="bss_gfx"
 
+/**
+ * @brief Starts the gfx module and enables video output.
+ * 
+ * This function must be called after gfx_init. It enabled the raster interrupt and video output.
+ *
+ * Code section: code_gfx
+ */
 void gfx_start(void)
 {
     VICII.ctrl1 = 0x1b; // enable video output
     __enable_interrupts();
 }
 
+/**
+ * @brief Fades out the graphics area of the screen.
+ *
+ * Code section: code_gfx
+ */
 void gfx_fade_out(void)
 {
   __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 80;
@@ -231,6 +263,11 @@ void gfx_fade_out(void)
   while (--num_chars != 0);
 }
 
+/**
+ * @brief Fades in the graphics area of the screen.
+ *
+ * Code section: code_gfx
+ */
 void gfx_fade_in(void)
 {
   __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 80;
@@ -245,6 +282,13 @@ void gfx_fade_in(void)
   }
 }
 
+/**
+ * @brief Waits for the next jiffy timer interrupt.
+ * 
+ * @return The number of jiffies that have passed since the last call to this function.
+ *
+ * Code section: code_gfx
+ */
 uint8_t gfx_wait_for_jiffy_timer(void)
 {
   static uint8_t last_raster_irq_counter = 0;
@@ -254,12 +298,27 @@ uint8_t gfx_wait_for_jiffy_timer(void)
   return elapsed_jiffies;
 }
 
+/**
+ * @brief Waits for the next frame.
+ *
+ * Code section: code_gfx
+ */
 void gfx_wait_for_next_frame(void)
 {
   uint8_t counter = raster_irq_counter;
   while (counter == raster_irq_counter);
 }
 
+/**
+ * @brief Decodes a room background image and stores it in the background bitmap.
+ * 
+ * The background bitmap is located at BG_BITMAP.
+ * 
+ * @param src The encoded bitmap data in the room resource.
+ * @param width The width of the bitmap in characters.
+ *
+ * Code section: code_gfx
+ */
 void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 {
   static uint8_t color_strip[128];
@@ -311,6 +370,76 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
   while (x != width);
 }
 
+/**
+ * @brief Clears the dialog area of the screen.
+ *
+ * Code section: code_gfx
+ */
+void gfx_clear_dialog(void)
+{
+  static const dmalist_t dmalist_clear_dialog_screen = {
+    .command  = 0,
+    .count    = 80 * 2 - 2,
+    .src_addr = LSB16(SCREEN_RAM),
+    .src_bank = BANK(SCREEN_RAM),
+    .dst_addr = LSB16(SCREEN_RAM + 2),
+    .dst_bank = BANK(SCREEN_RAM + 2),
+  };
+
+  *FAR_U16_PTR(SCREEN_RAM) = 0x0020;
+  dma_trigger(&dmalist_clear_dialog_screen);
+}
+
+/**
+ * @brief Prints a dialog to the screen.
+ * 
+ * @param color The color palette index of the dialog text.
+ * @param text The dialog text as null-terminated ASCII string.
+ * @return The number of characters printed.
+ *
+ * Code section: code_gfx
+ */
+uint8_t gfx_print_dialog(uint8_t color, const char *text)
+{
+  gfx_clear_dialog();
+  set_dialog_color(color);
+
+  uint8_t num_chars = 0;
+  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
+  for (uint8_t i = 0; i < 80; ++i) {
+    char c = text[i];
+    if (c == '\0') {
+      break;
+    }
+    else if (c == 1) {
+      screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 40;
+      continue;
+    }
+    *screen_ptr = (uint16_t)c;
+    ++num_chars;
+    ++screen_ptr;
+  }
+
+  return num_chars;
+}
+
+/** @} */ // gfx_public
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * @defgroup gfx_private GFX Private Functions
+ * @{
+ */
+
+/**
+ * @brief Updates the cursor.
+ *
+ * This function is called every frame by the raster interrupt. It updates the cursor position and
+ * appearance. It will hide and show the cursor based on VAR_CURSOR_STATE.
+ *
+ * Code section: code_gfx
+ */
 void update_cursor()
 {
   uint8_t cursor_state = vm_read_var8(VAR_CURSOR_STATE);
@@ -349,33 +478,36 @@ void update_cursor()
   }
 }
 
-uint8_t gfx_print_dialog(uint8_t color, const char *text)
+/**
+ * @brief Sets the color of the dialog text.
+ * 
+ * Fills the colram of the dialog area with the given color.
+ *
+ * @param color The color palette index.
+ *
+ * Code section: code_gfx
+ */
+void set_dialog_color(uint8_t color)
 {
-  uint8_t num_chars = 0;
-  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
-  uint8_t done = 0;
-  for (uint8_t i = 0; i < 80; ++i) {
-    if (done) {
-      *screen_ptr = 0x0020;
-    }
-    else {
-      char c = text[i];
-      if (c == '\0') {
-        done = 1;
-        c = ' ';
-      }
-      else if (c == 1) {
-        for (; i < 40; ++i) {
-          *screen_ptr = 0x0020;
-          ++screen_ptr;
-        }
-        continue;
-      }
-      *screen_ptr = (uint16_t)c;
-      ++num_chars;
-      ++screen_ptr;
-    }
-  }
+  static const dmalist_two_options_t dmalist_clear_dialog_colram = {
+    .opt_token1 = 0x80,
+    .opt_arg1   = 0xff,
+    .opt_token2 = 0x81,
+    .opt_arg2   = 0xff,
+    .command    = 0,
+    .count      = 80 * 2 - 2,
+    .src_addr   = LSB16(COLRAM),
+    .src_bank   = BANK(COLRAM),
+    .dst_addr   = LSB16(COLRAM + 2),
+    .dst_bank   = BANK(COLRAM + 2)
+  };
 
-  return num_chars;
+  __auto_type ptr = FAR_U8_PTR(COLRAM);
+  *ptr = 0;
+  *(ptr+1) = color;
+  dma_trigger(&dmalist_clear_dialog_colram);
 }
+
+/** @} */ // gfx_private
+
+//-----------------------------------------------------------------------------------------------

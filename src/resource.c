@@ -3,8 +3,11 @@
 #include "map.h"
 #include "util.h"
 
+//-----------------------------------------------------------------------------------------------
 
 #pragma clang section bss="zdata"
+
+//-----------------------------------------------------------------------------------------------
 
 uint8_t page_res_type[256];
 uint8_t page_res_index[256];
@@ -15,10 +18,6 @@ uint8_t page_res_index[256];
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages);
 static uint8_t defragment_memory(void);
 static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint);
-
-// Private wrapper functions
-static uint16_t start_resource_loading(uint8_t type, uint8_t id);
-static void continue_resource_loading(void);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -90,31 +89,80 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
   }
   while(i != hint);
 
-  uint16_t chunk_size = start_resource_loading(type_and_flags & RES_TYPE_MASK, id);
-
+  map_cs_diskio();
+  uint16_t chunk_size = diskio_start_resource_loading(type_and_flags & RES_TYPE_MASK, id);
+  
   if (chunk_size > MAX_RESOURCE_SIZE) {
     fatal_error(ERR_RESOURCE_TOO_LARGE);
   }
   uint8_t page = allocate(type_and_flags, id, (chunk_size + 255) / 256);
   uint16_t ds_save = map_get_ds();
   map_ds_resource(page);
-  continue_resource_loading();
+  diskio_continue_resource_loading();
+  unmap_cs();
+
   map_set_ds(ds_save);
+  
   return page;
 }
 
+/**
+ * @brief Locks a resource in memory
+ *
+ * This function locks a resource in memory. The resource will not be overwritten
+ * by other resources. This is useful for resources that are used frequently and
+ * should not be reloaded from disk.
+ *
+ * @param type Resource type and flags
+ * @param id Resource ID
+ * @param hint The position in the page list to start searching for the resource
+ *
+ * Code section: code_main
+ */
 void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint8_t new_type = type | RES_LOCKED_MASK;
   update_flags(new_type, id, hint);
 }
 
+/**
+ * @brief Unlocks a resource in memory
+ *
+ * This function unlocks a resource in memory. The resource will be overwritten
+ * by other resources if necessary.
+ *
+ * @param type Resource type and flags
+ * @param id Resource ID
+ * @param hint The position in the page list to start searching for the resource
+ *
+ * Code section: code_main
+ */
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint8_t new_type = type & ~RES_LOCKED_MASK;
   update_flags(new_type, id, hint);
 }
 
+/** @} */ // res_public
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * @defgroup res_private Resource Private Functions
+ * @{
+ */
+
+/**
+ * @brief Updates the flags of a resource
+ *
+ * This function updates the flags of a resource in the resource memory.
+ *
+ * @param type_and_flags New type and flags of the resource
+ * @param id ID of the resource
+ * @param hint The position in the page list to start searching for the resource
+ *
+ * Code section: code_main
+ */
 static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint)
 {
   uint8_t type = type_and_flags & RES_TYPE_MASK;
@@ -153,7 +201,6 @@ static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint)
  * @return uint8_t Index of the first page of the allocated memory
  *
  * Code section: code_main
- * Private function
  */
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 {
@@ -207,7 +254,6 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
  * @return uint8_t The number of pages that are now allocated (= the index of the first free page)
  *
  * Code section: code_main
- * Private function
  */
 static uint8_t defragment_memory(void)
 {
@@ -236,49 +282,6 @@ static uint8_t defragment_memory(void)
   return write_idx;
 }
 
-/** @} */ // res_public
+/** @} */ // res_private
 
 //-----------------------------------------------------------------------------------------------
-
-/**
- * @defgroup res_wrapper Resource Private Wrapper Functions
- * Placed in code section to protect from being overlayed by mapped modules.
- * @{
- */
-#pragma clang section text="code"
-
-/**
- * @brief Wrapper function for diskio_start_resource_loading
- *
- * Parameters are forwarded to diskio_start_resource_loading().
- *
- * @see diskio_start_resource_loading
- *
- * Code section: code
- * Private function
- */
-static uint16_t start_resource_loading(uint8_t type, uint8_t id)
-{
-  map_cs_diskio();
-  uint16_t chunk_size = diskio_start_resource_loading(type, id);
-  unmap_cs();
-  return chunk_size;
-}
-
-/**
- * @brief Wrapper function for diskio_continue_resource_loading
- *
- * Placed in code section to avoid being overwritten by the diskio functions.
- * @see diskio_continue_resource_loading
- *
- * Code section: code
- * Private function
- */
-static void continue_resource_loading(void)
-{
-  map_cs_diskio();
-  diskio_continue_resource_loading();
-  unmap_cs();
-}
-
-/** @} */ // res_wrapper

@@ -25,6 +25,7 @@ enum {
     VAR_CUTSCENEEXIT_KEY = 40,
 };
 
+
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];

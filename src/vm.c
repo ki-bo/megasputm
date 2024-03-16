@@ -37,6 +37,7 @@ int32_t proc_wait_timer[NUM_SCRIPT_SLOTS];
 uint8_t cs_room;
 uint8_t cs_cursor_state;
 uint8_t cs_iface_state;
+uint16_t cs_pc;
 
 
 // Private functions
@@ -158,7 +159,7 @@ void vm_start_cutscene(void)
 void vm_actor_start_talking(uint8_t actor_id)
 {
   actor_talking = actor_id;
-  uint8_t talk_color = actor_id != 0xff ? actor_talk_colors[actor_id] : 0x0f;
+  uint8_t talk_color = actor_id != 0xff ? actor_talk_colors[actor_id] : 0x09;
   map_cs_gfx();
   uint8_t num_chars = gfx_print_dialog(talk_color, dialog_buffer);
   unmap_cs();

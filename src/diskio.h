@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 
-// init functions
+// code_init functions
 void diskio_init(void);
 
-// diskio functions
+// code_diskio functions
 void diskio_check_motor_off(void);
 void diskio_load_file(const char *filename, uint8_t __far *address);
 void diskio_load_room(uint8_t room, __far uint8_t *address);

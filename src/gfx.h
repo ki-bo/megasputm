@@ -15,6 +15,7 @@ void gfx_start(void);
 void gfx_fade_out(void);
 void gfx_fade_in(void);
 void gfx_decode_bg_image(uint8_t *src, uint16_t width);
+void gfx_clear_dialog(void);
 uint8_t gfx_print_dialog(uint8_t color, const char *text);
 
 #endif // __GFX_H

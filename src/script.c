@@ -22,6 +22,7 @@ static void subtract(void);
 static void add(void);
 static void delay(void);
 static void cutscene(void);
+static void begin_override(void);
 static void cursor_cmd(void);
 static void load_room(void);
 static void print_ego(void);
@@ -35,7 +36,9 @@ static uint8_t * __attribute__((zpage)) pc;
 
 #pragma clang section bss="zdata"
 
-void (*opcode_jump_table[128])(void);
+static void (*opcode_jump_table[128])(void);
+static uint8_t *override_pc;
+
 
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="zdata"
 
@@ -53,6 +56,7 @@ void script_init(void)
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x40] = &cutscene;
   opcode_jump_table[0x53] = &actor_ops;
+  opcode_jump_table[0x58] = &begin_override;
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x60] = &cursor_cmd;
   opcode_jump_table[0x72] = &load_room;
@@ -337,10 +341,25 @@ static void subtract(void)
   vm_write_var(var_idx, resolve_next_param16() - read_word());
 }
 
+/**
+ * @brief Opcode 0x40: Cutscene
+ * 
+ */
 static void cutscene(void)
 {
   debug_msg("Cutscene");
   vm_start_cutscene();
+  override_pc = NULL;
+}
+
+/**
+ * @brief Opcode 0x58: Begin override
+ * 
+ */
+static void begin_override(void)
+{
+  debug_msg("Begin override");
+  override_pc = pc;
 }
 
 /**

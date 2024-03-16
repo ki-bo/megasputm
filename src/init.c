@@ -12,6 +12,14 @@
 
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="zdata_init"
 
+/**
+ * @brief Initialises all submodules
+ *
+ * This function does all initialisation of all sub-modules. It needs to be called
+ * at the beginning of the autoboot prg.
+ *
+ * Code section: code_init
+ */
 void global_init(void)
 {
   // configure dma
@@ -20,13 +28,10 @@ void global_init(void)
   // prepare charset
   charset_init();
 
-
   // init diskio module
   map_cs_diskio();
   diskio_init();
 
-  // init charset
-  
   // init gfx module  
   diskio_load_file("M12", (uint8_t __far *)(0x14000)); // load gfx code
   map_cs_gfx();

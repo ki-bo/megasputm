@@ -8,7 +8,12 @@
 #include "vm.h"
 #include <stdint.h>
 
-// The diskio functions are banked in when used
+//-----------------------------------------------------------------------------------------------
+
+#define FDC_BUF FAR_U8_PTR(0xffd6c00)
+#define DISK_CACHE 0x8000000UL
+
+//-----------------------------------------------------------------------------------------------
 
 #pragma clang section bss="bss_init"
 
@@ -40,6 +45,8 @@ static struct {
   uint8_t sound_room[120];
   uint16_t sound_offset[120];
 } lfl_index_file_contents;
+
+//-----------------------------------------------------------------------------------------------
 
 #pragma clang section data="data_diskio" bss="bss_diskio"
 
@@ -80,64 +87,6 @@ static uint8_t drive_ready;
 static uint8_t last_drive_access_frame;
 static uint8_t drive_in_use;
 
-typedef struct __f011 {
-  uint8_t fdc_control;
-  volatile uint8_t command;
-  uint16_t status;
-  volatile uint8_t track;
-  volatile uint8_t sector;
-  volatile uint8_t side;
-  volatile uint8_t data;
-  uint8_t clock;
-  uint8_t step;
-  uint8_t pcode;
-} f011_t;
-
-#define FDC (*(struct __f011 *)0xd080)
-#define FDC_BUF FAR_U8_PTR(0xffd6c00)
-#define DISK_CACHE 0x8000000UL
-#define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x10000UL))
-
-enum fdc_status_mask_t
-{
-  /** Drive select (0 to 7). Internal drive is 0. Second floppy drive on internal cable 
-      is 1. Other values reserved for C1565 external drive interface. */
-  FDC_DS_MASK = 0b00000111,
-  /** Directly controls the SIDE signal to the floppy drive, i.e., selecting which side of the media is active. */
-  FDC_SIDE_MASK = 0b00001000,
-  /** Swap upper and lower halves of data buffer (i.e. invert bit 8 of the sector buffer) */
-  FDC_SWAP_MASK = 0b00010000,
-  /** Activates drive motor and LED (unless LED signal is also set, causing the drive LED to blink) */
-  FDC_MOTOR_MASK = 0b00100000,
-  /** Drive LED blinks when set */
-  FDC_LED_MASK = 0b01000000,
-  /** The floppy controller has generated an interrupt (read only). Note that in- terrupts are not currently implemented on the 45GS27. */
-  FDC_IRQ_MASK = 0b10000000,
-  /** F011 Head is over track 0 flag (read only) */
-  FDC_TK0_MASK = 0x0001,
-  /** F011 FDC CRC check failure flag (read only) */
-  FDC_CRC_MASK = 0x0008,
-  /** F011 FDC Request Not Found (RNF), i.e., a sector read or write operation did not find the requested sector (read only) */
-  FDC_RNF_MASK = 0x0010,
-  /** F011 FDC CPU and disk pointers to sector buffer are equal, indicating that the sector buffer is either full or empty. (read only) */
-  FDC_EQ_MASK = 0x0020,
-  /** F011 FDC DRQ flag (one or more bytes of data are ready) (read only) */
-  FDC_DRQ_MASK = 0x0040,
-  /** F011 FDC busy flag (command is being executed) (read only) */
-  FDC_BUSY_MASK = 0x0080,
-  /** F011 Read Request flag, i.e., the requested sector was found during a read operation (read only) */
-  FDC_RDREQ_MASK = 0x8000
-};
-
-enum fdc_command_t
-{
-  FDC_CMD_CLR_BUFFER_PTRS = 0x01,
-  FDC_CMD_STEP_OUT = 0x10,
-  FDC_CMD_STEP_IN = 0x18,
-  FDC_CMD_SPINUP = 0x20,
-  FDC_CMD_READ_SECTOR = 0x40
-};
-
 // Private init functions
 static uint8_t read_next_directory_block(void);
 static uint8_t read_lfl_file_entry(void);
@@ -157,7 +106,7 @@ static void read_error(error_code_t error_code);
 static void led_and_motor_off(void);
 
 /**
- * @defgroup diskio_init Init Functions
+ * @defgroup diskio_init Disk I/O Init Functions
  * @{
  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
@@ -460,7 +409,7 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
     }
     dmalist_copy.dst_addr = (uint16_t)address;
     dmalist_copy.dst_bank = BANK(address);
-    dma_trigger_far_ext(UNBANKED_PTR(&dmalist_copy));
+    dma_trigger(&dmalist_copy);
     address += 254;
   }
   
@@ -815,31 +764,31 @@ static void seek_to(uint16_t offset)
 static void load_block(uint8_t track, uint8_t block)
 {
   static dmalist_two_options_t dmalist_copy_from_cache = {
-    .opt_token1 = 0x80,
-    .opt_arg1 = 0x80,
-    .opt_token2 = 0x81,
-    .opt_arg2 = 0xff,
+    .opt_token1     = 0x80,
+    .opt_arg1       = 0x80,
+    .opt_token2     = 0x81,
+    .opt_arg2       = 0xff,
     .end_of_options = 0x00,
-    .command = 0x00,      // DMA copy command
-    .count = 0x0200,
-    .src_addr = 0x0000,
-    .src_bank = 0x00,
-    .dst_addr = 0x6c00,
-    .dst_bank = 0x0d
+    .command        = 0x00,      // DMA copy command
+    .count          = 0x0200,
+    .src_addr       = 0x0000,
+    .src_bank       = 0x00,
+    .dst_addr       = 0x6c00,
+    .dst_bank       = 0x0d
   };
 
   static dmalist_two_options_t dmalist_copy_to_cache = {
-    .opt_token1 = 0x80,
-    .opt_arg1 = 0xff,
-    .opt_token2 = 0x81,
-    .opt_arg2 = 0x80,
+    .opt_token1     = 0x80,
+    .opt_arg1       = 0xff,
+    .opt_token2     = 0x81,
+    .opt_arg2       = 0x80,
     .end_of_options = 0x00,
-    .command = 0x00,      // DMA copy command
-    .count = 0x0200,
-    .src_addr = 0x6c00,
-    .src_bank = 0x0d,
-    .dst_addr = 0x0000,
-    .dst_bank = 0x00
+    .command        = 0x00,      // DMA copy command
+    .count          = 0x0200,
+    .src_addr       = 0x6c00,
+    .src_bank       = 0x0d,
+    .dst_addr       = 0x0000,
+    .dst_bank       = 0x00
   };
 
   if (track == 0 || track > 80 || block > 39) {
@@ -871,7 +820,7 @@ static void load_block(uint8_t track, uint8_t block)
     // block is in cache
     dmalist_copy_from_cache.src_addr = LSB16(cache_block);
     dmalist_copy_from_cache.src_bank = BANK(cache_block);
-    dma_trigger_far_ext(UNBANKED_PTR(&dmalist_copy_from_cache));
+    dma_trigger(&dmalist_copy_from_cache);
     last_physical_track = track;
     last_physical_sector = physical_sector;
     last_side = side;
@@ -927,7 +876,7 @@ static void load_block(uint8_t track, uint8_t block)
       // copy the sector to the cache
       dmalist_copy_to_cache.dst_addr = LSB16(cache_block);
       dmalist_copy_to_cache.dst_bank = BANK(cache_block);
-      dma_trigger_far_ext(UNBANKED_PTR(&dmalist_copy_to_cache));
+      dma_trigger(&dmalist_copy_to_cache);
 
       last_physical_track = track;
       last_physical_sector = physical_sector;
@@ -1031,3 +980,7 @@ static void led_and_motor_off(void)
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
   drive_ready = 0;
 }
+
+/** @} */ // end of diskio_private
+
+//-----------------------------------------------------------------------------------------------

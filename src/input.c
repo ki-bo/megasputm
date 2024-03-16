@@ -1,6 +1,8 @@
 #include "input.h"
 #include <mega65.h>
 
+//-----------------------------------------------------------------------------------------------
+
 #pragma clang section bss="zdata"
 
 //-----------------------------------------------------------------------------------------------
@@ -11,10 +13,17 @@ uint8_t input_button_pressed;
 
 //-----------------------------------------------------------------------------------------------
 
+/**
+ * @defgroup input_init Input Init Functions
+ * @{
+ */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Initialize the input module
+ *
+ * Code section: code_init
+ */
 void input_init(void)
 {
   input_cursor_x = 0;
@@ -22,12 +31,24 @@ void input_init(void)
   CIA1.ddra = 0xff; // set CIA1 port A as input
 }
 
+/** @} */ // input_init
+
 //-----------------------------------------------------------------------------------------------
 
+/**
+ * @defgroup input_public Input Public Functions
+ * @{
+ */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
-//-----------------------------------------------------------------------------------------------
-
+/**
+ * @brief Update the input module
+ *
+ * This function updates the cursor position. Should be called once per frame in the
+ * interrupt routine.
+ *
+ * Code section: code_main
+ */
 void input_update(void)
 {
   uint8_t joy = CIA1.pra;
@@ -55,5 +76,7 @@ void input_update(void)
     input_cursor_y = 249;
   }
 }
+
+/** @} */ // input_public
 
 //-----------------------------------------------------------------------------------------------
