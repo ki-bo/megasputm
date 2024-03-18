@@ -84,7 +84,7 @@ static uint8_t next_block;
 static uint8_t cur_block_read_ptr;
 static uint16_t cur_chunk_size;
 static uint8_t drive_ready;
-static uint8_t last_drive_access_frame;
+static uint8_t jiffies_elapsed_since_last_drive_access;
 static uint8_t drive_in_use;
 
 // Private init functions
@@ -128,6 +128,7 @@ void diskio_init(void)
   last_physical_track = 255;
   drive_ready = 0;
   drive_in_use = 0;
+  jiffies_elapsed_since_last_drive_access = 0;
 
   *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
   prepare_drive();
@@ -347,21 +348,27 @@ static void invalidate_disk_cache(void)
  * The function will check whether the drive has been accessed within the last 60 frames.
  * If not, it will turn off the drive motor and LED.
  * The function should be called regularly (several times per second) from the main loop, 
- * so the frame counter used for the check is correctly evaluated.
+ * so the jiffy counter used for the check is correctly evaluated.
+ *
+ * The function will accumulate the elapsed jiffies since the last call and turn off the
+ * drive motor and LED if the accumulated jiffies exceed 60.
+ *
+ * @param elapsed_jiffies The number of jiffies elapsed since the last call to this function
  *
  * Code section: code_diskio
  */
-void diskio_check_motor_off(void)
+void diskio_check_motor_off(uint8_t elapsed_jiffies)
 {
   if (!drive_ready || drive_in_use) {
     return;
   }
-  uint8_t cur_frame = FRAMECOUNT;
-  uint8_t elapsed_frames = cur_frame - last_drive_access_frame;
-  if (elapsed_frames < 60) {
+
+  jiffies_elapsed_since_last_drive_access += elapsed_jiffies;
+  if (jiffies_elapsed_since_last_drive_access < 60) {
     return;
   }
   led_and_motor_off();
+  jiffies_elapsed_since_last_drive_access = 0;
 }
 
 /**
@@ -882,7 +889,8 @@ static void load_block(uint8_t track, uint8_t block)
       last_physical_sector = physical_sector;
       last_side = side;
 
-      last_drive_access_frame = FRAMECOUNT;
+      // reset jiffy counter for drive access check
+      jiffies_elapsed_since_last_drive_access = 0;
     }
     last_block = block;
   }

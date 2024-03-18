@@ -76,10 +76,10 @@ __task void vm_mainloop(void)
   dialog_timer = 0;
 
   while (1) {
-    map_cs_diskio();
-    diskio_check_motor_off();
-    unmap_cs();
     uint8_t elapsed_jiffies = wait_for_jiffy();
+    map_cs_diskio();
+    diskio_check_motor_off(elapsed_jiffies);
+    unmap_cs();
 
     for (active_script_slot = 0; 
          active_script_slot < NUM_SCRIPT_SLOTS;

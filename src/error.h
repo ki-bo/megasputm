@@ -12,6 +12,7 @@ typedef enum {
     ERR_OUT_OF_SCRIPT_SLOTS = 8,
     ERR_UNKNOWN_OPCODE = 9,
     ERR_VARIDX_OUT_OF_RANGE = 10,
+    ERR_UNKNOWN_RESOURCE_OPERATION = 11,
 } error_code_t;
 
 #endif // __ERROR_H__

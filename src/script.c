@@ -10,7 +10,6 @@
 static uint8_t read_byte(void);
 static uint16_t read_word(void);
 static uint32_t read_24bits(void);
-static uint8_t resolve_var_param(void);
 static uint8_t resolve_next_param8(void);
 static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
@@ -22,6 +21,7 @@ static void subtract(void);
 static void add(void);
 static void delay(void);
 static void cutscene(void);
+static void begin_override_or_print_ego(void);
 static void begin_override(void);
 static void cursor_cmd(void);
 static void load_room(void);
@@ -56,7 +56,7 @@ void script_init(void)
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x40] = &cutscene;
   opcode_jump_table[0x53] = &actor_ops;
-  opcode_jump_table[0x58] = &begin_override;
+  opcode_jump_table[0x58] = &begin_override_or_print_ego;
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x60] = &cursor_cmd;
   opcode_jump_table[0x72] = &load_room;
@@ -70,22 +70,35 @@ void script_init(void)
  * We are not doing this code inline but as a separate function
  * because the compiler would otherwise not know about the clobbering
  * of registers (including zp registers) by the called function.
+ * Placing the function in section code will make sure that it
+ * is not inlined by functions in other sections, like code_main.
  * 
+ * The highest bit of the opcode is ignored, so opcodes 128-255 are
+ * jumping to the same function as opcodes 0-127.
+ *
  * @param opcode The opcode to be called (0-127).
  */
 void exec_opcode(uint8_t opcode)
 {
   //opcode_jump_table[opcode]();
-  __asm volatile(" asl a\n"
-                 " tax\n"
-                 " jsr (opcode_jump_table, x)"
-                 : /* no output operands */
-                 : "Ka" (opcode)
-                 : "x");
+  __asm (" asl a\n"
+         " tax\n"
+         " jsr (opcode_jump_table, x)"
+         : /* no output operands */
+         : "Ka" (opcode)
+         : "x");
 }
 
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
+/**
+ * @brief Runs a script.
+ *
+ * The script is run from the current pc until the script's state is not PROC_STATE_RUNNING.
+ * 
+ * @param proc_id The process id of the script to run.
+ * @return uint8_t 0 if the script has finished, 1 if the script is still running.
+ */
 uint8_t script_run(uint8_t proc_id)
 {
   map_ds_resource(proc_res_slot[proc_id]);
@@ -167,17 +180,15 @@ static int32_t read_int24(void)
   return value;
 }
 
-static uint8_t resolve_var_param()
-{
-  uint8_t param = read_byte();
-  if (opcode & 0x80) {
-    return vm_read_var8(param);
-  }
-  else {
-    return param;
-  }
-}
-
+/**
+ * @brief Resolves the next parameter as an 8-bit value.
+ *
+ * The parameter can be either a variable index or an 8-bit value.
+ * If the parameter is a variable index, the value of the variable is
+ * truncated to the lower 8 bits.
+ * 
+ * @return uint8_t The resolved parameter.
+ */
 static uint8_t resolve_next_param8(void)
 {
   uint8_t param;
@@ -192,6 +203,13 @@ static uint8_t resolve_next_param8(void)
   return param;
 }
 
+/**
+ * @brief Resolves the next parameter as a 16-bit value.
+ *
+ * The parameter can be either a variable index or a 16-bit value.
+ * 
+ * @return uint16_t The resolved parameter.
+ */
 static uint16_t resolve_next_param16(void)
 {
   uint16_t param;
@@ -206,6 +224,13 @@ static uint16_t resolve_next_param16(void)
   return param;
 }
 
+/**
+ * @brief Reads a null-terminated string from the script.
+ *
+ * Reads the string at pc and increments pc until a null byte is found.
+ * 
+ * @param dest The destination buffer where the string will be stored.
+ */
 static void read_null_terminated_string(char *dest)
 {
   char c;
@@ -215,6 +240,16 @@ static void read_null_terminated_string(char *dest)
   *dest = 0;
 }
 
+/**
+ * @brief Reads a string from the script and decodes it.
+ * 
+ * The string is encoded in a way that space characters are encoded as
+ * MSB of the character byte before the space.
+ *
+ * The resulting string in dest is null-terminated.
+ *
+ * @param dest The destination buffer where the decoded string will be stored.
+ */
 static void read_encoded_string_null_terminated(char *dest)
 {
   uint8_t num_chars = 0;
@@ -237,6 +272,7 @@ static void read_encoded_string_null_terminated(char *dest)
 /**
  * @brief Opcode 0x0c: Resource cmd
  * 
+ * Code section: code_main
  */
 static void resource_cmd(void)
 {
@@ -247,6 +283,9 @@ static void resource_cmd(void)
   switch (sub_opcode) {
     case 0x31:
       res_provide(RES_TYPE_ROOM, resource_id, 0);
+      break;
+    case 0x33:
+      res_lock(RES_TYPE_ROOM, resource_id, 0);
       break;
     case 0x51:
       res_provide(RES_TYPE_SCRIPT, resource_id, 0);
@@ -260,6 +299,8 @@ static void resource_cmd(void)
     case 0x63:
       res_lock(RES_TYPE_SOUND, resource_id, 0);
       break;
+    default:
+      fatal_error(ERR_UNKNOWN_RESOURCE_OPERATION);
   }
 }
 
@@ -267,6 +308,8 @@ static void resource_cmd(void)
  * @brief Opcode 0x13: Actor ops
  * 
  * Variant opcodes: 0x53, 0x93, 0xD3
+ *
+ * Code section: code_main
  */
 static void actor_ops(void)
 {
@@ -295,6 +338,11 @@ static void actor_ops(void)
   }
 }
 
+/**
+ * @brief Opcode 0x14: Print
+ * 
+ * Code section: code_main
+ */
 static void print(void)
 {
   debug_msg("Print");
@@ -307,6 +355,8 @@ static void print(void)
  * @brief Opcode 0x1A: Assign
  *
  * Assigns a value to a variable.
+ *
+ * Code section: code_main
  */
 static void assign(void)
 {
@@ -321,6 +371,8 @@ static void assign(void)
  * Reads 24 bits of ticks value for the wait timer. Note that the amount
  * of ticks that the script should pause actually needs to be calculated by
  * ticks_to_wait = 0xffffff - param_value.
+ *
+ * Code section: code_main
  */
 static void delay(void)
 {
@@ -333,6 +385,8 @@ static void delay(void)
  * @brief Opcode 0x3A: Subtract
  *
  * Subtracts a value from a variable.
+ *
+ * Code section: code_main
  */
 static void subtract(void)
 {
@@ -344,6 +398,7 @@ static void subtract(void)
 /**
  * @brief Opcode 0x40: Cutscene
  * 
+ * Code section: code_main
  */
 static void cutscene(void)
 {
@@ -353,18 +408,58 @@ static void cutscene(void)
 }
 
 /**
+ * @brief Opcode 0x58: Begin override or print ego
+ * 
+ * Function is called for both opcodes 0x58 and 0xd8 (0x58 | 0x80).
+ * Forward to the correct function depending on the opcode.
+ *
+ * Code section: code_main
+ */
+void begin_override_or_print_ego(void)
+{
+  if (!(opcode & 0x80)) {
+    begin_override();
+  }
+  else {
+    print_ego();
+  }
+}
+
+/**
  * @brief Opcode 0x58: Begin override
  * 
+ * Enables the user to override the currently running cutscene.
+ * The goto command that will be executed is directly following, and is stored
+ * in the override_pc variable. This is used to jump to the next opcode after
+ * the cutscene has been overridden.
+ *
+ * The begin_override opcode is skipping the goto command that is following it.
+ *
+ * Code section: code_main
  */
 static void begin_override(void)
 {
   debug_msg("Begin override");
   override_pc = pc;
+  pc += 3; // Skip the goto command
+}
+
+/**
+ * @brief Opcode 0xd8 (0x58 | 0x80): Print ego
+ * 
+ * Code section: code_main
+ */
+static void print_ego(void)
+{
+  debug_msg("Print ego");
 }
 
 /**
  * @brief Opcode 0x5A: Add
  * 
+ * Adds a value to a variable.
+ *
+ * Code section: code_main
  */
 static void add(void)
 {
@@ -373,6 +468,11 @@ static void add(void)
   vm_write_var(var_idx, resolve_next_param16() + read_word());
 }
 
+/**
+ * @brief Opcode 0x60: Cursor cmd
+ * 
+ * Code section: code_main
+ */
 static void cursor_cmd(void)
 {
   debug_msg("Cursor cmd");
@@ -380,6 +480,11 @@ static void cursor_cmd(void)
   state_iface = read_byte();
 }
 
+/**
+ * @brief Opcode 0x72: Load room
+ * 
+ * Code section: code_main
+ */
 static void load_room(void)
 {
   debug_msg("Load room");
@@ -388,11 +493,11 @@ static void load_room(void)
   vm_switch_room(room_no, res_slot);
 }
 
-static void print_ego(void)
-{
-  debug_msg("Print ego");
-}
-
+/**
+ * @brief Error handler for unimplemented opcodes.
+ * 
+ * Code section: code_main
+ */
 static void unimplemented_opcode(void)
 {
   debug_out("Unimplemented opcode: %02x at %04x", opcode, (uint16_t)(pc - 1));
