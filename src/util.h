@@ -50,7 +50,7 @@
 #define HUGE_VU8_PTR(X) ((volatile uint8_t __huge *)(X))
 #define HUGE_VI8_PTR(X) ((volatile int8_t __huge *)(X))
 
-#define LSB(X)   ((uint8_t)((uint8_t)(X)))
+#define LSB(X)   ((uint8_t)(X))
 #define MSB(X)   ((uint8_t)((uint16_t)(X) >> 8))
 #define LSB16(X) ((uint16_t)(X))
 #define BANK(X)  ((uint8_t)(((uint8_t)((uintptr_t)(X) >> 16)) & 0x0f))

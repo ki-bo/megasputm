@@ -3,9 +3,13 @@
 
 #include <stdint.h>
 
-#define FRAMECOUNT (*(volatile uint8_t *)0xd7fa)
+struct __cpu_vectors {
+  void *nmi;
+  void *reset;
+  void *irq;
+};
 
-typedef struct __f011 {
+struct __f011 {
   uint8_t fdc_control;
   volatile uint8_t command;
   uint16_t status;
@@ -16,7 +20,7 @@ typedef struct __f011 {
   uint8_t clock;
   uint8_t step;
   uint8_t pcode;
-} f011_t;
+};
 
 enum fdc_status_mask_t
 {
@@ -69,7 +73,8 @@ struct __dma {
   volatile uint8_t trig_inline;
 };
 
-#define FDC (*(struct __f011 *)0xd080)
-#define DMA (*(struct __dma *)0xd700)
+#define CPU_VECTORS (*(struct __cpu_vectors *)0xfffa)
+#define FDC         (*(struct __f011 *)       0xd080)
+#define DMA         (*(struct __dma *)        0xd700)
 
 #endif // __IO_H

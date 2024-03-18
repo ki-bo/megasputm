@@ -1,5 +1,6 @@
 #include "resource.h"
 #include "diskio.h"
+#include "dma.h"
 #include "map.h"
 #include "util.h"
 
@@ -11,13 +12,16 @@
 
 uint8_t page_res_type[256];
 uint8_t page_res_index[256];
+uint8_t res_pages_invalidated;
 
 //-----------------------------------------------------------------------------------------------
 
 // Private resource functions
+static uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint);
+static void find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
+static void find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages);
 static uint8_t defragment_memory(void);
-static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -38,6 +42,7 @@ static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint);
 void res_init(void)
 {
   memset(page_res_type, RES_TYPE_NONE, 256);
+  res_pages_invalidated = 0;
 }
 
 /** @} */ // res_init
@@ -74,15 +79,11 @@ void res_init(void)
  *
  * Code section: code_main
  */
-uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
+uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint8_t i = hint;
   do {
-    if(page_res_index[i] == id && page_res_type[i] == (type_and_flags & RES_TYPE_MASK)) {
-      if (type_and_flags != page_res_type[i]) {
-        // resource is available, but need to update flags
-        update_flags(type_and_flags, id, i);
-      }
+    if(page_res_index[i] == id && page_res_type[i] == type) {
       return i;
     }
     i++;
@@ -90,12 +91,12 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
   while(i != hint);
 
   map_cs_diskio();
-  uint16_t chunk_size = diskio_start_resource_loading(type_and_flags & RES_TYPE_MASK, id);
+  uint16_t chunk_size = diskio_start_resource_loading(type, id);
   
   if (chunk_size > MAX_RESOURCE_SIZE) {
     fatal_error(ERR_RESOURCE_TOO_LARGE);
   }
-  uint8_t page = allocate(type_and_flags, id, (chunk_size + 255) / 256);
+  uint8_t page = allocate(type, id, (chunk_size + 255) / 256);
   uint16_t ds_save = map_get_ds();
   map_ds_resource(page);
   diskio_continue_resource_loading();
@@ -121,8 +122,7 @@ uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint)
  */
 void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 {
-  uint8_t new_type = type | RES_LOCKED_MASK;
-  update_flags(new_type, id, hint);
+  find_and_set_flags(type, id, hint, RES_LOCKED_MASK);
 }
 
 /**
@@ -139,8 +139,42 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 {
-  uint8_t new_type = type & ~RES_LOCKED_MASK;
-  update_flags(new_type, id, hint);
+  find_and_clear_flags(type, id, hint, RES_LOCKED_MASK);
+}
+
+void res_activate(uint8_t type, uint8_t id, uint8_t hint)
+{
+  find_and_set_flags(type, id, hint, RES_ACTIVE_MASK);
+}
+
+void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
+{
+  find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
+}
+
+void res_set_flags(uint8_t slot, uint8_t flags)
+{
+  uint8_t current_type_and_flags = page_res_type[slot];
+  res_reset_flags(slot, current_type_and_flags | flags);
+}
+
+void res_clear_flags(uint8_t slot, uint8_t flags)
+{
+  uint8_t current_type_and_flags = page_res_type[slot];
+  res_reset_flags(slot, current_type_and_flags & ~flags);
+}
+
+void res_reset_flags(uint8_t slot, uint8_t flags)
+{
+  uint8_t current_type_and_flags = page_res_type[slot];
+  uint8_t current_id = page_res_index[slot];
+  uint8_t new_type_and_flags = (current_type_and_flags & RES_TYPE_MASK) | flags;
+
+  while (page_res_type[slot] == current_type_and_flags &&
+         page_res_index[slot] == current_id) {
+    page_res_type[slot] = new_type_and_flags;
+    ++slot;
+  }
 }
 
 /** @} */ // res_public
@@ -152,35 +186,38 @@ void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
  * @{
  */
 
-/**
- * @brief Updates the flags of a resource
- *
- * This function updates the flags of a resource in the resource memory.
- *
- * @param type_and_flags New type and flags of the resource
- * @param id ID of the resource
- * @param hint The position in the page list to start searching for the resource
- *
- * Code section: code_main
- */
-static void update_flags(uint8_t type_and_flags, uint8_t id, uint8_t hint)
+uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 {
-  uint8_t type = type_and_flags & RES_TYPE_MASK;
-  uint8_t found = 0;
   uint8_t i = hint;
   do {
-    if (page_res_index[i] == id && page_res_type[i] == type) {
-      page_res_type[i] = type_and_flags;
-      found = 1;
-    }
-    else if (found) {
-      // current page does not match, but we already had matching pages before.
-      // this means we reached the end of the resource's pages and can stop.
-      break;
+    if(page_res_index[i] == id && (page_res_type[i] & RES_TYPE_MASK) == type) {
+      return i;
     }
   }
-  while (++i != hint);
+  while(++i != hint);
+  return 0xffff;
 }
+
+void find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
+{
+  uint16_t result = find_resource(type & RES_TYPE_MASK, id, hint);
+  if (result == 0xffff) {
+    return;
+  }
+  uint8_t slot = (uint8_t) result;
+  res_set_flags(slot, flags);
+}
+
+void find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
+{
+  uint16_t result = find_resource(type & RES_TYPE_MASK, id, hint);
+  if (result == 0xffff) {
+    return;
+  }
+  uint8_t slot = (uint8_t) result;
+  res_clear_flags(slot, flags);
+}
+
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type"
@@ -257,20 +294,39 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
  */
 static uint8_t defragment_memory(void)
 {
+  static dmalist_t dmalist_res_defrag = {
+    .end_of_options = 0,
+    .command        = 0,
+    .count          = 256,
+    .src_addr       = 0,
+    .src_bank       = 0,
+    .dst_addr       = 0,
+    .dst_bank       = 0
+  };
+
   uint8_t read_idx = 0;
   uint8_t write_idx = 0;
+
+  dmalist_res_defrag.src_addr_lsb  = 0x00;
+  dmalist_res_defrag.dst_addr_lsb  = 0x00;
+  dmalist_res_defrag.src_addr_page = 0x0280;
+  dmalist_res_defrag.dst_addr_page = 0x0280;
 
   do {
     if (page_res_type[read_idx] == RES_TYPE_NONE) {
       ++read_idx;
+      ++dmalist_res_defrag.src_addr_page;
     }
     else {
       if (read_idx != write_idx) {
         page_res_type[write_idx] = page_res_type[read_idx];
         page_res_index[write_idx] = page_res_index[read_idx];
+        dma_trigger(&dmalist_res_defrag);
       }
       ++write_idx;
+      ++dmalist_res_defrag.dst_addr_page;
       ++read_idx;
+      ++dmalist_res_defrag.src_addr_page;
     }
   }
   while (read_idx != 0);
@@ -278,6 +334,8 @@ static uint8_t defragment_memory(void)
   for (uint8_t i = 255; i >= write_idx; i--) {
     page_res_type[i] = RES_TYPE_NONE;
   }
+
+  res_pages_invalidated = 1;
 
   return write_idx;
 }

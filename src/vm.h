@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define NUM_SCRIPT_SLOTS  8
+#define NUM_SCRIPT_SLOTS 32
 #define NUM_ACTORS       25
 #define ACTOR_NAME_LEN   16
 
@@ -15,14 +15,18 @@ enum {
 };
 
 enum {
-    VAR_EGO = 0,
-    VAR_ROOM_NO = 4,
-    VAR_MACHINE_SPEED = 6,
-    VAR_NUM_ACTORS = 11,
-    VAR_CURSOR_STATE = 21,
-    VAR_TIMER_NEXT = 25,
-    VAR_BACKUP_VERB = 38,
-    VAR_CUTSCENEEXIT_KEY = 40,
+  PROC_TYPE_GLOBAL = 1
+};
+
+enum {
+  VAR_EGO = 0,
+  VAR_ROOM_NO = 4,
+  VAR_MACHINE_SPEED = 6,
+  VAR_NUM_ACTORS = 11,
+  VAR_CURSOR_STATE = 21,
+  VAR_TIMER_NEXT = 25,
+  VAR_BACKUP_VERB = 38,
+  VAR_CUTSCENEEXIT_KEY = 40,
 };
 
 
@@ -49,7 +53,7 @@ extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 void vm_init(void);
 __task void vm_mainloop(void);
 uint8_t vm_get_active_proc_state(void);
-void vm_switch_room(uint8_t room_no, uint8_t res_slot);
+void vm_switch_room(uint8_t room_no);
 void vm_set_script_wait_timer(int32_t negative_ticks);
 void vm_start_cutscene(void);
 void vm_actor_start_talking(uint8_t actor_id);

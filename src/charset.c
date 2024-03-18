@@ -9,7 +9,7 @@ static void copy_chars(uint8_t char_idx_src, uint8_t char_idx_dst, uint16_t num_
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup charset_init Charset Init Functions
+ * @defgroup charset_init_public Charset Init Public Functions
  * @{
  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
@@ -28,6 +28,15 @@ void charset_init(void)
   // move lower case letters (index 0x00) to the ascii range (0x60)
   copy_chars(0x00, 0x60, 0x20);
 }
+
+/** @} */ // charset_init_public
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * @defgroup charset_init_private Charset Init Private Functions
+ * @{
+ */
 
 /**
  * @brief Copies a number of characters from ROM to the charrom area
@@ -58,6 +67,6 @@ void copy_chars(uint8_t char_idx_src, uint8_t char_idx_dst, uint16_t num_chars)
   dma_trigger(&dmalist_charset_copy);
 }
 
-/** @} */ // charset_init
+/** @} */ // charset_init_private
 
 //-----------------------------------------------------------------------------------------------

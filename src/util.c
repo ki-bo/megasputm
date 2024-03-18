@@ -13,7 +13,7 @@ void fatal_error(error_code_t error)
   //POKE(0xd020, 5);
   map_cs_diskio();
   while (1) {
-    diskio_check_motor_off();
+    diskio_check_motor_off(1);
   }
 }
 
@@ -23,29 +23,29 @@ void fatal_error_str(const char *message)
   POKE(0xd020, 5);
   map_cs_diskio();
   while (1) {
-    diskio_check_motor_off();
+    diskio_check_motor_off(1);
   }
 }
 
 void debug_msg(char* msg)
 {
   while (*msg) {
-    __asm volatile(" sta 0xd643\n"
-                   " nop"
-                   :           /* no output operands */
-                   : "Ka"(*msg) /* input operands */
-                   : "a" /* clobber list */);
+    __asm (" sta 0xd643\n"
+           " nop"
+           :           /* no output operands */
+           : "Ka"(*msg) /* input operands */
+           : "a" /* clobber list */);
     msg++;
   }
-  __asm volatile(" lda #0x0d\n"
-                 " sta 0xd643\n"
-                 " nop\n"
-                 " lda #0x0a\n"
-                 " sta 0xd643\n"
-                 " nop"
-                 : /* no output operands */
-                 : /* no input operands*/
-                 : "a" /* clobber list */);
+  __asm (" lda #0x0d\n"
+         " sta 0xd643\n"
+         " nop\n"
+         " lda #0x0a\n"
+         " sta 0xd643\n"
+         " nop"
+         : /* no output operands */
+         : /* no input operands*/
+         : "a" /* clobber list */);
 }
 
 void *memcpy(void *dest, const void *src, size_t n)

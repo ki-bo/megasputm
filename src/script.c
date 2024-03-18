@@ -15,6 +15,7 @@ static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
 static void actor_ops(void);
 static void print(void);
+static void jump(void);
 static void resource_cmd(void);
 static void assign(void);
 static void subtract(void);
@@ -51,6 +52,7 @@ void script_init(void)
   opcode_jump_table[0x0c] = &resource_cmd;
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &print;
+  opcode_jump_table[0x18] = &jump;
   opcode_jump_table[0x1a] = &assign;
   opcode_jump_table[0x2e] = &delay;
   opcode_jump_table[0x3a] = &subtract;
@@ -352,6 +354,21 @@ static void print(void)
 }
 
 /**
+ * @brief Opcode 0x18: Jump
+ * 
+ * Reads a 16 bit offset value and jumps to the new pc. An offset of 0 means
+ * that the script will continue with the next opcode. The offset is signed
+ * two-complement.
+ *
+ * Code section: code_main
+ */
+static void jump(void)
+{
+  debug_msg("Jump");
+  pc += read_word(); // will effectively jump backwards if the offset is negative
+}
+
+/**
  * @brief Opcode 0x1A: Assign
  *
  * Assigns a value to a variable.
@@ -489,8 +506,7 @@ static void load_room(void)
 {
   debug_msg("Load room");
   uint8_t room_no = read_byte();
-  uint8_t res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
-  vm_switch_room(room_no, res_slot);
+  vm_switch_room(room_no);
 }
 
 /**

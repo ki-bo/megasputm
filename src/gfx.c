@@ -14,7 +14,6 @@
 #define SCREEN_RAM 0x10000
 #define COLRAM 0xff80800UL
 #define BG_BITMAP 0x28000
-#define FRAMECOUNT (*(volatile uint8_t *)0xd7fa)
 #define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
 #define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
 
@@ -175,7 +174,7 @@ void gfx_init()
  */
 void setup_irq(void)
 {
-  *NEAR_U16_PTR(0xfffe) = (uint16_t)&raster_irq;
+  CPU_VECTORS.irq = &raster_irq;
 
   VICIV.rasterline = 250;
   VICIV.ctrl1 &= 0x7f;
@@ -211,16 +210,16 @@ volatile uint8_t raster_irq_counter = 0;
 __attribute__((interrupt()))
 static void raster_irq ()
 {
+  uint32_t map_save = map_get();
+
   ++raster_irq_counter;
 
   input_update();
 
-  uint32_t map_save = map_get();
   map_cs_gfx();
   update_cursor();
 
-  map_set(map_save);     // restore MAP
-  
+  map_set(map_save);     // restore MAP  
   VICIV.irr = VICIV.irr; // ack interrupt
 }
 
@@ -242,8 +241,14 @@ static void raster_irq ()
  */
 void gfx_start(void)
 {
-    VICII.ctrl1 = 0x1b; // enable video output
-    __enable_interrupts();
+  // Be careful with this register, as using rmw instructions just enabling the BLANK
+  // bit will also read and write the other bits. The upper bit will read the current
+  // bit8 of the current raster line, and writing it again will set the raster line
+  // for the raster interrupt. This can lead to strange errors where the wrong raster line
+  // might get set depending on when the write happens. To avoid all this, we just set
+  // the whole byte dirctly, making sure we keep the MSB clear.
+  VICII.ctrl1 = 0x1b; // enable video output
+  __enable_interrupts();
 }
 
 /**
@@ -321,16 +326,32 @@ void gfx_wait_for_next_frame(void)
  */
 void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 {
+#define GFX_STRIP_HEIGHT 128
+
+  static dmalist_single_option_t dmalist_rle_strip_copy = {
+    .opt_token      = 0x85,                   // destination skip rate
+    .opt_arg        = 0x08,                   // = 8 bytes
+    .end_of_options = 0x00,
+    .command        = 0,                      // DMA copy command
+    .count          = GFX_STRIP_HEIGHT,
+    .src_addr       = 0,
+    .src_bank       = 0,
+    .dst_addr       = 0,
+    .dst_bank       = 0x07
+  };
+
   static uint8_t color_strip[128];
 
   uint8_t __huge *dst = HUGE_U8_PTR(BG_BITMAP);
-  const uint8_t height = 128;
 
   uint8_t rle_counter = 1;
   uint8_t keep_color = 0;
   uint8_t col_byte;
   uint8_t y = 0;
   uint16_t x = 0;
+
+  dmalist_rle_strip_copy.src_addr = LSB16(UNBANKED_PTR(color_strip));
+  dmalist_rle_strip_copy.src_bank = BANK(UNBANKED_PTR(color_strip));
 
   do {
     --rle_counter;
@@ -353,17 +374,15 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
     }
 
     ++y;
-    if (y == height) {
-      uint8_t __huge *strip_ptr = dst;
-      for (y = 0; y < height; ++y) {
-        *strip_ptr = color_strip[y];
-        strip_ptr = strip_ptr + 8;
-      }
+    if (y == GFX_STRIP_HEIGHT) {
+      dmalist_rle_strip_copy.dst_addr = LSB16(dst);
+      dmalist_rle_strip_copy.dst_bank = BANK(dst);
+      dma_trigger(&dmalist_rle_strip_copy);
       y = 0;
       ++x;
-      dst = dst + 1;
+      ++dst;
       if (!(LSB(x) & 0x07)) {
-        dst = dst + (8 * (uint16_t)(height - 1));
+        dst += (GFX_STRIP_HEIGHT-1) * 8;
       }
     }
   } 
