@@ -1,6 +1,7 @@
 #include "script.h"
 #include "error.h"
 #include "map.h"
+#include "memory.h"
 #include "resource.h"
 #include "util.h"
 #include "vm.h"
@@ -104,14 +105,14 @@ void exec_opcode(uint8_t opcode)
 uint8_t script_run(uint8_t proc_id)
 {
   map_ds_resource(proc_res_slot[proc_id]);
-  pc = NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS) + proc_pc[proc_id];
+  pc = NEAR_U8_PTR(RES_MAPPED) + proc_pc[proc_id];
   while (vm_get_active_proc_state() == PROC_STATE_RUNNING) {
     opcode = read_byte();
     param_mask = opcode & 0xe0;
     exec_opcode(opcode);
   }
 
-  proc_pc[proc_id] = (uint16_t)(pc - NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS));
+  proc_pc[proc_id] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
 
   return 0;
 }

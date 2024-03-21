@@ -10,7 +10,13 @@ typedef struct
   // F018A format DMA request
   uint8_t end_of_options; // End of options token (0x00)
   uint8_t command;        // Command (LSB), e.g. DMA_COPY_CMD, DMA_FILL_CMD, etc.
-  uint16_t count;         // Number of bytes to copy
+  union {
+    uint16_t count;
+    struct {
+      uint8_t count_lsb;
+      uint8_t count_msb;
+    };
+  };
   union {
     struct {
       union {

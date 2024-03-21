@@ -1,5 +1,6 @@
 #include "map.h"
 #include "diskio.h"
+#include "memory.h"
 #include "resource.h"
 #include "util.h"
 #include <stdint.h>
@@ -215,7 +216,7 @@ void map_cs_gfx(void)
 void map_ds_resource(uint8_t res_page)
 {
   // map offset: RESOURCE_MEMORY + page*256 - 0x8000
-  uint16_t offset = 0x3000 + (RESOURCE_MEMORY / 256) + res_page - 0x80;
+  uint16_t offset = 0x3000 + (RESOURCE_BASE / 256) + res_page - 0x80;
   map_regs.y = LSB(offset);
   map_regs.z = MSB(offset);
   apply_map();

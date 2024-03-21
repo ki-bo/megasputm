@@ -3,6 +3,7 @@
 #include "input.h"
 #include "io.h"
 #include "map.h"
+#include "memory.h"
 #include "resource.h"
 #include "util.h"
 #include "vm.h"
@@ -11,9 +12,6 @@
 
 //-----------------------------------------------------------------------------------------------
 
-#define SCREEN_RAM 0x10000
-#define COLRAM 0xff80800UL
-#define BG_BITMAP 0x28000
 #define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
 #define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
 

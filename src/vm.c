@@ -3,6 +3,8 @@
 #include "error.h"
 #include "gfx.h"
 #include "map.h"
+#include "memory.h"
+
 #include "resource.h"
 #include "script.h"
 #include "util.h"
@@ -167,11 +169,11 @@ void vm_switch_room(uint8_t room_no)
   res_set_flags(room_res_slot, RES_ACTIVE_MASK);
   map_ds_resource(room_res_slot);
 
-  __auto_type room_hdr = (struct room_header *)DEFAULT_RESOURCE_ADDRESS;
+  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
 
   map_cs_gfx();
   gfx_fade_out();
-  gfx_decode_bg_image(NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS + room_hdr->bg_data_offset), 
+  gfx_decode_bg_image(NEAR_U8_PTR(RES_MAPPED + room_hdr->bg_data_offset), 
                       room_hdr->bg_width);
   gfx_fade_in();
   unmap_cs();
@@ -275,9 +277,9 @@ static uint8_t wait_for_jiffy(void)
 
 static void read_object_offsets(void)
 {
-  __auto_type room_hdr = (struct room_header *)DEFAULT_RESOURCE_ADDRESS;
+  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
   num_objects = room_hdr->num_objects;
-  uint8_t *data_ptr = NEAR_U8_PTR(DEFAULT_RESOURCE_ADDRESS + 0x1c + num_objects * 2);
+  uint8_t *data_ptr = NEAR_U8_PTR(RES_MAPPED + 0x1c + num_objects * 2);
   for (uint8_t i = 0; i < num_objects; ++i)
   {
     obj_offset[i] = *data_ptr++;

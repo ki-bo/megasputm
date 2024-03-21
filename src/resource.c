@@ -2,6 +2,7 @@
 #include "diskio.h"
 #include "dma.h"
 #include "map.h"
+#include "memory.h"
 #include "util.h"
 
 //-----------------------------------------------------------------------------------------------
@@ -105,6 +106,13 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   map_set_ds(ds_save);
   
   return page;
+}
+
+void create_object_resource(uint8_t* data, uint16_t size, uint8_t id)
+{
+  uint8_t page = allocate(RES_TYPE_OBJECT, id, (size + 255) / 256);
+  void __far* dest = (void __far*) (RESOURCE_BASE + page * 256);
+  memcpy_to_bank(dest, data, size);
 }
 
 /**
@@ -307,10 +315,8 @@ static uint8_t defragment_memory(void)
   uint8_t read_idx = 0;
   uint8_t write_idx = 0;
 
-  dmalist_res_defrag.src_addr_lsb  = 0x00;
-  dmalist_res_defrag.dst_addr_lsb  = 0x00;
-  dmalist_res_defrag.src_addr_page = 0x0280;
-  dmalist_res_defrag.dst_addr_page = 0x0280;
+  dmalist_res_defrag.src_addr_page = RESOURCE_BASE >> 8;
+  dmalist_res_defrag.dst_addr_page = RESOURCE_BASE >> 8;
 
   do {
     if (page_res_type[read_idx] == RES_TYPE_NONE) {

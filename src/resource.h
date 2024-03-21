@@ -4,15 +4,14 @@
 #include <stdint.h>
 
 #define MAX_RESOURCE_SIZE        0x4000
-#define DEFAULT_RESOURCE_ADDRESS 0x8000
-#define RESOURCE_MEMORY          0x18000UL
 
 enum res_type_t {
     RES_TYPE_NONE = 0,
     RES_TYPE_ROOM,
     RES_TYPE_COSTUME,
     RES_TYPE_SCRIPT,
-    RES_TYPE_SOUND
+    RES_TYPE_SOUND,
+    RES_TYPE_OBJECT
 };
 
 enum res_type_flags_t {
