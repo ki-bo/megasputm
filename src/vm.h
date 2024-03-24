@@ -20,6 +20,7 @@ enum {
 
 enum {
   VAR_EGO = 0,
+  VAR_DIALOG_ACTIVE = 3,
   VAR_ROOM_NO = 4,
   VAR_MACHINE_SPEED = 6,
   VAR_NUM_ACTORS = 11,
@@ -27,6 +28,13 @@ enum {
   VAR_TIMER_NEXT = 25,
   VAR_BACKUP_VERB = 38,
   VAR_CUTSCENEEXIT_KEY = 40,
+};
+
+enum {
+  OBJ_STATE_1 = 1,
+  OBJ_STATE_2 = 2,
+  OBJ_STATE_4 = 4,
+  OBJ_STATE_ACTIVE = 8,
 };
 
 
@@ -57,6 +65,8 @@ void vm_switch_room(uint8_t room_no);
 void vm_set_script_wait_timer(int32_t negative_ticks);
 void vm_start_cutscene(void);
 void vm_actor_start_talking(uint8_t actor_id);
+void vm_start_script(uint8_t script_id);
+void vm_stop_active_script(void);
 
 inline uint16_t vm_read_var(uint8_t var)
 {
@@ -71,7 +81,7 @@ inline uint8_t vm_read_var8(uint8_t var)
 }
 
 
-inline void vm_write_var(uint8_t var, uint16_t value)
+static inline void vm_write_var(uint8_t var, uint16_t value)
 {
   // variables_lo[var] = LSB(value);
   // variables_hi[var] = MSB(value);

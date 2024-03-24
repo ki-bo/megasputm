@@ -10,6 +10,7 @@
 #include "util.h"
 #include <stdint.h>
 #include <string.h>
+#include <mega65.h>
 
 struct room_header {
   uint16_t chunk_size;
@@ -88,7 +89,6 @@ uint8_t obj_offset[57];
 
 // Private functions
 static void process_dialog(uint8_t jiffies_elapsed);
-static void load_script(uint8_t script_id);
 static uint8_t wait_for_jiffy(void);
 static void read_object_offsets(void);
 
@@ -117,7 +117,7 @@ __task void vm_mainloop(void)
   gfx_start();
   unmap_cs();
 
-  load_script(1);
+  vm_start_script(1);
 
   wait_for_jiffy(); // this resets the elapsed jiffies timer
   dialog_timer = 0;
@@ -127,6 +127,8 @@ __task void vm_mainloop(void)
     map_cs_diskio();
     diskio_check_motor_off(elapsed_jiffies);
     unmap_cs();
+
+    process_dialog(elapsed_jiffies);
 
     for (active_script_slot = 0; 
          active_script_slot < NUM_SCRIPT_SLOTS;
@@ -140,12 +142,14 @@ __task void vm_mainloop(void)
         {
           proc_state[active_script_slot] = PROC_STATE_RUNNING;
         }
-
-        process_dialog(elapsed_jiffies);
       }
       if (proc_state[active_script_slot] == PROC_STATE_RUNNING)
       {
+        //VICIV.bordercol = active_script_slot + 1;
+        //VICIV.screencol = active_script_slot + 1;
         script_run(active_script_slot);
+        //VICIV.bordercol = 0;
+        //VICIV.screencol = 0;
       }
     }
   }
@@ -159,7 +163,7 @@ uint8_t vm_get_active_proc_state(void)
 void vm_switch_room(uint8_t room_no)
 {
   // save DS
-  uint8_t ds_save = map_get_ds();
+  uint16_t ds_save = map_get_ds();
 
   // exit and free old room
   res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_ROOM_NO), 0);
@@ -220,7 +224,37 @@ void vm_actor_start_talking(uint8_t actor_id)
   map_cs_gfx();
   uint8_t num_chars = gfx_print_dialog(talk_color, dialog_buffer);
   unmap_cs();
-  dialog_timer = (uint16_t)num_chars * (uint16_t)dialog_speed;
+  dialog_timer = 60 + (uint16_t)num_chars * (uint16_t)dialog_speed;
+  vm_write_var(VAR_DIALOG_ACTIVE, 1);
+}
+
+void vm_start_script(uint8_t script_id)
+{
+  uint8_t slot;
+  for (slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
+  {
+    if (proc_state[slot] == PROC_STATE_FREE)
+    {
+      proc_state[slot] = PROC_STATE_RUNNING;
+      proc_pc[slot] = 4; // skipping script header directly to first opcode
+      break;
+    }
+  }
+
+  if (slot == NUM_SCRIPT_SLOTS)
+  {
+    fatal_error(ERR_OUT_OF_SCRIPT_SLOTS);
+  }
+
+  uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+  res_set_flags(new_page, RES_ACTIVE_MASK);
+  proc_res_slot[slot] = new_page;
+}
+
+void vm_stop_active_script()
+{
+  res_deactivate(RES_TYPE_SCRIPT, proc_res_slot[active_script_slot], 0);
+  proc_state[active_script_slot] = PROC_STATE_FREE;
 }
 
 static void process_dialog(uint8_t jiffies_elapsed)
@@ -240,31 +274,11 @@ static void process_dialog(uint8_t jiffies_elapsed)
   }
 
   if (!dialog_timer) {
-    actor_talking = 0xff;
-    gfx_print_dialog(0xff, "\0");
+    map_cs_gfx();
+    gfx_clear_dialog();
+    unmap_cs();
+    vm_write_var(VAR_DIALOG_ACTIVE, 0);
   }
-}
-
-static void load_script(uint8_t script_id)
-{
-  uint8_t slot;
-  for (slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
-  {
-    if (proc_state[slot] == PROC_STATE_FREE)
-    {
-      proc_state[slot] = PROC_STATE_RUNNING;
-      proc_pc[slot] = 4; // skipping script header directly to first opcode
-      break;
-    }
-  }
-
-  if (slot == NUM_SCRIPT_SLOTS)
-  {
-    fatal_error(ERR_OUT_OF_SCRIPT_SLOTS);
-  }
-
-  proc_res_slot[slot] = res_provide(RES_TYPE_SCRIPT, script_id, 0);
-  res_set_flags(proc_res_slot[slot], RES_ACTIVE_MASK);
 }
 
 static uint8_t wait_for_jiffy(void)

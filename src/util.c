@@ -31,7 +31,7 @@ void debug_msg(char* msg)
 {
   while (*msg) {
     __asm (" sta 0xd643\n"
-           " nop"
+           " clv"
            :           /* no output operands */
            : "Ka"(*msg) /* input operands */
            : "a" /* clobber list */);
@@ -39,10 +39,10 @@ void debug_msg(char* msg)
   }
   __asm (" lda #0x0d\n"
          " sta 0xd643\n"
-         " nop\n"
+         " clv\n"
          " lda #0x0a\n"
          " sta 0xd643\n"
-         " nop"
+         " clv"
          : /* no output operands */
          : /* no input operands*/
          : "a" /* clobber list */);

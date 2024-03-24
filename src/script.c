@@ -1,5 +1,6 @@
 #include "script.h"
 #include "error.h"
+#include "io.h"
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
@@ -14,15 +15,21 @@ static uint32_t read_24bits(void);
 static uint8_t resolve_next_param8(void);
 static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
+static void stop_or_break(void);
+static void obj_state_active(void);
+static void resource_cmd(void);
 static void actor_ops(void);
 static void print(void);
+static void create_random_number(void);
 static void jump(void);
-static void resource_cmd(void);
 static void assign(void);
+static void delay_variable(void);
 static void subtract(void);
 static void add(void);
 static void delay(void);
 static void cutscene(void);
+static void start_script(void);
+static void jump_if_not_equal(void);
 static void begin_override_or_print_ego(void);
 static void begin_override(void);
 static void cursor_cmd(void);
@@ -40,6 +47,7 @@ static uint8_t * __attribute__((zpage)) pc;
 
 static void (*opcode_jump_table[128])(void);
 static uint8_t *override_pc;
+static uint8_t break_script = 0;
 
 
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="zdata"
@@ -50,14 +58,21 @@ void script_init(void)
     opcode_jump_table[i] = &unimplemented_opcode;
   }
 
+  opcode_jump_table[0x00] = &stop_or_break;
+  opcode_jump_table[0x07] = &obj_state_active;
   opcode_jump_table[0x0c] = &resource_cmd;
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &print;
+  opcode_jump_table[0x16] = &create_random_number;
   opcode_jump_table[0x18] = &jump;
   opcode_jump_table[0x1a] = &assign;
+  opcode_jump_table[0x2b] = &delay_variable;
   opcode_jump_table[0x2e] = &delay;
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x40] = &cutscene;
+  opcode_jump_table[0x42] = &start_script;
+  opcode_jump_table[0x47] = &obj_state_active;
+  opcode_jump_table[0x48] = &jump_if_not_equal;
   opcode_jump_table[0x53] = &actor_ops;
   opcode_jump_table[0x58] = &begin_override_or_print_ego;
   opcode_jump_table[0x5a] = &add;
@@ -104,11 +119,14 @@ void exec_opcode(uint8_t opcode)
  */
 uint8_t script_run(uint8_t proc_id)
 {
+  break_script = 0;
+
   map_ds_resource(proc_res_slot[proc_id]);
   pc = NEAR_U8_PTR(RES_MAPPED) + proc_pc[proc_id];
-  while (vm_get_active_proc_state() == PROC_STATE_RUNNING) {
+  while (vm_get_active_proc_state() == PROC_STATE_RUNNING && !(break_script)) {
+    //debug_out("pc: %04x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
     opcode = read_byte();
-    param_mask = opcode & 0xe0;
+    param_mask = 0x80;
     exec_opcode(opcode);
   }
 
@@ -272,6 +290,29 @@ static void read_encoded_string_null_terminated(char *dest)
   *dest = 0;
 }
 
+static void stop_or_break(void)
+{
+  //debug_msg("Stop or break");
+  if (!opcode) {
+    vm_stop_active_script();
+  }
+  else {
+    break_script = 1;
+  }
+}
+
+static void obj_state_active(void)
+{
+  //debug_msg("obj state active");
+  uint8_t obj_id = resolve_next_param16();
+  if (opcode & 0x40) {
+    global_game_objects[obj_id] &= ~OBJ_STATE_ACTIVE;
+  }
+  else {
+    global_game_objects[obj_id] |= OBJ_STATE_ACTIVE;
+  }
+}
+
 /**
  * @brief Opcode 0x0c: Resource cmd
  * 
@@ -279,7 +320,7 @@ static void read_encoded_string_null_terminated(char *dest)
  */
 static void resource_cmd(void)
 {
-  debug_msg("Resource cmd");
+  //debug_msg("Resource cmd");
   uint8_t resource_id = resolve_next_param8();
   uint8_t sub_opcode = read_byte();
 
@@ -316,7 +357,7 @@ static void resource_cmd(void)
  */
 static void actor_ops(void)
 {
-  debug_msg("Actor ops");
+  //debug_msg("Actor ops");
   uint8_t actor_id   = resolve_next_param8();
   uint8_t param      = resolve_next_param8();
   uint8_t sub_opcode = read_byte();
@@ -348,10 +389,20 @@ static void actor_ops(void)
  */
 static void print(void)
 {
-  debug_msg("Print");
+  //debug_msg("Print");
   uint8_t actor_id = resolve_next_param8();
   read_encoded_string_null_terminated(dialog_buffer);
   vm_actor_start_talking(actor_id);
+}
+
+static void create_random_number(void)
+{
+  //debug_msg("Create random number");
+  uint8_t var_idx = read_byte();
+  uint8_t upper_bound = resolve_next_param8();
+  while (RNDRDY & 0x80); // wait for random number generator to be ready
+  uint8_t rnd_number = RNDGEN * (upper_bound + 1) / 255;
+  vm_write_var(var_idx, rnd_number);
 }
 
 /**
@@ -365,7 +416,7 @@ static void print(void)
  */
 static void jump(void)
 {
-  debug_msg("Jump");
+  //debug_msg("Jump");
   pc += read_word(); // will effectively jump backwards if the offset is negative
 }
 
@@ -378,9 +429,17 @@ static void jump(void)
  */
 static void assign(void)
 {
-  debug_msg("Assign");
+  //debug_msg("Assign");
   uint8_t var_idx = read_byte();
   vm_write_var(var_idx, resolve_next_param16());
+}
+
+static void delay_variable(void)
+{
+  //debug_msg("Delay variable");
+  int32_t negative_ticks = -1 - vm_read_var(read_byte());
+  //debug_out("delay %d", negative_ticks);
+  vm_set_script_wait_timer(negative_ticks);
 }
 
 /**
@@ -394,7 +453,7 @@ static void assign(void)
  */
 static void delay(void)
 {
-  debug_msg("Delay");
+  //debug_msg("Delay");
   int32_t negative_ticks = read_int24();
   vm_set_script_wait_timer(negative_ticks);
 }
@@ -408,9 +467,9 @@ static void delay(void)
  */
 static void subtract(void)
 {
-  debug_msg("Subtract");
+  //debug_msg("Subtract");
   uint8_t var_idx = read_byte();
-  vm_write_var(var_idx, resolve_next_param16() - read_word());
+  vm_write_var(var_idx, vm_read_var(var_idx) - resolve_next_param16());
 }
 
 /**
@@ -420,11 +479,38 @@ static void subtract(void)
  */
 static void cutscene(void)
 {
-  debug_msg("Cutscene");
+  //debug_msg("Cutscene");
   vm_start_cutscene();
   override_pc = NULL;
 }
 
+/**
+ * @brief Opcode 0x42: Start script
+ * 
+ * Code section: code_main
+ */
+static void start_script(void)
+{
+  //debug_msg("Start script");
+  uint8_t script_id = resolve_next_param8();
+  vm_start_script(script_id);
+}
+
+/**
+ * @brief Opcode 0x48: Jump if not equal
+ * 
+ * Code section: code_main
+ */
+static void jump_if_not_equal(void)
+{
+  //debug_msg("Jump if not equal");
+  uint8_t var_idx = read_byte();
+  uint16_t value = resolve_next_param16();
+  int16_t offset = read_word();
+  if (vm_read_var(var_idx) != value) {
+    pc += offset;
+  }
+}
 /**
  * @brief Opcode 0x58: Begin override or print ego
  * 
@@ -457,9 +543,9 @@ void begin_override_or_print_ego(void)
  */
 static void begin_override(void)
 {
-  debug_msg("Begin override");
+  //debug_msg("Begin override");
   override_pc = pc;
-  pc += 3; // Skip the goto command
+  pc += 3; // Skip the jump command
 }
 
 /**
@@ -469,7 +555,7 @@ static void begin_override(void)
  */
 static void print_ego(void)
 {
-  debug_msg("Print ego");
+  //debug_msg("Print ego");
 }
 
 /**
@@ -481,9 +567,9 @@ static void print_ego(void)
  */
 static void add(void)
 {
-  debug_msg("Add");
+  //debug_msg("Add");
   uint8_t var_idx = read_byte();
-  vm_write_var(var_idx, resolve_next_param16() + read_word());
+  vm_write_var(var_idx, vm_read_var(var_idx) + resolve_next_param16());
 }
 
 /**
@@ -493,7 +579,7 @@ static void add(void)
  */
 static void cursor_cmd(void)
 {
-  debug_msg("Cursor cmd");
+  //debug_msg("Cursor cmd");
   vm_write_var(VAR_CURSOR_STATE, read_byte());
   state_iface = read_byte();
 }
@@ -505,7 +591,7 @@ static void cursor_cmd(void)
  */
 static void load_room(void)
 {
-  debug_msg("Load room");
+  //debug_msg("Load room");
   uint8_t room_no = read_byte();
   vm_switch_room(room_no);
 }

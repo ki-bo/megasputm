@@ -74,7 +74,7 @@ __data_initialization_needed:
 		lda #.byte1 (.sectionEnd data_init_table)
 		sta zp:_Zp+3
 		.extern __initialize_sections
-		;jsr __initialize_sections
+		jsr __initialize_sections
 
 		.section startup, noroot, noreorder
 		.pubweak __call_initialize_global_streams

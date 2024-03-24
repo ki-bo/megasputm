@@ -209,6 +209,11 @@ __attribute__((interrupt()))
 static void raster_irq ()
 {
   uint32_t map_save = map_get();
+  unmap_all();
+  if (!(VICIV.irr & 0x01)) {
+    map_set(map_save);
+    return;
+  }
 
   ++raster_irq_counter;
 
@@ -217,8 +222,8 @@ static void raster_irq ()
   map_cs_gfx();
   update_cursor();
 
-  map_set(map_save);     // restore MAP  
   VICIV.irr = VICIV.irr; // ack interrupt
+  map_set(map_save);     // restore MAP  
 }
 
 /** @} */ // gfx_runtime
@@ -433,7 +438,9 @@ uint8_t gfx_print_dialog(uint8_t color, const char *text)
       continue;
     }
     *screen_ptr = (uint16_t)c;
-    ++num_chars;
+    if (c != ' ') {
+      ++num_chars;
+    }
     ++screen_ptr;
   }
 

@@ -69,11 +69,7 @@ void res_init(void)
  * (see res_type_flags_t) and the flags are the upper 5 bits (see res_type_flags_t). 
  * The id is a number that identifies the resource within its type.
  *
- * If setting the RES_LOCKED_MASK flag, the resource will be locked in memory and
- * will not be overwritten by other resources. This is useful for resources that
- * are used frequently and should not be reloaded from disk.
- *
- * @param type_and_flags Resource type and flags to provide
+ * @param type_and_flags Resource type to provide
  * @param id Resource ID to provide
  * @param hint The position in the page list to start searching for the resource
  * @return uint8_t Page of the resource in the resource memory
