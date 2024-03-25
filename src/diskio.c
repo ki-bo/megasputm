@@ -327,7 +327,6 @@ static void invalidate_disk_cache(void)
 
   for (uint16_t sector = 0; sector < 20 * 80; ++sector) {
     *ptr = -1; // mark cache sector as unused
-    // ptr += 0x200;  <-- this is the original code, but results in "internal error: labeling failed"
     ptr += 0x200;
   }
 }

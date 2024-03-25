@@ -5,6 +5,7 @@
 
 #define NUM_SCRIPT_SLOTS 32
 #define NUM_ACTORS       25
+#define MAX_OBJECTS      57
 #define ACTOR_NAME_LEN   16
 
 enum {
@@ -31,10 +32,10 @@ enum {
 };
 
 enum {
-  OBJ_STATE_1 = 1,
-  OBJ_STATE_2 = 2,
-  OBJ_STATE_4 = 4,
-  OBJ_STATE_ACTIVE = 8,
+  OBJ_STATE_1 = 0x10,
+  OBJ_STATE_2 = 0x20,
+  OBJ_STATE_4 = 0x40,
+  OBJ_STATE_ACTIVE = 0x80,
 };
 
 
@@ -52,6 +53,7 @@ extern uint8_t actor_talk_colors[NUM_ACTORS];
 extern uint8_t actor_talking;
 
 extern uint8_t state_iface;
+extern uint16_t camera_x;
 
 extern uint8_t jiffy_counter;
 extern uint8_t proc_state[NUM_SCRIPT_SLOTS];
@@ -67,6 +69,7 @@ void vm_start_cutscene(void);
 void vm_actor_start_talking(uint8_t actor_id);
 void vm_start_script(uint8_t script_id);
 void vm_stop_active_script(void);
+void vm_update_screen(void);
 
 inline uint16_t vm_read_var(uint8_t var)
 {

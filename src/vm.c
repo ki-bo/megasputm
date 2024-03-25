@@ -63,6 +63,7 @@ uint8_t actor_talk_colors[NUM_ACTORS];
 uint8_t actor_talking;
 
 uint8_t state_iface;
+uint16_t camera_x;
 
 uint8_t active_script_slot;
 uint8_t jiffy_counter;
@@ -83,14 +84,16 @@ uint16_t cs_pc;
 // room and object data
 uint8_t room_res_slot;
 uint8_t num_objects;
-uint8_t obj_page[57];
-uint8_t obj_offset[57];
+uint8_t obj_page[MAX_OBJECTS];
+uint8_t obj_offset[MAX_OBJECTS];
+uint8_t screen_update_needed = 0;
 
 
 // Private functions
 static void process_dialog(uint8_t jiffies_elapsed);
 static uint8_t wait_for_jiffy(void);
-static void read_object_offsets(void);
+static void read_objects(void);
+static void redraw_screen(void);
 
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
@@ -152,6 +155,16 @@ __task void vm_mainloop(void)
         //VICIV.screencol = 0;
       }
     }
+    if (screen_update_needed)
+    {
+      //VICIV.bordercol = 15;
+      redraw_screen();
+      screen_update_needed = 0;
+      //VICIV.bordercol = 0;
+      map_cs_gfx();
+      gfx_update_screen();
+      unmap_cs();
+    }
   }
 }
 
@@ -179,12 +192,15 @@ void vm_switch_room(uint8_t room_no)
   gfx_fade_out();
   gfx_decode_bg_image(NEAR_U8_PTR(RES_MAPPED + room_hdr->bg_data_offset), 
                       room_hdr->bg_width);
-  gfx_fade_in();
-  unmap_cs();
 
   vm_write_var(VAR_ROOM_NO, room_no);
 
-  read_object_offsets();
+  read_objects();
+
+  redraw_screen();
+
+  gfx_fade_in();
+  unmap_cs();
 
   // restore DS
   map_set_ds(ds_save);
@@ -257,6 +273,11 @@ void vm_stop_active_script()
   proc_state[active_script_slot] = PROC_STATE_FREE;
 }
 
+void vm_update_screen(void)
+{
+  screen_update_needed = 1;
+}
+
 static void process_dialog(uint8_t jiffies_elapsed)
 {
   if (dialog_timer == 0)
@@ -289,14 +310,74 @@ static uint8_t wait_for_jiffy(void)
   return num_jiffies_elapsed;
 }
 
-static void read_object_offsets(void)
+/**
+ * @brief Reads object data from the current room
+ *
+ * Needs cs_gfx mapped and the room resource mapped to DS.
+ * 
+ */
+static void read_objects(void)
 {
+  struct offset {
+    uint8_t lsb;
+    uint8_t msb;
+  };
+
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
   num_objects = room_hdr->num_objects;
-  uint8_t *data_ptr = NEAR_U8_PTR(RES_MAPPED + 0x1c + num_objects * 2);
+
+  __auto_type image_offset = (struct offset *)NEAR_U8_PTR(RES_MAPPED + sizeof(struct room_header));
+  __auto_type obj_hdr_offset = image_offset + num_objects;
+
   for (uint8_t i = 0; i < num_objects; ++i)
   {
-    obj_offset[i] = *data_ptr++;
-    obj_page[i] = room_res_slot + *data_ptr++;
+    // read object and image offsets
+    uint8_t cur_obj_offset = obj_hdr_offset->lsb;
+    uint8_t cur_obj_page = room_res_slot + obj_hdr_offset->msb;
+    uint8_t cur_image_offset = image_offset->lsb;
+    uint8_t cur_image_page = room_res_slot + image_offset->msb;
+    ++obj_hdr_offset;
+    ++image_offset;
+    obj_offset[i] = cur_obj_offset;
+    obj_page[i] = cur_obj_page;
+
+    // read object metadata from header
+    map_ds_resource(cur_obj_page);
+    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + cur_obj_offset);
+    uint8_t width = obj_hdr->width * 8;
+    uint8_t height = obj_hdr->height_and_actor_dir & 0xf8;
+
+    // read object image
+    map_ds_resource(cur_image_page);
+    uint8_t *obj_image = NEAR_U8_PTR(RES_MAPPED + cur_image_offset);
+    gfx_decode_object_image(obj_image, width, height); 
+
+    // reset ds back to room header
+    map_ds_resource(room_res_slot);
   }
+}
+
+static void redraw_screen(void)
+{
+  uint32_t map_save = map_get();
+  map_cs_gfx();
+  gfx_draw_bg();
+
+  for (uint8_t i = 0; i < num_objects; ++i)
+  {
+    map_ds_resource(obj_page[i]);
+    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
+    if (!(global_game_objects[obj_hdr->id] & OBJ_STATE_ACTIVE)) {
+      continue;
+    }
+    uint8_t width = obj_hdr->width;
+    uint8_t height = obj_hdr->height_and_actor_dir >> 3;
+    uint8_t x = obj_hdr->pos_x;
+    uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
+    unmap_ds();
+
+    gfx_draw_object(i, x, y, width, height);
+  }
+
+  map_set(map_save);
 }

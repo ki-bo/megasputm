@@ -304,13 +304,14 @@ static void stop_or_break(void)
 static void obj_state_active(void)
 {
   //debug_msg("obj state active");
-  uint8_t obj_id = resolve_next_param16();
+  uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
     global_game_objects[obj_id] &= ~OBJ_STATE_ACTIVE;
   }
   else {
     global_game_objects[obj_id] |= OBJ_STATE_ACTIVE;
   }
+  vm_update_screen();
 }
 
 /**
@@ -437,8 +438,8 @@ static void assign(void)
 static void delay_variable(void)
 {
   //debug_msg("Delay variable");
-  int32_t negative_ticks = -1 - vm_read_var(read_byte());
-  //debug_out("delay %d", negative_ticks);
+  uint8_t var_idx = read_byte();
+  int32_t negative_ticks = -1 - (int32_t)vm_read_var(var_idx);
   vm_set_script_wait_timer(negative_ticks);
 }
 

@@ -12,6 +12,8 @@
 
 //-----------------------------------------------------------------------------------------------
 
+#define GFX_HEIGHT 128
+#define CHRCOUNT 80
 #define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
 #define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
 
@@ -72,6 +74,13 @@ __attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
 //-----------------------------------------------------------------------------------------------
 
 __attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
+static uint8_t __huge *next_char_data;
+static uint8_t __huge *obj_char_ptrs[MAX_OBJECTS];
+static uint16_t obj_first_char[MAX_OBJECTS];
+static uint16_t obj_id[MAX_OBJECTS];
+static uint8_t next_obj_slot = 0;
+static uint8_t num_chars_at_row[16];
+static uint8_t screen_update_request = 0;
 
 //-----------------------------------------------------------------------------------------------
 
@@ -79,6 +88,8 @@ __attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
 static void setup_irq(void);
 // Private interrupt function
 static void raster_irq(void);
+// Private gfx functions
+static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
 static void update_cursor(void);
 static void set_dialog_color(uint8_t color);
 
@@ -113,19 +124,21 @@ void gfx_init()
   __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
   __auto_type colram_ptr = FAR_U16_PTR(COLRAM);
 
-  for (uint16_t i = 0; i < 1000; ++i) {
+  for (uint16_t i = 0; i < CHRCOUNT * 25; ++i) {
     *screen_ptr++ = 0x0020;
     *colram_ptr++ = 0x0f00;
   }
 
-  gfx_fade_in();
+  for (uint8_t i = 0; i < 16; ++i) {
+    num_chars_at_row[i] = 40;
+  }
 
   VICIV.scrnptr   = (uint32_t)SCREEN_RAM; // implicitly sets CHRCOUNT(9..8) to 0
   VICIV.bordercol = COLOR_BLACK;
   VICIV.screencol = COLOR_BLACK;
   VICIV.colptr    = 0x800;
-  VICIV.chrcount  = 40; // 40 chars per row
-  VICIV.linestep  = 80; // 80 bytes per row (2 bytes per char)
+  VICIV.chrcount  = CHRCOUNT;     // 80 chars per row
+  VICIV.linestep  = CHRCOUNT * 2; // 160 bytes per row (2 bytes per char)
 
   // setup EGA palette
   for (uint8_t i = 0; i < 16; ++i) {
@@ -208,6 +221,15 @@ volatile uint8_t raster_irq_counter = 0;
 __attribute__((interrupt()))
 static void raster_irq ()
 {
+  static dmalist_t dmalist_copy_gfx = {
+    .command  = 0,
+    .count    = CHRCOUNT * 2 * 16,
+    .src_addr = 0xa000 + CHRCOUNT * 2 * 2,
+    .src_bank = 0x00,
+    .dst_addr = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
+    .dst_bank = BANK(SCREEN_RAM)
+  };
+
   uint32_t map_save = map_get();
   unmap_all();
   if (!(VICIV.irr & 0x01)) {
@@ -221,6 +243,12 @@ static void raster_irq ()
 
   map_cs_gfx();
   update_cursor();
+
+  if (screen_update_request) {
+    unmap_ds();
+    dma_trigger(&dmalist_copy_gfx);
+    screen_update_request = 0;
+  }
 
   VICIV.irr = VICIV.irr; // ack interrupt
   map_set(map_save);     // restore MAP  
@@ -261,9 +289,9 @@ void gfx_start(void)
  */
 void gfx_fade_out(void)
 {
-  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 80;
+  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + CHRCOUNT * 2;
 
-  uint16_t num_chars = 16*40;
+  uint16_t num_chars = 16 * CHRCOUNT;
   do {
     *screen_ptr = 0x0020;
     ++screen_ptr;
@@ -278,16 +306,7 @@ void gfx_fade_out(void)
  */
 void gfx_fade_in(void)
 {
-  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 80;
-  uint16_t char_data = BG_BITMAP / 64;
-
-  for (uint8_t x = 0; x < 40; ++x) {
-    for (uint8_t y = 0; y < 16; ++y) {
-      *screen_ptr = char_data++;
-      screen_ptr += 40;
-    }
-    screen_ptr -= 639;
-  }
+  gfx_update_screen();
 }
 
 /**
@@ -320,7 +339,10 @@ void gfx_wait_for_next_frame(void)
 /**
  * @brief Decodes a room background image and stores it in the background bitmap.
  * 
- * The background bitmap is located at BG_BITMAP.
+ * The background bitmap is located at BG_BITMAP. The static pointer next_char_data
+ * will point to the next byte following the last byte written to the background bitmap.
+ * Object images will be stored as char data following the room background image
+ * (starting at next_char_data).
  * 
  * @param src The encoded bitmap data in the room resource.
  * @param width The width of the bitmap in characters.
@@ -329,67 +351,32 @@ void gfx_wait_for_next_frame(void)
  */
 void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 {
-#define GFX_STRIP_HEIGHT 128
+  // when decoding a room background image, we always start over at the
+  // beginning of the char data memory
+  next_char_data = HUGE_U8_PTR(BG_BITMAP);
 
-  static dmalist_single_option_t dmalist_rle_strip_copy = {
-    .opt_token      = 0x85,                   // destination skip rate
-    .opt_arg        = 0x08,                   // = 8 bytes
-    .end_of_options = 0x00,
-    .command        = 0,                      // DMA copy command
-    .count          = GFX_STRIP_HEIGHT,
-    .src_addr       = 0,
-    .src_bank       = 0,
-    .dst_addr       = 0,
-    .dst_bank       = 0x07
-  };
+  decode_rle_bitmap(src, width, GFX_HEIGHT);
+  next_obj_slot = 0;
+}
 
-  static uint8_t color_strip[128];
-
-  uint8_t __huge *dst = HUGE_U8_PTR(BG_BITMAP);
-
-  uint8_t rle_counter = 1;
-  uint8_t keep_color = 0;
-  uint8_t col_byte;
-  uint8_t y = 0;
-  uint16_t x = 0;
-
-  dmalist_rle_strip_copy.src_addr = LSB16(UNBANKED_PTR(color_strip));
-  dmalist_rle_strip_copy.src_bank = BANK(UNBANKED_PTR(color_strip));
-
-  do {
-    --rle_counter;
-    if (rle_counter == 0) {
-      col_byte = *src++;
-      keep_color = col_byte & 0x80;
-      if (keep_color) {
-        rle_counter = col_byte & 0x7f;
-      }
-      else {
-        rle_counter = col_byte >> 4;
-        col_byte &= 0x0f;
-      }
-      if (rle_counter == 0) {
-        rle_counter = *src++;
-      }
-    }
-    if (!keep_color) {
-      color_strip[y] = col_byte;
-    }
-
-    ++y;
-    if (y == GFX_STRIP_HEIGHT) {
-      dmalist_rle_strip_copy.dst_addr = LSB16(dst);
-      dmalist_rle_strip_copy.dst_bank = BANK(dst);
-      dma_trigger(&dmalist_rle_strip_copy);
-      y = 0;
-      ++x;
-      ++dst;
-      if (!(LSB(x) & 0x07)) {
-        dst += (GFX_STRIP_HEIGHT-1) * 8;
-      }
-    }
-  } 
-  while (x != width);
+/**
+ * @brief Decodes an object image and stores it in the char data memory.
+ *
+ * The static pointer next_char_data will point to the next byte following the last byte
+ * written to the char data memory. That way, object char data will be stored sequentially
+ * in memory. We will keep track of object IDs and their corresponding char numbers in
+ * 
+ * 
+ * @param src Pointer to the encoded object image data.
+ * @param width Width of the object image in characters.
+ * @param height Height of the object image in characters.
+ */
+void gfx_decode_object_image(uint8_t *src, uint8_t width, uint8_t height)
+{
+  obj_char_ptrs[next_obj_slot] = next_char_data;
+  obj_first_char[next_obj_slot] = (uint32_t)next_char_data / 64;
+  decode_rle_bitmap(src, width, height);
+  ++next_obj_slot;
 }
 
 /**
@@ -401,7 +388,7 @@ void gfx_clear_dialog(void)
 {
   static const dmalist_t dmalist_clear_dialog_screen = {
     .command  = 0,
-    .count    = 80 * 2 - 2,
+    .count    = CHRCOUNT * 4 - 2,
     .src_addr = LSB16(SCREEN_RAM),
     .src_bank = BANK(SCREEN_RAM),
     .dst_addr = LSB16(SCREEN_RAM + 2),
@@ -434,17 +421,99 @@ uint8_t gfx_print_dialog(uint8_t color, const char *text)
       break;
     }
     else if (c == 1) {
-      screen_ptr = FAR_U16_PTR(SCREEN_RAM) + 40;
+      screen_ptr = FAR_U16_PTR(SCREEN_RAM) + CHRCOUNT;
       continue;
     }
     *screen_ptr = (uint16_t)c;
-    if (c != ' ') {
-      ++num_chars;
-    }
+    ++num_chars;
     ++screen_ptr;
   }
 
   return num_chars;
+}
+
+void gfx_draw_bg(void)
+{
+  uint16_t ds_save = map_get_ds();
+  unmap_ds();
+
+  __auto_type screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
+  uint16_t char_data = BG_BITMAP / 64; // + camera_x * 16;
+
+  for (uint8_t x = 0; x < 40; ++x) {
+    for (uint8_t y = 0; y < 16; ++y) {
+      *screen_ptr = char_data++;
+      screen_ptr += CHRCOUNT;
+    }
+    screen_ptr -= CHRCOUNT * 16 - 1;
+  }
+
+  memset(num_chars_at_row, 40, 16);
+
+  map_set_ds(ds_save);
+}
+
+void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_t height)
+{
+  static const uint16_t times_chrcount[16] = {
+    CHRCOUNT * 0,
+    CHRCOUNT * 1,
+    CHRCOUNT * 2,
+    CHRCOUNT * 3,
+    CHRCOUNT * 4,
+    CHRCOUNT * 5,
+    CHRCOUNT * 6,
+    CHRCOUNT * 7,
+    CHRCOUNT * 8,
+    CHRCOUNT * 9,
+    CHRCOUNT * 10,
+    CHRCOUNT * 11,
+    CHRCOUNT * 12,
+    CHRCOUNT * 13,
+    CHRCOUNT * 14,
+    CHRCOUNT * 15
+  };
+
+  uint16_t *screen_ptr;
+  uint16_t char_num_row = obj_first_char[local_id];
+  uint16_t char_num_col;
+  uint8_t width_save = width;
+  int8_t col;
+  int8_t row = y;
+  uint8_t initial_height = height;
+  uint8_t first;
+
+  do {
+    if (row >= 0 && row < 16) {
+      screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + times_chrcount[row];
+      width = width_save;
+      col = x;
+      char_num_col = char_num_row;
+      first = 1;
+      do {
+        if (col >= 0 && col < 40) {
+          if (first) {
+            first = 0;
+            screen_ptr += col;
+          }
+          *screen_ptr = char_num_col;
+          ++screen_ptr;
+        }
+        ++col;
+        char_num_col += initial_height;
+      }
+      while (--width);
+    }
+    ++row;
+    ++char_num_row;
+  }
+  while (--height);
+}
+
+void gfx_update_screen(void)
+{
+  screen_update_request = 1;
+  while (screen_update_request);
 }
 
 /** @} */ // gfx_public
@@ -455,6 +524,69 @@ uint8_t gfx_print_dialog(uint8_t color, const char *text)
  * @defgroup gfx_private GFX Private Functions
  * @{
  */
+
+static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
+{
+  static dmalist_single_option_t dmalist_rle_strip_copy = {
+    .opt_token      = 0x85,                   // destination skip rate
+    .opt_arg        = 0x08,                   // = 8 bytes
+    .end_of_options = 0x00,
+    .command        = 0,                      // DMA copy command
+    .count          = 0,
+    .src_addr       = 0,
+    .src_bank       = 0,
+    .dst_addr       = 0,
+    .dst_bank       = 0x07
+  };
+
+  static uint8_t color_strip[GFX_HEIGHT];
+
+  uint8_t rle_counter = 1;
+  uint8_t keep_color = 0;
+  uint8_t col_byte;
+  uint8_t y = 0;
+  uint16_t x = 0;
+  uint16_t col_addr_inc = (height - 1) * 8;
+
+  dmalist_rle_strip_copy.count = height;
+  dmalist_rle_strip_copy.src_addr = LSB16(UNBANKED_PTR(color_strip));
+  dmalist_rle_strip_copy.src_bank = BANK(UNBANKED_PTR(color_strip));
+
+  do {
+    --rle_counter;
+    if (rle_counter == 0) {
+      col_byte = *src++;
+      keep_color = col_byte & 0x80;
+      if (keep_color) {
+        rle_counter = col_byte & 0x7f;
+      }
+      else {
+        rle_counter = col_byte >> 4;
+        col_byte &= 0x0f;
+      }
+      if (rle_counter == 0) {
+        rle_counter = *src++;
+      }
+    }
+    if (!keep_color) {
+      color_strip[y] = col_byte;
+    }
+
+    ++y;
+    if (y == height) {
+      dmalist_rle_strip_copy.dst_addr = LSB16(next_char_data);
+      dmalist_rle_strip_copy.dst_bank = BANK(next_char_data);
+      dma_trigger(&dmalist_rle_strip_copy);
+      y = 0;
+      ++x;
+      ++next_char_data;
+      if (!(LSB(x) & 0x07)) {
+        next_char_data += col_addr_inc;
+      }
+    }
+  } 
+  while (x != width);
+}
 
 /**
  * @brief Updates the cursor.
@@ -519,7 +651,7 @@ void set_dialog_color(uint8_t color)
     .opt_token2 = 0x81,
     .opt_arg2   = 0xff,
     .command    = 0,
-    .count      = 80 * 2 - 2,
+    .count      = CHRCOUNT * 2 * 2 - 2,
     .src_addr   = LSB16(COLRAM),
     .src_bank   = BANK(COLRAM),
     .dst_addr   = LSB16(COLRAM + 2),
