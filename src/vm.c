@@ -95,18 +95,49 @@ static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
 static void redraw_screen(void);
 
+/**
+ * @defgroup vm_init VM Init Functions
+ * @{
+ */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
+/**
+ * @brief Initializes the virtual machine
+ * 
+ * Initializes the virtual machine by setting all script slots to free.
+ *
+ * Code section: code_init
+ */
 void vm_init(void)
 {
   for (active_script_slot = 0; active_script_slot < NUM_SCRIPT_SLOTS; ++active_script_slot)
   {
     proc_state[active_script_slot] = PROC_STATE_FREE;
-    proc_wait_timer[active_script_slot] = 0;
   }
 }
 
+/** @} */ // vm_init
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * @defgroup vm_public VM Public Functions
+ * @{
+ */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
+
+/**
+ * @brief Main loop of the virtual machine
+ * 
+ * The main loop of the virtual machine. This function will never return and runs an infinite
+ * loop processing all game logic. It is waiting for at least one jiffy to pass before
+ * processing the next cycle of the active scripts.
+ *
+ * Graphics update is triggered if at least one script has requested a screen update by setting
+ * the screen_update_needed flag.
+ *
+ * Code section: code_main
+ */
 __task void vm_mainloop(void)
 {
   // We will never return, so reset the stack pointer to the top of the stack
@@ -168,11 +199,27 @@ __task void vm_mainloop(void)
   }
 }
 
+/**
+ * @brief Returns the current state of the active process
+ * 
+ * @return uint8_t The current state of the active process
+ *
+ * Code section: code_main
+ */
 uint8_t vm_get_active_proc_state(void)
 {
   return proc_state[active_script_slot];
 }
 
+/**
+ * @brief Switches the scene to another room
+ * 
+ * Switches the scene to another room by deactivating the current room and activating the new
+ * room. The new room number is stored in VAR_ROOM_NO. The function will also decode the new
+ * background image and redraw the screen, including drawing all objects currently visible.
+ *
+ * Code section: code_main
+ */
 void vm_switch_room(uint8_t room_no)
 {
   // save DS
@@ -214,11 +261,14 @@ void vm_switch_room(uint8_t room_no)
  * as parameter to this function.
  *
  * The scheduler will suspend execution of the currently active process until the
- * timer becomes positive.
+ * timer becomes zero or positive.
  *
- * The process state will be set to PROC_STATE_WAITING when this function returns.
+ * The process state of the currently active process is set to PROC_STATE_WAITING
+ * when this function returns.
  * 
  * @param timer_value The negative amount of ticks to suspend
+ *
+ * Code section: code_main
  */
 void vm_set_script_wait_timer(int32_t negative_ticks)
 {
@@ -226,6 +276,14 @@ void vm_set_script_wait_timer(int32_t negative_ticks)
   proc_wait_timer[active_script_slot] = negative_ticks;
 }
 
+/**
+ * @brief Starts a cutscene
+ *
+ * Starts a cutscene by saving the current game state and setting the cursor and interface
+ * state to the cutscene state. The cutscene state is stored in the cutscene variables.
+ *
+ * Code section: code_main
+ */
 void vm_start_cutscene(void)
 {
   cs_room = vm_read_var8(VAR_ROOM_NO);
@@ -233,6 +291,23 @@ void vm_start_cutscene(void)
   cs_iface_state = state_iface;
 }
 
+/**
+ * @brief Outputs dialog on screen for the specified actor
+ * 
+ * Outputs dialog on screen for the specified actor. The dialog is stored in the dialog buffer
+ * and the dialog timer is set to the number of jiffies needed to display the dialog. The
+ * variable VAR_DIALOG_ACTIVE is set to 1 while the dialog is presented on screen. It will
+ * be reset back to 0 in the main loop once the dialog timer expires.
+ * 
+ * For general text outputs, actor_id 0xff can be used.
+ *
+ * The dialog is directly printed on screen without waiting for a redraw event.
+
+ * @param actor_id ID of the actor talking, will be used to select the configured text color
+ *                 for the text output on screen.
+ *
+ * Code section: code_main
+ */
 void vm_actor_start_talking(uint8_t actor_id)
 {
   actor_talking = actor_id;
@@ -244,6 +319,16 @@ void vm_actor_start_talking(uint8_t actor_id)
   vm_write_var(VAR_DIALOG_ACTIVE, 1);
 }
 
+/**
+ * @brief Starts a global script
+ * 
+ * The script with the given id is added to a free process slot and marked with state
+ * PROC_STATE_RUNNING. The script will start execution at the next cycle of the main loop.
+ *
+ * @param script_id 
+ *
+ * Code section: code_main
+ */
 void vm_start_script(uint8_t script_id)
 {
   uint8_t slot;
@@ -267,17 +352,53 @@ void vm_start_script(uint8_t script_id)
   proc_res_slot[slot] = new_page;
 }
 
+/**
+ * @brief Stops the currently active script
+ * 
+ * Deactivates the currently active script and sets the process state to PROC_STATE_FREE.
+ * The associated script resource is deactivated and thus marked free to override if needed.
+ *
+ * Code section: code_main
+ */
 void vm_stop_active_script()
 {
   res_deactivate(RES_TYPE_SCRIPT, proc_res_slot[active_script_slot], 0);
   proc_state[active_script_slot] = PROC_STATE_FREE;
 }
 
+/**
+ * @brief Requests that the screen is updated
+ *
+ * The screen update flag is set to 1, which will trigger a screen update in the main loop.
+ * The redraw will happen after all active scripts have finished their current execution cycle.
+ *
+ * Code section: code_main
+ */
 void vm_update_screen(void)
 {
   screen_update_needed = 1;
 }
 
+/// @} // vm_public
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+ * @defgroup vm_private VM Private Functions
+ * @{
+ */
+
+/**
+ * @brief Processes the dialog timer
+ *
+ * Decreases the dialog timer by the number of jiffies elapsed since the last call. Clears
+ * the dialog area on screen and resets the dialog active variable when the timer reaches
+ * zero. Note that the dialog timer is counting down.
+ * 
+ * @param jiffies_elapsed The number of jiffies elapsed since the last call
+ *
+ * Code section: code_main
+ */
 static void process_dialog(uint8_t jiffies_elapsed)
 {
   if (dialog_timer == 0)
@@ -302,6 +423,17 @@ static void process_dialog(uint8_t jiffies_elapsed)
   }
 }
 
+/**
+ * @brief Waits for at least one jiffy to have passed since the last call
+ *
+ * Waits until at least one jiffy has passed since the last call. The function will return
+ * the number of jiffies elapsed since the last call. If at least one jiffy has passed
+ * already since the last call, the function will return immediately.
+ * 
+ * @return uint8_t The number of jiffies elapsed since the last call
+ *
+ * Code section: code_main
+ */
 static uint8_t wait_for_jiffy(void)
 {
   map_cs_gfx();
@@ -311,10 +443,18 @@ static uint8_t wait_for_jiffy(void)
 }
 
 /**
- * @brief Reads object data from the current room
+ * @brief Reads object data for the current room
+ *
+ * Reads all offsets for object images and object data from the current room resource. The
+ * function will read the number of objects from the room header and then read the object
+ * offsets and image offsets from the room resource. The function will then read the object
+ * metadata and image data for each object and store it in the object data arrays.
+ *
+ * The images are decoded and kept in gfx memory for fast drawing on screen.
  *
  * Needs cs_gfx mapped and the room resource mapped to DS.
- * 
+ *
+ * Code section: code_main
  */
 static void read_objects(void)
 {
@@ -357,6 +497,15 @@ static void read_objects(void)
   }
 }
 
+/**
+ * @brief Redraws the screen
+ *
+ * Redraws the screen by redrawing the background and all objects currently visible on screen.
+ * The function will read the object data from the object data arrays and draw the objects
+ * on screen at their current position.
+ *
+ * Code section: code_main
+ */
 static void redraw_screen(void)
 {
   uint32_t map_save = map_get();
@@ -381,3 +530,7 @@ static void redraw_screen(void)
 
   map_set(map_save);
 }
+
+/// @} // vm_private
+
+//-----------------------------------------------------------------------------------------------

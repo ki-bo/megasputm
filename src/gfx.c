@@ -432,13 +432,21 @@ uint8_t gfx_print_dialog(uint8_t color, const char *text)
   return num_chars;
 }
 
+/**
+ * @brief Draws the current room's background image
+ *
+ * The background image is drawn to the backbuffer screen memory. The horizontal
+ * camera position is taken into account.
+ * 
+ * Code section: code_gfx
+ */
 void gfx_draw_bg(void)
 {
   uint16_t ds_save = map_get_ds();
   unmap_ds();
 
   __auto_type screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
-  uint16_t char_data = BG_BITMAP / 64; // + camera_x * 16;
+  uint16_t char_data = BG_BITMAP / 64 + camera_x * 16;
 
   for (uint8_t x = 0; x < 40; ++x) {
     for (uint8_t y = 0; y < 16; ++y) {
@@ -453,6 +461,21 @@ void gfx_draw_bg(void)
   map_set_ds(ds_save);
 }
 
+/**
+ * @brief Draws an object to the backbuffer.
+ *
+ * The object is drawn to the backbuffer screen memory. The coordinates x and y are
+ * the position relative to the visible screen area (top/left being 0,0). The object
+ * is drawn with the given width and height in characters.
+ * 
+ * @param local_id The local object ID (0-based position in the room's objects list)
+ * @param x The x position of the object in characters.
+ * @param y The y position of the object in characters.
+ * @param width The width of the object in characters.
+ * @param height The height of the object in characters.
+ *
+ * Code section: code_gfx
+ */
 void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_t height)
 {
   static const uint16_t times_chrcount[16] = {
@@ -510,6 +533,14 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
   while (--height);
 }
 
+/**
+ * @brief Draws the backbuffer to the screen.
+ *
+ * The drawing is done in the interrupt routine to avoid tearing. This function will
+ * request the drawing and block until the drawing is done.
+ * 
+ * Code section: code_gfx
+ */
 void gfx_update_screen(void)
 {
   screen_update_request = 1;
