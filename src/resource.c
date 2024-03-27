@@ -245,8 +245,6 @@ void find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
  */
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 {
-
-
   uint8_t cur_size = 0;
   uint8_t block_idx = 0;
   uint8_t num_free_blocks = 0;

@@ -53,7 +53,7 @@ static uint8_t * __attribute__((zpage)) pc;
 
 #pragma clang section bss="zdata"
 
-// private functions
+// private variables
 static void (*opcode_jump_table[128])(void);
 static uint8_t *override_pc;
 static uint8_t break_script = 0;
@@ -138,6 +138,54 @@ uint8_t script_run(uint8_t proc_id)
   proc_pc[proc_id] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
 
   return 0;
+}
+
+/**
+ * @brief Runs a script as a function of the current script.
+ * 
+ * The script is only run for one cycle. It saves the current script state
+ * and restores it after the function has been executed.
+ *
+ * The script needs to be mapped to RES_MAPPED before calling this function.
+ * The offset is the offset to the first opcode of the script relative to 
+ * RES_MAPPED.
+ *
+ * @param offset The offset to the first opcode of the script.
+ */
+void script_run_as_function(uint8_t offset)
+{
+  static uint8_t call_depth = 0;
+
+  ++call_depth;
+  if (call_depth > 15) {
+    fatal_error(ERR_SCRIPT_RECURSION);
+  }
+
+  debug_out("Running script as function, call depth %d", call_depth);
+
+  // save the current script state
+  uint8_t *old_pc = pc;
+  uint8_t old_opcode = opcode;
+  uint8_t old_param_mask = param_mask;
+
+  pc = NEAR_U8_PTR(RES_MAPPED) + offset;
+
+  while (1) {
+    opcode = read_byte();
+    if (!opcode) {
+      // we reached the end of the script
+      break;
+    }
+    param_mask = 0x80;
+    exec_opcode(opcode);
+  }
+
+  // restore the previous script state
+  pc = old_pc;
+  opcode = old_opcode;
+  param_mask = old_param_mask;
+
+  --call_depth;
 }
 
 #pragma clang section text="code"
@@ -753,6 +801,7 @@ static void load_room(void)
   //debug_msg("Load room");
   uint8_t room_no = read_byte();
   vm_switch_room(room_no);
+  debug_out("Switched to room %d", room_no);
 }
 
 /**

@@ -225,15 +225,24 @@ void vm_switch_room(uint8_t room_no)
   // save DS
   uint16_t ds_save = map_get_ds();
 
+  debug_out("Switching to room %02x", room_no);
+
+  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
+
   // exit and free old room
-  res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_ROOM_NO), 0);
+  debug_out("Deactivating old room %02x", vm_read_var8(VAR_ROOM_NO));
+  if (vm_read_var(VAR_ROOM_NO) != 0) {
+    map_ds_resource(room_res_slot);
+    uint16_t exit_script_offset = room_hdr->exit_script_offset;
+    map_ds_resource(room_res_slot + MSB(exit_script_offset));
+    script_run_as_function(LSB(exit_script_offset) + 4);
+    res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_ROOM_NO), 0);
+  }
 
   // activate new room data
   room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
   res_set_flags(room_res_slot, RES_ACTIVE_MASK);
   map_ds_resource(room_res_slot);
-
-  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
 
   map_cs_gfx();
   gfx_fade_out();
@@ -244,8 +253,15 @@ void vm_switch_room(uint8_t room_no)
 
   read_objects();
 
+  // run entry script
+  map_ds_resource(room_res_slot);
+  uint16_t entry_script_offset = room_hdr->entry_script_offset;
+  map_ds_resource(room_res_slot + MSB(entry_script_offset));
+  script_run_as_function(LSB(entry_script_offset) + 4);
+
   redraw_screen();
 
+  map_cs_gfx();
   gfx_fade_in();
   unmap_cs();
 

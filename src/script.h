@@ -14,5 +14,6 @@ void script_init(void);
 
 // code_main functions
 uint8_t script_run(uint8_t script_id);
+void script_run_as_function(uint8_t offset);
 
 #endif // __SCRIPT_H
