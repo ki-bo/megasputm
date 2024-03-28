@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+enum {
+    INPUT_BUTTON_LEFT  = 1,
+    INPUT_BUTTON_RIGHT = 2
+};
+
 extern uint8_t input_cursor_x;
 extern uint8_t input_cursor_y;
 extern uint8_t input_button_pressed;

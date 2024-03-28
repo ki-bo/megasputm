@@ -635,8 +635,8 @@ void update_cursor()
     return;
   }
 
-  uint16_t spr_pos_x = input_cursor_x * 2 - HOTSPOT_OFFSET_X;
-  uint8_t  spr_pos_y = input_cursor_y - HOTSPOT_OFFSET_Y;
+  uint16_t spr_pos_x = (input_cursor_x + 12) * 2 - HOTSPOT_OFFSET_X;
+  uint8_t  spr_pos_y = (input_cursor_y + 50)     - HOTSPOT_OFFSET_Y;
   if (cursor_state & 0x02) {
     VICII.spr_ena  = 0x02;
     VICII.spr1_x   = LSB(spr_pos_x);

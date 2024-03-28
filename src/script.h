@@ -13,7 +13,6 @@ enum script_return_t {
 void script_init(void);
 
 // code_main functions
-uint8_t script_run(uint8_t script_id);
-void script_run_as_function(uint8_t offset);
+uint8_t script_run_active_slot(void);
 
 #endif // __SCRIPT_H

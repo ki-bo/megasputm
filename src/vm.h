@@ -11,12 +11,19 @@
 enum {
   PROC_STATE_FREE,
   PROC_STATE_RUNNING,
-  PROC_STATE_WAITING,
+  PROC_STATE_WAITING_FOR_TIMER,
+  PROC_STATE_WAITING_FOR_CHILD,
   PROC_STATE_DEAD
 };
 
 enum {
   PROC_TYPE_GLOBAL = 1
+};
+
+enum {
+  INPUT_EVENT_VERB_SELECT = 1,
+  INPUT_EVENT_SCENE_CLICK = 2,
+  INPUT_EVENT_KEYPRESS    = 4
 };
 
 enum {
@@ -27,17 +34,28 @@ enum {
   VAR_NUM_ACTORS = 11,
   VAR_CURSOR_STATE = 21,
   VAR_TIMER_NEXT = 25,
-  VAR_BACKUP_VERB = 38,
+  VAR_COMMAND_VERB = 26,
+  VAR_COMMAND_OBJECT_LEFT = 27,
+  VAR_COMMAND_OBJECT_RIGHT = 28,
+  VAR_COMMAND_PREPOSITION = 29,
+  VAR_SCENE_CURSOR_X = 30,
+  VAR_SCENE_CURSOR_Y = 31,
+  VAR_INPUT_EVENT = 32,
+  VAR_DEFAULT_VERB = 38,
   VAR_CUTSCENEEXIT_KEY = 40,
 };
 
 enum {
   OBJ_STATE_1 = 0x10,
-  OBJ_STATE_2 = 0x20,
+  OBJ_STATE_DONT_SELECT = 0x20,
   OBJ_STATE_4 = 0x40,
   OBJ_STATE_ACTIVE = 0x80,
 };
 
+enum {
+  SCRIPT_ID_COMMAND = 2,
+  SCRIPT_ID_INPUT_EVENT = 4
+};
 
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
@@ -55,7 +73,7 @@ extern uint8_t actor_talking;
 extern uint8_t state_iface;
 extern uint16_t camera_x;
 
-extern uint8_t jiffy_counter;
+extern uint8_t active_script_slot;
 extern uint8_t proc_state[NUM_SCRIPT_SLOTS];
 extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
@@ -67,22 +85,25 @@ void vm_switch_room(uint8_t room_no);
 void vm_set_script_wait_timer(int32_t negative_ticks);
 void vm_start_cutscene(void);
 void vm_actor_start_talking(uint8_t actor_id);
-void vm_start_script(uint8_t script_id);
+uint8_t vm_start_script(uint8_t script_id);
+uint8_t vm_start_room_script(uint16_t room_script_offset);
+uint8_t vm_start_child_script(uint8_t script_id);
 void vm_stop_active_script(void);
+void vm_stop_script(uint8_t script_id);
 void vm_update_screen(void);
+uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 
-inline uint16_t vm_read_var(uint8_t var)
+static inline uint16_t vm_read_var(uint8_t var)
 {
   volatile uint16_t value;
   value = variables_lo[var] | (variables_hi[var] << 8);
   return value;
 }
 
-inline uint8_t vm_read_var8(uint8_t var)
+static inline uint8_t vm_read_var8(uint8_t var)
 {
   return variables_lo[var];
 }
-
 
 static inline void vm_write_var(uint8_t var, uint16_t value)
 {

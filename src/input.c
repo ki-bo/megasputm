@@ -53,28 +53,28 @@ void input_update(void)
 {
   uint8_t joy = CIA1.pra;
   if (!(joy & 0x01)) {
-    input_cursor_y -= 2;
-  } else if (!(joy & 0x02)) {
-    input_cursor_y += 2;
+    if (input_cursor_y < 2) {
+      input_cursor_y = 0;
+    } 
+    else {
+      input_cursor_y -= 2;
+    }
+  } 
+  else if (!(joy & 0x02)) {
+    if (input_cursor_y > 197) {
+      input_cursor_y = 199;
+    } 
+    else {
+      input_cursor_y += 2;
+    }
   }
-  if (!(joy & 0x04)) {
+  if (!(joy & 0x04) && input_cursor_x != 0) {
     input_cursor_x -= 1;
-  } else if (!(joy & 0x08)) {
+  } 
+  else if (!(joy & 0x08) && input_cursor_x != 159) {
     input_cursor_x += 1;
   }
-  input_button_pressed = !(joy & 0x10) ? 1 : 0;
-
-  if (input_cursor_x < 12) {
-    input_cursor_x = 12;
-  } else if (input_cursor_x > 171) {
-    input_cursor_x = 171;
-  }
-
-  if (input_cursor_y < 50) {
-    input_cursor_y = 50;
-  } else if (input_cursor_y > 249) {
-    input_cursor_y = 249;
-  }
+  input_button_pressed = !(joy & 0x10) ? INPUT_BUTTON_LEFT : 0;
 }
 
 /** @} */ // input_public
