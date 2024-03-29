@@ -80,7 +80,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint8_t i = hint;
   do {
-    if(page_res_index[i] == id && page_res_type[i] == type) {
+    if(page_res_index[i] == id && (page_res_type[i] & RES_TYPE_MASK) == type) {
       return i;
     }
     i++;

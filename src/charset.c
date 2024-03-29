@@ -25,8 +25,11 @@ void charset_init(void)
   // make default Commodore lower case charset available
   copy_chars(0, 0, 256);
 
-  // move lower case letters (index 0x00) to the ascii range (0x60)
-  copy_chars(0x00, 0x60, 0x20);
+  // move lower case letters (index 0x01) to the ascii range (0x61)
+  copy_chars(0x01, 0x61, 0x1a);
+
+  // copy quotation mark
+  copy_chars(0x22, 0x60, 0x01);
 }
 
 /** @} */ // charset_init_public

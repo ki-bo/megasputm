@@ -18,33 +18,43 @@ static uint32_t read_24bits(void);
 static uint8_t resolve_next_param8(void);
 static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
+
 static void stop_or_break(void);
-static void jump_if_smaller(void);
+static void jump_if_greater(void);
+static void show_object(void);
 static void jump_if_equal(void);
 static void obj_state_active(void);
 static void resource_cmd(void);
+static void object_owner(void);
 static void actor_ops(void);
 static void print(void);
 static void create_random_number(void);
 static void jump(void);
 static void execute_command(void);
+static void jump_if_can_not_pick_up_object(void);
 static void assign(void);
+static void start_sound(void);
 static void jump_if_or_if_not_equal_zero(void);
 static void delay_variable(void);
 static void subtract(void);
 static void add(void);
 static void delay(void);
 static void get_object_at_position(void);
-static void jump_if_greater(void);
+static void jump_if_smaller(void);
 static void cutscene(void);
 static void start_script(void);
+static void jump_if_smaller_or_equal(void);
+static void increment_or_decrement(void);
 static void jump_if_not_equal(void);
+static void jump_if_object_not_active(void);
 static void begin_override_or_print_ego(void);
 static void begin_override(void);
 static void cursor_cmd(void);
 static void load_room(void);
+static void jump_if_greater_or_equal(void);
 static void print_ego(void);
 static void unimplemented_opcode(void);
+
 static void reset_command(void);
 
 //----------------------------------------------------------------------
@@ -88,35 +98,47 @@ void script_init(void)
   }
 
   opcode_jump_table[0x00] = &stop_or_break;
-  opcode_jump_table[0x04] = &jump_if_smaller;
+  opcode_jump_table[0x04] = &jump_if_greater;
+  opcode_jump_table[0x05] = &show_object;
   opcode_jump_table[0x07] = &obj_state_active;
   opcode_jump_table[0x08] = &jump_if_equal;
   opcode_jump_table[0x0c] = &resource_cmd;
+  opcode_jump_table[0x10] = &object_owner;
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &print;
   opcode_jump_table[0x16] = &create_random_number;
   opcode_jump_table[0x18] = &jump;
   opcode_jump_table[0x19] = &execute_command;
   opcode_jump_table[0x1a] = &assign;
+  opcode_jump_table[0x1c] = &start_sound;
+  opcode_jump_table[0x20] = &stop_or_break;
+  opcode_jump_table[0x25] = &show_object;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
   opcode_jump_table[0x2b] = &delay_variable;
   opcode_jump_table[0x2e] = &delay;
   opcode_jump_table[0x35] = &get_object_at_position;
-  opcode_jump_table[0x38] = &jump_if_greater;
+  opcode_jump_table[0x38] = &jump_if_smaller;
   opcode_jump_table[0x39] = &execute_command;
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x40] = &cutscene;
   opcode_jump_table[0x42] = &start_script;
+  opcode_jump_table[0x44] = &jump_if_smaller_or_equal;
+  opcode_jump_table[0x45] = &show_object;
+  opcode_jump_table[0x46] = &increment_or_decrement;
   opcode_jump_table[0x47] = &obj_state_active;
   opcode_jump_table[0x48] = &jump_if_not_equal;
+  opcode_jump_table[0x4f] = &jump_if_object_not_active;
   opcode_jump_table[0x53] = &actor_ops;
   opcode_jump_table[0x58] = &begin_override_or_print_ego;
   opcode_jump_table[0x59] = &execute_command;
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x60] = &cursor_cmd;
+  opcode_jump_table[0x65] = &show_object;
   opcode_jump_table[0x72] = &load_room;
   opcode_jump_table[0x75] = &get_object_at_position;
+  opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &execute_command;
+  opcode_jump_table[0x7f] = &jump_if_can_not_pick_up_object;
 }
 
 /// @} // script_init
@@ -145,10 +167,9 @@ uint8_t script_run_active_slot(void)
   map_ds_resource(proc_res_slot[active_script_slot]);
   pc = NEAR_U8_PTR(RES_MAPPED) + proc_pc[active_script_slot];
   while (vm_get_active_proc_state() == PROC_STATE_RUNNING && !(break_script)) {
-    //debug_out("pc: %04x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
     opcode = read_byte();
     param_mask = 0x80;
-    debug_out("[%d] (%03x) %02x", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
+    //debug_out("[%d] (%03x) %02x", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
     exec_opcode(opcode);
   }
 
@@ -368,32 +389,39 @@ static void read_encoded_string_null_terminated(char *dest)
 /**
  * @brief Opcode 0x00: Stop or break
  *
- * Opcode 0x00 is used to stop the currently running script.
+ * Opcodes 0x00 or 0xa0 (doesn't seem to be different) are used to stop 
+ * the currently running script.
  *
  * Opcode 0x80 is used to break the script and return to the main loop
  * for one cycle. This usually is used to execute a redraw of the screen
  * before continuing the script.
  *
- * Variant opcodes: 0x80
+ * Opcode 0x20 is used to stop the music playback.
+ *
+ * Variant opcodes: 0x20, 0x80, 0xa0
  * 
  * Code section: code_main
  */
 static void stop_or_break(void)
 {
-  debug_msg("Stop or break");
-  if (!opcode) {
-    vm_stop_active_script();
+  if (opcode == 0x80) {
+    //debug_msg("Break script");
+    break_script = 1;
+  }
+  else if (opcode == 0x20){
+    //debug_msg("Stop music");
   }
   else {
-    break_script = 1;
+    //debug_msg("Stop script");
+    vm_stop_active_script();
   }
 }
 
 /**
- * @brief Opcode 0x04: Jump if smaller
+ * @brief Opcode 0x04: Jump if greater
  *
  * Reads a variable index and a 16-bit value. If the value of the variable is
- * smaller than the value, the script will jump to the new pc. The offset is
+ * greater than the value, the script will jump to the new pc. The offset is
  * signed two-complement and is a byte position relative to the opcode of the
  * script command following. An offset of 0 would therefore disable the condition
  * completely, as practically no jump will occur.
@@ -404,15 +432,31 @@ static void stop_or_break(void)
  *
  * Code section: code_main
  */
-static void jump_if_smaller(void)
+static void jump_if_greater(void)
 {
-  debug_msg("Jump if smaller");
+  //debug_msg("Jump if greater");
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
-  if (vm_read_var(var_idx) < value) {
+  if (vm_read_var(var_idx) > value) {
     pc += offset;
   }
+}
+
+static void show_object(void)
+{
+  //debug_msg("Show object");
+  uint16_t obj_id = resolve_next_param16();
+  uint8_t x = resolve_next_param8();
+  uint8_t y = resolve_next_param8();
+
+  if (x != 255 || y != 255) {
+    fatal_error(ERR_NOT_IMPLEMENTED);
+  }
+
+  global_game_objects[obj_id] |= OBJ_STATE_ACTIVE;
+
+  vm_update_screen();
 }
 
 /**
@@ -430,7 +474,7 @@ static void jump_if_smaller(void)
  */
 static void jump_if_equal(void)
 {
-  debug_msg("Jump if equal");
+  //debug_msg("Jump if equal");
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
@@ -452,7 +496,7 @@ static void jump_if_equal(void)
  */
 static void obj_state_active(void)
 {
-  debug_msg("obj state active");
+  //debug_msg("obj state active");
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
     global_game_objects[obj_id] &= ~OBJ_STATE_ACTIVE;
@@ -479,7 +523,7 @@ static void obj_state_active(void)
  */
 static void resource_cmd(void)
 {
-  debug_msg("Resource cmd");
+  //debug_msg("Resource cmd");
   uint8_t resource_id = resolve_next_param8();
   uint8_t sub_opcode = read_byte();
 
@@ -507,6 +551,14 @@ static void resource_cmd(void)
   }
 }
 
+static void object_owner(void)
+{
+  //debug_msg("Object owner");
+  uint8_t var_idx = read_byte();
+  uint16_t obj_id = resolve_next_param16();
+  vm_write_var(var_idx, global_game_objects[obj_id] & 0x0f);
+}
+
 /**
  * @brief Opcode 0x13: Actor ops
  * 
@@ -519,7 +571,7 @@ static void resource_cmd(void)
  */
 static void actor_ops(void)
 {
-  debug_msg("Actor ops");
+  //debug_msg("Actor ops");
   uint8_t actor_id   = resolve_next_param8();
   uint8_t param      = resolve_next_param8();
   uint8_t sub_opcode = read_byte();
@@ -557,7 +609,7 @@ static void actor_ops(void)
  */
 static void print(void)
 {
-  debug_msg("Print");
+  //debug_msg("Print");
   uint8_t actor_id = resolve_next_param8();
   read_encoded_string_null_terminated(dialog_buffer);
   vm_actor_start_talking(actor_id);
@@ -575,7 +627,7 @@ static void print(void)
  */
 static void create_random_number(void)
 {
-  debug_msg("Create random number");
+  //debug_msg("Create random number");
   uint8_t var_idx = read_byte();
   uint8_t upper_bound = resolve_next_param8();
   while (RNDRDY & 0x80); // wait for random number generator to be ready
@@ -594,7 +646,7 @@ static void create_random_number(void)
  */
 static void jump(void)
 {
-  debug_msg("Jump");
+  //debug_msg("Jump");
   pc += read_word(); // will effectively jump backwards if the offset is negative
 }
 
@@ -611,9 +663,15 @@ static void jump(void)
  */
 static void assign(void)
 {
-  debug_msg("Assign");
+  //debug_msg("Assign");
   uint8_t var_idx = read_byte();
   vm_write_var(var_idx, resolve_next_param16());
+}
+
+static void start_sound(void)
+{
+  //debug_msg("Start sound");
+  volatile uint8_t sound_id = resolve_next_param8();
 }
 
 /**
@@ -635,13 +693,13 @@ static void jump_if_or_if_not_equal_zero(void)
   uint8_t var_idx = read_byte();
   int16_t offset = read_word();
   if (opcode & param_mask) {
-    debug_msg("Jump if equal zero");
+    //debug_msg("Jump if equal zero");
     if (vm_read_var(var_idx) == 0) {
       pc += offset;
     }
   }
   else {
-    debug_msg("Jump if not equal zero");
+    //debug_msg("Jump if not equal zero");
     if (vm_read_var(var_idx) != 0) {
       pc += offset;
     }
@@ -659,7 +717,7 @@ static void jump_if_or_if_not_equal_zero(void)
  */
 static void delay_variable(void)
 {
-  debug_msg("Delay variable");
+  //debug_msg("Delay variable");
   uint8_t var_idx = read_byte();
   int32_t negative_ticks = -1 - (int32_t)vm_read_var(var_idx);
   vm_set_script_wait_timer(negative_ticks);
@@ -676,37 +734,71 @@ static void delay_variable(void)
  */
 static void delay(void)
 {
-  debug_msg("Delay");
+  //debug_msg("Delay");
   int32_t negative_ticks = read_int24();
   vm_set_script_wait_timer(negative_ticks);
 }
 
 static void execute_command(void)
 {
-  debug_msg("Execute command");
+  //debug_msg("Execute command");
   uint8_t command_verb = resolve_next_param8();
+
   if (command_verb == 0xfb) {
+    debug_out("  command_verb: %d = RESET", command_verb);
     reset_command();
     return;
   }
   else if (command_verb == 0xfc) {
+    debug_out("  command_verb: %d = STOP", command_verb);
     vm_stop_script(SCRIPT_ID_COMMAND);
     return;
   }
+  else if (command_verb == 0xfd) {
+    debug_out("  unimplemented command verb 0xfd, needed for load/save");
+    fatal_error(ERR_UNKNOWN_VERB);
+  }
+
+  uint16_t command_object_left  = resolve_next_param16();
+  uint16_t command_object_right = resolve_next_param16();
 
   uint8_t sub_opcode = read_byte();
   switch (sub_opcode) {
   case 0:
+    // put command into cmd stack
+    debug_msg("  put command into cmd stack");
+    if (cmd_stack.num_entries == CMD_STACK_SIZE) {
+      fatal_error(ERR_CMD_STACK_OVERFLOW);
+    }
+    cmd_stack.verb[cmd_stack.num_entries] = command_verb;
+    cmd_stack.object_left[cmd_stack.num_entries] = command_object_left;
+    cmd_stack.object_right[cmd_stack.num_entries] = command_object_right;
+    ++cmd_stack.num_entries;
+    debug_out("  verb %d, obj_left %d, obj_right %d, stacksize %d", command_verb, command_object_left, command_object_right, cmd_stack.num_entries);
     return;
+
   case 1:
+    // execute a command directly
+    debug_msg("  execute a command directly");
+    vm_write_var(VAR_COMMAND_VERB, command_verb);
+    vm_write_var(VAR_COMMAND_OBJECT_LEFT, command_object_left);
+    vm_write_var(VAR_COMMAND_OBJECT_RIGHT, command_object_right);
+    vm_start_object_script(command_verb, command_object_left);
     break;
+
+  case 2:
+    //debug_msg("  print command on screen");
+    // prepare a new command for printing on screen
+    vm_write_var(VAR_NEXT_COMMAND_VERB, command_verb);
+    vm_write_var(VAR_NEXT_COMMAND_OBJECT_LEFT, command_object_left);
+    vm_write_var(VAR_NEXT_COMMAND_OBJECT_RIGHT, command_object_right);
   }
   
 }
 
 static void get_object_at_position(void)
 {
-  debug_msg("Get object at position");
+  //debug_msg("Get object at position");
   uint8_t var_idx = read_byte();
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
@@ -716,10 +808,10 @@ static void get_object_at_position(void)
 }
 
 /**
- * @brief Opcode 0x38: Jump if greater
+ * @brief Opcode 0x38: Jump if smaller
  *
  * Reads a variable index and a 16-bit value. If the value of the variable is
- * greater than the value, the script will jump to the new pc. The offset is
+ * smaller than the value, the script will jump to the new pc. The offset is
  * signed two-complement and is a byte position relative to the opcode of the
  * script command following. An offset of 0 would therefore disable the
  * condition completely, as practically no jump will occur.
@@ -728,13 +820,13 @@ static void get_object_at_position(void)
  *
  * Code section: code_main
  */
-static void jump_if_greater(void)
+static void jump_if_smaller(void)
 {
-  debug_msg("Jump if greater");
+  //debug_msg("Jump if smaller");
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
-  if (vm_read_var(var_idx) > value) {
+  if (vm_read_var(var_idx) < value) {
     pc += offset;
   }
 }
@@ -753,7 +845,7 @@ static void jump_if_greater(void)
  */
 static void subtract(void)
 {
-  debug_msg("Subtract");
+  //debug_msg("Subtract");
   uint8_t var_idx = read_byte();
   vm_write_var(var_idx, vm_read_var(var_idx) - resolve_next_param16());
 }
@@ -769,7 +861,7 @@ static void subtract(void)
  */
 static void cutscene(void)
 {
-  debug_msg("Cutscene");
+  //debug_msg("Cutscene");
   vm_start_cutscene();
   override_pc = NULL;
   reset_command();
@@ -787,9 +879,59 @@ static void cutscene(void)
  */
 static void start_script(void)
 {
-  debug_msg("Start script");
+  //debug_msg("Start script");
   uint8_t script_id = resolve_next_param8();
   vm_start_script(script_id);
+}
+
+/**
+ * @brief Opcode 0x44: Jump if smaller or equal
+ *
+ * Reads a variable index and a 16-bit value. If the value of the variable is
+ * smaller or equal to the value, the script will jump to the new pc. The offset
+ * is signed two-complement and is a byte position relative to the opcode of the
+ * script command following. An offset of 0 would therefore disable the condition
+ * completely, as practically no jump will occur.
+ * The value to compare with can either be a 16-bit constant value (if opcode
+ * is 0x44) or a variable index (if opcode is 0xC4).
+ *
+ * Variant opcodes: 0xC4
+ *
+ * Code section: code_main
+ */
+static void jump_if_smaller_or_equal(void)
+{
+  //debug_msg("Jump if smaller or equal");
+  uint8_t var_idx = read_byte();
+  uint16_t value = resolve_next_param16();
+  int16_t offset = read_word();
+  if (vm_read_var(var_idx) <= value) {
+    pc += offset;
+  }
+}
+
+/**
+ * @brief Opcode 0x46: Increment or decrement
+ * 
+ * Reads a variable index and increments or decrements the value of the variable.
+ * If the opcode bit 7 is set, the variable is decremented, otherwise it is
+ * incremented.
+ *
+ * Variant opcodes: 0xC6
+ *
+ * Code section: code_main
+ */
+static void increment_or_decrement(void)
+{
+  //debug_msg("Increment variable");
+  uint8_t var_idx = read_byte();
+  uint16_t value = vm_read_var(var_idx);
+  if (opcode & 0x80) {
+    vm_write_var(var_idx, value - 1);
+  }
+  else {
+    vm_write_var(var_idx, value + 1);
+  }
 }
 
 /**
@@ -807,7 +949,7 @@ static void start_script(void)
  */
 static void jump_if_not_equal(void)
 {
-  debug_msg("Jump if not equal");
+  //debug_msg("Jump if not equal");
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
@@ -815,6 +957,32 @@ static void jump_if_not_equal(void)
     pc += offset;
   }
 }
+
+/**
+ * @brief Opcode 0x4F: Jump if object not active
+ *
+ * Reads an object id and a signed offset. If the object is not active, the script
+ * will jump to the new pc. The offset is signed two-complement and is a byte
+ * position relative to the opcode of the script command following. An offset of 0
+ * would therefore disable the condition completely, as practically no jump will occur.
+ *
+ * The object active state is relevant for screen rendering (used for showing/hiding
+ * an object).
+ *
+ * Variant opcodes: 0xCF
+ *
+ * Code section: code_main
+ */
+static void jump_if_object_not_active(void)
+{
+  //debug_msg("Jump if object not active");
+  uint16_t obj_id = resolve_next_param16();
+  int16_t offset = read_word();
+  if ((global_game_objects[obj_id] & OBJ_STATE_ACTIVE) == 0) {
+    pc += offset;
+  }
+}
+
 /**
  * @brief Opcode 0x58: Begin override or print ego
  * 
@@ -849,7 +1017,7 @@ void begin_override_or_print_ego(void)
  */
 static void begin_override(void)
 {
-  debug_msg("Begin override");
+  //debug_msg("Begin override");
   override_pc = pc;
   pc += 3; // Skip the jump command
 }
@@ -861,7 +1029,7 @@ static void begin_override(void)
  */
 static void print_ego(void)
 {
-  debug_msg("Print ego");
+  //debug_msg("Print ego");
 }
 
 /**
@@ -878,7 +1046,7 @@ static void print_ego(void)
  */
 static void add(void)
 {
-  debug_msg("Add");
+  //debug_msg("Add");
   uint8_t var_idx = read_byte();
   vm_write_var(var_idx, vm_read_var(var_idx) + resolve_next_param16());
 }
@@ -893,7 +1061,7 @@ static void add(void)
  */
 static void cursor_cmd(void)
 {
-  debug_msg("Cursor cmd");
+  //debug_msg("Cursor cmd");
   vm_write_var(VAR_CURSOR_STATE, read_byte());
   state_iface = read_byte();
 }
@@ -908,10 +1076,59 @@ static void cursor_cmd(void)
  */
 static void load_room(void)
 {
-  debug_msg("Load room");
+  //debug_msg("Load room");
   uint8_t room_no = read_byte();
   vm_switch_room(room_no);
   debug_out("Switched to room %d", room_no);
+}
+
+/** 
+ * @brief Opcode 0x78: Jump if greater or equal
+ *
+ * Reads a variable index and a 16-bit value. If the value of the variable is
+ * greater or equal to the value, the script will jump to the new pc. The offset
+ * is signed two-complement and is a byte position relative to the opcode of the
+ * script command following. An offset of 0 would therefore disable the condition
+ * completely, as practically no jump will occur.
+ * The value to compare with can either be a 16-bit constant value (if opcode
+ * is 0x78) or a variable index (if opcode is 0xF8).
+ *
+ * Variant opcodes: 0xF8
+ *
+ * Code section: code_main
+ */
+static void jump_if_greater_or_equal(void)
+{
+  //debug_msg("Jump if greater or equal");
+  uint8_t var_idx = read_byte();
+  uint16_t value = resolve_next_param16();
+  int16_t offset = read_word();
+  if (vm_read_var(var_idx) >= value) {
+    pc += offset;
+  }
+}
+
+/**
+ * @brief Opcode 0x7f: Jump if can not pick up object
+ *
+ * Reads an object id and a signed offset. If the object can not be picked up,
+ * the script will jump to the new pc. The offset is signed two-complement and
+ * is a byte position relative to the opcode of the script command following.
+ * An offset of 0 would therefore disable the condition completely, as practically
+ * no jump will occur.
+ *
+ * Variant opcodes: 0xFF
+ *
+ * Code section: code_main
+ */
+static void jump_if_can_not_pick_up_object(void)
+{
+  //debug_msg("Jump if can not pick up object");
+  uint16_t obj_id = resolve_next_param16();
+  int16_t offset = read_word();
+  if ((global_game_objects[obj_id] & OBJ_STATE_CAN_PICKUP) == 0) {
+    pc += offset;
+  }
 }
 
 /**
@@ -927,9 +1144,9 @@ static void unimplemented_opcode(void)
 
 static void reset_command(void)
 {
-  debug_msg("Reset command");
-  vm_write_var(VAR_COMMAND_VERB, vm_read_var(VAR_DEFAULT_VERB));
-  vm_write_var(VAR_COMMAND_OBJECT_LEFT, 0);
-  vm_write_var(VAR_COMMAND_OBJECT_RIGHT, 0);
-  vm_write_var(VAR_COMMAND_PREPOSITION, 0);
+  //debug_msg("Reset command");
+  vm_write_var(VAR_NEXT_COMMAND_VERB, vm_read_var(VAR_DEFAULT_VERB));
+  vm_write_var(VAR_NEXT_COMMAND_OBJECT_LEFT, 0);
+  vm_write_var(VAR_NEXT_COMMAND_OBJECT_RIGHT, 0);
+  vm_write_var(VAR_NEXT_COMMAND_PREPOSITION, 0);
 }

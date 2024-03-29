@@ -18,6 +18,9 @@ typedef enum {
     ERR_OUT_OF_INVENTORY_SPACE = 14,
     ERR_TOO_MANY_INVENTORY_OBJECTS = 15,
     ERR_SCRIPT_RECURSION = 16,
+    ERR_UNKNOWN_VERB = 17,
+    ERR_CMD_STACK_OVERFLOW = 18,
+    ERR_NOT_IMPLEMENTED = 19,
 } error_code_t;
 
 #endif // __ERROR_H__

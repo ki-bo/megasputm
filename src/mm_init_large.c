@@ -1,3 +1,5 @@
+#include "util.h"
+
 #if defined(__CALYPSI_TARGET_65816__) || (defined(__CALYPSI_TARGET_SYSTEM_MEGA65__) && defined(__CALYPSI_CORE_45GS02__))
 #pragma rtattr initialize="large"
 
@@ -56,7 +58,6 @@ void __initialize_sections(_InitTableAttr struct __init_data *p,
 	      src = (__far const uint8_t*)(((uint32_t)src) + 1);
       }
     } else {
-      
       for (size_t i = p->size; i != 0; i--) {
         *dest = 0;
 	      dest = (__far uint8_t*)(((uint32_t)dest) + 1);

@@ -3,17 +3,17 @@
 
 #include <stdint.h>
 
-#define NUM_SCRIPT_SLOTS 32
-#define NUM_ACTORS       25
-#define MAX_OBJECTS      57
-#define ACTOR_NAME_LEN   16
+#define NUM_SCRIPT_SLOTS   32
+#define NUM_ACTORS         25
+#define MAX_OBJECTS        57
+#define CMD_STACK_SIZE      6
+#define ACTOR_NAME_LEN     16
 
 enum {
   PROC_STATE_FREE,
   PROC_STATE_RUNNING,
   PROC_STATE_WAITING_FOR_TIMER,
-  PROC_STATE_WAITING_FOR_CHILD,
-  PROC_STATE_DEAD
+  PROC_STATE_WAITING_FOR_CHILD
 };
 
 enum {
@@ -31,13 +31,17 @@ enum {
   VAR_DIALOG_ACTIVE = 3,
   VAR_ROOM_NO = 4,
   VAR_MACHINE_SPEED = 6,
+  VAR_COMMAND_VERB = 8,
+  VAR_COMMAND_OBJECT_LEFT = 9,
+  VAR_COMMAND_OBJECT_RIGHT = 10,
   VAR_NUM_ACTORS = 11,
+  VAR_COMMAND_VERB_AVAILABLE = 18,
   VAR_CURSOR_STATE = 21,
   VAR_TIMER_NEXT = 25,
-  VAR_COMMAND_VERB = 26,
-  VAR_COMMAND_OBJECT_LEFT = 27,
-  VAR_COMMAND_OBJECT_RIGHT = 28,
-  VAR_COMMAND_PREPOSITION = 29,
+  VAR_NEXT_COMMAND_VERB = 26,
+  VAR_NEXT_COMMAND_OBJECT_LEFT = 27,
+  VAR_NEXT_COMMAND_OBJECT_RIGHT = 28,
+  VAR_NEXT_COMMAND_PREPOSITION = 29,
   VAR_SCENE_CURSOR_X = 30,
   VAR_SCENE_CURSOR_Y = 31,
   VAR_INPUT_EVENT = 32,
@@ -46,10 +50,10 @@ enum {
 };
 
 enum {
-  OBJ_STATE_1 = 0x10,
+  OBJ_STATE_CAN_PICKUP  = 0x10,
   OBJ_STATE_DONT_SELECT = 0x20,
-  OBJ_STATE_4 = 0x40,
-  OBJ_STATE_ACTIVE = 0x80,
+  OBJ_STATE_4           = 0x40,
+  OBJ_STATE_ACTIVE      = 0x80
 };
 
 enum {
@@ -78,6 +82,14 @@ extern uint8_t proc_state[NUM_SCRIPT_SLOTS];
 extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
+struct cmd_stack_t {
+  uint8_t  num_entries;
+  uint8_t  verb[CMD_STACK_SIZE];
+  uint16_t object_left[CMD_STACK_SIZE];
+  uint16_t object_right[CMD_STACK_SIZE];
+};
+extern struct cmd_stack_t cmd_stack;
+
 void vm_init(void);
 __task void vm_mainloop(void);
 uint8_t vm_get_active_proc_state(void);
@@ -88,6 +100,7 @@ void vm_actor_start_talking(uint8_t actor_id);
 uint8_t vm_start_script(uint8_t script_id);
 uint8_t vm_start_room_script(uint16_t room_script_offset);
 uint8_t vm_start_child_script(uint8_t script_id);
+uint8_t vm_start_object_script(uint8_t verb, uint16_t object);
 void vm_stop_active_script(void);
 void vm_stop_script(uint8_t script_id);
 void vm_update_screen(void);

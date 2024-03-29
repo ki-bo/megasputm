@@ -84,13 +84,15 @@ uint8_t cs_iface_state;
 uint16_t cs_pc;
 
 // room and object data
-uint8_t room_res_slot;
-uint8_t num_objects;
-uint8_t obj_page[MAX_OBJECTS];
-uint8_t obj_offset[MAX_OBJECTS];
-uint8_t obj_id[MAX_OBJECTS];
-uint8_t screen_update_needed = 0;
+uint8_t  room_res_slot;
+uint8_t  num_objects;
+uint8_t  obj_page[MAX_OBJECTS];
+uint8_t  obj_offset[MAX_OBJECTS];
+uint16_t obj_id[MAX_OBJECTS];
+uint8_t  screen_update_needed = 0;
 
+// command queue
+struct cmd_stack_t cmd_stack;
 
 // Private functions
 static void process_dialog(uint8_t jiffies_elapsed);
@@ -102,6 +104,10 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
 static void execute_script_slot(uint8_t slot);
+static uint8_t get_local_object_id(uint16_t global_object_id);
+static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset);
+static void execute_command_stack(void);
+static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
 
 /**
  * @defgroup vm_init VM Init Functions
@@ -183,6 +189,8 @@ __task void vm_mainloop(void)
       execute_script_slot(active_script_slot);
     }
 
+    execute_command_stack();
+
     if (screen_update_needed)
     {
       //VICIV.bordercol = 15;
@@ -230,7 +238,7 @@ void vm_switch_room(uint8_t room_no)
   debug_out("Deactivating old room %02x", vm_read_var8(VAR_ROOM_NO));
   if (vm_read_var(VAR_ROOM_NO) != 0) {
     map_ds_resource(room_res_slot);
-    vm_start_room_script(room_hdr->exit_script_offset);
+    vm_start_room_script(room_hdr->exit_script_offset + 4);
     res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_ROOM_NO), 0);
   }
 
@@ -250,8 +258,7 @@ void vm_switch_room(uint8_t room_no)
 
   // run entry script
   map_ds_resource(room_res_slot);
-  uint16_t entry_script_offset = room_hdr->entry_script_offset;
-  vm_start_room_script(room_hdr->entry_script_offset);
+  vm_start_room_script(room_hdr->entry_script_offset + 4);
 
   redraw_screen();
 
@@ -341,6 +348,8 @@ void vm_actor_start_talking(uint8_t actor_id)
  */
 uint8_t vm_start_script(uint8_t script_id)
 {
+  debug_out("Starting new top-level script %d", script_id);
+
   uint8_t slot = find_free_script_slot();
   proc_script_id[slot] = script_id;
   proc_state[slot] = PROC_STATE_RUNNING;
@@ -357,23 +366,17 @@ uint8_t vm_start_script(uint8_t script_id)
 
 uint8_t vm_start_room_script(uint16_t room_script_offset)
 {
-  uint8_t slot = find_free_script_slot();
-  proc_script_id[slot] = 0xff; // room scripts have no id
-  proc_state[slot] = PROC_STATE_RUNNING;
-  proc_parent[slot] = active_script_slot;
-  proc_child[slot] = 0xff;
-  proc_res_slot[slot] = room_res_slot + MSB(room_script_offset);
-  proc_pc[slot] = LSB(room_script_offset) + 4; // skipping script header directly to first opcode
-  
-  // update the calling script to wait for the room script
-  proc_child[active_script_slot] = slot;
-  proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_CHILD;
+  debug_out("Starting room script at offset %04x", room_script_offset);
 
-  return slot;
+  uint8_t res_slot = room_res_slot + MSB(room_script_offset);
+  uint16_t offset = LSB(room_script_offset);
+  return start_child_script_at_address(res_slot, offset);
 }
 
 uint8_t vm_start_child_script(uint8_t script_id)
 {
+  debug_out("Starting script %d as child of slot %d", script_id, active_script_slot);
+
   uint8_t slot = vm_start_script(script_id);
   proc_parent[slot] = active_script_slot;
   
@@ -382,6 +385,26 @@ uint8_t vm_start_child_script(uint8_t script_id)
   proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_CHILD;
 
   return slot;
+}
+
+uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
+{
+  uint8_t id = get_local_object_id(global_object_id);
+  if (id == 0xff) {
+    return 0xff;
+  }
+
+  uint8_t script_offset = get_room_object_script_offset(verb, id);
+  if (script_offset == 0) {
+    return 0xff;
+  }
+
+  uint8_t res_slot = obj_page[id];
+  script_offset += obj_offset[id];
+
+  debug_out("Starting object script %d for verb %d at slot %02x offset %04x", global_object_id, verb, res_slot, script_offset);
+
+  return start_child_script_at_address(res_slot, script_offset);
 }
 
 /**
@@ -444,7 +467,6 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 
   uint16_t found_obj_id = 0;
   y >>= 2;
-  y -= 4;
 
   for (uint8_t i = 0; i < num_objects; ++i) {
     map_ds_resource(obj_page[i]);
@@ -607,7 +629,7 @@ static void redraw_screen(void)
   map_cs_gfx();
   gfx_draw_bg();
 
-  for (uint8_t i = 0; i < num_objects; ++i)
+  for (int8_t i = num_objects - 1; i >= 0; --i)
   {
     map_ds_resource(obj_page[i]);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
@@ -631,7 +653,7 @@ static void handle_input(void)
   static uint8_t last_input_button_pressed = 0;
 
   vm_write_var(VAR_SCENE_CURSOR_X, input_cursor_x >> 2);
-  vm_write_var(VAR_SCENE_CURSOR_Y, input_cursor_y >> 1);
+  vm_write_var(VAR_SCENE_CURSOR_Y, (input_cursor_y >> 1) - 8);
 
   if (input_button_pressed == last_input_button_pressed)
   {
@@ -747,6 +769,92 @@ static void execute_script_slot(uint8_t slot)
   }
 
   active_script_slot = save_active_script_slot;
+}
+
+static uint8_t get_local_object_id(uint16_t global_object_id)
+{
+  debug_out("Searching for object %d", global_object_id);
+  for (uint8_t i = 0; i < num_objects; ++i)
+  {
+    if (obj_id[i] == global_object_id)
+    {
+      debug_out("  Found object at local id %d", i);
+      return i;
+    }
+  }
+
+  return 0xff;
+}
+
+static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset)
+{
+  uint8_t slot = find_free_script_slot();
+  proc_script_id[slot] = 0xff; // room scripts have no id
+  proc_state[slot] = PROC_STATE_RUNNING;
+  proc_parent[slot] = active_script_slot;
+  proc_child[slot] = 0xff;
+  proc_res_slot[slot] = res_slot;
+  proc_pc[slot] = offset;
+  
+  // update the calling script to wait for the child script
+  proc_child[active_script_slot] = slot;
+  proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_CHILD;
+
+  return slot;
+}
+
+static void execute_command_stack(void)
+{
+  if (cmd_stack.num_entries == 0)
+  {
+    return;
+  }
+
+  --cmd_stack.num_entries;
+  uint8_t verb = cmd_stack.verb[cmd_stack.num_entries];
+  uint16_t object_left = cmd_stack.object_left[cmd_stack.num_entries];
+  uint16_t object_right = cmd_stack.object_right[cmd_stack.num_entries];
+
+  vm_write_var(VAR_COMMAND_VERB, verb);
+  vm_write_var(VAR_COMMAND_OBJECT_LEFT, object_left);
+  vm_write_var(VAR_COMMAND_OBJECT_RIGHT, object_right);
+  
+  uint8_t script_offset = 0;
+  uint8_t local_object_id = get_local_object_id(object_left);
+  if (local_object_id != 0xff) {
+    script_offset = get_room_object_script_offset(verb, local_object_id);
+  }
+  vm_write_var(VAR_COMMAND_VERB_AVAILABLE, script_offset != 0);
+
+  uint8_t slot = vm_start_script(SCRIPT_ID_COMMAND);
+  debug_out("Command script verb %d object1 %d object2 %d verb_available %d", verb, object_left, object_right, script_offset != 0);
+  execute_script_slot(slot);
+}
+
+static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id)
+{
+  uint16_t save_ds = map_get_ds();
+
+  map_ds_resource(obj_page[local_object_id]);
+  uint16_t cur_offset = obj_offset[local_object_id];
+  cur_offset += 15;
+  uint8_t *ptr = NEAR_U8_PTR(RES_MAPPED + cur_offset);
+  uint8_t script_offset = 0;
+
+  debug_out("Searching for verb %02x in object %d", verb, local_object_id);
+
+  while (*ptr != 0) {
+    debug_out("Verb %02x, offset %02x", *ptr, *(ptr + 1));
+    if (*ptr == verb || *ptr == 0xff) {
+      script_offset = *(ptr + 1);
+      break;
+    }
+    ptr += 2;
+  }
+
+  map_set_ds(save_ds);
+
+  return script_offset;
 }
 
 /// @} // vm_private

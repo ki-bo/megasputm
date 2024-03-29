@@ -23,7 +23,7 @@
         )
 
         ; memory for boot program
-        (memory autoboot (address (#x1fff . #x2fff))
+        (memory autoboot (address (#x1fff . #x3fff))
                 (section 
                         (autoboot_load_address #x1fff)
                         (programStart #x2001) 
@@ -34,7 +34,7 @@
         )
 
         ; memory for init program (will be discarded once executed)
-        (memory init (address (#x4000 . #x47ff))
+        (memory init (address (#x8000 . #x8fff))
                 (scatter-to init_copy)
                 (section 
                         code_init
@@ -44,7 +44,7 @@
         )
 
         ; temporary memory for init program (will be discarded when init is done)
-        (memory bssram-init (address (#x4800 . #x4fff))
+        (memory bssram-init (address (#x9000 . #x9fff))
                 (section 
                         bss_init
                 )
