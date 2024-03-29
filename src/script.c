@@ -39,6 +39,7 @@ static void delay_variable(void);
 static void subtract(void);
 static void add(void);
 static void delay(void);
+static void set_camera(void);
 static void get_object_at_position(void);
 static void jump_if_smaller(void);
 static void cutscene(void);
@@ -50,6 +51,7 @@ static void jump_if_object_not_active(void);
 static void begin_override_or_print_ego(void);
 static void begin_override(void);
 static void cursor_cmd(void);
+static void is_script_running(void);
 static void load_room(void);
 static void jump_if_greater_or_equal(void);
 static void print_ego(void);
@@ -74,6 +76,10 @@ static uint8_t * __attribute__((zpage)) pc;
 static void (*opcode_jump_table[128])(void);
 static uint8_t *override_pc;
 static uint8_t break_script = 0;
+static uint8_t backup_opcode;
+static uint8_t backup_param_mask;
+static uint8_t *backup_pc;
+static uint8_t backup_break_script;
 
 //----------------------------------------------------------------------
 
@@ -116,6 +122,7 @@ void script_init(void)
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
   opcode_jump_table[0x2b] = &delay_variable;
   opcode_jump_table[0x2e] = &delay;
+  opcode_jump_table[0x32] = &set_camera;
   opcode_jump_table[0x35] = &get_object_at_position;
   opcode_jump_table[0x38] = &jump_if_smaller;
   opcode_jump_table[0x39] = &execute_command;
@@ -134,6 +141,7 @@ void script_init(void)
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x60] = &cursor_cmd;
   opcode_jump_table[0x65] = &show_object;
+  opcode_jump_table[0x68] = &is_script_running;
   opcode_jump_table[0x72] = &load_room;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
@@ -176,6 +184,22 @@ uint8_t script_run_active_slot(void)
   proc_pc[active_script_slot] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
 
   return 0;
+}
+
+void script_save_state(void)
+{
+  backup_opcode = opcode;
+  backup_param_mask = param_mask;
+  backup_pc = pc;
+  backup_break_script = break_script;
+}
+
+void script_restore_state(void)
+{
+  opcode = backup_opcode;
+  param_mask = backup_param_mask;
+  pc = backup_pc;
+  break_script = backup_break_script;
 }
 
 #pragma clang section text="code"
@@ -528,6 +552,12 @@ static void resource_cmd(void)
   uint8_t sub_opcode = read_byte();
 
   switch (sub_opcode) {
+    case 0x21:
+      res_provide(RES_TYPE_COSTUME, resource_id, 0);
+      break;
+    case 0x23:
+      res_lock(RES_TYPE_COSTUME, resource_id, 0);
+      break;
     case 0x31:
       res_provide(RES_TYPE_ROOM, resource_id, 0);
       break;
@@ -737,6 +767,14 @@ static void delay(void)
   //debug_msg("Delay");
   int32_t negative_ticks = read_int24();
   vm_set_script_wait_timer(negative_ticks);
+}
+
+static void set_camera(void)
+{
+  //debug_msg("Set camera");
+  camera_x = resolve_next_param8();
+  debug_out("Camera x: %d", camera_x);
+  vm_update_screen();
 }
 
 static void execute_command(void)
@@ -1064,6 +1102,19 @@ static void cursor_cmd(void)
   //debug_msg("Cursor cmd");
   vm_write_var(VAR_CURSOR_STATE, read_byte());
   state_iface = read_byte();
+}
+
+static void is_script_running(void)
+{
+  //debug_msg("Is script running");
+  uint8_t var_idx = read_byte();
+  uint8_t script_id = resolve_next_param8();
+  if (vm_is_script_running(script_id)) {
+    vm_write_var(var_idx, 1);
+  }
+  else {
+    vm_write_var(var_idx, 0);
+  }
 }
 
 /**

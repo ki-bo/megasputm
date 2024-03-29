@@ -336,6 +336,18 @@ void gfx_wait_for_next_frame(void)
   while (counter == raster_irq_counter);
 }
 
+void gfx_clear_bg_image(void)
+{
+  // clear one screen worth of char data
+  memset_bank(FAR_U8_PTR(BG_BITMAP), 0, 16U * 40U * 64U);
+
+  // reset next_char_data pointer
+  next_char_data = HUGE_U8_PTR(BG_BITMAP) + 16 * 40 * 2;
+
+  // reset object pointers
+  next_obj_slot = 0;
+}
+
 /**
  * @brief Decodes a room background image and stores it in the background bitmap.
  * 
@@ -351,6 +363,7 @@ void gfx_wait_for_next_frame(void)
  */
 void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 {
+  debug_out("Decoding bg image, width: %d\n", width)
   // when decoding a room background image, we always start over at the
   // beginning of the char data memory
   next_char_data = HUGE_U8_PTR(BG_BITMAP);
@@ -446,7 +459,7 @@ void gfx_draw_bg(void)
   unmap_ds();
 
   __auto_type screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
-  uint16_t char_data = BG_BITMAP / 64 + camera_x * 16;
+  uint16_t char_data = BG_BITMAP / 64 + (camera_x - 20) * 16;
 
   for (uint8_t x = 0; x < 40; ++x) {
     for (uint8_t y = 0; y < 16; ++y) {

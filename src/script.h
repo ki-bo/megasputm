@@ -14,5 +14,7 @@ void script_init(void);
 
 // code_main functions
 uint8_t script_run_active_slot(void);
+void script_save_state(void);
+void script_restore_state(void);
 
 #endif // __SCRIPT_H

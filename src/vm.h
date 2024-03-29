@@ -103,6 +103,7 @@ uint8_t vm_start_child_script(uint8_t script_id);
 uint8_t vm_start_object_script(uint8_t verb, uint16_t object);
 void vm_stop_active_script(void);
 void vm_stop_script(uint8_t script_id);
+uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_screen(void);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 

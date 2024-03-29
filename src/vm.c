@@ -103,7 +103,7 @@ static void handle_input(void);
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
-static void execute_script_slot(uint8_t slot);
+static void execute_script_slot(uint8_t slot, uint8_t dont_restart_active_slot);
 static uint8_t get_local_object_id(uint16_t global_object_id);
 static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset);
 static void execute_command_stack(void);
@@ -128,6 +128,8 @@ void vm_init(void)
   {
     proc_state[active_script_slot] = PROC_STATE_FREE;
   }
+
+  camera_x = 20;
 }
 
 /** @} */ // vm_init
@@ -186,7 +188,7 @@ __task void vm_mainloop(void)
          active_script_slot < NUM_SCRIPT_SLOTS;
          ++active_script_slot)
     {
-      execute_script_slot(active_script_slot);
+      execute_script_slot(active_script_slot, 0);
     }
 
     execute_command_stack();
@@ -239,35 +241,49 @@ void vm_switch_room(uint8_t room_no)
   if (vm_read_var(VAR_ROOM_NO) != 0) {
     map_ds_resource(room_res_slot);
     vm_start_room_script(room_hdr->exit_script_offset + 4);
+    execute_script_slot(active_script_slot, 1);
     res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_ROOM_NO), 0);
   }
 
-  // activate new room data
-  room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
-  res_set_flags(room_res_slot, RES_ACTIVE_MASK);
-  map_ds_resource(room_res_slot);
-
   map_cs_gfx();
+  gfx_clear_dialog();
   gfx_fade_out();
-  gfx_decode_bg_image(NEAR_U8_PTR(RES_MAPPED + room_hdr->bg_data_offset), 
-                      room_hdr->bg_width);
 
   vm_write_var(VAR_ROOM_NO, room_no);
 
-  read_objects();
+  if (room_no == 0) {
+    gfx_clear_bg_image();
+    num_objects = 0;
+  }
+  else {
 
-  // run entry script
-  map_ds_resource(room_res_slot);
-  vm_start_room_script(room_hdr->entry_script_offset + 4);
+    debug_out("Activating new room %d", room_no);
+    // activate new room data
+    room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
+    res_set_flags(room_res_slot, RES_ACTIVE_MASK);
+    map_ds_resource(room_res_slot);
 
+    map_cs_gfx();
+    gfx_decode_bg_image(NEAR_U8_PTR(RES_MAPPED + room_hdr->bg_data_offset), 
+                        room_hdr->bg_width);
+
+    read_objects();
+
+    // run entry script
+    vm_start_room_script(room_hdr->entry_script_offset + 4);
+    execute_script_slot(active_script_slot, 1);
+  }
+
+  debug_msg("Redrawing screen");
   redraw_screen();
 
-  map_cs_gfx();
+  debug_msg("Fade in");
   gfx_fade_in();
   unmap_cs();
 
   // restore DS
   map_set_ds(ds_save);
+  debug_msg("Room switch done");
 }
 
 /**
@@ -445,6 +461,19 @@ void vm_stop_script(uint8_t script_id)
       }
     }
   }
+}
+
+uint8_t vm_is_script_running(uint8_t script_id)
+{
+  for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
+  {
+    if (proc_state[slot] != PROC_STATE_FREE && proc_script_id[slot] == script_id)
+    {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 /**
@@ -731,8 +760,10 @@ static void update_script_timers(uint8_t elapsed_jiffies)
 
 }
 
-static void execute_script_slot(uint8_t slot)
+static void execute_script_slot(uint8_t slot, uint8_t dont_restart_active_slot)
 {
+  uint32_t map_save = map_get();
+
   // non-top-level scripts will be executed as childs in other scripts, so skip them here
   if (proc_parent[slot] != 0xff) {
     return;
@@ -746,9 +777,17 @@ static void execute_script_slot(uint8_t slot)
     slot = proc_child[slot];
   }
 
+  if (dont_restart_active_slot) {
+    script_save_state();
+  }
+
   uint8_t save_active_script_slot = active_script_slot;
 
   while (slot != 0xff && proc_state[slot] == PROC_STATE_RUNNING) {
+    if (slot == save_active_script_slot && dont_restart_active_slot) {
+      // skip the active script if it should not be restarted
+      break;
+    }
     active_script_slot = slot;
     script_run_active_slot();
     if (proc_state[slot] == PROC_STATE_WAITING_FOR_CHILD) {
@@ -769,6 +808,12 @@ static void execute_script_slot(uint8_t slot)
   }
 
   active_script_slot = save_active_script_slot;
+
+  if (dont_restart_active_slot) {
+    script_restore_state();
+  }
+
+  map_set(map_save);
 }
 
 static uint8_t get_local_object_id(uint16_t global_object_id)
@@ -828,7 +873,7 @@ static void execute_command_stack(void)
 
   uint8_t slot = vm_start_script(SCRIPT_ID_COMMAND);
   debug_out("Command script verb %d object1 %d object2 %d verb_available %d", verb, object_left, object_right, script_offset != 0);
-  execute_script_slot(slot);
+  execute_script_slot(slot, 0);
 }
 
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id)
