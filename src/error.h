@@ -21,6 +21,7 @@ typedef enum {
     ERR_UNKNOWN_VERB = 17,
     ERR_CMD_STACK_OVERFLOW = 18,
     ERR_NOT_IMPLEMENTED = 19,
+    ERR_EXEC_PARALLEL_SCRIPT = 20,
 } error_code_t;
 
 #endif // __ERROR_H__

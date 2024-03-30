@@ -64,6 +64,7 @@ static void reset_command(void);
 #pragma clang section bss="zzpage"
 
 // private zeropage variables
+uint8_t __attribute__((zpage)) parallel_script_count;
 static uint8_t __attribute__((zpage)) opcode;
 static uint8_t __attribute__((zpage)) param_mask;
 static uint8_t * __attribute__((zpage)) pc;
@@ -164,12 +165,16 @@ void script_init(void)
  *
  * The script is run from the current pc until the script's state is not PROC_STATE_RUNNING.
  * 
- * @return uint8_t 0 if the script has finished, 1 if the script is still running.
- *
  * Code section: code_main
  */
-uint8_t script_run_active_slot(void)
+void script_run_active_slot(void)
 {
+  if (parallel_script_count == 6) {
+    fatal_error(ERR_SCRIPT_RECURSION);
+  }
+
+  ++parallel_script_count;
+
   break_script = 0;
 
   map_ds_resource(proc_res_slot[active_script_slot]);
@@ -182,24 +187,25 @@ uint8_t script_run_active_slot(void)
   }
 
   proc_pc[active_script_slot] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
-
-  return 0;
+  --parallel_script_count;
 }
 
-void script_save_state(void)
+void script_run_slot_stacked(uint8_t slot)
 {
-  backup_opcode = opcode;
-  backup_param_mask = param_mask;
-  backup_pc = pc;
-  backup_break_script = break_script;
-}
+  uint8_t  stack_opcode       = opcode;
+  uint8_t  stack_param_mask   = param_mask;
+  uint8_t *stack_pc           = pc;
+  uint8_t  stack_break_script = break_script;
+  uint8_t  stack_active_slot  = active_script_slot;
 
-void script_restore_state(void)
-{
-  opcode = backup_opcode;
-  param_mask = backup_param_mask;
-  pc = backup_pc;
-  break_script = backup_break_script;
+  active_script_slot = slot;
+  script_run_active_slot();
+
+  opcode = stack_opcode;
+  param_mask = stack_param_mask;
+  pc = stack_pc;
+  break_script = stack_break_script;
+  active_script_slot = stack_active_slot;
 }
 
 #pragma clang section text="code"

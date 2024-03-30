@@ -90,7 +90,7 @@ static void setup_irq(void);
 static void raster_irq(void);
 // Private gfx functions
 static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
-static void update_cursor(void);
+static void update_cursor(uint8_t snail_override);
 static void set_dialog_color(uint8_t color);
 
 //-----------------------------------------------------------------------------------------------
@@ -242,7 +242,10 @@ static void raster_irq ()
   input_update();
 
   map_cs_gfx();
-  update_cursor();
+  if (script_watchdog < 30) {
+    ++script_watchdog;
+  }
+  update_cursor(script_watchdog == 30);
 
   if (screen_update_request) {
     unmap_ds();
@@ -640,7 +643,7 @@ static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
  *
  * Code section: code_gfx
  */
-void update_cursor()
+void update_cursor(uint8_t snail_override)
 {
   uint8_t cursor_state = vm_read_var8(VAR_CURSOR_STATE);
   if (!(cursor_state & 0x01)) {
@@ -650,7 +653,7 @@ void update_cursor()
 
   uint16_t spr_pos_x = (input_cursor_x + 12) * 2 - HOTSPOT_OFFSET_X;
   uint8_t  spr_pos_y = (input_cursor_y + 50)     - HOTSPOT_OFFSET_Y;
-  if (cursor_state & 0x02) {
+  if (cursor_state & 0x02 && !snail_override) {
     VICII.spr_ena  = 0x02;
     VICII.spr1_x   = LSB(spr_pos_x);
     VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x02;

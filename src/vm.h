@@ -74,6 +74,7 @@ extern uint8_t actor_costumes[NUM_ACTORS];
 extern uint8_t actor_talk_colors[NUM_ACTORS];
 extern uint8_t actor_talking;
 
+extern volatile uint8_t script_watchdog;
 extern uint8_t state_iface;
 extern uint16_t camera_x;
 

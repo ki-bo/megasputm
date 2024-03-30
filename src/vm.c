@@ -62,6 +62,7 @@ uint8_t actor_costumes[NUM_ACTORS];
 uint8_t actor_talk_colors[NUM_ACTORS];
 uint8_t actor_talking;
 
+volatile uint8_t script_watchdog;
 uint8_t state_iface;
 uint16_t camera_x;
 
@@ -103,7 +104,7 @@ static void handle_input(void);
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
-static void execute_script_slot(uint8_t slot, uint8_t dont_restart_active_slot);
+static void execute_script_slot(uint8_t slot);
 static uint8_t get_local_object_id(uint16_t global_object_id);
 static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset);
 static void execute_command_stack(void);
@@ -173,6 +174,7 @@ __task void vm_mainloop(void)
   dialog_timer = 0;
 
   while (1) {
+    script_watchdog = 0;
     uint8_t elapsed_jiffies = wait_for_jiffy();
     map_cs_diskio();
     diskio_check_motor_off(elapsed_jiffies);
@@ -188,7 +190,7 @@ __task void vm_mainloop(void)
          active_script_slot < NUM_SCRIPT_SLOTS;
          ++active_script_slot)
     {
-      execute_script_slot(active_script_slot, 0);
+      execute_script_slot(active_script_slot);
     }
 
     execute_command_stack();
@@ -241,7 +243,7 @@ void vm_switch_room(uint8_t room_no)
   if (vm_read_var(VAR_ROOM_NO) != 0) {
     map_ds_resource(room_res_slot);
     vm_start_room_script(room_hdr->exit_script_offset + 4);
-    execute_script_slot(active_script_slot, 1);
+    execute_script_slot(active_script_slot);
     res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_ROOM_NO), 0);
   }
 
@@ -271,19 +273,16 @@ void vm_switch_room(uint8_t room_no)
 
     // run entry script
     vm_start_room_script(room_hdr->entry_script_offset + 4);
-    execute_script_slot(active_script_slot, 1);
+    execute_script_slot(active_script_slot);
   }
 
   debug_msg("Redrawing screen");
   redraw_screen();
-
-  debug_msg("Fade in");
-  gfx_fade_in();
+  screen_update_needed = 1;
   unmap_cs();
 
   // restore DS
   map_set_ds(ds_save);
-  debug_msg("Room switch done");
 }
 
 /**
@@ -760,7 +759,7 @@ static void update_script_timers(uint8_t elapsed_jiffies)
 
 }
 
-static void execute_script_slot(uint8_t slot, uint8_t dont_restart_active_slot)
+static void execute_script_slot(uint8_t slot)
 {
   uint32_t map_save = map_get();
 
@@ -777,19 +776,24 @@ static void execute_script_slot(uint8_t slot, uint8_t dont_restart_active_slot)
     slot = proc_child[slot];
   }
 
-  if (dont_restart_active_slot) {
-    script_save_state();
-  }
-
   uint8_t save_active_script_slot = active_script_slot;
 
   while (slot != 0xff && proc_state[slot] == PROC_STATE_RUNNING) {
-    if (slot == save_active_script_slot && dont_restart_active_slot) {
-      // skip the active script if it should not be restarted
-      break;
-    }
     active_script_slot = slot;
-    script_run_active_slot();
+    if (parallel_script_count == 0) {
+      // top-level scripts don't need to save state on stack
+      script_run_active_slot();
+    }
+    else {
+      // never execute the script that called us recursively
+      // (remember we can be called from within a script)
+      if (active_script_slot == save_active_script_slot) {
+        break;
+      }
+
+      // save state on stack for nested scripts
+      script_run_slot_stacked(active_script_slot);
+    }
     if (proc_state[slot] == PROC_STATE_WAITING_FOR_CHILD) {
       // script has just started a new child script
       debug_out("Script %d has started new child %d", slot, proc_child[slot]);
@@ -809,21 +813,15 @@ static void execute_script_slot(uint8_t slot, uint8_t dont_restart_active_slot)
 
   active_script_slot = save_active_script_slot;
 
-  if (dont_restart_active_slot) {
-    script_restore_state();
-  }
-
   map_set(map_save);
 }
 
 static uint8_t get_local_object_id(uint16_t global_object_id)
 {
-  debug_out("Searching for object %d", global_object_id);
   for (uint8_t i = 0; i < num_objects; ++i)
   {
     if (obj_id[i] == global_object_id)
     {
-      debug_out("  Found object at local id %d", i);
       return i;
     }
   }
@@ -873,7 +871,7 @@ static void execute_command_stack(void)
 
   uint8_t slot = vm_start_script(SCRIPT_ID_COMMAND);
   debug_out("Command script verb %d object1 %d object2 %d verb_available %d", verb, object_left, object_right, script_offset != 0);
-  execute_script_slot(slot, 0);
+  execute_script_slot(slot);
 }
 
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id)

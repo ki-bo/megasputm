@@ -9,12 +9,13 @@ enum script_return_t {
     SCRIPT_BLOCKED = 2,
 };
 
+extern uint8_t __attribute__((zpage)) parallel_script_count;
+
 // code_init functions
 void script_init(void);
 
 // code_main functions
-uint8_t script_run_active_slot(void);
-void script_save_state(void);
-void script_restore_state(void);
+void script_run_active_slot(void);
+void script_run_slot_stacked(uint8_t slot);
 
 #endif // __SCRIPT_H

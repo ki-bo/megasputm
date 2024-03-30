@@ -1,5 +1,3 @@
-#include "util.h"
-
 #if defined(__CALYPSI_TARGET_65816__) || (defined(__CALYPSI_TARGET_SYSTEM_MEGA65__) && defined(__CALYPSI_CORE_45GS02__))
 #pragma rtattr initialize="large"
 
