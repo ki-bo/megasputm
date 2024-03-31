@@ -30,7 +30,12 @@ run: mm.d81
 	$(ETHLOAD) -m mm.d81 -r autoboot.raw
 
 debug_xemu: mm.d81
-	$(XMEGA65) -uartmon :4510 -8 mm.d81 -besure
+	@echo "--------------------------------------------------"
+	@echo "Starting Xemu..."
+	@echo "Make sure a tmux session named 'mmxemu' is running"
+	@echo "Use 'xemu_tmux_session.sh' to create one"
+	@echo "--------------------------------------------------"
+	tmux send-keys -t mmxemu "$(XMEGA65) -8 mm.d81 -besure -curskeyjoy" C-m
 
 obj/%.o: %.s
 	@mkdir -p obj

@@ -1,6 +1,7 @@
 #include "resource.h"
 #include "diskio.h"
 #include "dma.h"
+#include "error.h"
 #include "map.h"
 #include "memory.h"
 #include "util.h"
@@ -296,6 +297,9 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
  */
 static uint8_t defragment_memory(void)
 {
+  debug_msg("Warning: Defragmenting memory");
+  fatal_error(ERR_OUT_OF_RESOURCE_MEMORY);
+
   static dmalist_t dmalist_res_defrag = {
     .end_of_options = 0,
     .command        = 0,

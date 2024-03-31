@@ -16,6 +16,7 @@ void gfx_fade_out(void);
 void gfx_fade_in(void);
 void gfx_clear_bg_image(void);
 void gfx_decode_bg_image(uint8_t *src, uint16_t width);
+void gfx_decode_masking_buffer(uint8_t *src, uint16_t width);
 void gfx_decode_object_image(uint8_t *src, uint8_t width, uint8_t height);
 void gfx_clear_dialog(void);
 uint8_t gfx_print_dialog(uint8_t color, const char *text);

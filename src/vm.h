@@ -83,6 +83,8 @@ extern uint8_t proc_state[NUM_SCRIPT_SLOTS];
 extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
+extern uint8_t room_res_slot;
+
 struct cmd_stack_t {
   uint8_t  num_entries;
   uint8_t  verb[CMD_STACK_SIZE];

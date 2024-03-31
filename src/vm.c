@@ -197,10 +197,8 @@ __task void vm_mainloop(void)
 
     if (screen_update_needed)
     {
-      //VICIV.bordercol = 15;
       redraw_screen();
       screen_update_needed = 0;
-      //VICIV.bordercol = 0;
       map_cs_gfx();
       gfx_update_screen();
       unmap_cs();
@@ -234,12 +232,10 @@ void vm_switch_room(uint8_t room_no)
   // save DS
   uint16_t ds_save = map_get_ds();
 
-  debug_out("Switching to room %02x", room_no);
-
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
 
   // exit and free old room
-  debug_out("Deactivating old room %02x", vm_read_var8(VAR_ROOM_NO));
+  debug_out("Deactivating old room %d", vm_read_var8(VAR_ROOM_NO));
   if (vm_read_var(VAR_ROOM_NO) != 0) {
     map_ds_resource(room_res_slot);
     vm_start_room_script(room_hdr->exit_script_offset + 4);
@@ -264,10 +260,15 @@ void vm_switch_room(uint8_t room_no)
     room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
     res_set_flags(room_res_slot, RES_ACTIVE_MASK);
     map_ds_resource(room_res_slot);
+    uint16_t room_width = room_hdr->bg_width;
+    uint16_t bg_data_offset = room_hdr->bg_data_offset;
+    uint16_t bg_masking_offset = room_hdr->bg_attr_offset;
 
     map_cs_gfx();
-    gfx_decode_bg_image(NEAR_U8_PTR(RES_MAPPED + room_hdr->bg_data_offset), 
-                        room_hdr->bg_width);
+    gfx_decode_bg_image(map_ds_room_offset(bg_data_offset), room_width);
+    gfx_decode_masking_buffer(map_ds_room_offset(bg_masking_offset), room_width);
+
+    map_ds_resource(room_res_slot);
 
     read_objects();
 
@@ -276,7 +277,6 @@ void vm_switch_room(uint8_t room_no)
     execute_script_slot(active_script_slot);
   }
 
-  debug_msg("Redrawing screen");
   redraw_screen();
   screen_update_needed = 1;
   unmap_cs();

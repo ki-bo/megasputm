@@ -75,12 +75,12 @@ __attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
 
 __attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
 static uint8_t __huge *next_char_data;
-static uint8_t __huge *obj_char_ptrs[MAX_OBJECTS];
 static uint16_t obj_first_char[MAX_OBJECTS];
-static uint16_t obj_id[MAX_OBJECTS];
 static uint8_t next_obj_slot = 0;
 static uint8_t num_chars_at_row[16];
 static uint8_t screen_update_request = 0;
+static uint8_t masking_cache_iterations[119];
+static uint16_t masking_cache_data_offset[119];
 
 //-----------------------------------------------------------------------------------------------
 
@@ -90,6 +90,7 @@ static void setup_irq(void);
 static void raster_irq(void);
 // Private gfx functions
 static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
+static void decode_masking_buffer(uint8_t *src, uint16_t width, uint16_t height);
 static void update_cursor(uint8_t snail_override);
 static void set_dialog_color(uint8_t color);
 
@@ -375,6 +376,60 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
   next_obj_slot = 0;
 }
 
+void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
+{
+  // debug_out("Decode masking buffer, width: %d\n", width);
+  uint8_t mask_col = 0;
+  uint16_t num_bytes = width * (GFX_HEIGHT / 8);
+  uint8_t remaining_pixels = GFX_HEIGHT;
+  uint16_t mask_data_offset = 0;
+  uint8_t iterations;
+  uint8_t count_byte;
+  //uint8_t data_byte;
+
+  while (num_bytes) {
+    uint8_t count_byte = *src++;
+    ++mask_data_offset;
+    iterations = count_byte & 0x7f;
+    //count_byte &= 0x80;
+    //uint8_t data_byte = *src;
+    // debug_out("  remaining pixels[%d]: %d\n", mask_col - 1, remaining_pixels);
+    // debug_out("bytes left: %d fill: %d, iterations: %d, data_byte: %d @offset %d", num_bytes, count_byte!=0, iterations, data_byte, mask_data_offset);
+
+    if (iterations > remaining_pixels) {
+      num_bytes -= iterations;
+      iterations -= remaining_pixels;
+      if (!(count_byte & 0x80)) {
+        masking_cache_iterations[mask_col] = iterations | 0x80;
+        masking_cache_data_offset[mask_col] = mask_data_offset + remaining_pixels;
+      }
+      else {
+        masking_cache_iterations[mask_col] = iterations;
+        masking_cache_data_offset[mask_col] = mask_data_offset;      
+      }
+      // debug_out("  cache_iterations[%d] = %d (%d)\n", mask_col, masking_cache_iterations[mask_col] & 0x7f, masking_cache_iterations[mask_col]);
+      // debug_out("  cache_offset[%d]     = %d\n", mask_col, masking_cache_data_offset[mask_col]);
+      ++mask_col;
+      remaining_pixels = GFX_HEIGHT - iterations;
+    }
+    else {
+      num_bytes -= iterations;
+      remaining_pixels -= iterations;
+    }
+
+    if (!(count_byte & 0x80)) {
+      mask_data_offset += iterations;
+      src += iterations;
+    }
+    else {
+      ++mask_data_offset;
+      ++src;
+    }
+  }
+}
+
+
+
 /**
  * @brief Decodes an object image and stores it in the char data memory.
  *
@@ -389,7 +444,6 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
  */
 void gfx_decode_object_image(uint8_t *src, uint8_t width, uint8_t height)
 {
-  obj_char_ptrs[next_obj_slot] = next_char_data;
   obj_first_char[next_obj_slot] = (uint32_t)next_char_data / 64;
   decode_rle_bitmap(src, width, height);
   ++next_obj_slot;

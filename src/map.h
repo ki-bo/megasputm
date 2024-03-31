@@ -17,5 +17,6 @@ void unmap_ds(void);
 void map_cs_diskio(void);
 void map_cs_gfx(void);
 void map_ds_resource(uint8_t res_page);
+uint8_t *map_ds_room_offset(uint16_t room_offset);
 
 #endif // __MAP_H

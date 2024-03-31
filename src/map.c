@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "resource.h"
 #include "util.h"
+#include "vm.h"
 #include <stdint.h>
 
 // private code functions
@@ -243,6 +244,26 @@ static inline void apply_map(void)
          :                     /* no output operands */
          : "Kq"(map_regs.quad) /* input operands */
          :                     /* clobber list */);
+}
+
+/**
+ * @brief Maps a room offset to DS
+ *
+ * Maps a room offset to DS. The room offset is a 16-bit value that points to a location
+ * in the room data. The room data is stored in the resource memory.
+ *
+ * The room data is mapped so that the specified offset will be between 0x8000 and 0x80ff.
+ * The mapped block is 16kb in size (mapped to 0x8000 - 0xbfff).
+ * 
+ * @param room_offset The room offset to map
+ * @return uint8_t* The pointer to the mapped room offset (is between 0x8000 and 0x80ff)
+ */
+uint8_t *map_ds_room_offset(uint16_t room_offset)
+{
+  uint8_t res_slot = room_res_slot + MSB(room_offset);
+  uint8_t new_offset = LSB(room_offset);
+  map_ds_resource(res_slot);
+  return NEAR_U8_PTR(RES_MAPPED + new_offset);
 }
 
 /** @} */ // map_private
