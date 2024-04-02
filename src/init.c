@@ -1,4 +1,5 @@
 #include "init.h"
+#include "actor.h"
 #include "charset.h"
 #include "dma.h"
 #include "diskio.h"
@@ -44,5 +45,6 @@ void global_init(void)
   // init main engine code
   res_init();
   script_init();
+  actor_init();
   vm_init();
 }

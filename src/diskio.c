@@ -344,7 +344,7 @@ static void invalidate_disk_cache(void)
 /**
  * @brief Checks whether drive motor should be turned off
  * 
- * The function will check whether the drive has been accessed within the last 60 frames.
+ * The function will check whether the drive has been accessed within the last 60 jiffies.
  * If not, it will turn off the drive motor and LED.
  * The function should be called regularly (several times per second) from the main loop, 
  * so the jiffy counter used for the check is correctly evaluated.
@@ -756,6 +756,10 @@ static void seek_to(uint16_t offset)
  * in the cache, the function will read the block from the floppy disk into the
  * FDC buffer and store it in the cache.
  *
+ * The floppy buffer read pointer will be reset to point to the first byte of
+ * the block after the function returns. Thus, reading from the floppy buffer
+ * with FDC.data will return the first byte of the block.
+ *
  * As sectors in 1581 format are 512 bytes, they always contain two logical
  * blocks. This function loads the sector containing the specified block into
  * the floppy buffer. Therefore, a second block is always implicitly
@@ -947,12 +951,12 @@ static void acquire_drive(void)
  * @brief Release the drive again after it has been used
  * 
  * The motor will not turn off immediately when calling this function, but
- * only after 60 frames have passed without the drive being accessed.
+ * only after 60 jiffies have passed without the drive being accessed.
  * This prevents continuous spinning up and down of the drive when multiple
  * disk I/O operations are performed in quick succession.
  *
  * The main loop will regularly call diskio_check_motor_off() to turn off the
- * drive motor when it has not been accessed for 60 video frames.
+ * drive motor when it has not been accessed for 60 jiffies (eg. video frames).
  *
  * Code section: code_diskio
  * Private function

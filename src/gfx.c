@@ -385,7 +385,6 @@ void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
   uint16_t mask_data_offset = 0;
   uint8_t iterations;
   uint8_t count_byte;
-  //uint8_t data_byte;
 
   while (num_bytes) {
     uint8_t count_byte = *src++;

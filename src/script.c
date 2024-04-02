@@ -1,4 +1,5 @@
 #include "script.h"
+#include "actor.h"
 #include "error.h"
 #include "io.h"
 #include "map.h"
@@ -20,12 +21,16 @@ static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
 
 static void stop_or_break(void);
+static void position_actor(void);
+static void start_music(void);
 static void jump_if_greater(void);
 static void show_object(void);
 static void jump_if_equal(void);
 static void obj_state_active(void);
 static void resource_cmd(void);
 static void object_owner(void);
+static void start_animation(void);
+static void set_camera_target(void);
 static void actor_ops(void);
 static void print(void);
 static void create_random_number(void);
@@ -34,9 +39,13 @@ static void execute_command(void);
 static void jump_if_can_not_pick_up_object(void);
 static void assign(void);
 static void start_sound(void);
+static void walk_to(void);
 static void jump_if_or_if_not_equal_zero(void);
 static void delay_variable(void);
+static void place_actor_in_room(void);
 static void subtract(void);
+static void wait_for_actor(void);
+static void stop_sound(void);
 static void add(void);
 static void delay(void);
 static void set_camera(void);
@@ -44,10 +53,12 @@ static void get_object_at_position(void);
 static void jump_if_smaller(void);
 static void cutscene(void);
 static void start_script(void);
+static void get_actor_position_x(void);
 static void jump_if_smaller_or_equal(void);
 static void increment_or_decrement(void);
 static void jump_if_not_equal(void);
 static void jump_if_object_not_active(void);
+static void camera_follows_actor(void);
 static void begin_override_or_print_ego(void);
 static void begin_override(void);
 static void cursor_cmd(void);
@@ -105,12 +116,16 @@ void script_init(void)
   }
 
   opcode_jump_table[0x00] = &stop_or_break;
+  opcode_jump_table[0x01] = &position_actor;
+  opcode_jump_table[0x02] = &start_music;
   opcode_jump_table[0x04] = &jump_if_greater;
   opcode_jump_table[0x05] = &show_object;
   opcode_jump_table[0x07] = &obj_state_active;
   opcode_jump_table[0x08] = &jump_if_equal;
   opcode_jump_table[0x0c] = &resource_cmd;
   opcode_jump_table[0x10] = &object_owner;
+  opcode_jump_table[0x11] = &start_animation;
+  opcode_jump_table[0x12] = &set_camera_target;
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &print;
   opcode_jump_table[0x16] = &create_random_number;
@@ -118,35 +133,49 @@ void script_init(void)
   opcode_jump_table[0x19] = &execute_command;
   opcode_jump_table[0x1a] = &assign;
   opcode_jump_table[0x1c] = &start_sound;
+  opcode_jump_table[0x1e] = &walk_to;
   opcode_jump_table[0x20] = &stop_or_break;
+  opcode_jump_table[0x21] = &position_actor;
   opcode_jump_table[0x25] = &show_object;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
   opcode_jump_table[0x2b] = &delay_variable;
+  opcode_jump_table[0x2d] = &place_actor_in_room;
   opcode_jump_table[0x2e] = &delay;
   opcode_jump_table[0x32] = &set_camera;
+  opcode_jump_table[0x3e] = &walk_to;
   opcode_jump_table[0x35] = &get_object_at_position;
   opcode_jump_table[0x38] = &jump_if_smaller;
   opcode_jump_table[0x39] = &execute_command;
   opcode_jump_table[0x3a] = &subtract;
+  opcode_jump_table[0x3b] = &wait_for_actor;
+  opcode_jump_table[0x3c] = &stop_sound;
   opcode_jump_table[0x40] = &cutscene;
+  opcode_jump_table[0x41] = &position_actor;
   opcode_jump_table[0x42] = &start_script;
+  opcode_jump_table[0x43] = &get_actor_position_x;
   opcode_jump_table[0x44] = &jump_if_smaller_or_equal;
   opcode_jump_table[0x45] = &show_object;
   opcode_jump_table[0x46] = &increment_or_decrement;
   opcode_jump_table[0x47] = &obj_state_active;
   opcode_jump_table[0x48] = &jump_if_not_equal;
   opcode_jump_table[0x4f] = &jump_if_object_not_active;
+  opcode_jump_table[0x51] = &start_animation;
+  opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
   opcode_jump_table[0x58] = &begin_override_or_print_ego;
   opcode_jump_table[0x59] = &execute_command;
   opcode_jump_table[0x5a] = &add;
+  opcode_jump_table[0x5e] = &walk_to;
   opcode_jump_table[0x60] = &cursor_cmd;
+  opcode_jump_table[0x61] = &position_actor;
   opcode_jump_table[0x65] = &show_object;
   opcode_jump_table[0x68] = &is_script_running;
+  opcode_jump_table[0x6d] = &place_actor_in_room;
   opcode_jump_table[0x72] = &load_room;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &execute_command;
+  opcode_jump_table[0x7e] = &walk_to;
   opcode_jump_table[0x7f] = &jump_if_can_not_pick_up_object;
 }
 
@@ -448,6 +477,33 @@ static void stop_or_break(void)
 }
 
 /**
+ * @brief Opcode 0x01: Position actor
+ *
+ * Reads an actor id and two 8-bit values for x and y position. The actor
+ * is then positioned at the given position.
+ *
+ * Variant opcodes: 0x21, 0x61, 0xA1, 0xE1
+ *
+ * Code section: code_main
+ */
+static void position_actor(void)
+{
+  //debug_msg("Position actor");
+  uint8_t actor_id = resolve_next_param8();
+  uint8_t x = resolve_next_param8();
+  uint8_t y = resolve_next_param8();
+  actors.x[actor_id] = x;
+  actors.y[actor_id] = y;
+}
+
+static void start_music(void)
+{
+  //debug_msg("Start music");
+  uint8_t music_id = resolve_next_param8();
+  //music_play(music_id);
+}
+
+/**
  * @brief Opcode 0x04: Jump if greater
  *
  * Reads a variable index and a 16-bit value. If the value of the variable is
@@ -595,6 +651,21 @@ static void object_owner(void)
   vm_write_var(var_idx, global_game_objects[obj_id] & 0x0f);
 }
 
+static void start_animation(void)
+{
+  //debug_msg("Start animation");
+  uint8_t actor_id = resolve_next_param8();
+  uint8_t animation_id = resolve_next_param8();
+  actor_start_animation(actor_id, animation_id);
+}
+
+static void set_camera_target(void)
+{
+  //debug_msg("Move camera to position");
+  uint8_t x = resolve_next_param8();
+  vm_set_camera_target(x);
+}
+
 /**
  * @brief Opcode 0x13: Actor ops
  * 
@@ -614,20 +685,20 @@ static void actor_ops(void)
 
   switch (sub_opcode) {
     case 0x01:
-      actor_sounds[actor_id] = param;
+      actors.sound[actor_id] = param;
       break;
     case 0x02:
-      actor_palette_idx[actor_id] = read_byte();
-      actor_palette_colors[actor_id] = param;
+      actors.palette_idx[actor_id] = read_byte();
+      actors.palette_color[actor_id] = param;
       break;
     case 0x03:
-      read_null_terminated_string(actor_names[actor_id]);
+      read_null_terminated_string(actors.name[actor_id]);
       break;
     case 0x04:
-      actor_costumes[actor_id] = param;
+      actors.costume[actor_id] = param;
       break;
     case 0x05:
-      actor_talk_colors[actor_id] = param;
+      actors.talk_color[actor_id] = param;
       break;
   }
 }
@@ -710,6 +781,15 @@ static void start_sound(void)
   volatile uint8_t sound_id = resolve_next_param8();
 }
 
+static void walk_to(void)
+{
+  //debug_msg("Actor walk to");
+  uint8_t actor_id = resolve_next_param8();
+  uint8_t x = resolve_next_param8();
+  uint8_t y = resolve_next_param8();
+  actor_walk_to(actor_id, x, y);
+}
+
 /**
  * @brief Opcode 0x28: Jump if equal or not equal zero
  *
@@ -757,6 +837,25 @@ static void delay_variable(void)
   uint8_t var_idx = read_byte();
   int32_t negative_ticks = -1 - (int32_t)vm_read_var(var_idx);
   vm_set_script_wait_timer(negative_ticks);
+}
+
+/**
+ * @brief Opcode 0x2D: Place actor in room
+ *
+ * Reads the actor id and the room id from the script and places the actor in
+ * the room.
+ *
+ * Variant opcodes: 0x6D, 0xAD, 0xED
+ *
+ * Code section: code_main
+ */
+static void place_actor_in_room(void)
+{
+  //debug_msg("Place actor in room");
+  uint8_t actor_id = resolve_next_param8();
+  uint8_t room_id = resolve_next_param8();
+  actor_place_in_room(actor_id, room_id);
+  debug_out("Actor %d placed in room %d", actor_id, room_id);
 }
 
 /**
@@ -894,6 +993,30 @@ static void subtract(void)
   vm_write_var(var_idx, vm_read_var(var_idx) - resolve_next_param16());
 }
 
+static void wait_for_actor(void)
+{
+  //debug_msg("Wait for actor");
+  uint8_t actor_id = resolve_next_param8();
+  uint8_t local_id = actors.local_id[actor_id];
+  if (local_id == 0xff) {
+    return;
+  }
+
+  if (local_actors.walking[local_id]) {
+    // if actor is still moving, we break the script for one cycle
+    // but need to make sure we execute this opcode again
+    // so we set the pc back to the opcode
+    pc -= 2;
+    break_script = 1;
+  }
+}
+
+static void stop_sound(void)
+{
+  //debug_msg("Stop sound");
+  uint8_t sound_id = resolve_next_param8();
+}
+
 /**
  * @brief Opcode 0x40: Cutscene
  * 
@@ -926,6 +1049,14 @@ static void start_script(void)
   //debug_msg("Start script");
   uint8_t script_id = resolve_next_param8();
   vm_start_script(script_id);
+}
+
+static void get_actor_position_x(void)
+{
+  //debug_msg("Assign actor position x");
+  uint8_t var_idx = read_byte();
+  uint8_t actor_id = resolve_next_param8();
+  vm_write_var(var_idx, actors.x[actor_id]);
 }
 
 /**
@@ -1025,6 +1156,13 @@ static void jump_if_object_not_active(void)
   if ((global_game_objects[obj_id] & OBJ_STATE_ACTIVE) == 0) {
     pc += offset;
   }
+}
+
+static void camera_follows_actor(void)
+{
+  //debug_msg("Camera follows actor");
+  uint8_t actor_id = resolve_next_param8();
+  vm_set_camera_follow_actor(actor_id);
 }
 
 /**

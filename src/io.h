@@ -11,12 +11,12 @@ struct __cpu_vectors {
 
 struct __f011 {
   uint8_t fdc_control;
-  volatile uint8_t command;
+  uint8_t command;
   uint16_t status;
-  volatile uint8_t track;
-  volatile uint8_t sector;
-  volatile uint8_t side;
-  volatile uint8_t data;
+  uint8_t track;
+  uint8_t sector;
+  uint8_t side;
+  uint8_t data;
   uint8_t clock;
   uint8_t step;
   uint8_t pcode;
@@ -63,20 +63,20 @@ enum fdc_command_t
 };
 
 struct __dma {
-  volatile uint8_t addrlsbtrig;
-  volatile uint8_t addrmsb;
-  volatile uint8_t addrbank;
+  uint8_t addrlsbtrig;
+  uint8_t addrmsb;
+  uint8_t addrbank;
   uint8_t en018b;
   uint8_t addrmb;
-  volatile uint8_t etrig;
-  volatile uint8_t etrig_mapped;
-  volatile uint8_t trig_inline;
+  uint8_t etrig;
+  uint8_t etrig_mapped;
+  uint8_t trig_inline;
 };
 
-#define CPU_VECTORS (*(struct __cpu_vectors *)0xfffa)
-#define FDC         (*(struct __f011 *)       0xd080)
-#define DMA         (*(struct __dma *)        0xd700)
-#define RNDGEN      (*(volatile uint8_t *)    0xd7ef)
-#define RNDRDY      (*(volatile uint8_t *)    0xd7fe)
+#define CPU_VECTORS (*(volatile struct __cpu_vectors *) 0xfffa)
+#define FDC         (*(volatile struct __f011 *)        0xd080)
+#define DMA         (*(volatile struct __dma *)         0xd700)
+#define RNDGEN      (*(volatile uint8_t *)              0xd7ef)
+#define RNDRDY      (*(volatile uint8_t *)              0xd7fe)
 
 #endif // __IO_H

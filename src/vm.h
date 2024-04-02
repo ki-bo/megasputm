@@ -4,10 +4,8 @@
 #include <stdint.h>
 
 #define NUM_SCRIPT_SLOTS   32
-#define NUM_ACTORS         25
 #define MAX_OBJECTS        57
 #define CMD_STACK_SIZE      6
-#define ACTOR_NAME_LEN     16
 
 enum {
   PROC_STATE_FREE,
@@ -28,6 +26,7 @@ enum {
 
 enum {
   VAR_EGO = 0,
+  VAR_CAMERA_CURRENT_X = 2,
   VAR_DIALOG_ACTIVE = 3,
   VAR_ROOM_NO = 4,
   VAR_MACHINE_SPEED = 6,
@@ -61,18 +60,16 @@ enum {
   SCRIPT_ID_INPUT_EVENT = 4
 };
 
+enum {
+  CAMERA_STATE_FOLLOW_ACTOR = 1,
+  CAMERA_STATE_MOVE_TO_TARGET_POS = 2,
+  CAMERA_STATE_MOVING = 4
+};
+
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];
 extern char dialog_buffer[256];
-
-extern uint8_t actor_sounds[NUM_ACTORS];
-extern uint8_t actor_palette_idx[NUM_ACTORS];
-extern uint8_t actor_palette_colors[NUM_ACTORS];
-extern char    actor_names[NUM_ACTORS][ACTOR_NAME_LEN];
-extern uint8_t actor_costumes[NUM_ACTORS];
-extern uint8_t actor_talk_colors[NUM_ACTORS];
-extern uint8_t actor_talking;
 
 extern volatile uint8_t script_watchdog;
 extern uint8_t state_iface;
@@ -84,6 +81,7 @@ extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
 extern uint8_t room_res_slot;
+extern uint8_t current_room;
 
 struct cmd_stack_t {
   uint8_t  num_entries;
@@ -99,7 +97,9 @@ uint8_t vm_get_active_proc_state(void);
 void vm_switch_room(uint8_t room_no);
 void vm_set_script_wait_timer(int32_t negative_ticks);
 void vm_start_cutscene(void);
+void vm_costume_init();
 void vm_actor_start_talking(uint8_t actor_id);
+void vm_actor_place_in_room(uint8_t actor_id, uint8_t room_no);
 uint8_t vm_start_script(uint8_t script_id);
 uint8_t vm_start_room_script(uint16_t room_script_offset);
 uint8_t vm_start_child_script(uint8_t script_id);
@@ -109,6 +109,8 @@ void vm_stop_script(uint8_t script_id);
 uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_screen(void);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
+void vm_set_camera_follow_actor(uint8_t actor_id);
+void vm_set_camera_target(uint8_t x);
 
 static inline uint16_t vm_read_var(uint8_t var)
 {

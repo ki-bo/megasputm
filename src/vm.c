@@ -1,4 +1,6 @@
 #include "vm.h"
+#include "actor.h"
+#include "costume.h"
 #include "diskio.h"
 #include "error.h"
 #include "gfx.h"
@@ -54,17 +56,16 @@ uint8_t variables_lo[256];
 uint8_t variables_hi[256];
 char dialog_buffer[256];
 
-uint8_t actor_sounds[NUM_ACTORS];
-uint8_t actor_palette_idx[NUM_ACTORS];
-uint8_t actor_palette_colors[NUM_ACTORS];
-char    actor_names[NUM_ACTORS][ACTOR_NAME_LEN];
-uint8_t actor_costumes[NUM_ACTORS];
-uint8_t actor_talk_colors[NUM_ACTORS];
 uint8_t actor_talking;
+
+uint8_t slow_update_counter;
 
 volatile uint8_t script_watchdog;
 uint8_t state_iface;
 uint16_t camera_x;
+uint16_t camera_target;
+uint8_t camera_state;
+uint8_t camera_follow_actor_id;
 
 uint8_t active_script_slot;
 uint8_t dialog_speed = 6;
@@ -86,6 +87,8 @@ uint16_t cs_pc;
 
 // room and object data
 uint8_t  room_res_slot;
+uint8_t  current_room;
+uint16_t room_width;
 uint8_t  num_objects;
 uint8_t  obj_page[MAX_OBJECTS];
 uint8_t  obj_offset[MAX_OBJECTS];
@@ -109,6 +112,8 @@ static uint8_t get_local_object_id(uint16_t global_object_id);
 static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset);
 static void execute_command_stack(void);
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
+static void update_actors(void);
+static void update_camera(void);
 
 /**
  * @defgroup vm_init VM Init Functions
@@ -131,6 +136,9 @@ void vm_init(void)
   }
 
   camera_x = 20;
+  camera_state = 0;
+  camera_follow_actor_id = 0xff;
+  slow_update_counter = 8;
 }
 
 /** @} */ // vm_init
@@ -175,6 +183,13 @@ __task void vm_mainloop(void)
 
   while (1) {
     script_watchdog = 0;
+    if (slow_update_counter == 0) {
+      slow_update_counter = 2;
+    }
+    else {
+      --slow_update_counter;
+    }
+
     uint8_t elapsed_jiffies = wait_for_jiffy();
     map_cs_diskio();
     diskio_check_motor_off(elapsed_jiffies);
@@ -194,6 +209,8 @@ __task void vm_mainloop(void)
     }
 
     execute_command_stack();
+    update_actors();
+    update_camera();
 
     if (screen_update_needed)
     {
@@ -248,6 +265,7 @@ void vm_switch_room(uint8_t room_no)
   gfx_fade_out();
 
   vm_write_var(VAR_ROOM_NO, room_no);
+  current_room = room_no;
 
   if (room_no == 0) {
     gfx_clear_bg_image();
@@ -260,7 +278,7 @@ void vm_switch_room(uint8_t room_no)
     room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
     res_set_flags(room_res_slot, RES_ACTIVE_MASK);
     map_ds_resource(room_res_slot);
-    uint16_t room_width = room_hdr->bg_width;
+    room_width = room_hdr->bg_width;
     uint16_t bg_data_offset = room_hdr->bg_data_offset;
     uint16_t bg_masking_offset = room_hdr->bg_attr_offset;
 
@@ -271,6 +289,10 @@ void vm_switch_room(uint8_t room_no)
     map_ds_resource(room_res_slot);
 
     read_objects();
+
+    camera_follow_actor_id = 0xff;
+    camera_state = 0;
+    camera_x = 20;
 
     // run entry script
     vm_start_room_script(room_hdr->entry_script_offset + 4);
@@ -343,7 +365,7 @@ void vm_start_cutscene(void)
 void vm_actor_start_talking(uint8_t actor_id)
 {
   actor_talking = actor_id;
-  uint8_t talk_color = actor_id != 0xff ? actor_talk_colors[actor_id] : 0x09;
+  uint8_t talk_color = actor_id != 0xff ? actors.talk_color[actor_id] : 0x09;
   map_cs_gfx();
   uint8_t num_chars = gfx_print_dialog(talk_color, dialog_buffer);
   unmap_cs();
@@ -521,6 +543,19 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
   map_set_ds(ds_save);
 
   return found_obj_id;
+}
+
+void vm_set_camera_follow_actor(uint8_t actor_id)
+{
+  camera_follow_actor_id = actor_id;
+  camera_state = CAMERA_STATE_FOLLOW_ACTOR;
+}
+
+void vm_set_camera_target(uint8_t x)
+{
+  camera_target = x;
+  camera_follow_actor_id = 0xff;
+  camera_state = CAMERA_STATE_MOVE_TO_TARGET_POS;
 }
 
 /// @} // vm_public
@@ -898,6 +933,109 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
   map_set_ds(save_ds);
 
   return script_offset;
+}
+
+static void update_actors(void)
+{
+  if (slow_update_counter != 0)
+  {
+    return;
+  }
+
+  for (uint8_t i = 0; i < MAX_LOCAL_ACTORS; ++i)
+  {
+    if (local_actors.global_id[i] == 0xff)
+    {
+      continue;
+    }
+
+    actor_next_step(i);
+/*
+    map_ds_resource(local_actors.res_slot[i]);
+
+    __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
+    debug_out("Local actor %d costume %d", i, actors.costume[local_actors.global_id[i]]);
+    debug_out(" num_animations: %d", costume_hdr->num_animations);
+    debug_out(" enable_mirroring: %02x", costume_hdr->enable_mirroring_and_format & 0x80);
+    debug_out(" format: %02x", costume_hdr->enable_mirroring_and_format & 0x7f);
+    debug_out(" animation_commands_offset: %04x", costume_hdr->animation_commands_offset);
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+      debug_out(" limb table offset[%d]: %d", i, costume_hdr->limb_table_offsets[i]);
+    }
+*/
+  }
+}
+
+static void update_camera(void)
+{
+  if (slow_update_counter != 0)
+  {
+    return;
+  }
+
+  if (camera_state == CAMERA_STATE_FOLLOW_ACTOR && camera_follow_actor_id == 0xff)
+  {
+    camera_state = 0;
+    return;
+  }
+
+  uint16_t max_camera_x = room_width / 8 - 21;
+
+  if (camera_state & CAMERA_STATE_FOLLOW_ACTOR)
+  {
+    camera_target = actors.x[camera_follow_actor_id];
+    debug_out("Camera following actor %d at x %d, cur camera: %d", camera_follow_actor_id, camera_target, camera_x);
+  }
+  else if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS)
+  {
+    debug_out("Camera moving to target %d", camera_target);
+  }
+  else
+  {
+    return;
+  }
+
+  if (camera_state & CAMERA_STATE_MOVING) {
+    if (camera_target > camera_x) {
+      debug_msg("Camera continue moving right");
+      camera_x += 1;
+      if (camera_x > max_camera_x) {
+        camera_x = max_camera_x;
+        camera_state &= ~CAMERA_STATE_MOVING;
+      }
+    }
+    else if (camera_target < camera_x) {
+      debug_msg("Camera continue moving left");
+      camera_x -= 1;
+      if (camera_x < 20) {
+        camera_x = 20;
+        camera_state &= ~CAMERA_STATE_MOVING;
+      }
+    }
+    else {
+      debug_msg("Camera reached target");
+      camera_state &= ~CAMERA_STATE_MOVING;
+    }
+  }
+  else {
+    if (camera_target <= camera_x - 10 && camera_x >= 20)
+    {
+      debug_msg("Camera start moving left");
+      --camera_x;
+      camera_state |= CAMERA_STATE_MOVING;
+    }
+    else if (camera_target >= camera_x + 10 && camera_x < max_camera_x)
+    {
+      debug_msg("Camera start moving right");
+      ++camera_x;
+      camera_state |= CAMERA_STATE_MOVING;
+    }
+  }
+
+  vm_write_var(VAR_CAMERA_CURRENT_X, camera_x);
+
+  vm_update_screen();
 }
 
 /// @} // vm_private
