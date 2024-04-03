@@ -201,7 +201,7 @@ void script_init(void)
  *
  * The script is run from the current pc until the script's state is not PROC_STATE_RUNNING.
  * 
- * Code section: code_main
+ * Code section: code_script
  */
 void script_run_active_slot(void)
 {
@@ -255,7 +255,7 @@ void script_run_slot_stacked(uint8_t slot)
  * because the compiler would otherwise not know about the clobbering
  * of registers (including zp registers) by the called function.
  * Placing the function in section code will make sure that it
- * is not inlined by functions in other sections, like code_main.
+ * is not inlined by functions in other sections, like code_script.
  * 
  * The highest bit of the opcode is ignored, so opcodes 128-255 are
  * jumping to the same function as opcodes 0-127.
@@ -285,7 +285,7 @@ void exec_opcode(uint8_t opcode)
  * 
  * @return uint8_t The byte.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static uint8_t read_byte(void)
 {
@@ -301,7 +301,7 @@ static uint8_t read_byte(void)
  * 
  * @return uint16_t The 16-bit word.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static uint16_t read_word(void)
 {
@@ -330,7 +330,7 @@ static uint16_t read_word(void)
  * 
  * @return int32_t The read value.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static int32_t read_int24(void)
 {
@@ -366,7 +366,7 @@ static int32_t read_int24(void)
  * 
  * @return uint8_t The resolved parameter.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static uint8_t resolve_next_param8(void)
 {
@@ -389,7 +389,7 @@ static uint8_t resolve_next_param8(void)
  * 
  * @return uint16_t The resolved parameter.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static uint16_t resolve_next_param16(void)
 {
@@ -412,7 +412,7 @@ static uint16_t resolve_next_param16(void)
  * 
  * @param dest The destination buffer where the string will be stored.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void read_null_terminated_string(char *dest)
 {
@@ -433,7 +433,7 @@ static void read_null_terminated_string(char *dest)
  *
  * @param dest The destination buffer where the decoded string will be stored.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void read_encoded_string_null_terminated(char *dest)
 {
@@ -469,7 +469,7 @@ static void read_encoded_string_null_terminated(char *dest)
  *
  * Variant opcodes: 0x20, 0x80, 0xa0
  * 
- * Code section: code_main
+ * Code section: code_script
  */
 static void stop_or_break(void)
 {
@@ -494,7 +494,7 @@ static void stop_or_break(void)
  *
  * Variant opcodes: 0x21, 0x61, 0xA1, 0xE1
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void put_actor(void)
 {
@@ -526,7 +526,7 @@ static void start_music(void)
  *
  * Variant opcodes: 0x84
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_greater(void)
 {
@@ -569,7 +569,7 @@ static void draw_object(void)
  * The value to compare with can either be a 16-bit constant value (if opcode
  * is 0x08) or a variable index (if opcode is 0x88).
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_equal(void)
 {
@@ -591,7 +591,7 @@ static void jump_if_equal(void)
  *
  * Variant opcodes: 0x47, 0x87, 0xC7
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void state_of(void)
 {
@@ -619,7 +619,7 @@ static void state_of(void)
  *
  * Variant opcodes: 0x8c
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void resource_cmd(void)
 {
@@ -695,7 +695,7 @@ static void camera_pan_to(void)
  *
  * Variant opcodes: 0x53, 0x93, 0xD3
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void actor_ops(void)
 {
@@ -742,7 +742,7 @@ static void actor_ops(void)
  * The text is displayed on screen immediately. No update screen request is
  * necessary.
  * 
- * Code section: code_main
+ * Code section: code_script
  */
 static void say_line(void)
 {
@@ -765,7 +765,7 @@ static void say_line(void)
  *
  * Variant opcodes: 0x96
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void random(void)
 {
@@ -784,7 +784,7 @@ static void random(void)
  * that the script will continue with the next opcode. The offset is signed
  * two-complement.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump(void)
 {
@@ -801,7 +801,7 @@ static void jump(void)
  *
  * Variant opcodes: 0x9A
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void assign(void)
 {
@@ -837,7 +837,7 @@ static void walk_to(void)
  *
  * Variant opcodes: 0xA8
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_or_if_not_equal_zero(void)
 {
@@ -864,7 +864,7 @@ static void jump_if_or_if_not_equal_zero(void)
  * of the variable. The delay is calculated as -1 - variable_value. The timer
  * will count upwards and resume execution of the script once it reaaches 0.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void sleep_for_variable(void)
 {
@@ -882,7 +882,7 @@ static void sleep_for_variable(void)
  *
  * Variant opcodes: 0x6D, 0xAD, 0xED
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void place_actor_in_room(void)
 {
@@ -900,7 +900,7 @@ static void place_actor_in_room(void)
  * of ticks that the script should pause actually needs to be calculated by
  * ticks_to_wait = 0xffffff - param_value.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void sleep_for(void)
 {
@@ -995,7 +995,7 @@ static void get_object_at_position(void)
  * The value to compare with can either be a 16-bit constant value (if opcode
  * is 0x38) or a variable index (if opcode is 0xB8).
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_smaller(void)
 {
@@ -1018,7 +1018,7 @@ static void jump_if_smaller(void)
  * Opcode 0x3A: VAR(PARAM1) -= PARAM2
  * Opcode 0xBA: VAR(PARAM1) -= VAR(PARAM2)
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void subtract(void)
 {
@@ -1058,7 +1058,7 @@ static void stop_sound(void)
  * it can be restored once the cutscene is over (eg. remembering the current room
  * so the scene can be restored after the cutscene).
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void cut_scene(void)
 {
@@ -1082,7 +1082,7 @@ static void cut_scene(void)
  *
  * Variant opcodes: 0xC2
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void start_script(void)
 {
@@ -1112,7 +1112,7 @@ static void get_actor_position_x(void)
  *
  * Variant opcodes: 0xC4
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_smaller_or_equal(void)
 {
@@ -1134,7 +1134,7 @@ static void jump_if_smaller_or_equal(void)
  *
  * Variant opcodes: 0xC6
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void increment_or_decrement(void)
 {
@@ -1160,7 +1160,7 @@ static void increment_or_decrement(void)
  * The value to compare with can either be a 16-bit constant value (if opcode 
  * is 0x48) or a variable index (if opcode is 0xC8).
  * 
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_not_equal(void)
 {
@@ -1186,7 +1186,7 @@ static void jump_if_not_equal(void)
  *
  * Variant opcodes: 0xCF
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_object_not_active(void)
 {
@@ -1213,7 +1213,7 @@ static void camera_follows_actor(void)
  *
  * Variant opcodes: 0xd8
  *
- * Code section: code_main
+ * Code section: code_script
  */
 void begin_override_or_print_ego(void)
 {
@@ -1235,7 +1235,7 @@ void begin_override_or_print_ego(void)
  *
  * The begin_override opcode is skipping the goto command that is following it.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void begin_override(void)
 {
@@ -1247,7 +1247,7 @@ static void begin_override(void)
 /**
  * @brief Opcode 0xd8 (0x58 | 0x80): Print ego
  * 
- * Code section: code_main
+ * Code section: code_script
  */
 static void print_ego(void)
 {
@@ -1264,7 +1264,7 @@ static void print_ego(void)
  * Opcode 0x5A: VAR(PARAM1) += PARAM2
  * Opcode 0xDA: VAR(PARAM1) += VAR(PARAM2)
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void add(void)
 {
@@ -1279,7 +1279,7 @@ static void add(void)
  * Reads the cursor state and the state of the interface. The cursor state
  * is stored in VAR_CURSOR_STATE and the interface state is stored in state_iface.
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void cursor_cmd(void)
 {
@@ -1307,7 +1307,7 @@ static void is_script_running(void)
  * Switches the scene to a new room. The room number is read from the script.
  * The new room is activated immediately and a screen update is requested.
  * 
- * Code section: code_main
+ * Code section: code_script
  */
 static void current_room(void)
 {
@@ -1330,7 +1330,7 @@ static void current_room(void)
  *
  * Variant opcodes: 0xF8
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_greater_or_equal(void)
 {
@@ -1354,7 +1354,7 @@ static void jump_if_greater_or_equal(void)
  *
  * Variant opcodes: 0xFF
  *
- * Code section: code_main
+ * Code section: code_script
  */
 static void jump_if_not_pickupable(void)
 {
@@ -1369,7 +1369,7 @@ static void jump_if_not_pickupable(void)
 /**
  * @brief Error handler for unimplemented opcodes.
  * 
- * Code section: code_main
+ * Code section: code_script
  */
 static void unimplemented_opcode(void)
 {
