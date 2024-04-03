@@ -65,7 +65,7 @@ void actor_place_in_room(uint8_t actor_id, uint8_t room_no)
   }
 
   actors.room[actor_id] = room_no;
-  if (room_no == current_room) {
+  if (room_no == vm_read_var8(VAR_SELECTED_ROOM)) {
     uint8_t local_id = get_free_local_id();
     actors.local_id[actor_id] = local_id;
     local_actors.global_id[local_id] = actor_id;

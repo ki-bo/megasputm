@@ -50,6 +50,15 @@
                 )
         )
 
+        ; memory for script module
+        (memory script (address (#x2000 . #x3fff))
+                (section
+                        code_script
+                        cdata_script
+                        data_script
+                )
+        )
+        
         ; memory for main program (loaded after init is done)
         (memory main (address (#x4000 . #x7fff))
                 (section

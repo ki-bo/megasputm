@@ -12,6 +12,7 @@
 //----------------------------------------------------------------------
 
 // private functions
+static void debug_header();
 static void exec_opcode(uint8_t opcode);
 static uint8_t read_byte(void);
 static uint16_t read_word(void);
@@ -21,37 +22,37 @@ static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
 
 static void stop_or_break(void);
-static void position_actor(void);
+static void put_actor(void);
 static void start_music(void);
 static void jump_if_greater(void);
-static void show_object(void);
+static void draw_object(void);
 static void jump_if_equal(void);
-static void obj_state_active(void);
+static void state_of(void);
 static void resource_cmd(void);
-static void object_owner(void);
-static void start_animation(void);
-static void set_camera_target(void);
+static void owner_of(void);
+static void do_animation(void);
+static void camera_pan_to(void);
 static void actor_ops(void);
-static void print(void);
-static void create_random_number(void);
+static void say_line(void);
+static void random(void);
 static void jump(void);
 static void execute_command(void);
-static void jump_if_can_not_pick_up_object(void);
+static void jump_if_not_pickupable(void);
 static void assign(void);
 static void start_sound(void);
 static void walk_to(void);
 static void jump_if_or_if_not_equal_zero(void);
-static void delay_variable(void);
+static void sleep_for_variable(void);
 static void place_actor_in_room(void);
 static void subtract(void);
 static void wait_for_actor(void);
 static void stop_sound(void);
 static void add(void);
-static void delay(void);
+static void sleep_for(void);
 static void set_camera(void);
 static void get_object_at_position(void);
 static void jump_if_smaller(void);
-static void cutscene(void);
+static void cut_scene(void);
 static void start_script(void);
 static void get_actor_position_x(void);
 static void jump_if_smaller_or_equal(void);
@@ -63,7 +64,7 @@ static void begin_override_or_print_ego(void);
 static void begin_override(void);
 static void cursor_cmd(void);
 static void is_script_running(void);
-static void load_room(void);
+static void current_room(void);
 static void jump_if_greater_or_equal(void);
 static void print_ego(void);
 static void unimplemented_opcode(void);
@@ -88,6 +89,25 @@ static uint8_t * __attribute__((zpage)) pc;
 static void (*opcode_jump_table[128])(void);
 static uint8_t *override_pc;
 static uint8_t break_script = 0;
+#define DEBUG_SCRIPT_ID 1
+#ifdef DEBUG_SCRIPTS
+#define debug_scr2(...) sprintf(msg, "[%02d](%03x) %02x ", active_script_slot, debug_pc, debug_opcode); \
+                        sprintf(msg + 13, __VA_ARGS__); \
+                        debug_msg(msg);
+#ifdef DEBUG_SCRIPT_ID
+#define debug_scr(...) \
+  if (proc_script_id[active_script_slot] == DEBUG_SCRIPT_ID) { \
+    debug_scr2(__VA_ARGS__); \
+  }
+#else
+#define debug_scr(...) debug_scr2(__VA_ARGS__)
+#endif
+static uint16_t debug_pc;
+static uint8_t  debug_opcode;
+#else
+#define debug_scr(...)
+#endif
+
 static uint8_t backup_opcode;
 static uint8_t backup_param_mask;
 static uint8_t *backup_pc;
@@ -116,31 +136,31 @@ void script_init(void)
   }
 
   opcode_jump_table[0x00] = &stop_or_break;
-  opcode_jump_table[0x01] = &position_actor;
+  opcode_jump_table[0x01] = &put_actor;
   opcode_jump_table[0x02] = &start_music;
   opcode_jump_table[0x04] = &jump_if_greater;
-  opcode_jump_table[0x05] = &show_object;
-  opcode_jump_table[0x07] = &obj_state_active;
+  opcode_jump_table[0x05] = &draw_object;
+  opcode_jump_table[0x07] = &state_of;
   opcode_jump_table[0x08] = &jump_if_equal;
   opcode_jump_table[0x0c] = &resource_cmd;
-  opcode_jump_table[0x10] = &object_owner;
-  opcode_jump_table[0x11] = &start_animation;
-  opcode_jump_table[0x12] = &set_camera_target;
+  opcode_jump_table[0x10] = &owner_of;
+  opcode_jump_table[0x11] = &do_animation;
+  opcode_jump_table[0x12] = &camera_pan_to;
   opcode_jump_table[0x13] = &actor_ops;
-  opcode_jump_table[0x14] = &print;
-  opcode_jump_table[0x16] = &create_random_number;
+  opcode_jump_table[0x14] = &say_line;
+  opcode_jump_table[0x16] = &random;
   opcode_jump_table[0x18] = &jump;
   opcode_jump_table[0x19] = &execute_command;
   opcode_jump_table[0x1a] = &assign;
   opcode_jump_table[0x1c] = &start_sound;
   opcode_jump_table[0x1e] = &walk_to;
   opcode_jump_table[0x20] = &stop_or_break;
-  opcode_jump_table[0x21] = &position_actor;
-  opcode_jump_table[0x25] = &show_object;
+  opcode_jump_table[0x21] = &put_actor;
+  opcode_jump_table[0x25] = &draw_object;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
-  opcode_jump_table[0x2b] = &delay_variable;
+  opcode_jump_table[0x2b] = &sleep_for_variable;
   opcode_jump_table[0x2d] = &place_actor_in_room;
-  opcode_jump_table[0x2e] = &delay;
+  opcode_jump_table[0x2e] = &sleep_for;
   opcode_jump_table[0x32] = &set_camera;
   opcode_jump_table[0x3e] = &walk_to;
   opcode_jump_table[0x35] = &get_object_at_position;
@@ -149,17 +169,17 @@ void script_init(void)
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x3b] = &wait_for_actor;
   opcode_jump_table[0x3c] = &stop_sound;
-  opcode_jump_table[0x40] = &cutscene;
-  opcode_jump_table[0x41] = &position_actor;
+  opcode_jump_table[0x40] = &cut_scene;
+  opcode_jump_table[0x41] = &put_actor;
   opcode_jump_table[0x42] = &start_script;
   opcode_jump_table[0x43] = &get_actor_position_x;
   opcode_jump_table[0x44] = &jump_if_smaller_or_equal;
-  opcode_jump_table[0x45] = &show_object;
+  opcode_jump_table[0x45] = &draw_object;
   opcode_jump_table[0x46] = &increment_or_decrement;
-  opcode_jump_table[0x47] = &obj_state_active;
+  opcode_jump_table[0x47] = &state_of;
   opcode_jump_table[0x48] = &jump_if_not_equal;
   opcode_jump_table[0x4f] = &jump_if_object_not_active;
-  opcode_jump_table[0x51] = &start_animation;
+  opcode_jump_table[0x51] = &do_animation;
   opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
   opcode_jump_table[0x58] = &begin_override_or_print_ego;
@@ -167,16 +187,16 @@ void script_init(void)
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x5e] = &walk_to;
   opcode_jump_table[0x60] = &cursor_cmd;
-  opcode_jump_table[0x61] = &position_actor;
-  opcode_jump_table[0x65] = &show_object;
+  opcode_jump_table[0x61] = &put_actor;
+  opcode_jump_table[0x65] = &draw_object;
   opcode_jump_table[0x68] = &is_script_running;
   opcode_jump_table[0x6d] = &place_actor_in_room;
-  opcode_jump_table[0x72] = &load_room;
+  opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &execute_command;
   opcode_jump_table[0x7e] = &walk_to;
-  opcode_jump_table[0x7f] = &jump_if_can_not_pick_up_object;
+  opcode_jump_table[0x7f] = &jump_if_not_pickupable;
 }
 
 /// @} // script_init
@@ -187,7 +207,7 @@ void script_init(void)
  * @defgroup script_public Script Public Functions
  * @{
  */
-#pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
+#pragma clang section text="code_script" rodata="cdata_script" data="data_script" bss="zdata"
 
 /**
  * @brief Runs the next script cycle of the currently active script slot.
@@ -211,7 +231,10 @@ void script_run_active_slot(void)
   while (vm_get_active_proc_state() == PROC_STATE_RUNNING && !(break_script)) {
     opcode = read_byte();
     param_mask = 0x80;
-    //debug_out("[%d] (%03x) %02x", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
+#ifdef DEBUG_SCRIPTS
+    debug_opcode = opcode;
+    debug_pc = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5);
+#endif
     exec_opcode(opcode);
   }
 
@@ -446,13 +469,14 @@ static void read_encoded_string_null_terminated(char *dest)
 }
 
 /**
- * @brief Opcode 0x00: Stop or break
+ * @brief Opcode 0x00: stop-script (current one) or break-here
  *
  * Opcodes 0x00 or 0xa0 (doesn't seem to be different) are used to stop 
- * the currently running script.
+ * the currently running script (as if using stop-script without parameter
+ * in SCUMM).
  *
  * Opcode 0x80 is used to break the script and return to the main loop
- * for one cycle. This usually is used to execute a redraw of the screen
+ * for one cycle (break-here command in SCUMM). This usually is used to execute a redraw of the screen
  * before continuing the script.
  *
  * Opcode 0x20 is used to stop the music playback.
@@ -464,20 +488,20 @@ static void read_encoded_string_null_terminated(char *dest)
 static void stop_or_break(void)
 {
   if (opcode == 0x80) {
-    //debug_msg("Break script");
+    debug_scr("break-here");
     break_script = 1;
   }
   else if (opcode == 0x20){
-    //debug_msg("Stop music");
+    debug_scr("stop-music");
   }
   else {
-    //debug_msg("Stop script");
+    debug_scr("stop-script");
     vm_stop_active_script();
   }
 }
 
 /**
- * @brief Opcode 0x01: Position actor
+ * @brief Opcode 0x01: put-actor
  *
  * Reads an actor id and two 8-bit values for x and y position. The actor
  * is then positioned at the given position.
@@ -486,12 +510,12 @@ static void stop_or_break(void)
  *
  * Code section: code_main
  */
-static void position_actor(void)
+static void put_actor(void)
 {
-  //debug_msg("Position actor");
   uint8_t actor_id = resolve_next_param8();
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
+  debug_scr("put-actor at %d, %d", x, y);
   actors.x[actor_id] = x;
   actors.y[actor_id] = y;
 }
@@ -500,7 +524,7 @@ static void start_music(void)
 {
   //debug_msg("Start music");
   uint8_t music_id = resolve_next_param8();
-  //music_play(music_id);
+  debug_scr("start-music %d", music_id);
 }
 
 /**
@@ -520,16 +544,16 @@ static void start_music(void)
  */
 static void jump_if_greater(void)
 {
-  //debug_msg("Jump if greater");
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
+  debug_scr("if (VAR[%d]=%d <= %d(ind))", var_idx, vm_read_var(var_idx), value);
   if (vm_read_var(var_idx) > value) {
     pc += offset;
   }
 }
 
-static void show_object(void)
+static void draw_object(void)
 {
   //debug_msg("Show object");
   uint16_t obj_id = resolve_next_param16();
@@ -537,10 +561,13 @@ static void show_object(void)
   uint8_t y = resolve_next_param8();
 
   if (x != 255 || y != 255) {
+    debug_scr("draw-object %d at %d, %d", obj_id, x, y);
     fatal_error(ERR_NOT_IMPLEMENTED);
   }
 
-  global_game_objects[obj_id] |= OBJ_STATE_ACTIVE;
+  debug_scr("draw-object %d", obj_id);
+  global_game_objects[obj_id] |= OBJ_STATE;
+  vm_clear_all_other_object_states(obj_id);
 
   vm_update_screen();
 }
@@ -560,17 +587,17 @@ static void show_object(void)
  */
 static void jump_if_equal(void)
 {
-  //debug_msg("Jump if equal");
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
+  debug_scr("if (VAR[%d]=%d != %d(ind))", var_idx, vm_read_var(var_idx), value);
   if (vm_read_var(var_idx) == value) {
     pc += offset;
   }
 }
 
 /**
- * @brief Opcode 0x07: Set or clear active state of an object
+ * @brief Opcode 0x07: state-of
  * 
  * If the opcode bit 6 is set, the object state is cleared, otherwise it is set.
  * As an object active state is relevant for screen rendering (used for showing/
@@ -580,15 +607,16 @@ static void jump_if_equal(void)
  *
  * Code section: code_main
  */
-static void obj_state_active(void)
+static void state_of(void)
 {
-  //debug_msg("obj state active");
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
-    global_game_objects[obj_id] &= ~OBJ_STATE_ACTIVE;
+    debug_scr("state-of %d is OFF", obj_id);
+    global_game_objects[obj_id] &= ~OBJ_STATE;
   }
   else {
-    global_game_objects[obj_id] |= OBJ_STATE_ACTIVE;
+    debug_scr("state-of %d is ON", obj_id);
+    global_game_objects[obj_id] |= OBJ_STATE;
   }
   vm_update_screen();
 }
@@ -609,33 +637,40 @@ static void obj_state_active(void)
  */
 static void resource_cmd(void)
 {
-  //debug_msg("Resource cmd");
   uint8_t resource_id = resolve_next_param8();
   uint8_t sub_opcode = read_byte();
 
   switch (sub_opcode) {
     case 0x21:
+      debug_scr("load-costume %d", resource_id);
       res_provide(RES_TYPE_COSTUME, resource_id, 0);
       break;
     case 0x23:
+      debug_scr("lock-costume %d", resource_id);
       res_lock(RES_TYPE_COSTUME, resource_id, 0);
       break;
     case 0x31:
+      debug_scr("load-room %d", resource_id);
       res_provide(RES_TYPE_ROOM, resource_id, 0);
       break;
     case 0x33:
+      debug_scr("lock-room %d", resource_id);
       res_lock(RES_TYPE_ROOM, resource_id, 0);
       break;
     case 0x51:
+      debug_scr("load-script %d", resource_id);
       res_provide(RES_TYPE_SCRIPT, resource_id, 0);
       break;
     case 0x53:
+      debug_scr("lock-script %d", resource_id);
       res_lock(RES_TYPE_SCRIPT, resource_id, 0);
       break;
     case 0x61:
+      debug_scr("load-sound %d", resource_id);
       res_provide(RES_TYPE_SOUND, resource_id, 0);
       break;
     case 0x63:
+      debug_scr("lock-sound %d", resource_id);
       res_lock(RES_TYPE_SOUND, resource_id, 0);
       break;
     default:
@@ -643,27 +678,27 @@ static void resource_cmd(void)
   }
 }
 
-static void object_owner(void)
+static void owner_of(void)
 {
-  //debug_msg("Object owner");
   uint8_t var_idx = read_byte();
   uint16_t obj_id = resolve_next_param16();
+  debug_scr("owner-of %d is %d", obj_id, global_game_objects[obj_id] & 0x0f);
   vm_write_var(var_idx, global_game_objects[obj_id] & 0x0f);
 }
 
-static void start_animation(void)
+static void do_animation(void)
 {
-  //debug_msg("Start animation");
   uint8_t actor_id = resolve_next_param8();
   uint8_t animation_id = resolve_next_param8();
+  debug_scr("do-animation (actor=)%d (anim=)%d", actor_id, animation_id);
   actor_start_animation(actor_id, animation_id);
 }
 
-static void set_camera_target(void)
+static void camera_pan_to(void)
 {
-  //debug_msg("Move camera to position");
   uint8_t x = resolve_next_param8();
-  vm_set_camera_target(x);
+  debug_scr("camera-pan-to %d", x);
+  vm_camera_pan_to(x);
 }
 
 /**
@@ -685,45 +720,59 @@ static void actor_ops(void)
 
   switch (sub_opcode) {
     case 0x01:
+      debug_scr("actor %d sound %d", actor_id, param);
       actors.sound[actor_id] = param;
       break;
     case 0x02:
-      actors.palette_idx[actor_id] = read_byte();
       actors.palette_color[actor_id] = param;
+      actors.palette_idx[actor_id] = read_byte();
+      debug_scr("actor %d color %d is %d", actor_id, param, actors.palette_idx[actor_id]);
       break;
     case 0x03:
       read_null_terminated_string(actors.name[actor_id]);
+      debug_scr("actor %d name \"%s\"", actor_id, actors.name[actor_id]);
       break;
     case 0x04:
+      debug_scr("actor %d costume %d", actor_id, param);
       actors.costume[actor_id] = param;
       break;
     case 0x05:
+      debug_scr("actor %d talk-color %d", actor_id, param);
       actors.talk_color[actor_id] = param;
       break;
   }
 }
 
 /**
- * @brief Opcode 0x14: Print
+ * @brief Opcode 0x14: say-line (or print-line)
  *
- * Outputs a dialog string to the screen. The actor id is resolved and the
+ * Outputs a text message to the screen. The actor id is resolved and the
  * dialog string is read/decoded from the script.
+ *
+ * If the actor id is 0xff, the text is printed as a message from the game
+ * with a default color. No actor talking animation will be triggered
+ * in that case.
  *
  * The text is displayed on screen immediately. No update screen request is
  * necessary.
  * 
  * Code section: code_main
  */
-static void print(void)
+static void say_line(void)
 {
-  //debug_msg("Print");
   uint8_t actor_id = resolve_next_param8();
-  read_encoded_string_null_terminated(dialog_buffer);
-  vm_actor_start_talking(actor_id);
+  //if (actor_id == 0xff) {
+    //debug_msg("print-line");
+  //}
+  //else {
+    //debug_msg("say-line");
+  //}
+  read_encoded_string_null_terminated(message_buffer);
+  vm_say_line(actor_id);
 }
 
 /**
- * @brief Opcode 0x16: Create random number
+ * @brief Opcode 0x16: random
  * 
  * Creates a random number in the range [0..upper_bound] (including the upper_bound).
  * The random number is stored in the variable that is specified by the first parameter.
@@ -732,9 +781,9 @@ static void print(void)
  *
  * Code section: code_main
  */
-static void create_random_number(void)
+static void random(void)
 {
-  //debug_msg("Create random number");
+  //debug_msg("random");
   uint8_t var_idx = read_byte();
   uint8_t upper_bound = resolve_next_param8();
   while (RNDRDY & 0x80); // wait for random number generator to be ready
@@ -823,7 +872,7 @@ static void jump_if_or_if_not_equal_zero(void)
 }
 
 /**
- * @brief Opcode 0x2B: Delay variable
+ * @brief Opcode 0x2B: sleep-for using value from a variable
  * 
  * Reads a variable index and delays the script execution by the negative value
  * of the variable. The delay is calculated as -1 - variable_value. The timer
@@ -831,9 +880,9 @@ static void jump_if_or_if_not_equal_zero(void)
  *
  * Code section: code_main
  */
-static void delay_variable(void)
+static void sleep_for_variable(void)
 {
-  //debug_msg("Delay variable");
+  //debug_msg("sleep-for with variable");
   uint8_t var_idx = read_byte();
   int32_t negative_ticks = -1 - (int32_t)vm_read_var(var_idx);
   vm_set_script_wait_timer(negative_ticks);
@@ -859,7 +908,7 @@ static void place_actor_in_room(void)
 }
 
 /**
- * @brief Opcode 0x2E: Delay
+ * @brief Opcode 0x2E: sleep-for
  * 
  * Reads 24 bits of ticks value for the wait timer. Note that the amount
  * of ticks that the script should pause actually needs to be calculated by
@@ -867,9 +916,9 @@ static void place_actor_in_room(void)
  *
  * Code section: code_main
  */
-static void delay(void)
+static void sleep_for(void)
 {
-  //debug_msg("Delay");
+  //debug_msg("sleep-for");
   int32_t negative_ticks = read_int24();
   vm_set_script_wait_timer(negative_ticks);
 }
@@ -902,8 +951,8 @@ static void execute_command(void)
     fatal_error(ERR_UNKNOWN_VERB);
   }
 
-  uint16_t command_object_left  = resolve_next_param16();
-  uint16_t command_object_right = resolve_next_param16();
+  uint16_t command_noun1 = resolve_next_param16();
+  uint16_t command_noun2 = resolve_next_param16();
 
   uint8_t sub_opcode = read_byte();
   switch (sub_opcode) {
@@ -914,27 +963,27 @@ static void execute_command(void)
       fatal_error(ERR_CMD_STACK_OVERFLOW);
     }
     cmd_stack.verb[cmd_stack.num_entries] = command_verb;
-    cmd_stack.object_left[cmd_stack.num_entries] = command_object_left;
-    cmd_stack.object_right[cmd_stack.num_entries] = command_object_right;
+    cmd_stack.noun1[cmd_stack.num_entries] = command_noun1;
+    cmd_stack.noun2[cmd_stack.num_entries] = command_noun2;
     ++cmd_stack.num_entries;
-    debug_out("  verb %d, obj_left %d, obj_right %d, stacksize %d", command_verb, command_object_left, command_object_right, cmd_stack.num_entries);
+    debug_out("  verb %d, noun1 %d, noun2 %d, stacksize %d", command_verb, command_noun1, command_noun2, cmd_stack.num_entries);
     return;
 
   case 1:
     // execute a command directly
     debug_msg("  execute a command directly");
     vm_write_var(VAR_COMMAND_VERB, command_verb);
-    vm_write_var(VAR_COMMAND_OBJECT_LEFT, command_object_left);
-    vm_write_var(VAR_COMMAND_OBJECT_RIGHT, command_object_right);
-    vm_start_object_script(command_verb, command_object_left);
+    vm_write_var(VAR_COMMAND_NOUN1, command_noun1);
+    vm_write_var(VAR_COMMAND_NOUN2, command_noun2);
+    vm_start_object_script(command_verb, command_noun1);
     break;
 
   case 2:
-    //debug_msg("  print command on screen");
-    // prepare a new command for printing on screen
-    vm_write_var(VAR_NEXT_COMMAND_VERB, command_verb);
-    vm_write_var(VAR_NEXT_COMMAND_OBJECT_LEFT, command_object_left);
-    vm_write_var(VAR_NEXT_COMMAND_OBJECT_RIGHT, command_object_right);
+    //debug_msg("  print sentence on screen");
+    // prepare a new sentence for printing on screen
+    vm_write_var(VAR_SENTENCE_VERB, command_verb);
+    vm_write_var(VAR_SENTENCE_NOUN1, command_noun1);
+    vm_write_var(VAR_SENTENCE_NOUN2, command_noun2);
   }
   
 }
@@ -1026,12 +1075,18 @@ static void stop_sound(void)
  *
  * Code section: code_main
  */
-static void cutscene(void)
+static void cut_scene(void)
 {
-  //debug_msg("Cutscene");
-  vm_start_cutscene();
-  override_pc = NULL;
-  reset_command();
+  //debug_msg("cut-scene");
+  if (!(opcode & 0x80)) {
+    vm_cut_scene_begin();
+    override_pc = NULL;
+    reset_command();
+  }
+  else {
+    //debug_msg("end of cut-scene");
+    vm_cut_scene_end();
+  }
 }
 
 /**
@@ -1153,7 +1208,7 @@ static void jump_if_object_not_active(void)
   //debug_msg("Jump if object not active");
   uint16_t obj_id = resolve_next_param16();
   int16_t offset = read_word();
-  if ((global_game_objects[obj_id] & OBJ_STATE_ACTIVE) == 0) {
+  if ((global_game_objects[obj_id] & OBJ_STATE) == 0) {
     pc += offset;
   }
 }
@@ -1262,18 +1317,18 @@ static void is_script_running(void)
 }
 
 /**
- * @brief Opcode 0x72: Load room
+ * @brief Opcode 0x72: current-room
  *
  * Switches the scene to a new room. The room number is read from the script.
  * The new room is activated immediately and a screen update is requested.
  * 
  * Code section: code_main
  */
-static void load_room(void)
+static void current_room(void)
 {
   //debug_msg("Load room");
   uint8_t room_no = read_byte();
-  vm_switch_room(room_no);
+  vm_set_current_room(room_no);
   debug_out("Switched to room %d", room_no);
 }
 
@@ -1304,7 +1359,7 @@ static void jump_if_greater_or_equal(void)
 }
 
 /**
- * @brief Opcode 0x7f: Jump if can not pick up object
+ * @brief Opcode 0x7f: Jump if not pickupable
  *
  * Reads an object id and a signed offset. If the object can not be picked up,
  * the script will jump to the new pc. The offset is signed two-complement and
@@ -1316,12 +1371,12 @@ static void jump_if_greater_or_equal(void)
  *
  * Code section: code_main
  */
-static void jump_if_can_not_pick_up_object(void)
+static void jump_if_not_pickupable(void)
 {
   //debug_msg("Jump if can not pick up object");
   uint16_t obj_id = resolve_next_param16();
   int16_t offset = read_word();
-  if ((global_game_objects[obj_id] & OBJ_STATE_CAN_PICKUP) == 0) {
+  if ((global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE) == 0) {
     pc += offset;
   }
 }
@@ -1340,8 +1395,8 @@ static void unimplemented_opcode(void)
 static void reset_command(void)
 {
   //debug_msg("Reset command");
-  vm_write_var(VAR_NEXT_COMMAND_VERB, vm_read_var(VAR_DEFAULT_VERB));
-  vm_write_var(VAR_NEXT_COMMAND_OBJECT_LEFT, 0);
-  vm_write_var(VAR_NEXT_COMMAND_OBJECT_RIGHT, 0);
-  vm_write_var(VAR_NEXT_COMMAND_PREPOSITION, 0);
+  vm_write_var(VAR_SENTENCE_VERB, vm_read_var(VAR_DEFAULT_VERB));
+  vm_write_var(VAR_SENTENCE_NOUN1, 0);
+  vm_write_var(VAR_SENTENCE_NOUN2, 0);
+  vm_write_var(VAR_SENTENCE_PREPOSITION, 0);
 }

@@ -4,6 +4,8 @@ AS = as6502
 CC = cc6502
 LN = ln6502
 
+CONFIG ?= default
+
 CC_FLAGS  = --target=mega65 --code-model=plain -O2 --no-cross-call --strong-inline --inline-on-matching-custom-text-section --list-file=$(@:%.o=%.lst)
 DEP_FLAGS = -MMD -MP
 ASM_FLAGS = --target=mega65 --list-file=$(@:%.o=%.lst)
@@ -18,6 +20,14 @@ C_SRCS    = $(wildcard src/*.c)
 ASM_SRCS  = $(wildcard src/*.s)
 OBJS      = $(ASM_SRCS:src/%.s=obj/%.o) $(C_SRCS:src/%.c=obj/%.o)
 DEPS      = $(OBJS:%.o=%.d)
+
+ifeq ($(CONFIG),debug)
+	CC_FLAGS += -DDEBUG
+endif
+
+ifeq ($(CONFIG),debug_scripts)
+	CC_FLAGS += -DDEBUG -DDEBUG_SCRIPTS
+endif
 
 -include $(DEPS)
 
@@ -50,7 +60,7 @@ runtime.raw: $(OBJS) mega65-mm.scm
 
 mm.d81: runtime.raw
 	cp gamedata/MM.D81 mm.d81
-	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write main.raw m01 -write m1-1.raw m11 -write m1-2.raw m12
+	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write script.raw m01 -write main.raw m02 -write m1-1.raw m11 -write m1-2.raw m12
 
 clean:
 	-rm -rf obj

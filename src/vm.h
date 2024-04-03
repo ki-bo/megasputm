@@ -25,22 +25,22 @@ enum {
 };
 
 enum {
-  VAR_EGO = 0,
-  VAR_CAMERA_CURRENT_X = 2,
-  VAR_DIALOG_ACTIVE = 3,
-  VAR_ROOM_NO = 4,
+  VAR_SELECTED_ACTOR = 0,
+  VAR_CAMERA_X = 2,
+  VAR_MESSAGE_GOING = 3,
+  VAR_SELECTED_ROOM = 4,
   VAR_MACHINE_SPEED = 6,
   VAR_COMMAND_VERB = 8,
-  VAR_COMMAND_OBJECT_LEFT = 9,
-  VAR_COMMAND_OBJECT_RIGHT = 10,
-  VAR_NUM_ACTORS = 11,
-  VAR_COMMAND_VERB_AVAILABLE = 18,
+  VAR_COMMAND_NOUN1 = 9,
+  VAR_COMMAND_NOUN2 = 10,
+  VAR_NUMBER_OF_ACTORS = 11,
+  VAR_VALID_VERB = 18,
   VAR_CURSOR_STATE = 21,
   VAR_TIMER_NEXT = 25,
-  VAR_NEXT_COMMAND_VERB = 26,
-  VAR_NEXT_COMMAND_OBJECT_LEFT = 27,
-  VAR_NEXT_COMMAND_OBJECT_RIGHT = 28,
-  VAR_NEXT_COMMAND_PREPOSITION = 29,
+  VAR_SENTENCE_VERB = 26,
+  VAR_SENTENCE_NOUN1 = 27,
+  VAR_SENTENCE_NOUN2 = 28,
+  VAR_SENTENCE_PREPOSITION = 29,
   VAR_SCENE_CURSOR_X = 30,
   VAR_SCENE_CURSOR_Y = 31,
   VAR_INPUT_EVENT = 32,
@@ -49,10 +49,13 @@ enum {
 };
 
 enum {
-  OBJ_STATE_CAN_PICKUP  = 0x10,
-  OBJ_STATE_DONT_SELECT = 0x20,
-  OBJ_STATE_4           = 0x40,
-  OBJ_STATE_ACTIVE      = 0x80
+  OBJ_CLASS_PICKUPABLE  = 0x10,
+  OBJ_CLASS_DONT_SELECT = 0x20,
+  OBJ_CLASS_LOCKED      = 0x40,
+  // SCUMM defines different meanings for the state bit
+  // 0: HERE, CLOSED, R-OPEN,   OFF, R_GONE
+  // 1: GONE, OPEN,   R-CLOSED, ON,  R_HERE
+  OBJ_STATE             = 0x80
 };
 
 enum {
@@ -69,36 +72,37 @@ enum {
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];
-extern char dialog_buffer[256];
+extern char message_buffer[256];
 
 extern volatile uint8_t script_watchdog;
 extern uint8_t state_iface;
 extern uint16_t camera_x;
 
 extern uint8_t active_script_slot;
+extern uint8_t proc_script_id[NUM_SCRIPT_SLOTS];
 extern uint8_t proc_state[NUM_SCRIPT_SLOTS];
 extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
 extern uint8_t room_res_slot;
-extern uint8_t current_room;
 
 struct cmd_stack_t {
   uint8_t  num_entries;
   uint8_t  verb[CMD_STACK_SIZE];
-  uint16_t object_left[CMD_STACK_SIZE];
-  uint16_t object_right[CMD_STACK_SIZE];
+  uint16_t noun1[CMD_STACK_SIZE];
+  uint16_t noun2[CMD_STACK_SIZE];
 };
 extern struct cmd_stack_t cmd_stack;
 
 void vm_init(void);
 __task void vm_mainloop(void);
 uint8_t vm_get_active_proc_state(void);
-void vm_switch_room(uint8_t room_no);
+void vm_set_current_room(uint8_t room_no);
 void vm_set_script_wait_timer(int32_t negative_ticks);
-void vm_start_cutscene(void);
+void vm_cut_scene_begin(void);
+void vm_cut_scene_end(void);
 void vm_costume_init();
-void vm_actor_start_talking(uint8_t actor_id);
+void vm_say_line(uint8_t actor_id);
 void vm_actor_place_in_room(uint8_t actor_id, uint8_t room_no);
 uint8_t vm_start_script(uint8_t script_id);
 uint8_t vm_start_room_script(uint16_t room_script_offset);
@@ -109,8 +113,9 @@ void vm_stop_script(uint8_t script_id);
 uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_screen(void);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
+void vm_clear_all_other_object_states(uint16_t global_object_id);
 void vm_set_camera_follow_actor(uint8_t actor_id);
-void vm_set_camera_target(uint8_t x);
+void vm_camera_pan_to(uint8_t x);
 
 static inline uint16_t vm_read_var(uint8_t var)
 {
