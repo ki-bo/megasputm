@@ -48,6 +48,18 @@ void debug_msg(char* msg)
          : "a" /* clobber list */);
 }
 
+void debug_msg2(char* msg)
+{
+  while (*msg) {
+    __asm (" sta 0xd643\n"
+           " clv"
+           :           /* no output operands */
+           : "Ka"(*msg) /* input operands */
+           : "a" /* clobber list */);
+    msg++;
+  }
+}
+
 void *memcpy(void *dest, const void *src, size_t n)
 {
   global_dma_list.command  = 0;      // DMA copy command

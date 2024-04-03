@@ -76,11 +76,15 @@ void fatal_error_str(const char *message);
 extern char msg[80];
 #define debug_out(...) sprintf(msg, __VA_ARGS__); \
                        debug_msg(msg);
+#define debug_out2(...) sprintf(msg, __VA_ARGS__); \
+                        debug_msg2(msg);
 #else
 #define debug_out(...)
+#define debug_out2(...)
 #endif
 
 void debug_msg(char* msg);
+void debug_msg2(char* msg);
 
 // Memory functions (overloaded using DMA functionality)
 void *memcpy(void *dest, const void *src, size_t n);

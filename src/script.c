@@ -11,6 +11,12 @@
 
 //----------------------------------------------------------------------
 
+#ifdef DEBUG_SCRIPTS
+#define debug_scr(...) debug_scr(__VA_ARGS__)
+#else
+#define debug_scr(...)
+#endif
+
 // private functions
 static void debug_header();
 static void exec_opcode(uint8_t opcode);
@@ -89,25 +95,6 @@ static uint8_t * __attribute__((zpage)) pc;
 static void (*opcode_jump_table[128])(void);
 static uint8_t *override_pc;
 static uint8_t break_script = 0;
-#define DEBUG_SCRIPT_ID 1
-#ifdef DEBUG_SCRIPTS
-#define debug_scr2(...) sprintf(msg, "[%02d](%03x) %02x ", active_script_slot, debug_pc, debug_opcode); \
-                        sprintf(msg + 13, __VA_ARGS__); \
-                        debug_msg(msg);
-#ifdef DEBUG_SCRIPT_ID
-#define debug_scr(...) \
-  if (proc_script_id[active_script_slot] == DEBUG_SCRIPT_ID) { \
-    debug_scr2(__VA_ARGS__); \
-  }
-#else
-#define debug_scr(...) debug_scr2(__VA_ARGS__)
-#endif
-static uint16_t debug_pc;
-static uint8_t  debug_opcode;
-#else
-#define debug_scr(...)
-#endif
-
 static uint8_t backup_opcode;
 static uint8_t backup_param_mask;
 static uint8_t *backup_pc;
@@ -232,8 +219,7 @@ void script_run_active_slot(void)
     opcode = read_byte();
     param_mask = 0x80;
 #ifdef DEBUG_SCRIPTS
-    debug_opcode = opcode;
-    debug_pc = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5);
+    debug_scr2("[%02d](%03x) %02x ", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
 #endif
     exec_opcode(opcode);
   }
@@ -290,7 +276,7 @@ void exec_opcode(uint8_t opcode)
          : "x");
 }
 
-#pragma clang section text="code_main"
+#pragma clang section text="code_script"
 
 /**
  * @brief Reads a byte from the script.
@@ -761,13 +747,13 @@ static void actor_ops(void)
 static void say_line(void)
 {
   uint8_t actor_id = resolve_next_param8();
-  //if (actor_id == 0xff) {
-    //debug_msg("print-line");
-  //}
-  //else {
-    //debug_msg("say-line");
-  //}
   read_encoded_string_null_terminated(message_buffer);
+  if (actor_id == 0xff) {
+    debug_scr("print-line");
+  }
+  else {
+    debug_scr("say-line %d");
+  }
   vm_say_line(actor_id);
 }
 
@@ -783,9 +769,9 @@ static void say_line(void)
  */
 static void random(void)
 {
-  //debug_msg("random");
   uint8_t var_idx = read_byte();
   uint8_t upper_bound = resolve_next_param8();
+  debug_scr("VAR[%d] = random %d", var_idx, upper_bound);
   while (RNDRDY & 0x80); // wait for random number generator to be ready
   uint8_t rnd_number = RNDGEN * (upper_bound + 1) / 255;
   vm_write_var(var_idx, rnd_number);
@@ -802,8 +788,8 @@ static void random(void)
  */
 static void jump(void)
 {
-  //debug_msg("Jump");
   pc += read_word(); // will effectively jump backwards if the offset is negative
+  debug_scr("jump %03x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5));
 }
 
 /**
@@ -904,7 +890,7 @@ static void place_actor_in_room(void)
   uint8_t actor_id = resolve_next_param8();
   uint8_t room_id = resolve_next_param8();
   actor_place_in_room(actor_id, room_id);
-  debug_out("Actor %d placed in room %d", actor_id, room_id);
+  debug_scr("Actor %d placed in room %d", actor_id, room_id);
 }
 
 /**
@@ -927,7 +913,7 @@ static void set_camera(void)
 {
   //debug_msg("Set camera");
   camera_x = resolve_next_param8();
-  debug_out("Camera x: %d", camera_x);
+  debug_scr("Camera x: %d", camera_x);
   vm_update_screen();
 }
 
@@ -937,17 +923,17 @@ static void execute_command(void)
   uint8_t command_verb = resolve_next_param8();
 
   if (command_verb == 0xfb) {
-    debug_out("  command_verb: %d = RESET", command_verb);
+    debug_scr("  command_verb: %d = RESET", command_verb);
     reset_command();
     return;
   }
   else if (command_verb == 0xfc) {
-    debug_out("  command_verb: %d = STOP", command_verb);
+    debug_scr("  command_verb: %d = STOP", command_verb);
     vm_stop_script(SCRIPT_ID_COMMAND);
     return;
   }
   else if (command_verb == 0xfd) {
-    debug_out("  unimplemented command verb 0xfd, needed for load/save");
+    debug_scr("  unimplemented command verb 0xfd, needed for load/save");
     fatal_error(ERR_UNKNOWN_VERB);
   }
 
@@ -966,7 +952,7 @@ static void execute_command(void)
     cmd_stack.noun1[cmd_stack.num_entries] = command_noun1;
     cmd_stack.noun2[cmd_stack.num_entries] = command_noun2;
     ++cmd_stack.num_entries;
-    debug_out("  verb %d, noun1 %d, noun2 %d, stacksize %d", command_verb, command_noun1, command_noun2, cmd_stack.num_entries);
+    debug_scr("  verb %d, noun1 %d, noun2 %d, stacksize %d", command_verb, command_noun1, command_noun2, cmd_stack.num_entries);
     return;
 
   case 1:
@@ -996,7 +982,6 @@ static void get_object_at_position(void)
   uint8_t y = resolve_next_param8();
   uint16_t obj_id = vm_get_object_at(x, y);
   vm_write_var(var_idx, obj_id);
-  debug_out("Object at position %d, %d is %d", x, y, obj_id);
 }
 
 /**
