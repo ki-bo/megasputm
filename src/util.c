@@ -29,6 +29,7 @@ void fatal_error_str(const char *message)
 
 void debug_msg(char* msg)
 {
+#ifdef DEBUG
   while (*msg) {
     __asm (" sta 0xd643\n"
            " clv"
@@ -46,10 +47,12 @@ void debug_msg(char* msg)
          : /* no output operands */
          : /* no input operands*/
          : "a" /* clobber list */);
+#endif
 }
 
 void debug_msg2(char* msg)
 {
+#ifdef DEBUG
   while (*msg) {
     __asm (" sta 0xd643\n"
            " clv"
@@ -58,6 +61,7 @@ void debug_msg2(char* msg)
            : "a" /* clobber list */);
     msg++;
   }
+#endif
 }
 
 void *memcpy(void *dest, const void *src, size_t n)

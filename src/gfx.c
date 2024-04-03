@@ -188,7 +188,7 @@ void setup_irq(void)
 {
   CPU_VECTORS.irq = &raster_irq;
 
-  VICIV.rasterline = 250;
+  VICIV.rasterline = 252;
   VICIV.ctrl1 &= 0x7f;
   VICIV.imr = 0x01;  // enable raster interrupt
   VICIV.irr = VICIV.irr; // clear pending interrupts

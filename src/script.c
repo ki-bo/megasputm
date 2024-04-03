@@ -12,7 +12,7 @@
 //----------------------------------------------------------------------
 
 #ifdef DEBUG_SCRIPTS
-#define debug_scr(...) debug_scr(__VA_ARGS__)
+#define debug_scr(...) debug_out(__VA_ARGS__)
 #else
 #define debug_scr(...)
 #endif
@@ -219,7 +219,7 @@ void script_run_active_slot(void)
     opcode = read_byte();
     param_mask = 0x80;
 #ifdef DEBUG_SCRIPTS
-    debug_scr2("[%02d](%03x) %02x ", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
+    debug_out2("[%02d](%03x) %02x ", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
 #endif
     exec_opcode(opcode);
   }
