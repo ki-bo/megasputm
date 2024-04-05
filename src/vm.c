@@ -58,8 +58,6 @@ char message_buffer[256];
 
 uint8_t actor_talking;
 
-uint8_t slow_update_counter;
-
 volatile uint8_t script_watchdog;
 uint8_t state_iface;
 uint16_t camera_x;
@@ -137,7 +135,6 @@ void vm_init(void)
   camera_x = 20;
   camera_state = 0;
   camera_follow_actor_id = 0xff;
-  slow_update_counter = 8;
 }
 
 /** @} */ // vm_init
@@ -182,15 +179,15 @@ __task void vm_mainloop(void)
 
   while (1) {
     script_watchdog = 0;
-    if (slow_update_counter == 0) {
-      slow_update_counter = 2;
-    }
-    else {
-      --slow_update_counter;
-    }
 
-    uint8_t elapsed_jiffies = wait_for_jiffy();
-    VICIV.bordercol = 0x0f;
+    uint8_t elapsed_jiffies = 0;
+    uint8_t jiffy_threshold = vm_read_var(VAR_TIMER_NEXT);
+    do {
+      elapsed_jiffies += wait_for_jiffy();
+    }
+    while (jiffy_threshold && elapsed_jiffies < jiffy_threshold);
+
+    //VICIV.bordercol = 0x0f;
 
     map_cs_diskio();
     diskio_check_motor_off(elapsed_jiffies);
@@ -213,14 +210,14 @@ __task void vm_mainloop(void)
     update_actors();
     update_camera();
 
-    VICIV.bordercol = 0x00;
+    //VICIV.bordercol = 0x00;
 
     if (screen_update_needed)
     {
-      VICIV.bordercol = 0x01;
+      //VICIV.bordercol = 0x01;
       redraw_screen();
       screen_update_needed = 0;
-      VICIV.bordercol = 0x00;
+      //VICIV.bordercol = 0x00;
       map_cs_gfx();
       gfx_update_screen();
       unmap_cs();
@@ -1002,11 +999,6 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
 
 static void update_actors(void)
 {
-  if (slow_update_counter != 0)
-  {
-    return;
-  }
-
   for (uint8_t i = 0; i < MAX_LOCAL_ACTORS; ++i)
   {
     if (local_actors.global_id[i] == 0xff)
@@ -1021,24 +1013,55 @@ static void update_actors(void)
     __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
     debug_out("Local actor %d costume %d", i, actors.costume[local_actors.global_id[i]]);
     debug_out(" num_animations: %d", costume_hdr->num_animations);
-    debug_out(" enable_mirroring: %02x", costume_hdr->enable_mirroring_and_format & 0x80);
+    debug_out(" disable_mirroring: %d", (costume_hdr->enable_mirroring_and_format & 0x80)==0x80);
     debug_out(" format: %02x", costume_hdr->enable_mirroring_and_format & 0x7f);
-    debug_out(" animation_commands_offset: %04x", costume_hdr->animation_commands_offset);
+    debug_out(" animation_commands_offset: %d", costume_hdr->animation_commands_offset);
     for (uint8_t i = 0; i < 16; ++i)
     {
-      debug_out(" limb table offset[%d]: %d", i, costume_hdr->limb_table_offsets[i]);
+      debug_out(" level table offset[%d]: %d", i, costume_hdr->level_table_offsets[i]);
     }
+    uint8_t num_animations = costume_hdr->num_animations ? costume_hdr->num_animations + 1 : 0;
+    for (uint8_t j = 0; j < costume_hdr->num_animations; ++j)
+    {
+      debug_out(" animation offset[%d]: %d", j, costume_hdr->animation_offsets[j]);
+      __auto_type anim_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_offsets[j]);
+      uint16_t cel_mask = *(uint16_t *)anim_ptr;
+      anim_ptr += 2;
+      debug_out(" cel mask: %04x", cel_mask);
+      for (int8_t k = 15; k > -1; --k)
+      {
+        if (!(cel_mask & 1)) {
+          cel_mask >>= 1;
+          continue;
+        }
+        cel_mask >>= 1;
+        uint8_t cmd_offset = *anim_ptr++;
+        debug_out("  cel: %d", k);
+        debug_out("  cmd offset: %02x", cmd_offset);
+        if (cmd_offset == 0xff) {
+          continue;
+        }
+        uint8_t num_commands = *anim_ptr++;
+        debug_out("  no loop: %d", (num_commands & 0x80)==0x80);
+        num_commands &= 0x7f;
+        ++num_commands;
+        debug_out("  num commands: %d", num_commands);
+        __auto_type cmd_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_commands_offset + cmd_offset);
+        for (uint8_t l = 0; l < num_commands; ++l)
+        {
+          debug_out("   cmd_byte: %02x", *cmd_ptr);
+          ++cmd_ptr;
+        }
+      }
+
+    }
+    fatal_error(1);
 */
   }
 }
 
 static void update_camera(void)
 {
-  if (slow_update_counter != 0)
-  {
-    return;
-  }
-
   if (camera_state == CAMERA_STATE_FOLLOW_ACTOR && camera_follow_actor_id == 0xff)
   {
     camera_state = 0;
