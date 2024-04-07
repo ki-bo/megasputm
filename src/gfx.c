@@ -1,5 +1,8 @@
 #include "gfx.h"
+#include "actor.h"
+#include "costume.h"
 #include "dma.h"
+#include "error.h"
 #include "input.h"
 #include "io.h"
 #include "map.h"
@@ -32,7 +35,7 @@ const char palette_blue[16] = {
 
 //-----------------------------------------------------------------------------------------------
 
-#pragma clang section rodata="cdata_gfx" bss="bss_gfx"
+#pragma clang section data="data_gfx" rodata="cdata_gfx" bss="bss_gfx"
 __attribute__((aligned(64))) static const uint8_t cursor_snail[] = {
   0x11,0x11,0x11,0x10,0x00,0x00,0x01,0x11,
   0x11,0x11,0x11,0x06,0x66,0x66,0x60,0x11,
@@ -74,6 +77,7 @@ __attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
 //-----------------------------------------------------------------------------------------------
 
 __attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
+static uint8_t color_strip[GFX_HEIGHT];
 static uint8_t __huge *next_char_data;
 static uint16_t obj_first_char[MAX_OBJECTS];
 static uint8_t next_obj_slot = 0;
@@ -81,6 +85,40 @@ static uint8_t num_chars_at_row[16];
 static uint8_t screen_update_request = 0;
 static uint8_t masking_cache_iterations[119];
 static uint16_t masking_cache_data_offset[119];
+static uint16_t screen_pixel_offset_x;
+
+static dmalist_single_option_t dmalist_rle_strip_copy = {
+  .opt_token      = 0x85,                   // destination skip rate
+  .opt_arg        = 0x08,                   // = 8 bytes
+  .end_of_options = 0x00,
+  .command        = 0,                      // DMA copy command
+  .count          = 0,
+  .src_addr       = 0,
+  .src_bank       = 0,
+  .dst_addr       = 0,
+  .dst_bank       = 0x07
+};
+
+static const uint16_t times_chrcount[18] = {
+  CHRCOUNT * 0,
+  CHRCOUNT * 1,
+  CHRCOUNT * 2,
+  CHRCOUNT * 3,
+  CHRCOUNT * 4,
+  CHRCOUNT * 5,
+  CHRCOUNT * 6,
+  CHRCOUNT * 7,
+  CHRCOUNT * 8,
+  CHRCOUNT * 9,
+  CHRCOUNT * 10,
+  CHRCOUNT * 11,
+  CHRCOUNT * 12,
+  CHRCOUNT * 13,
+  CHRCOUNT * 14,
+  CHRCOUNT * 15,
+  CHRCOUNT * 16,
+  CHRCOUNT * 17
+};
 
 //-----------------------------------------------------------------------------------------------
 
@@ -122,12 +160,19 @@ void gfx_init()
   memset_bank(FAR_U8_PTR(BG_BITMAP), 0, 0 /* 0 means 64kb */);
   memset_bank(FAR_U8_PTR(COLRAM), 0, 2000);
 
-  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
-  __auto_type colram_ptr = FAR_U16_PTR(COLRAM);
+  dmalist_rle_strip_copy.src_addr = LSB16(UNBANKED_PTR(color_strip));
+  dmalist_rle_strip_copy.src_bank = BANK(UNBANKED_PTR(color_strip));
+
+  __auto_type screen_ptr    = FAR_U16_PTR(SCREEN_RAM);
+  __auto_type colram_ptr    = FAR_U16_PTR(COLRAM);
+  __auto_type screen_bb_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN);
+  __auto_type colram_bb_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM);
 
   for (uint16_t i = 0; i < CHRCOUNT * 25; ++i) {
-    *screen_ptr++ = 0x0020;
-    *colram_ptr++ = 0x0f00;
+    *screen_ptr++    = 0x0020;
+    *screen_bb_ptr++ = 0x0020;
+    *colram_ptr++    = 0x0f00;
+    *colram_bb_ptr++ = 0x0f00;
   }
 
   for (uint8_t i = 0; i < 16; ++i) {
@@ -222,13 +267,27 @@ volatile uint8_t raster_irq_counter = 0;
 __attribute__((interrupt()))
 static void raster_irq ()
 {
-  static dmalist_t dmalist_copy_gfx = {
-    .command  = 0,
-    .count    = CHRCOUNT * 2 * 16,
-    .src_addr = 0xa000 + CHRCOUNT * 2 * 2,
-    .src_bank = 0x00,
-    .dst_addr = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
-    .dst_bank = BANK(SCREEN_RAM)
+  static dmalist_single_option_t dmalist_copy_gfx[2] = {
+    {
+      .opt_token  = 0x81,
+      .opt_arg    = 0x00,
+      .command    = 4, // copy + chain
+      .count      = CHRCOUNT * 2 * 16,
+      .src_addr   = BACKBUFFER_SCREEN + CHRCOUNT * 2 * 2,
+      .src_bank   = 0x00,
+      .dst_addr   = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
+      .dst_bank   = BANK(SCREEN_RAM)
+    },
+    {
+      .opt_token  = 0x81,
+      .opt_arg    = 0xff,
+      .command    = 0,
+      .count      = CHRCOUNT * 2 * 16,
+      .src_addr   = BACKBUFFER_COLRAM + CHRCOUNT * 2 * 2,
+      .src_bank   = 0x00,
+      .dst_addr   = LSB16(COLRAM + CHRCOUNT * 2 * 2),
+      .dst_bank   = BANK(COLRAM)
+    }
   };
 
   uint32_t map_save = map_get();
@@ -514,8 +573,11 @@ void gfx_draw_bg(void)
   uint16_t ds_save = map_get_ds();
   unmap_ds();
 
+  uint16_t left_char_offset = camera_x - 20;
+  screen_pixel_offset_x = left_char_offset * 8;
+
   __auto_type screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
-  uint16_t char_data = BG_BITMAP / 64 + (camera_x - 20) * 16;
+  uint16_t char_data = BG_BITMAP / 64 + left_char_offset * 16;
 
   for (uint8_t x = 0; x < 40; ++x) {
     for (uint8_t y = 0; y < 16; ++y) {
@@ -547,25 +609,6 @@ void gfx_draw_bg(void)
  */
 void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_t height)
 {
-  static const uint16_t times_chrcount[16] = {
-    CHRCOUNT * 0,
-    CHRCOUNT * 1,
-    CHRCOUNT * 2,
-    CHRCOUNT * 3,
-    CHRCOUNT * 4,
-    CHRCOUNT * 5,
-    CHRCOUNT * 6,
-    CHRCOUNT * 7,
-    CHRCOUNT * 8,
-    CHRCOUNT * 9,
-    CHRCOUNT * 10,
-    CHRCOUNT * 11,
-    CHRCOUNT * 12,
-    CHRCOUNT * 13,
-    CHRCOUNT * 14,
-    CHRCOUNT * 15
-  };
-
   uint16_t *screen_ptr;
   uint16_t char_num_row = obj_first_char[local_id];
   uint16_t char_num_col;
@@ -602,11 +645,108 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
   while (--height);
 }
 
+void gfx_draw_cel(int16_t xpos, int16_t ypos, uint8_t *cel_data)
+{
+  __auto_type hdr = (struct costume_image *)cel_data;
+  cel_data += sizeof(struct costume_image);
+
+  uint8_t width = hdr->width;
+  int16_t screen_pos_x = xpos - screen_pixel_offset_x;
+  if (screen_pos_x + width <= 0) {
+    debug_out("out of screen %d", screen_pos_x + width);
+    return;
+  }
+  uint8_t height = hdr->height;
+  uint8_t num_char_cols = (hdr->width + 7) / 8;
+  uint8_t num_char_rows = (hdr->height + 7) / 8;
+  uint8_t num_pixel_lines_of_chars = num_char_rows * 8;
+  uint16_t num_chars = num_char_cols * num_char_rows;
+  uint16_t num_bytes = num_chars * 64;
+  uint16_t char_num = (uint32_t)next_char_data / 64;
+  uint8_t run_length_counter = 1;
+  uint8_t current_color;
+  uint16_t col_addr_inc = (num_pixel_lines_of_chars - 1) * 8;
+  int16_t x = 0;
+  int16_t y = 0;
+
+  memset_bank((uint8_t __far *)next_char_data, num_bytes, 0);
+
+  dmalist_rle_strip_copy.count = num_pixel_lines_of_chars;
+
+  do {
+    if (--run_length_counter == 0)
+    {
+      uint8_t data_byte = *cel_data++;
+      run_length_counter = data_byte & 0x0f;
+      current_color = data_byte >> 4;
+      if (run_length_counter == 0)
+      {
+        run_length_counter = *cel_data++;
+      }
+    }
+    color_strip[y] = current_color;
+    ++y;
+    if (y == height) {
+      dmalist_rle_strip_copy.dst_addr = LSB16(next_char_data);
+      dmalist_rle_strip_copy.dst_bank = BANK(next_char_data);
+      dma_trigger(&dmalist_rle_strip_copy);
+      y = 0;
+      ++x;
+      ++next_char_data;
+      if (!(x &0x07)) {
+        next_char_data += col_addr_inc;
+      }
+    }
+  }
+  while (x != width);
+
+  unmap_ds();
+
+  next_char_data += num_bytes;
+
+  // place cel using rrb features
+  screen_pos_x &= 0x3ff;
+  uint8_t screen_pos_y = y / 8;
+  __auto_type screen_left_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
+  __auto_type colram_left_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
+
+  for (uint8_t y = 0; y < num_char_rows; ++y) {
+    debug_out("screen_pos_y %d screen_left_ptr %04x num_chars_at_row %d", screen_pos_y, (uint16_t)screen_left_ptr, num_chars_at_row[screen_pos_y]);
+    __auto_type screen_ptr = screen_left_ptr + num_chars_at_row[screen_pos_y];
+    __auto_type colram_ptr = colram_left_ptr + num_chars_at_row[screen_pos_y];
+    debug_out("gotox screen_ptr %04x colram_ptr %08lx", (uint16_t)screen_ptr, (uint32_t)colram_ptr);
+    *screen_ptr++ = screen_pos_x;
+    *colram_ptr++ = 0x0090;
+    uint16_t cur_char = char_num;
+    for (uint8_t x = 0; x < num_char_cols; ++x) {
+      debug_out(" char x %d y %d screen_ptr %04x colram_ptr %08lx cur_char %04x", x, y, (uint16_t)screen_ptr, (uint32_t)colram_ptr, cur_char);
+      *screen_ptr++ = cur_char;
+      *colram_ptr++ = 0x0f00;
+      cur_char += num_char_rows;
+    }
+    ++char_num;
+    ++screen_pos_y;
+    screen_left_ptr += CHRCOUNT;
+    colram_left_ptr += CHRCOUNT;
+  }
+
+  screen_left_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + 40;
+  colram_left_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2 + 40;
+  for (uint8_t i = 0; i < 6; ++i) {
+    debug_out2("%04x.%04x ", *screen_left_ptr, *colram_left_ptr);
+    ++screen_left_ptr;
+    ++colram_left_ptr;
+  }
+  screen_update_request = 1;
+  fatal_error(1);
+
+}
+
 /**
- * @brief Draws the backbuffer to the screen.
+ * @brief Copies the backbuffer to the screen.
  *
- * The drawing is done in the interrupt routine to avoid tearing. This function will
- * request the drawing and block until the drawing is done.
+ * The screen update is done in the interrupt routine to avoid tearing. This function will
+ * request it and block until the copying is done.
  * 
  * Code section: code_gfx
  */
@@ -627,20 +767,6 @@ void gfx_update_screen(void)
 
 static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
 {
-  static dmalist_single_option_t dmalist_rle_strip_copy = {
-    .opt_token      = 0x85,                   // destination skip rate
-    .opt_arg        = 0x08,                   // = 8 bytes
-    .end_of_options = 0x00,
-    .command        = 0,                      // DMA copy command
-    .count          = 0,
-    .src_addr       = 0,
-    .src_bank       = 0,
-    .dst_addr       = 0,
-    .dst_bank       = 0x07
-  };
-
-  static uint8_t color_strip[GFX_HEIGHT];
-
   uint8_t rle_counter = 1;
   uint8_t keep_color = 0;
   uint8_t col_byte;
@@ -649,8 +775,6 @@ static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
   uint16_t col_addr_inc = (height - 1) * 8;
 
   dmalist_rle_strip_copy.count = height;
-  dmalist_rle_strip_copy.src_addr = LSB16(UNBANKED_PTR(color_strip));
-  dmalist_rle_strip_copy.src_bank = BANK(UNBANKED_PTR(color_strip));
 
   do {
     --rle_counter;

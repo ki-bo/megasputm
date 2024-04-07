@@ -100,6 +100,7 @@ static void process_dialog(uint8_t jiffies_elapsed);
 static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
 static void redraw_screen(void);
+static void redraw_actors(void);
 static void handle_input(void);
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t state);
 static uint8_t find_free_script_slot(void);
@@ -212,16 +213,19 @@ __task void vm_mainloop(void)
 
     //VICIV.bordercol = 0x00;
 
-    if (screen_update_needed)
-    {
+    if (screen_update_needed & SCREEN_UPDATE_BG) {
       //VICIV.bordercol = 0x01;
       redraw_screen();
-      screen_update_needed = 0;
       //VICIV.bordercol = 0x00;
       map_cs_gfx();
       gfx_update_screen();
       unmap_cs();
     }
+    if (screen_update_needed & SCREEN_UPDATE_ACTORS) {
+      redraw_actors();
+    }
+
+    screen_update_needed = 0;
   }
 }
 
@@ -301,7 +305,7 @@ void vm_set_current_room(uint8_t room_no)
   }
 
   redraw_screen();
-  screen_update_needed = 1;
+  screen_update_needed |= SCREEN_UPDATE_BG;
   unmap_cs();
 
   // restore DS
@@ -518,7 +522,7 @@ uint8_t vm_is_script_running(uint8_t script_id)
  */
 void vm_update_screen(void)
 {
-  screen_update_needed = 1;
+  screen_update_needed |= SCREEN_UPDATE_BG;
 }
 
 uint16_t vm_get_object_at(uint8_t x, uint8_t y)
@@ -750,12 +754,16 @@ static void redraw_screen(void)
 {
   uint32_t map_save = map_get();
   map_cs_gfx();
+
+  // draw background
   gfx_draw_bg();
 
+  // draw all visible room objects
   for (int8_t i = num_objects - 1; i >= 0; --i)
   {
     map_ds_resource(obj_page[i]);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
+    // OBJ_STATE is used to determine visibility of object in this room
     if (!(global_game_objects[obj_hdr->id] & OBJ_STATE)) {
       continue;
     }
@@ -766,6 +774,46 @@ static void redraw_screen(void)
     unmap_ds();
 
     gfx_draw_object(i, x, y, width, height);
+  }
+
+  map_set(map_save);
+}
+
+static void redraw_actors(void)
+{
+  uint32_t map_save = map_get();
+  map_cs_gfx();
+
+  // iterate over all actors and draw their current cels on all cel levels
+  for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
+    if (local_actors.global_id[local_id] == 0xff) {
+      // no actor in local actor slot, skip
+      continue;
+    }
+
+    uint8_t global_id = local_actors.global_id[local_id];
+    uint16_t pos_x = (actors.x[global_id] << 3) + (local_actors.x_fraction[local_id] >> 13);
+    uint8_t pos_y = actors.y[global_id] << 2;
+    debug_out("drawing actor %d", global_id);
+
+    map_ds_resource(local_actors.res_slot[local_id]);
+    __auto_type cel_level_cmd_ptr = local_actors.cel_level_cmd_ptr[local_id];
+    __auto_type cel_level_cur_cmd = local_actors.cel_level_cur_cmd[local_id];
+    __auto_type cel_level_table_offset = ((struct costume_header *)RES_MAPPED)->level_table_offsets;
+    for (uint8_t level = 0; level < 16; ++level) {
+      uint8_t cmd_offset = *cel_level_cur_cmd++;
+      uint8_t *cmd_ptr = *cel_level_cmd_ptr++;
+      debug_out("  level %d cmd_offset %02x", level, cmd_offset);
+      if (cmd_offset != 0xff) {
+        uint8_t cmd = cmd_ptr[cmd_offset];
+        if (cmd < 0x79) {
+          uint16_t cel_offset = *NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
+          __auto_type cel_data = NEAR_U8_PTR(RES_MAPPED + cel_offset);
+          gfx_draw_cel(pos_x, pos_y, cel_data);
+        }
+      }
+      ++cel_level_table_offset;
+    }
   }
 
   map_set(map_save);
@@ -1006,7 +1054,9 @@ static void update_actors(void)
       continue;
     }
 
-    actor_next_step(i);
+    if (actor_next_step(i)) {
+      screen_update_needed |= SCREEN_UPDATE_ACTORS;
+    }
 /*
     map_ds_resource(local_actors.res_slot[i]);
 

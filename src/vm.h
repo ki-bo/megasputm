@@ -69,6 +69,11 @@ enum {
   CAMERA_STATE_MOVING = 4
 };
 
+enum {
+  SCREEN_UPDATE_BG = 1,
+  SCREEN_UPDATE_ACTORS = 2
+};
+
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];

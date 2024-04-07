@@ -49,7 +49,7 @@ static void start_sound(void);
 static void walk_to(void);
 static void jump_if_or_if_not_equal_zero(void);
 static void sleep_for_variable(void);
-static void place_actor_in_room(void);
+static void put_actor_in_room(void);
 static void subtract(void);
 static void wait_for_actor(void);
 static void stop_sound(void);
@@ -146,7 +146,7 @@ void script_init(void)
   opcode_jump_table[0x25] = &draw_object;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
   opcode_jump_table[0x2b] = &sleep_for_variable;
-  opcode_jump_table[0x2d] = &place_actor_in_room;
+  opcode_jump_table[0x2d] = &put_actor_in_room;
   opcode_jump_table[0x2e] = &sleep_for;
   opcode_jump_table[0x32] = &set_camera;
   opcode_jump_table[0x3e] = &walk_to;
@@ -177,7 +177,7 @@ void script_init(void)
   opcode_jump_table[0x61] = &put_actor;
   opcode_jump_table[0x65] = &draw_object;
   opcode_jump_table[0x68] = &is_script_running;
-  opcode_jump_table[0x6d] = &place_actor_in_room;
+  opcode_jump_table[0x6d] = &put_actor_in_room;
   opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
@@ -629,7 +629,7 @@ static void resource_cmd(void)
   switch (sub_opcode) {
     case 0x21:
       debug_scr("load-costume %d", resource_id);
-      res_provide(RES_TYPE_COSTUME, resource_id, 0);
+      uint8_t slot = res_provide(RES_TYPE_COSTUME, resource_id, 0);
       break;
     case 0x23:
       debug_scr("lock-costume %d", resource_id);
@@ -875,7 +875,7 @@ static void sleep_for_variable(void)
 }
 
 /**
- * @brief Opcode 0x2D: Place actor in room
+ * @brief Opcode 0x2D: put-actor a in-room r
  *
  * Reads the actor id and the room id from the script and places the actor in
  * the room.
@@ -884,13 +884,12 @@ static void sleep_for_variable(void)
  *
  * Code section: code_script
  */
-static void place_actor_in_room(void)
+static void put_actor_in_room(void)
 {
-  //debug_msg("Place actor in room");
   uint8_t actor_id = resolve_next_param8();
   uint8_t room_id = resolve_next_param8();
-  actor_place_in_room(actor_id, room_id);
-  debug_scr("Actor %d placed in room %d", actor_id, room_id);
+  actor_put_in_room(actor_id, room_id);
+  debug_scr("put-actor %d in-room %d", actor_id, room_id);
 }
 
 /**

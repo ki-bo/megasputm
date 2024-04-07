@@ -1,6 +1,9 @@
 #include "actor.h"
+#include "costume.h"
 #include "error.h"
+#include "gfx.h"
 #include "map.h"
+#include "memory.h"
 #include "resource.h"
 #include "util.h"
 #include "vm.h"
@@ -48,16 +51,13 @@ void actor_init(void)
  */
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
 
-void actor_place_in_room(uint8_t actor_id, uint8_t room_no)
+void actor_put_in_room(uint8_t actor_id, uint8_t room_no)
 {
   if (actors.room[actor_id] == room_no) {
     return;
   }
 
   if (actor_is_in_current_room(actor_id)) {
-    map_cs_gfx();
-    //gfx_remove_actor(actor_id);
-    unmap_cs();
     deactivate_costume(actor_id);
     local_actors.global_id[actors.local_id[actor_id]] = 0xff;
     actors.local_id[actor_id] = 0xff;
@@ -71,9 +71,6 @@ void actor_place_in_room(uint8_t actor_id, uint8_t room_no)
     local_actors.global_id[local_id] = actor_id;
     activate_costume(actor_id);
     debug_out("Actor %d is now in current room with local id %d", actor_id, local_id);
-    map_cs_gfx();
-    //gfx_add_actor(actor_id);
-    unmap_cs();
   }
 }
 
@@ -95,12 +92,14 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
   if (local_actors.walking[local_id]) {
     calculate_step(local_id);
   }
+
+  actor_start_animation(local_id, ANIM_WALK + local_actors.direction[local_id]);
 }
 
-void actor_next_step(uint8_t local_id)
+uint8_t actor_next_step(uint8_t local_id)
 {
   if (!local_actors.walking[local_id]) {
-    return;
+    return 0;
   }
 
   uint8_t actor_id = local_actors.global_id[local_id];
@@ -125,10 +124,59 @@ void actor_next_step(uint8_t local_id)
     local_actors.y_fraction[local_id] = 0;
     local_actors.walking[local_id] = 0;
   }
+
+  return 1;
 }
 
-void actor_start_animation(uint8_t actor_id, uint8_t animation)
+void actor_start_animation(uint8_t local_id, uint8_t animation)
 {
+  if (local_actors.cost_anim[local_id] == animation) {
+    return;
+  }
+
+  local_actors.cost_anim[local_id] = animation;
+  __auto_type cel_level_cur_cmd  = local_actors.cel_level_cur_cmd[local_id];
+  __auto_type cel_level_cmd_ptr  = local_actors.cel_level_cmd_ptr[local_id];
+  __auto_type cel_level_last_cmd = local_actors.cel_level_last_cmd[local_id];
+
+  for (uint8_t i = 0; i < 16; ++i) {
+    cel_level_cur_cmd[i] = 0xff;
+  }
+
+  uint16_t save_ds = map_get_ds();
+  map_ds_resource(local_actors.res_slot[local_id]);
+
+  __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
+  debug_out("Local actor %d start animation %d", local_id, animation);
+  debug_out("  Num animations in costume: %d", costume_hdr->num_animations);
+  if (animation >= costume_hdr->num_animations + 1) {
+    fatal_error(ERR_ANIMATION_NOT_DEFINED);
+  }
+  debug_out(" animation offset: %d", costume_hdr->animation_offsets[animation]);
+  __auto_type anim_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_offsets[animation]);
+  uint16_t cel_level_mask = *(uint16_t *)anim_ptr;
+  anim_ptr += 2;
+  debug_out(" cel level mask: %04x", cel_level_mask);
+  for (int8_t level = 0; level < 16; ++level)
+  {
+    if ((MSB(cel_level_mask) & 0x80)) {
+      uint8_t cmd_offset = *anim_ptr++;
+      debug_out("  cel level: %d", level);
+      debug_out("    cmd offset: %02x", cmd_offset);
+      if (cmd_offset != 0xff) {
+        *cel_level_cur_cmd  = 0;
+        *cel_level_cmd_ptr  = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_commands_offset + cmd_offset);
+        *cel_level_last_cmd = *anim_ptr++;
+        debug_out("    cur %d last %d cmd_ptr %04x", *cel_level_cur_cmd, *cel_level_last_cmd, (uint16_t)*cel_level_cmd_ptr);
+      }
+    }  
+    cel_level_mask <<= 1;
+    ++cel_level_cur_cmd;
+    ++cel_level_cmd_ptr;
+    ++cel_level_last_cmd;
+  }
+
+  map_set_ds(save_ds);
 }
 
 /// @} // actor_public
@@ -194,6 +242,26 @@ static void calculate_step(uint8_t local_id)
 
   debug_out("From %d, %d to %d, %d", x, y, walk_to_x, walk_to_y);
   debug_out("Diff: %d, %d", x_diff, y_diff);
+  if (x_diff < 0) {
+    if (y_diff < 0) {
+      if (x_diff < 2 * y_diff) {
+        local_actors.direction[local_id] = 3;
+      }
+      else {
+        local_actors.direction[local_id] = 0;
+      }
+    }
+  }
+  else {
+    if (y_diff < 0) {
+      if (x_diff < 2 * y_diff) {
+        local_actors.direction[local_id] = 2;
+      }
+      else {
+        local_actors.direction[local_id] = 1;
+      }
+    }
+  }
 
   if (x_diff == 0 && y_diff == 0) {
     local_actors.walking[local_id] = 0;
@@ -201,11 +269,11 @@ static void calculate_step(uint8_t local_id)
   }
 
   if (x_diff == 0) {
-    local_actors.walk_step_x[local_id] = 0;
-    local_actors.walk_step_y[local_id] = (y_diff > 0) ? 0x10000 : -0x10000;
+    x_step = 0;
+    y_step = (y_diff > 0) ? 0x10000 : -0x10000;
   } else if (y_diff == 0) {
-    local_actors.walk_step_x[local_id] = (x_diff > 0) ? 0x10000 : -0x10000;
-    local_actors.walk_step_y[local_id] = 0;
+    x_step = (x_diff > 0) ? 0x10000 : -0x10000;
+    y_step = 0;
   } else {
     int8_t abs_x_diff = abs(x_diff);
     int8_t abs_y_diff = abs(y_diff);
@@ -221,6 +289,7 @@ static void calculate_step(uint8_t local_id)
   local_actors.walk_step_x[local_id] = x_step;
   local_actors.walk_step_y[local_id] = y_step;
   debug_out("Actor %d step: %ld, %ld", actor_id, x_step, y_step);
+  debug_out("  direction: %d", local_actors.direction[local_id]);
 }
 
 /// @} // actor_private

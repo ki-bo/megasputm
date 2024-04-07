@@ -14,9 +14,14 @@ struct costume_header {
     uint16_t animation_offsets[];
 };
 
-struct costume_animation {
-    uint16_t level_mask;
-    
+struct costume_image {
+  uint16_t width;
+  uint16_t height;
+  int16_t offset_x;
+  int16_t offset_y;
+  int16_t move_x;
+  int16_t move_y;
 };
+
 
 #endif // __COSTUME_H

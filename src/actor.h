@@ -8,6 +8,11 @@
 #define MAX_LOCAL_ACTORS    6
 #define ACTOR_NAME_LEN     16
 
+enum {
+  ANIM_STAND = 1,
+  ANIM_WALK = 2
+};
+
 typedef struct {
   uint8_t       sound[NUM_ACTORS];
   uint8_t       palette_idx[NUM_ACTORS];
@@ -26,6 +31,11 @@ typedef struct {
 typedef struct {
   uint8_t       global_id[MAX_LOCAL_ACTORS];
   uint8_t       res_slot[MAX_LOCAL_ACTORS];
+  uint8_t       direction[MAX_LOCAL_ACTORS];
+  uint8_t       cost_anim[MAX_LOCAL_ACTORS];
+  uint8_t      *cel_level_cmd_ptr[MAX_LOCAL_ACTORS][16];
+  uint8_t       cel_level_cur_cmd[MAX_LOCAL_ACTORS][16];
+  uint8_t       cel_level_last_cmd[MAX_LOCAL_ACTORS][16];
   uint8_t       walking[MAX_LOCAL_ACTORS];
   uint16_t      x_fraction[MAX_LOCAL_ACTORS];
   uint16_t      y_fraction[MAX_LOCAL_ACTORS];
@@ -46,9 +56,9 @@ extern local_actors_t local_actors;
 void actor_init(void);
 
 // main functions
-void actor_place_in_room(uint8_t actor_id, uint8_t room_no);
+void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y);
-void actor_next_step(uint8_t local_id);
+uint8_t actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);
 
 // inline main functions

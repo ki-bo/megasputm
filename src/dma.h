@@ -40,6 +40,7 @@ typedef struct
       uint16_t dst_addr_page;
     };
   };
+  uint16_t modulo;
 } dmalist_t;
 
 typedef struct 
@@ -57,6 +58,7 @@ typedef struct
     uint8_t src_bank;       // Source bank and flags
     uint16_t dst_addr;      // Destination address
     uint8_t dst_bank;       // Destination bank and flags
+    uint16_t modulo;
 } dmalist_single_option_t;
 
 typedef struct 
@@ -76,6 +78,7 @@ typedef struct
     uint8_t src_bank;        // Source bank and flags
     uint16_t dst_addr;       // Destination address
     uint8_t dst_bank;        // Destination bank and flags
+    uint16_t modulo;
 } dmalist_two_options_t;
 
 extern dmalist_t               global_dma_list;
@@ -85,7 +88,7 @@ extern dmalist_two_options_t   global_dma_list_opt2;
 // code_init functions
 void dma_init(void);
 
-inline void dma_trigger(const void *dma_list)
+static inline void dma_trigger(const void *dma_list)
 {
   DMA.addrbank     = 0;
   DMA.addrmsb      = MSB(dma_list);
