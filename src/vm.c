@@ -182,7 +182,7 @@ __task void vm_mainloop(void)
     script_watchdog = 0;
 
     uint8_t elapsed_jiffies = 0;
-    uint8_t jiffy_threshold = vm_read_var(VAR_TIMER_NEXT);
+    uint8_t jiffy_threshold = 12; //vm_read_var(VAR_TIMER_NEXT);
     do {
       elapsed_jiffies += wait_for_jiffy();
     }
@@ -213,19 +213,24 @@ __task void vm_mainloop(void)
 
     //VICIV.bordercol = 0x00;
 
-    if (screen_update_needed & SCREEN_UPDATE_BG) {
-      //VICIV.bordercol = 0x01;
-      redraw_screen();
-      //VICIV.bordercol = 0x00;
+    if (screen_update_needed) {
+      if (screen_update_needed & SCREEN_UPDATE_BG) {
+        //VICIV.bordercol = 0x01;
+        redraw_screen();
+        //VICIV.bordercol = 0x00;
+      }
+      if (screen_update_needed & SCREEN_UPDATE_ACTORS) {
+        VICIV.bordercol = 0x01;
+        redraw_actors();
+        VICIV.bordercol = 0x00;
+
+      }
       map_cs_gfx();
       gfx_update_screen();
       unmap_cs();
-    }
-    if (screen_update_needed & SCREEN_UPDATE_ACTORS) {
-      redraw_actors();
+      screen_update_needed = 0;
     }
 
-    screen_update_needed = 0;
   }
 }
 
@@ -783,6 +788,7 @@ static void redraw_actors(void)
 {
   uint32_t map_save = map_get();
   map_cs_gfx();
+  gfx_reset_cel_drawing();
 
   // iterate over all actors and draw their current cels on all cel levels
   for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
@@ -793,28 +799,73 @@ static void redraw_actors(void)
 
     uint8_t global_id = local_actors.global_id[local_id];
     uint16_t pos_x = (actors.x[global_id] << 3) + (local_actors.x_fraction[local_id] >> 13);
-    uint8_t pos_y = actors.y[global_id] << 2;
-    debug_out("drawing actor %d", global_id);
+    uint8_t pos_y = actors.y[global_id] << 1;
+    //debug_out("drawing actor %d", global_id);
 
     map_ds_resource(local_actors.res_slot[local_id]);
+    __auto_type hdr = (struct costume_header *)RES_MAPPED;
     __auto_type cel_level_cmd_ptr = local_actors.cel_level_cmd_ptr[local_id];
     __auto_type cel_level_cur_cmd = local_actors.cel_level_cur_cmd[local_id];
-    __auto_type cel_level_table_offset = ((struct costume_header *)RES_MAPPED)->level_table_offsets;
+    __auto_type cel_level_last_cmd = local_actors.cel_level_last_cmd[local_id];
+    __auto_type cel_level_table_offset = hdr->level_table_offsets;
+    int16_t dx = -72;
+    int16_t dy = -100;
     for (uint8_t level = 0; level < 16; ++level) {
-      uint8_t cmd_offset = *cel_level_cur_cmd++;
-      uint8_t *cmd_ptr = *cel_level_cmd_ptr++;
-      debug_out("  level %d cmd_offset %02x", level, cmd_offset);
+      uint8_t cmd_offset = *cel_level_cur_cmd;
+      uint8_t *cmd_ptr = *cel_level_cmd_ptr;
+      //debug_out("  level %d cmd_offset %02x", level, cmd_offset);
       if (cmd_offset != 0xff) {
-        uint8_t cmd = cmd_ptr[cmd_offset];
-        if (cmd < 0x79) {
-          uint16_t cel_offset = *NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
-          __auto_type cel_data = NEAR_U8_PTR(RES_MAPPED + cel_offset);
-          gfx_draw_cel(pos_x, pos_y, cel_data);
+        while (1) {
+          uint8_t cmd = cmd_ptr[cmd_offset];
+          debug_out("cmd_offset: %d cmd: %d last: %d", cmd_offset, cmd, *cel_level_last_cmd);
+          if (cmd < 0x79) {
+            __auto_type cel_ptrs_for_cur_level = NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
+            __auto_type cel_data = (struct costume_cel*)(RES_MAPPED + cel_ptrs_for_cur_level[cmd]);
+            int16_t dx_level = dx + cel_data->offset_x;
+            int16_t dy_level = dy + cel_data->offset_y;
+            dx += cel_data->move_x;
+            dy -= cel_data->move_y;
+            debug_out("drawing cmd %d cel %04x dx %d dy %d", cmd, (uint16_t)cel_data, dx_level, dy_level);
+            uint8_t mirror;
+            if (local_actors.direction[local_id] == 0 && !(hdr->disable_mirroring_and_format & 0x80)) {
+              mirror = 1;
+              pos_x += dx_level;
+              // when mirroring, additional padding pixels due to rounding up to chars will 
+              // appear to the left of the cel image. Thus, we correct for that padding again
+              // by adjusting the x position.
+              //if (cel_data->width & 0x07) {
+              //  pos_x -= 8 - cel_data->width & 0x07;
+              //}
+            }
+            else {
+              mirror = 0;
+              pos_x -= dx_level;
+            }
+            pos_y += dy_level;
+            gfx_draw_cel(pos_x, pos_y, cel_data, mirror);
+          }
+          uint8_t last_cmd_offset = *cel_level_last_cmd;
+          if (cmd_offset == (last_cmd_offset & 0x7f)) {
+            if (!(last_cmd_offset & 0x80)) {
+              debug_out("  loop to 0");
+              *cel_level_cur_cmd = 0;
+            }
+            break;
+          }
+          else {
+            (*cel_level_cur_cmd)++;
+            break;
+          }
         }
       }
+      ++cel_level_cmd_ptr;
+      ++cel_level_cur_cmd;
+      ++cel_level_last_cmd;
       ++cel_level_table_offset;
     }
   }
+
+  gfx_finalize_cel_drawing();
 
   map_set(map_save);
 }
@@ -1123,11 +1174,11 @@ static void update_camera(void)
   if (camera_state & CAMERA_STATE_FOLLOW_ACTOR)
   {
     camera_target = actors.x[camera_follow_actor_id];
-    debug_out("Camera following actor %d at x %d, cur camera: %d", camera_follow_actor_id, camera_target, camera_x);
+    //debug_out("Camera following actor %d at x %d, cur camera: %d", camera_follow_actor_id, camera_target, camera_x);
   }
   else if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS)
   {
-    debug_out("Camera moving to target %d", camera_target);
+    //debug_out("Camera moving to target %d", camera_target);
   }
   else
   {
@@ -1136,7 +1187,7 @@ static void update_camera(void)
 
   if (camera_state & CAMERA_STATE_MOVING) {
     if (camera_target > camera_x) {
-      debug_msg("Camera continue moving right");
+      //debug_msg("Camera continue moving right");
       camera_x += 1;
       if (camera_x > max_camera_x) {
         camera_x = max_camera_x;
@@ -1144,7 +1195,7 @@ static void update_camera(void)
       }
     }
     else if (camera_target < camera_x) {
-      debug_msg("Camera continue moving left");
+      //debug_msg("Camera continue moving left");
       camera_x -= 1;
       if (camera_x < 20) {
         camera_x = 20;

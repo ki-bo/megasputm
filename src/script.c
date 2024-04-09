@@ -677,7 +677,10 @@ static void do_animation(void)
   uint8_t actor_id = resolve_next_param8();
   uint8_t animation_id = resolve_next_param8();
   debug_scr("do-animation (actor=)%d (anim=)%d", actor_id, animation_id);
-  actor_start_animation(actor_id, animation_id);
+  uint8_t local_id = actors.local_id[actor_id];
+  if (local_id != 0xff) {
+    actor_start_animation(local_id, animation_id);
+  }
 }
 
 static void camera_pan_to(void)

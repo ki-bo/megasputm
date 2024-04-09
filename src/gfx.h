@@ -1,6 +1,7 @@
 #ifndef __GFX_H
 #define __GFX_H
 
+#include "costume.h"
 #include <stdint.h>
 
 // code_init functions
@@ -22,7 +23,9 @@ void gfx_clear_dialog(void);
 uint8_t gfx_print_dialog(uint8_t color, const char *text);
 void gfx_draw_bg(void);
 void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_t height);
-void gfx_draw_cel(int16_t xpos, int16_t ypos, uint8_t *cel_data);
+void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror);
+void gfx_finalize_cel_drawing(void);
+void gfx_reset_cel_drawing(void);
 void gfx_update_screen(void);
 
 #endif // __GFX_H

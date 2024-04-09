@@ -79,6 +79,7 @@ __attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
 __attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
 static uint8_t color_strip[GFX_HEIGHT];
 static uint8_t __huge *next_char_data;
+static uint8_t __huge *char_data_start_cels;
 static uint16_t obj_first_char[MAX_OBJECTS];
 static uint8_t next_obj_slot = 0;
 static uint8_t num_chars_at_row[16];
@@ -131,6 +132,12 @@ static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
 static void decode_masking_buffer(uint8_t *src, uint16_t width, uint16_t height);
 static void update_cursor(uint8_t snail_override);
 static void set_dialog_color(uint8_t color);
+static void place_cel_chars(uint16_t char_num,
+                            int16_t screen_pos_x, 
+                            int8_t screen_pos_y,
+                            uint8_t width_chars,
+                            uint8_t height_chars,
+                            uint8_t mirror);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -405,7 +412,7 @@ void gfx_clear_bg_image(void)
   memset_bank(FAR_U8_PTR(BG_BITMAP), 0, 16U * 40U * 64U);
 
   // reset next_char_data pointer
-  next_char_data = HUGE_U8_PTR(BG_BITMAP) + 16 * 40 * 2;
+  next_char_data = HUGE_U8_PTR(BG_BITMAP) + 16U * 40U * 2;
 
   // reset object pointers
   next_obj_slot = 0;
@@ -432,6 +439,8 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
   next_char_data = HUGE_U8_PTR(BG_BITMAP);
 
   decode_rle_bitmap(src, width, GFX_HEIGHT);
+  
+  char_data_start_cels = next_char_data;
   next_obj_slot = 0;
 }
 
@@ -486,8 +495,6 @@ void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
   }
 }
 
-
-
 /**
  * @brief Decodes an object image and stores it in the char data memory.
  *
@@ -505,6 +512,7 @@ void gfx_decode_object_image(uint8_t *src, uint8_t width, uint8_t height)
   obj_first_char[next_obj_slot] = (uint32_t)next_char_data / 64;
   decode_rle_bitmap(src, width, height);
   ++next_obj_slot;
+  char_data_start_cels = next_char_data;
 }
 
 /**
@@ -587,7 +595,7 @@ void gfx_draw_bg(void)
     screen_ptr -= CHRCOUNT * 16 - 1;
   }
 
-  memset(num_chars_at_row, 40, 16);
+  memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
 
   map_set_ds(ds_save);
 }
@@ -645,23 +653,28 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
   while (--height);
 }
 
-void gfx_draw_cel(int16_t xpos, int16_t ypos, uint8_t *cel_data)
+void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror)
 {
-  __auto_type hdr = (struct costume_image *)cel_data;
-  cel_data += sizeof(struct costume_image);
+  __auto_type hdr = (struct costume_cel *)cel_data;
+  uint8_t *rle_data = ((uint8_t *)cel_data) + sizeof(struct costume_cel);
 
-  uint8_t width = hdr->width;
+  //debug_out(" cel x %d y %d", xpos, ypos);
+  uint8_t width = cel_data->width;
   int16_t screen_pos_x = xpos - screen_pixel_offset_x;
   if (screen_pos_x + width <= 0) {
     debug_out("out of screen %d", screen_pos_x + width);
     return;
   }
-  uint8_t height = hdr->height;
-  uint8_t num_char_cols = (hdr->width + 7) / 8;
-  uint8_t num_char_rows = (hdr->height + 7) / 8;
+  uint8_t height = cel_data->height;
+  uint8_t num_char_cols = (cel_data->width + 7) / 8;
+  uint8_t num_char_rows = (cel_data->height + 7) / 8;
   uint8_t num_pixel_lines_of_chars = num_char_rows * 8;
   uint16_t num_chars = num_char_cols * num_char_rows;
   uint16_t num_bytes = num_chars * 64;
+  if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
+    next_char_data = char_data_start_cels;
+  }
+  uint8_t __huge *next_char_data_save = next_char_data;
   uint16_t char_num = (uint32_t)next_char_data / 64;
   uint8_t run_length_counter = 1;
   uint8_t current_color;
@@ -669,19 +682,19 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, uint8_t *cel_data)
   int16_t x = 0;
   int16_t y = 0;
 
-  memset_bank((uint8_t __far *)next_char_data, num_bytes, 0);
+  memset_bank((uint8_t __far *)next_char_data, 0, num_bytes);
 
-  dmalist_rle_strip_copy.count = num_pixel_lines_of_chars;
+  dmalist_rle_strip_copy.count = height;
 
   do {
     if (--run_length_counter == 0)
     {
-      uint8_t data_byte = *cel_data++;
+      uint8_t data_byte = *rle_data++;
       run_length_counter = data_byte & 0x0f;
       current_color = data_byte >> 4;
       if (run_length_counter == 0)
       {
-        run_length_counter = *cel_data++;
+        run_length_counter = *rle_data++;
       }
     }
     color_strip[y] = current_color;
@@ -693,53 +706,39 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, uint8_t *cel_data)
       y = 0;
       ++x;
       ++next_char_data;
-      if (!(x &0x07)) {
+      if (!(x & 0x07)) {
         next_char_data += col_addr_inc;
       }
     }
   }
   while (x != width);
+  next_char_data = next_char_data_save + num_bytes;
 
   unmap_ds();
 
-  next_char_data += num_bytes;
+  place_cel_chars(char_num, screen_pos_x, ypos, num_char_cols, num_char_rows, mirror);
+}
 
-  // place cel using rrb features
-  screen_pos_x &= 0x3ff;
-  uint8_t screen_pos_y = y / 8;
-  __auto_type screen_left_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
-  __auto_type colram_left_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
-
-  for (uint8_t y = 0; y < num_char_rows; ++y) {
-    debug_out("screen_pos_y %d screen_left_ptr %04x num_chars_at_row %d", screen_pos_y, (uint16_t)screen_left_ptr, num_chars_at_row[screen_pos_y]);
-    __auto_type screen_ptr = screen_left_ptr + num_chars_at_row[screen_pos_y];
-    __auto_type colram_ptr = colram_left_ptr + num_chars_at_row[screen_pos_y];
-    debug_out("gotox screen_ptr %04x colram_ptr %08lx", (uint16_t)screen_ptr, (uint32_t)colram_ptr);
-    *screen_ptr++ = screen_pos_x;
-    *colram_ptr++ = 0x0090;
-    uint16_t cur_char = char_num;
-    for (uint8_t x = 0; x < num_char_cols; ++x) {
-      debug_out(" char x %d y %d screen_ptr %04x colram_ptr %08lx cur_char %04x", x, y, (uint16_t)screen_ptr, (uint32_t)colram_ptr, cur_char);
-      *screen_ptr++ = cur_char;
-      *colram_ptr++ = 0x0f00;
-      cur_char += num_char_rows;
-    }
-    ++char_num;
-    ++screen_pos_y;
-    screen_left_ptr += CHRCOUNT;
-    colram_left_ptr += CHRCOUNT;
+void gfx_finalize_cel_drawing(void)
+{  
+  __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
+  __auto_type colram_start_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
+  for (uint8_t y = 0; y < 16; ++y) {
+    uint8_t end_of_row = num_chars_at_row[y];
+    __auto_type screen_ptr = screen_start_ptr + end_of_row;
+    __auto_type colram_ptr = colram_start_ptr + end_of_row;
+    *screen_ptr++ = 0x0140; // gotox to right screen edge (x=320)
+    *colram_ptr++ = 0x0010;
+    *screen_ptr   = 0xffff; // end of line char code
+    *colram_ptr   = 0x0000;
+    screen_start_ptr += CHRCOUNT;
+    colram_start_ptr += CHRCOUNT;
   }
+}
 
-  screen_left_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + 40;
-  colram_left_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2 + 40;
-  for (uint8_t i = 0; i < 6; ++i) {
-    debug_out2("%04x.%04x ", *screen_left_ptr, *colram_left_ptr);
-    ++screen_left_ptr;
-    ++colram_left_ptr;
-  }
-  screen_update_request = 1;
-  fatal_error(1);
-
+void gfx_reset_cel_drawing(void)
+{
+  memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
 }
 
 /**
@@ -886,6 +885,56 @@ void set_dialog_color(uint8_t color)
   *ptr = 0;
   *(ptr+1) = color;
   dma_trigger(&dmalist_clear_dialog_colram);
+}
+
+static void place_cel_chars(uint16_t char_num,
+                            int16_t screen_pos_x, 
+                            int8_t screen_pos_y,
+                            uint8_t width_chars,
+                            uint8_t height_chars,
+                            uint8_t mirror)
+{
+  // place cel using rrb features
+  screen_pos_x &= 0x3ff;
+  uint8_t char_row = screen_pos_y / 8;
+  uint8_t sub_y = screen_pos_y & 0x07;
+  
+  debug_out(" scrx %d scry %d sub_y %d", screen_pos_x, char_row, sub_y);
+  __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + times_chrcount[char_row + 2];
+  __auto_type colram_start_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + times_chrcount[char_row + 2];
+
+  for (uint8_t y = 0; y < height_chars; ++y) {
+    __auto_type screen_ptr = screen_start_ptr + num_chars_at_row[char_row];
+    __auto_type colram_ptr = colram_start_ptr + num_chars_at_row[char_row];
+    *screen_ptr = screen_pos_x;
+    *colram_ptr = 0x0090;
+    if (mirror) {
+      screen_ptr += width_chars;
+      colram_ptr += width_chars;
+    }
+    else {
+      ++screen_ptr;
+      ++colram_ptr;
+    }
+    uint16_t cur_char = char_num;
+    for (uint8_t x = 0; x < width_chars; ++x) {
+      *screen_ptr = cur_char;
+      cur_char += height_chars;
+      if (mirror) {
+        --screen_ptr;
+        *colram_ptr-- = 0x0f40;
+      }
+      else {
+        ++screen_ptr;
+        *colram_ptr++ = 0x0f00;
+      }
+    }
+    num_chars_at_row[char_row] += width_chars + 1;
+    ++char_num;
+    ++char_row;
+    screen_start_ptr += CHRCOUNT;
+    colram_start_ptr += CHRCOUNT;
+  }
 }
 
 /** @} */ // gfx_private
