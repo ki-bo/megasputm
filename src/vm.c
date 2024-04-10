@@ -111,6 +111,7 @@ static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset);
 static void execute_command_stack(void);
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
 static void update_actors(void);
+static void animate_actors(void);
 static void update_camera(void);
 
 /**
@@ -182,7 +183,7 @@ __task void vm_mainloop(void)
     script_watchdog = 0;
 
     uint8_t elapsed_jiffies = 0;
-    uint8_t jiffy_threshold = 12; //vm_read_var(VAR_TIMER_NEXT);
+    uint8_t jiffy_threshold = vm_read_var(VAR_TIMER_NEXT);
     do {
       elapsed_jiffies += wait_for_jiffy();
     }
@@ -210,6 +211,7 @@ __task void vm_mainloop(void)
     execute_command_stack();
     update_actors();
     update_camera();
+    animate_actors();
 
     //VICIV.bordercol = 0x00;
 
@@ -220,9 +222,9 @@ __task void vm_mainloop(void)
         //VICIV.bordercol = 0x00;
       }
       if (screen_update_needed & SCREEN_UPDATE_ACTORS) {
-        VICIV.bordercol = 0x01;
+        //VICIV.bordercol = 0x01;
         redraw_actors();
-        VICIV.bordercol = 0x00;
+        //VICIV.bordercol = 0x00;
 
       }
       map_cs_gfx();
@@ -525,9 +527,14 @@ uint8_t vm_is_script_running(uint8_t script_id)
  *
  * Code section: code_main
  */
-void vm_update_screen(void)
+void vm_update_bg(void)
 {
   screen_update_needed |= SCREEN_UPDATE_BG;
+}
+
+void vm_update_actors(void)
+{
+  screen_update_needed |= SCREEN_UPDATE_ACTORS;
 }
 
 uint16_t vm_get_object_at(uint8_t x, uint8_t y)
@@ -797,6 +804,8 @@ static void redraw_actors(void)
       continue;
     }
 
+    actor_draw(local_id);
+/*
     uint8_t global_id = local_actors.global_id[local_id];
     uint16_t pos_x = (actors.x[global_id] << 3) + (local_actors.x_fraction[local_id] >> 13);
     uint8_t pos_y = actors.y[global_id] << 1;
@@ -863,6 +872,7 @@ static void redraw_actors(void)
       ++cel_level_last_cmd;
       ++cel_level_table_offset;
     }
+*/
   }
 
   gfx_finalize_cel_drawing();
@@ -1161,6 +1171,22 @@ static void update_actors(void)
   }
 }
 
+static void animate_actors(void)
+{
+  uint8_t redraw_needed = 0;
+  for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id)
+  {
+    if (local_actors.global_id[local_id] == 0xff)
+    {
+      continue;
+    }
+    redraw_needed |= actor_update_animation(local_id);
+  }
+  if (redraw_needed) {
+    screen_update_needed |= SCREEN_UPDATE_ACTORS;
+  }
+}
+
 static void update_camera(void)
 {
   if (camera_state == CAMERA_STATE_FOLLOW_ACTOR && camera_follow_actor_id == 0xff)
@@ -1208,6 +1234,7 @@ static void update_camera(void)
       if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS) {
         camera_state &= ~CAMERA_STATE_MOVE_TO_TARGET_POS;
       }
+      return;
     }
   }
   else {
@@ -1227,7 +1254,8 @@ static void update_camera(void)
 
   vm_write_var(VAR_CAMERA_X, camera_x);
 
-  vm_update_screen();
+  vm_update_bg();
+  vm_update_actors();
 }
 
 /// @} // vm_private

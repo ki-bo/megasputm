@@ -555,7 +555,7 @@ static void draw_object(void)
   global_game_objects[obj_id] |= OBJ_STATE;
   vm_clear_all_other_object_states(obj_id);
 
-  vm_update_screen();
+  vm_update_bg();
 }
 
 /**
@@ -604,7 +604,7 @@ static void state_of(void)
     debug_scr("state-of %d is ON", obj_id);
     global_game_objects[obj_id] |= OBJ_STATE;
   }
-  vm_update_screen();
+  vm_update_bg();
 }
 
 /**
@@ -914,9 +914,13 @@ static void sleep_for(void)
 static void set_camera(void)
 {
   //debug_msg("Set camera");
-  camera_x = resolve_next_param8();
-  debug_scr("Camera x: %d", camera_x);
-  vm_update_screen();
+  uint16_t new_camera_x = resolve_next_param8();
+  if (new_camera_x != camera_x) {
+    camera_x = new_camera_x;
+    debug_scr("Camera x: %d", camera_x);
+    vm_update_bg();
+    vm_update_actors();
+  }
 }
 
 static void execute_command(void)

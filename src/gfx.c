@@ -894,40 +894,72 @@ static void place_cel_chars(uint16_t char_num,
                             uint8_t height_chars,
                             uint8_t mirror)
 {
-  // place cel using rrb features
-  screen_pos_x &= 0x3ff;
-  uint8_t char_row = screen_pos_y / 8;
-  uint8_t sub_y = screen_pos_y & 0x07;
-  
-  debug_out(" scrx %d scry %d sub_y %d", screen_pos_x, char_row, sub_y);
-  __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + times_chrcount[char_row + 2];
-  __auto_type colram_start_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + times_chrcount[char_row + 2];
+  static uint8_t row_masks[8] = {0xff, 0x7f, 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01};
 
-  for (uint8_t y = 0; y < height_chars; ++y) {
-    __auto_type screen_ptr = screen_start_ptr + num_chars_at_row[char_row];
-    __auto_type colram_ptr = colram_start_ptr + num_chars_at_row[char_row];
-    *screen_ptr = screen_pos_x;
-    *colram_ptr = 0x0090;
-    if (mirror) {
-      screen_ptr += width_chars;
-      colram_ptr += width_chars;
-    }
-    else {
-      ++screen_ptr;
-      ++colram_ptr;
-    }
-    uint16_t cur_char = char_num;
-    for (uint8_t x = 0; x < width_chars; ++x) {
-      *screen_ptr = cur_char;
-      cur_char += height_chars;
+  // place cel using rrb features
+  //screen_pos_x = 0;
+  //screen_pos_y = 2;
+  screen_pos_x &= 0x3ff;
+  int8_t char_row = screen_pos_y / 8;
+  int8_t last_but_one_row = height_chars - 2;
+  uint8_t shift_y = (uint8_t)screen_pos_y & 0x07;
+  //debug_out(" char_num %04x scrx %d char_row %d sub_y %d", char_num, screen_pos_x, char_row, shift_y);
+  if (shift_y) {
+    shift_y = 8 - shift_y;
+  }
+  //debug_out("    shift_y %d", shift_y);
+
+  uint8_t rowmask = ~row_masks[shift_y];
+  uint16_t gotox_col = (uint8_t)0x98 | (rowmask << 8);
+  uint16_t gotox_scr = shift_y << 13;
+  --char_num;
+  //mirror = 0;
+  
+  __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN);
+  
+  if (char_row >= 0) {
+    uint16_t offset = times_chrcount[char_row + 2];
+    screen_start_ptr += times_chrcount[char_row + 2];
+  }
+  __auto_type colram_start_ptr = screen_start_ptr + (BACKBUFFER_COLRAM - BACKBUFFER_SCREEN) / 2;
+  for (int8_t y = -1; y < height_chars; ++y) {
+    //debug_out(" printing to row %d", char_row);
+    if (char_row >= 0 && char_row < 16) {
+      uint8_t num_chars_cur_row = num_chars_at_row[char_row];
+      __auto_type screen_ptr = screen_start_ptr + num_chars_cur_row;
+      __auto_type colram_ptr = colram_start_ptr + num_chars_cur_row;
+      *screen_ptr = screen_pos_x | gotox_scr;
+      //debug_out("  screen_ptr: %04x colram_ptr: %04x gotox_scr: %04x gotox_col: %04x", (uint16_t)screen_ptr, (uint16_t)colram_ptr, gotox_scr, gotox_col)
+      *colram_ptr = gotox_col;
       if (mirror) {
-        --screen_ptr;
-        *colram_ptr-- = 0x0f40;
+        screen_ptr += width_chars;
+        colram_ptr += width_chars;
       }
       else {
         ++screen_ptr;
-        *colram_ptr++ = 0x0f00;
+        ++colram_ptr;
       }
+      uint16_t cur_char = char_num;
+      for (uint8_t x = 0; x < width_chars; ++x) {
+        //debug_out("   screen_ptr: %04x cur_char: %04x", (uint16_t)screen_ptr, cur_char);
+        *screen_ptr = cur_char;
+        cur_char += height_chars;
+        if (mirror) {
+          --screen_ptr;
+          *colram_ptr-- = 0x0f40;
+        }
+        else {
+          ++screen_ptr;
+          *colram_ptr++ = 0x0f00;
+        }
+      }
+    }
+   if (y == last_but_one_row) {
+      rowmask = row_masks[shift_y];
+      gotox_col = (uint8_t)0x98 | (rowmask << 8);
+    }
+    else if (y == -1) {
+      gotox_col = 0x0090;
     }
     num_chars_at_row[char_row] += width_chars + 1;
     ++char_num;
@@ -935,6 +967,8 @@ static void place_cel_chars(uint16_t char_num,
     screen_start_ptr += CHRCOUNT;
     colram_start_ptr += CHRCOUNT;
   }
+  //screen_update_request = 1;
+  //fatal_error(1);
 }
 
 /** @} */ // gfx_private

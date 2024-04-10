@@ -36,6 +36,7 @@ typedef struct {
   uint8_t      *cel_level_cmd_ptr[MAX_LOCAL_ACTORS][16];
   uint8_t       cel_level_cur_cmd[MAX_LOCAL_ACTORS][16];
   uint8_t       cel_level_last_cmd[MAX_LOCAL_ACTORS][16];
+  uint8_t       animation_just_started[MAX_LOCAL_ACTORS];
   uint8_t       walking[MAX_LOCAL_ACTORS];
   uint16_t      x_fraction[MAX_LOCAL_ACTORS];
   uint16_t      y_fraction[MAX_LOCAL_ACTORS];
@@ -60,6 +61,8 @@ void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y);
 uint8_t actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);
+uint8_t actor_update_animation(uint8_t local_id);
+void actor_draw(uint8_t local_id);
 
 // inline main functions
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"

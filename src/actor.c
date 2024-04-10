@@ -175,8 +175,94 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
     ++cel_level_cmd_ptr;
     ++cel_level_last_cmd;
   }
+  local_actors.animation_just_started[local_id] = 1;
 
   map_set_ds(save_ds);
+}
+
+uint8_t actor_update_animation(uint8_t local_id)
+{
+  uint8_t animation_just_started = local_actors.animation_just_started[local_id];
+  local_actors.animation_just_started[local_id] = 0;
+  if (animation_just_started) {
+    return 0;
+  }
+
+  uint8_t result = 0;
+
+  map_ds_resource(local_actors.res_slot[local_id]);
+  __auto_type cel_level_cur_cmd = local_actors.cel_level_cur_cmd[local_id];
+  __auto_type cel_level_last_cmd = local_actors.cel_level_last_cmd[local_id];
+  for (uint8_t level = 0; level < 16; ++level) {
+    uint8_t cmd_offset = *cel_level_cur_cmd;
+    if (cmd_offset != 0xff) {
+      while (1) {
+        uint8_t last_cmd_offset = *cel_level_last_cmd;
+        if (cmd_offset == (last_cmd_offset & 0x7f)) {
+          if (!(last_cmd_offset & 0x80)) {
+            debug_out("  loop to 0");
+            *cel_level_cur_cmd = 0;
+            result = 1;
+          }
+          break;
+        }
+        else {
+          (*cel_level_cur_cmd)++;
+          result = 1;
+          break;
+        }
+      }
+    }
+    ++cel_level_cur_cmd;
+    ++cel_level_last_cmd;
+  }
+  return result;
+}
+
+void actor_draw(uint8_t local_id)
+{
+  uint8_t global_id = local_actors.global_id[local_id];
+  uint16_t pos_x = (actors.x[global_id] << 3) + (local_actors.x_fraction[local_id] >> 13);
+  uint8_t pos_y = actors.y[global_id] << 1;
+
+  map_ds_resource(local_actors.res_slot[local_id]);
+  __auto_type hdr = (struct costume_header *)RES_MAPPED;
+  __auto_type cel_level_cmd_ptr = local_actors.cel_level_cmd_ptr[local_id];
+  __auto_type cel_level_cur_cmd = local_actors.cel_level_cur_cmd[local_id];
+  __auto_type cel_level_table_offset = hdr->level_table_offsets;
+  int16_t dx = -72;
+  int16_t dy = -100;
+  for (uint8_t level = 0; level < 16; ++level) {
+    uint8_t cmd_offset = *cel_level_cur_cmd;
+    uint8_t *cmd_ptr = *cel_level_cmd_ptr;
+    if (cmd_offset != 0xff) {
+      uint8_t cmd = cmd_ptr[cmd_offset];
+      if (cmd < 0x79) {
+        __auto_type cel_ptrs_for_cur_level = NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
+        __auto_type cel_data = (struct costume_cel*)(RES_MAPPED + cel_ptrs_for_cur_level[cmd]);
+        int16_t dx_level = dx + cel_data->offset_x;
+        int16_t dy_level = dy + cel_data->offset_y;
+        dx += cel_data->move_x;
+        dy -= cel_data->move_y;
+        debug_out("drawing cmd %d cel %04x dx %d dy %d", cmd, (uint16_t)cel_data, dx_level, dy_level);
+        uint8_t mirror;
+        if (local_actors.direction[local_id] == 0 && !(hdr->disable_mirroring_and_format & 0x80)) {
+          mirror = 1;
+          pos_x += dx_level;
+        }
+        else {
+          mirror = 0;
+          pos_x -= dx_level;
+        }
+        pos_y += dy_level;
+        gfx_draw_cel(pos_x, pos_y, cel_data, mirror);
+      }
+    }
+    ++cel_level_cmd_ptr;
+    ++cel_level_cur_cmd;
+    ++cel_level_table_offset;
+  }
+
 }
 
 /// @} // actor_public
