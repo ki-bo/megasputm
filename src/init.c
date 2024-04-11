@@ -23,6 +23,8 @@
  */
 void global_init(void)
 {
+  map_init();
+  
   // configure dma
   dma_init();
 

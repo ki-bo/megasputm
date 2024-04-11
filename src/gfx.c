@@ -267,7 +267,10 @@ volatile uint8_t raster_irq_counter = 0;
 /**
  * @brief Raster interrupt routine.
  * 
- * This function is called every frame.
+ * This function is called every frame. It copies the backbuffer screen and color
+ * RAM to the actual screen and color RAM. It also updates the cursor position and
+ * appearance. A raster_irq timer is updated which will drive the timing of the non-
+ * interrupt main loop and scripts.
  *
  * Code section: code
  */
@@ -380,7 +383,10 @@ void gfx_fade_in(void)
 }
 
 /**
- * @brief Waits for the next jiffy timer interrupt.
+ * @brief Waits for the next jiffy timer increase.
+ *
+ * The jiffy counter is updated every raster irq. This function will block until the jiffy
+ * counter is updated the next time.
  * 
  * @return The number of jiffies that have passed since the last call to this function.
  *
@@ -406,13 +412,23 @@ void gfx_wait_for_next_frame(void)
   while (counter == raster_irq_counter);
 }
 
+/**
+ * @brief Clears the background image.
+ *
+ * The pixel data memory is cleared so the background image is blank. This routine
+ * is used when selecting room 0 (also called "the-void" in SCUMM).
+ *
+ * Code section: code_gfx
+ */
 void gfx_clear_bg_image(void)
 {
+  uint16_t num_bytes = 16U * 40U * 64U;
+
   // clear one screen worth of char data
-  memset_bank(FAR_U8_PTR(BG_BITMAP), 0, 16U * 40U * 64U);
+  memset_bank(FAR_U8_PTR(BG_BITMAP), 0, num_bytes);
 
   // reset next_char_data pointer
-  next_char_data = HUGE_U8_PTR(BG_BITMAP) + 16U * 40U * 2;
+  next_char_data = HUGE_U8_PTR(BG_BITMAP) + num_bytes;
 
   // reset object pointers
   next_obj_slot = 0;
@@ -444,6 +460,24 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
   next_obj_slot = 0;
 }
 
+/**
+ * @brief Decodes the binary masking data after the background image.
+ *
+ * The masking data is stored in the room resource following the background image.
+ * It is used to mask out actor pixels that should not be drawn over the background.
+ * That way, actors can be placed behind background image objects by not drawing
+ * their pixels where the masking buffer is set.
+ *
+ * The result is not cached in memory, but the masking_cache_iterations and
+ * masking_cache_data_offset arrays are filled with the data for each column.
+ * Those arrays allow starting the actual decoding of the masking data at
+ * arbitrary columns.
+ * 
+ * @param src Pointer to the encoded masking data.
+ * @param width Width of the masking data in characters.
+ *
+ * Code section: code_gfx
+ */
 void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
 {
   // debug_out("Decode masking buffer, width: %d\n", width);
@@ -506,6 +540,8 @@ void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
  * @param src Pointer to the encoded object image data.
  * @param width Width of the object image in characters.
  * @param height Height of the object image in characters.
+ *
+ * Code section: code_gfx
  */
 void gfx_decode_object_image(uint8_t *src, uint8_t width, uint8_t height)
 {
@@ -653,6 +689,24 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
   while (--height);
 }
 
+/**
+ * @brief Draws an actor cel to the backbuffer.
+ * 
+ * The actor cel is drawn to the backbuffer screen memory. The coordinates x and y are
+ * the position relative to the visible screen area (top/left being 0,0). If the 
+ * mirror parameter is non-zero, the actor cel is drawn mirrored horizontally.
+ *
+ * The position is relative the the walking location of the actor. However, the cel contains
+ * relative positioning offsets that already need to be applied to the position provided
+ * to this function.
+ *
+ * @param xpos Horizontal screen position in pixels.
+ * @param ypos Vertical screen position in pixels.
+ * @param cel_data Pointer to cel data to decode.
+ * @param mirror 0 = no mirroring, 1 = mirror cel horizontally
+ *
+ * Code section: code_gfx
+ */
 void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror)
 {
   __auto_type hdr = (struct costume_cel *)cel_data;
@@ -683,7 +737,6 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
   int16_t y = 0;
 
   memset_bank((uint8_t __far *)next_char_data, 0, num_bytes);
-
   dmalist_rle_strip_copy.count = height;
 
   do {
@@ -714,13 +767,24 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
   while (x != width);
   next_char_data = next_char_data_save + num_bytes;
 
-  unmap_ds();
 
   place_cel_chars(char_num, screen_pos_x, ypos, num_char_cols, num_char_rows, mirror);
 }
 
+/**
+ * @brief Finalizes drawing of all actors of the current screen.
+ *
+ * Needs to be called after all actors were drawn to the backbuffer. It will reposition
+ * the RRB position (GOTOX) to the right edge of the screen and place an end-of-line
+ * character code to indicate the RRB rendering should stop for this character row.
+ *
+ * Code section: code_gfx
+ */
 void gfx_finalize_cel_drawing(void)
-{  
+{
+  uint16_t save_ds = map_get_ds();
+  unmap_ds();
+
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
   __auto_type colram_start_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
   for (uint8_t y = 0; y < 16; ++y) {
@@ -734,8 +798,20 @@ void gfx_finalize_cel_drawing(void)
     screen_start_ptr += CHRCOUNT;
     colram_start_ptr += CHRCOUNT;
   }
+
+  map_set_ds(save_ds);
 }
 
+/**
+ * @brief Resets RRB write pointers to the end of the background image.
+ *
+ * This function needs to be called before the actor cels are drawn to the backbuffer.
+ * It will reset the position of the RRB write positions for each character row to the
+ * end of the background image.
+ * Any new cels drawn will therefore overwrite any previously placed RRB objects.
+ *
+ * Code section: code_gfx
+ */
 void gfx_reset_cel_drawing(void)
 {
   memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
@@ -897,23 +973,24 @@ static void place_cel_chars(uint16_t char_num,
   static uint8_t row_masks[8] = {0xff, 0x7f, 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01};
 
   // place cel using rrb features
-  //screen_pos_x = 0;
-  //screen_pos_y = 2;
-  screen_pos_x &= 0x3ff;
   int8_t char_row = screen_pos_y / 8;
+  if (char_row > 15) {
+    return;
+  }
+  screen_pos_x &= 0x3ff;
   int8_t last_but_one_row = height_chars - 2;
   uint8_t shift_y = (uint8_t)screen_pos_y & 0x07;
-  //debug_out(" char_num %04x scrx %d char_row %d sub_y %d", char_num, screen_pos_x, char_row, shift_y);
   if (shift_y) {
     shift_y = 8 - shift_y;
   }
-  //debug_out("    shift_y %d", shift_y);
 
   uint8_t rowmask = ~row_masks[shift_y];
   uint16_t gotox_col = (uint8_t)0x98 | (rowmask << 8);
   uint16_t gotox_scr = shift_y << 13;
   --char_num;
-  //mirror = 0;
+
+  uint16_t save_ds = map_get_ds();
+  unmap_ds();
   
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN);
   
@@ -923,13 +1000,11 @@ static void place_cel_chars(uint16_t char_num,
   }
   __auto_type colram_start_ptr = screen_start_ptr + (BACKBUFFER_COLRAM - BACKBUFFER_SCREEN) / 2;
   for (int8_t y = -1; y < height_chars; ++y) {
-    //debug_out(" printing to row %d", char_row);
     if (char_row >= 0 && char_row < 16) {
       uint8_t num_chars_cur_row = num_chars_at_row[char_row];
       __auto_type screen_ptr = screen_start_ptr + num_chars_cur_row;
       __auto_type colram_ptr = colram_start_ptr + num_chars_cur_row;
       *screen_ptr = screen_pos_x | gotox_scr;
-      //debug_out("  screen_ptr: %04x colram_ptr: %04x gotox_scr: %04x gotox_col: %04x", (uint16_t)screen_ptr, (uint16_t)colram_ptr, gotox_scr, gotox_col)
       *colram_ptr = gotox_col;
       if (mirror) {
         screen_ptr += width_chars;
@@ -941,7 +1016,6 @@ static void place_cel_chars(uint16_t char_num,
       }
       uint16_t cur_char = char_num;
       for (uint8_t x = 0; x < width_chars; ++x) {
-        //debug_out("   screen_ptr: %04x cur_char: %04x", (uint16_t)screen_ptr, cur_char);
         *screen_ptr = cur_char;
         cur_char += height_chars;
         if (mirror) {
@@ -967,8 +1041,8 @@ static void place_cel_chars(uint16_t char_num,
     screen_start_ptr += CHRCOUNT;
     colram_start_ptr += CHRCOUNT;
   }
-  //screen_update_request = 1;
-  //fatal_error(1);
+
+  map_set_ds(save_ds);
 }
 
 /** @} */ // gfx_private

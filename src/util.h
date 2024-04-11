@@ -72,7 +72,7 @@
 void fatal_error(error_code_t error);
 void fatal_error_str(const char *message);
 
-#if DEBUG
+#ifdef DEBUG
 extern char msg[80];
 #define debug_out(...) sprintf(msg, __VA_ARGS__); \
                        debug_msg(msg);

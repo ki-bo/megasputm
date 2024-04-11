@@ -147,27 +147,27 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   map_ds_resource(local_actors.res_slot[local_id]);
 
   __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
-  debug_out("Local actor %d start animation %d", local_id, animation);
-  debug_out("  Num animations in costume: %d", costume_hdr->num_animations);
+  //debug_out("Local actor %d start animation %d", local_id, animation);
+  //debug_out("  Num animations in costume: %d", costume_hdr->num_animations);
   if (animation >= costume_hdr->num_animations + 1) {
     fatal_error(ERR_ANIMATION_NOT_DEFINED);
   }
-  debug_out(" animation offset: %d", costume_hdr->animation_offsets[animation]);
+  //debug_out(" animation offset: %04x", costume_hdr->animation_offsets[animation]);
   __auto_type anim_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_offsets[animation]);
-  uint16_t cel_level_mask = *(uint16_t *)anim_ptr;
+  uint16_t cel_level_mask = *((uint16_t *)anim_ptr);
+  // todo: remove this dummy write once compiler bug is fixed
+  *((uint16_t *)0xc000) = cel_level_mask;
   anim_ptr += 2;
-  debug_out(" cel level mask: %04x", cel_level_mask);
-  for (int8_t level = 0; level < 16; ++level)
-  {
-    if ((MSB(cel_level_mask) & 0x80)) {
+  for (int8_t level = 0; level < 16; ++level) {
+    if (cel_level_mask & 0x8000) {
       uint8_t cmd_offset = *anim_ptr++;
-      debug_out("  cel level: %d", level);
-      debug_out("    cmd offset: %02x", cmd_offset);
+      //debug_out("  cel level: %d", level);
+      //debug_out("    cmd offset: %02x", cmd_offset);
       if (cmd_offset != 0xff) {
         *cel_level_cur_cmd  = 0;
         *cel_level_cmd_ptr  = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_commands_offset + cmd_offset);
         *cel_level_last_cmd = *anim_ptr++;
-        debug_out("    cur %d last %d cmd_ptr %04x", *cel_level_cur_cmd, *cel_level_last_cmd, (uint16_t)*cel_level_cmd_ptr);
+        //debug_out("    cur %d last %d cmd_ptr %04x", *cel_level_cur_cmd, *cel_level_last_cmd, (uint16_t)*cel_level_cmd_ptr);
       }
     }  
     cel_level_mask <<= 1;
@@ -200,7 +200,7 @@ uint8_t actor_update_animation(uint8_t local_id)
         uint8_t last_cmd_offset = *cel_level_last_cmd;
         if (cmd_offset == (last_cmd_offset & 0x7f)) {
           if (!(last_cmd_offset & 0x80)) {
-            debug_out("  loop to 0");
+            //debug_out("  loop to 0");
             *cel_level_cur_cmd = 0;
             result = 1;
           }
@@ -224,7 +224,6 @@ void actor_draw(uint8_t local_id)
   uint8_t global_id = local_actors.global_id[local_id];
   uint16_t pos_x = (actors.x[global_id] << 3) + (local_actors.x_fraction[local_id] >> 13);
   uint8_t pos_y = actors.y[global_id] << 1;
-
   map_ds_resource(local_actors.res_slot[local_id]);
   __auto_type hdr = (struct costume_header *)RES_MAPPED;
   __auto_type cel_level_cmd_ptr = local_actors.cel_level_cmd_ptr[local_id];
@@ -244,7 +243,7 @@ void actor_draw(uint8_t local_id)
         int16_t dy_level = dy + cel_data->offset_y;
         dx += cel_data->move_x;
         dy -= cel_data->move_y;
-        debug_out("drawing cmd %d cel %04x dx %d dy %d", cmd, (uint16_t)cel_data, dx_level, dy_level);
+        //debug_out("drawing cmd %d cel %04x dx %d dy %d", cmd, (uint16_t)cel_data, dx_level, dy_level);
         uint8_t mirror;
         if (local_actors.direction[local_id] == 0 && !(hdr->disable_mirroring_and_format & 0x80)) {
           mirror = 1;
@@ -262,7 +261,6 @@ void actor_draw(uint8_t local_id)
     ++cel_level_cur_cmd;
     ++cel_level_table_offset;
   }
-
 }
 
 /// @} // actor_public
@@ -326,8 +324,8 @@ static void calculate_step(uint8_t local_id)
   int32_t x_step = 0;
   int32_t y_step = 0;
 
-  debug_out("From %d, %d to %d, %d", x, y, walk_to_x, walk_to_y);
-  debug_out("Diff: %d, %d", x_diff, y_diff);
+  //debug_out("From %d, %d to %d, %d", x, y, walk_to_x, walk_to_y);
+  //debug_out("Diff: %d, %d", x_diff, y_diff);
   if (x_diff < 0) {
     if (y_diff < 0) {
       if (x_diff < 2 * y_diff) {

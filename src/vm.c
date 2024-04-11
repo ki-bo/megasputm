@@ -189,8 +189,6 @@ __task void vm_mainloop(void)
     }
     while (jiffy_threshold && elapsed_jiffies < jiffy_threshold);
 
-    //VICIV.bordercol = 0x0f;
-
     map_cs_diskio();
     diskio_check_motor_off(elapsed_jiffies);
     unmap_cs();
@@ -232,7 +230,6 @@ __task void vm_mainloop(void)
       unmap_cs();
       screen_update_needed = 0;
     }
-
   }
 }
 
@@ -279,12 +276,15 @@ void vm_set_current_room(uint8_t room_no)
 
   vm_write_var(VAR_SELECTED_ROOM, room_no);
 
+  camera_follow_actor_id = 0xff;
+  camera_state = 0;
+  camera_x = 20;
+
   if (room_no == 0) {
     gfx_clear_bg_image();
     num_objects = 0;
   }
   else {
-
     debug_out("Activating new room %d", room_no);
     // activate new room data
     room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
@@ -301,10 +301,6 @@ void vm_set_current_room(uint8_t room_no)
     map_ds_resource(room_res_slot);
 
     read_objects();
-
-    camera_follow_actor_id = 0xff;
-    camera_state = 0;
-    camera_x = 20;
 
     // run entry script
     vm_start_room_script(room_hdr->entry_script_offset + 4);
