@@ -86,6 +86,9 @@ static uint8_t num_chars_at_row[16];
 static uint8_t screen_update_request = 0;
 static uint8_t masking_cache_iterations[119];
 static uint16_t masking_cache_data_offset[119];
+static uint8_t num_masking_cache_cols = 0;
+static uint8_t masking_column[GFX_HEIGHT];
+static uint16_t masking_data_room_offset;
 static uint16_t screen_pixel_offset_x;
 
 static dmalist_single_option_t dmalist_rle_strip_copy = {
@@ -138,6 +141,7 @@ static void place_cel_chars(uint16_t char_num,
                             uint8_t width_chars,
                             uint8_t height_chars,
                             uint8_t mirror);
+static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -472,14 +476,18 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
  * masking_cache_data_offset arrays are filled with the data for each column.
  * Those arrays allow starting the actual decoding of the masking data at
  * arbitrary columns.
+ *
+ * The function will change DS and won't restore it.
  * 
- * @param src Pointer to the encoded masking data.
+ * @param bg_masking_offset Room offset to background masking data.
  * @param width Width of the masking data in characters.
  *
  * Code section: code_gfx
  */
-void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
+void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 {
+  masking_data_room_offset = bg_masking_offset;
+  uint8_t *src = map_ds_room_offset(bg_masking_offset);
   // debug_out("Decode masking buffer, width: %d\n", width);
   uint8_t mask_col = 0;
   uint16_t num_bytes = width * (GFX_HEIGHT / 8);
@@ -492,22 +500,25 @@ void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
     uint8_t count_byte = *src++;
     ++mask_data_offset;
     iterations = count_byte & 0x7f;
-    //count_byte &= 0x80;
-    //uint8_t data_byte = *src;
+
+    // count_byte &= 0x80;
+    // uint8_t data_byte = *src;
     // debug_out("  remaining pixels[%d]: %d\n", mask_col - 1, remaining_pixels);
     // debug_out("bytes left: %d fill: %d, iterations: %d, data_byte: %d @offset %d", num_bytes, count_byte!=0, iterations, data_byte, mask_data_offset);
 
     if (iterations > remaining_pixels) {
       num_bytes -= iterations;
       iterations -= remaining_pixels;
-      if (!(count_byte & 0x80)) {
-        masking_cache_iterations[mask_col] = iterations | 0x80;
-        masking_cache_data_offset[mask_col] = mask_data_offset + remaining_pixels;
+      uint8_t cache_iterations = iterations;
+      uint16_t cache_data_offset = mask_data_offset;
+      if (count_byte & 0x80) {
+        cache_iterations |= 0x80;
       }
       else {
-        masking_cache_iterations[mask_col] = iterations;
-        masking_cache_data_offset[mask_col] = mask_data_offset;      
+        cache_data_offset += remaining_pixels;
       }
+      masking_cache_iterations[mask_col] = cache_iterations;
+      masking_cache_data_offset[mask_col] = cache_data_offset;
       // debug_out("  cache_iterations[%d] = %d (%d)\n", mask_col, masking_cache_iterations[mask_col] & 0x7f, masking_cache_iterations[mask_col]);
       // debug_out("  cache_offset[%d]     = %d\n", mask_col, masking_cache_data_offset[mask_col]);
       ++mask_col;
@@ -527,6 +538,7 @@ void gfx_decode_masking_buffer(uint8_t *src, uint16_t width)
       ++src;
     }
   }
+  num_masking_cache_cols = mask_col;
 }
 
 /**
@@ -709,14 +721,11 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
  */
 void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror)
 {
-  __auto_type hdr = (struct costume_cel *)cel_data;
-  uint8_t *rle_data = ((uint8_t *)cel_data) + sizeof(struct costume_cel);
-
   //debug_out(" cel x %d y %d", xpos, ypos);
   uint8_t width = cel_data->width;
   int16_t screen_pos_x = xpos - screen_pixel_offset_x;
-  if (screen_pos_x + width <= 0) {
-    debug_out("out of screen %d", screen_pos_x + width);
+  if (screen_pos_x + width <= 0 || screen_pos_x >= 320) {
+    debug_out("cel out of screen");
     return;
   }
   uint8_t height = cel_data->height;
@@ -735,10 +744,19 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
   uint16_t col_addr_inc = (num_pixel_lines_of_chars - 1) * 8;
   int16_t x = 0;
   int16_t y = 0;
-
+  uint8_t mask = mirror ? 0x01 << (xpos & 0x07) : 0x80 >> (xpos & 0x07);
+  int16_t mask_cur_col = xpos / 8;
+  if (mirror) {
+    mask_cur_col += num_char_cols - 1;
+    if (xpos & 0x07) {
+      ++mask_cur_col;
+    }
+  }
+  decode_single_mask_column(mask_cur_col, ypos, height);
   memset_bank((uint8_t __far *)next_char_data, 0, num_bytes);
   dmalist_rle_strip_copy.count = height;
 
+  uint8_t *rle_data = ((uint8_t *)cel_data) + sizeof(struct costume_cel);
   do {
     if (--run_length_counter == 0)
     {
@@ -750,7 +768,12 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
         run_length_counter = *rle_data++;
       }
     }
-    color_strip[y] = current_color;
+    if (masking_column[y] & mask) {
+      color_strip[y] = 0;
+    }
+    else {
+      color_strip[y] = current_color;
+    }
     ++y;
     if (y == height) {
       dmalist_rle_strip_copy.dst_addr = LSB16(next_char_data);
@@ -762,11 +785,26 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
       if (!(x & 0x07)) {
         next_char_data += col_addr_inc;
       }
+      if (mirror) {
+        mask <<= 1;
+        if (!mask) {
+          --mask_cur_col;
+          mask = 0x01;
+          decode_single_mask_column(mask_cur_col, ypos, height);
+        }
+      }
+      else {
+        mask >>= 1;
+        if (!mask) {
+          ++mask_cur_col;
+          mask = 0x80;
+          decode_single_mask_column(mask_cur_col, ypos, height);
+        }
+      }
     }
   }
   while (x != width);
   next_char_data = next_char_data_save + num_bytes;
-
 
   place_cel_chars(char_num, screen_pos_x, ypos, num_char_cols, num_char_rows, mirror);
 }
@@ -1042,6 +1080,71 @@ static void place_cel_chars(uint16_t char_num,
     colram_start_ptr += CHRCOUNT;
   }
 
+  map_set_ds(save_ds);
+}
+
+static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines)
+{
+  if (col < 0 || col > num_masking_cache_cols) {
+    memset_bank(UNBANKED_PTR(masking_column), 0, num_lines);
+    return;
+  }
+
+  uint16_t save_ds = map_get_ds();
+  uint8_t *data = map_ds_room_offset(masking_data_room_offset);
+  uint8_t cur_mask;
+  uint8_t iterations;
+  uint8_t fill;
+  uint8_t idx_src = 0;
+  uint8_t idx_dst = 0;
+
+  if (col == 0) {
+    iterations = data[idx_src++];
+  }
+  else {
+    --col;
+    iterations = masking_cache_iterations[(uint8_t)col];
+    data += masking_cache_data_offset[(uint8_t)col];
+  }
+  fill = iterations & 0x80;
+  iterations &= 0x7f;
+
+  while (y_start) {
+    if (iterations <= y_start) {
+      y_start -= iterations;
+      if (!(fill & 0x80)) {
+        idx_src += iterations;
+      }
+      else {
+        ++idx_src;
+      }
+      iterations = data[idx_src++];
+      fill = iterations & 0x80;
+      iterations &= 0x7f;
+    }
+    else {
+      iterations -= y_start;
+      if (!(fill & 0x80)) {
+        idx_src += y_start;
+      }
+      y_start = 0;
+    }
+  }
+  cur_mask = data[idx_src++];
+
+  while (idx_dst != num_lines) {
+    masking_column[idx_dst++] = cur_mask;
+    --iterations;
+    if (!iterations) {
+      iterations = data[idx_src++];
+      cur_mask = data[idx_src++];
+      fill = iterations & 0x80;
+      iterations &= 0x7f;
+    }
+    else if (!(fill & 0x80)) {
+      cur_mask = data[idx_src++];
+    }
+  }
   map_set_ds(save_ds);
 }
 

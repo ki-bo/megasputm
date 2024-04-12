@@ -223,7 +223,6 @@ __task void vm_mainloop(void)
         //VICIV.bordercol = 0x01;
         redraw_actors();
         //VICIV.bordercol = 0x00;
-
       }
       map_cs_gfx();
       gfx_update_screen();
@@ -296,7 +295,7 @@ void vm_set_current_room(uint8_t room_no)
 
     map_cs_gfx();
     gfx_decode_bg_image(map_ds_room_offset(bg_data_offset), room_width);
-    gfx_decode_masking_buffer(map_ds_room_offset(bg_masking_offset), room_width);
+    gfx_decode_masking_buffer(bg_masking_offset, room_width);
 
     map_ds_resource(room_res_slot);
 
@@ -801,74 +800,6 @@ static void redraw_actors(void)
     }
 
     actor_draw(local_id);
-/*
-    uint8_t global_id = local_actors.global_id[local_id];
-    uint16_t pos_x = (actors.x[global_id] << 3) + (local_actors.x_fraction[local_id] >> 13);
-    uint8_t pos_y = actors.y[global_id] << 1;
-    //debug_out("drawing actor %d", global_id);
-
-    map_ds_resource(local_actors.res_slot[local_id]);
-    __auto_type hdr = (struct costume_header *)RES_MAPPED;
-    __auto_type cel_level_cmd_ptr = local_actors.cel_level_cmd_ptr[local_id];
-    __auto_type cel_level_cur_cmd = local_actors.cel_level_cur_cmd[local_id];
-    __auto_type cel_level_last_cmd = local_actors.cel_level_last_cmd[local_id];
-    __auto_type cel_level_table_offset = hdr->level_table_offsets;
-    int16_t dx = -72;
-    int16_t dy = -100;
-    for (uint8_t level = 0; level < 16; ++level) {
-      uint8_t cmd_offset = *cel_level_cur_cmd;
-      uint8_t *cmd_ptr = *cel_level_cmd_ptr;
-      //debug_out("  level %d cmd_offset %02x", level, cmd_offset);
-      if (cmd_offset != 0xff) {
-        while (1) {
-          uint8_t cmd = cmd_ptr[cmd_offset];
-          debug_out("cmd_offset: %d cmd: %d last: %d", cmd_offset, cmd, *cel_level_last_cmd);
-          if (cmd < 0x79) {
-            __auto_type cel_ptrs_for_cur_level = NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
-            __auto_type cel_data = (struct costume_cel*)(RES_MAPPED + cel_ptrs_for_cur_level[cmd]);
-            int16_t dx_level = dx + cel_data->offset_x;
-            int16_t dy_level = dy + cel_data->offset_y;
-            dx += cel_data->move_x;
-            dy -= cel_data->move_y;
-            debug_out("drawing cmd %d cel %04x dx %d dy %d", cmd, (uint16_t)cel_data, dx_level, dy_level);
-            uint8_t mirror;
-            if (local_actors.direction[local_id] == 0 && !(hdr->disable_mirroring_and_format & 0x80)) {
-              mirror = 1;
-              pos_x += dx_level;
-              // when mirroring, additional padding pixels due to rounding up to chars will 
-              // appear to the left of the cel image. Thus, we correct for that padding again
-              // by adjusting the x position.
-              //if (cel_data->width & 0x07) {
-              //  pos_x -= 8 - cel_data->width & 0x07;
-              //}
-            }
-            else {
-              mirror = 0;
-              pos_x -= dx_level;
-            }
-            pos_y += dy_level;
-            gfx_draw_cel(pos_x, pos_y, cel_data, mirror);
-          }
-          uint8_t last_cmd_offset = *cel_level_last_cmd;
-          if (cmd_offset == (last_cmd_offset & 0x7f)) {
-            if (!(last_cmd_offset & 0x80)) {
-              debug_out("  loop to 0");
-              *cel_level_cur_cmd = 0;
-            }
-            break;
-          }
-          else {
-            (*cel_level_cur_cmd)++;
-            break;
-          }
-        }
-      }
-      ++cel_level_cmd_ptr;
-      ++cel_level_cur_cmd;
-      ++cel_level_last_cmd;
-      ++cel_level_table_offset;
-    }
-*/
   }
 
   gfx_finalize_cel_drawing();
