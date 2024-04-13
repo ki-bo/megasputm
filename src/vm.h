@@ -3,15 +3,18 @@
 
 #include <stdint.h>
 
-#define NUM_SCRIPT_SLOTS   32
-#define MAX_OBJECTS        57
-#define CMD_STACK_SIZE      6
+#define NUM_SCRIPT_SLOTS     32
+#define MAX_OBJECTS          57
+#define CMD_STACK_SIZE        6
 
 enum {
-  PROC_STATE_FREE,
-  PROC_STATE_RUNNING,
-  PROC_STATE_WAITING_FOR_TIMER,
-  PROC_STATE_WAITING_FOR_CHILD
+  // bits 0-2 reserved for process state
+  PROC_STATE_FREE = 0,
+  PROC_STATE_RUNNING = 1,
+  PROC_STATE_WAITING_FOR_TIMER = 2,
+  PROC_STATE_WAITING_FOR_CHILD = 3,
+  // flags (bits 3-7)
+  PROC_FLAGS_FROZEN = 0x80
 };
 
 enum {
@@ -74,13 +77,25 @@ enum {
   SCREEN_UPDATE_ACTORS = 2
 };
 
+enum {
+  UI_FLAGS_APPLY_FREEZE     = 0x01,
+	UI_FLAGS_APPLY_CURSOR     = 0x02,
+	UI_FLAGS_APPLY_INTERFACE  = 0x04,
+	UI_FLAGS_ENABLE_FREEZE    = 0x08,
+	UI_FLAGS_ENABLE_CURSOR    = 0x10,
+	UI_FLAGS_ENABLE_SENTENCE  = 0x20,
+	UI_FLAGS_ENABLE_INVENTORY = 0x40,
+	UI_FLAGS_ENABLE_VERBS     = 0x80
+};
+
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];
 extern char message_buffer[256];
 
 extern volatile uint8_t script_watchdog;
-extern uint8_t state_iface;
+extern int8_t cursor_state;
+extern uint8_t ui_state;
 extern uint16_t camera_x;
 
 extern uint8_t active_script_slot;
@@ -101,7 +116,8 @@ extern struct cmd_stack_t cmd_stack;
 
 void vm_init(void);
 __task void vm_mainloop(void);
-uint8_t vm_get_active_proc_state(void);
+uint8_t vm_get_active_proc_state_and_flags(void);
+void vm_change_ui_flags(uint8_t flags);
 void vm_set_current_room(uint8_t room_no);
 void vm_set_script_wait_timer(int32_t negative_ticks);
 void vm_cut_scene_begin(void);

@@ -22,6 +22,8 @@ static void activate_costume(uint8_t actor_id);
 static void deactivate_costume(uint8_t actor_id);
 static uint8_t is_walk_to_done(uint8_t local_id);
 static void calculate_step(uint8_t local_id);
+static void add_local_actor(uint8_t actor_id);
+static void remove_local_actor(uint8_t actor_id);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -58,20 +60,39 @@ void actor_put_in_room(uint8_t actor_id, uint8_t room_no)
   }
 
   if (actor_is_in_current_room(actor_id)) {
-    deactivate_costume(actor_id);
-    local_actors.global_id[actors.local_id[actor_id]] = 0xff;
-    actors.local_id[actor_id] = 0xff;
-    debug_out("Actor %d is no longer in current room", actor_id);
+    remove_local_actor(actor_id);
   }
 
   actors.room[actor_id] = room_no;
   if (room_no == vm_read_var8(VAR_SELECTED_ROOM)) {
-    uint8_t local_id = get_free_local_id();
-    actors.local_id[actor_id] = local_id;
-    local_actors.global_id[local_id] = actor_id;
-    activate_costume(actor_id);
-    debug_out("Actor %d is now in current room with local id %d", actor_id, local_id);
+    add_local_actor(actor_id);
   }
+}
+
+void actor_room_changed(void)
+{
+  uint16_t save_ds = map_get_ds();
+
+  uint8_t new_room = vm_read_var8(VAR_SELECTED_ROOM);
+  for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
+    uint8_t global_id = local_actors.global_id[local_id];
+    if (global_id != 0xff && actors.room[global_id] != new_room) {
+      remove_local_actor(global_id);
+    }
+  }
+
+  if (new_room == 0) {
+    return;
+  }
+
+  uint8_t num_actors = vm_read_var8(VAR_NUMBER_OF_ACTORS);
+  for (uint8_t actor_id = 0; actor_id < num_actors; ++actor_id) {
+    if (actors.room[actor_id] == new_room && actors.local_id[actor_id] == 0xff) {
+      add_local_actor(actor_id);
+    }
+  }
+
+  map_set_ds(save_ds);
 }
 
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
@@ -374,6 +395,23 @@ static void calculate_step(uint8_t local_id)
   local_actors.walk_step_y[local_id] = y_step;
   debug_out("Actor %d step: %ld, %ld", actor_id, x_step, y_step);
   debug_out("  direction: %d", local_actors.direction[local_id]);
+}
+
+static void add_local_actor(uint8_t actor_id)
+{
+  uint8_t local_id = get_free_local_id();
+  actors.local_id[actor_id] = local_id;
+  local_actors.global_id[local_id] = actor_id;
+  activate_costume(actor_id);
+  debug_out("Actor %d is now in current room with local id %d", actor_id, local_id);
+}
+
+static void remove_local_actor(uint8_t actor_id)
+{
+  deactivate_costume(actor_id);
+  local_actors.global_id[actors.local_id[actor_id]] = 0xff;
+  actors.local_id[actor_id] = 0xff;
+  debug_out("Actor %d is no longer in current room", actor_id);
 }
 
 /// @} // actor_private

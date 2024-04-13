@@ -58,6 +58,7 @@ void actor_init(void);
 
 // main functions
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
+void actor_room_changed(void);
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y);
 uint8_t actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);

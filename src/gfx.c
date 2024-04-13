@@ -831,8 +831,11 @@ void gfx_finalize_cel_drawing(void)
     __auto_type colram_ptr = colram_start_ptr + end_of_row;
     *screen_ptr++ = 0x0140; // gotox to right screen edge (x=320)
     *colram_ptr++ = 0x0010;
-    *screen_ptr   = 0xffff; // end of line char code
-    *colram_ptr   = 0x0000;
+    // fill remaining bytes of row with zeros to prevent accidential gotox rendering
+    uint8_t remaining_bytes = (CHRCOUNT - end_of_row - 1) * 2;
+    memset(screen_ptr, 0, remaining_bytes);
+    memset(colram_ptr, 0, remaining_bytes);
+    // set next row pointers
     screen_start_ptr += CHRCOUNT;
     colram_start_ptr += CHRCOUNT;
   }
@@ -936,6 +939,7 @@ static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
 void update_cursor(uint8_t snail_override)
 {
   uint8_t cursor_state = vm_read_var8(VAR_CURSOR_STATE);
+  // VAR_CURSOR_STATE bit 0 = hide/show cursor
   if (!(cursor_state & 0x01)) {
     VICII.spr_ena = 0x00;
     return;
@@ -943,13 +947,16 @@ void update_cursor(uint8_t snail_override)
 
   uint16_t spr_pos_x = (input_cursor_x + 12) * 2 - HOTSPOT_OFFSET_X;
   uint8_t  spr_pos_y = (input_cursor_y + 50)     - HOTSPOT_OFFSET_Y;
+  // VAR_CURSOR_STATE bit 1 = snail/regular cursor
   if (cursor_state & 0x02 && !snail_override) {
+    // enable sprite 2 only = regular cursor
     VICII.spr_ena  = 0x02;
     VICII.spr1_x   = LSB(spr_pos_x);
     VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x02;
     VICII.spr1_y   = spr_pos_y;
   }
   else {
+    // enable sprite 1 only = snail cursor
     VICII.spr_ena  = 0x01;
     VICII.spr0_x   = LSB(spr_pos_x);
     VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x01;

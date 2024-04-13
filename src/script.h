@@ -3,12 +3,6 @@
 
 #include <stdint.h>
 
-enum script_return_t {
-    SCRIPT_RUNNING = 0,
-    SCRIPT_FINISHED = 1,
-    SCRIPT_BLOCKED = 2,
-};
-
 extern uint8_t __attribute__((zpage)) parallel_script_count;
 
 // code_init functions

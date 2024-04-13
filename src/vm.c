@@ -59,7 +59,8 @@ char message_buffer[256];
 uint8_t actor_talking;
 
 volatile uint8_t script_watchdog;
-uint8_t state_iface;
+int8_t cursor_state;
+uint8_t ui_state;
 uint16_t camera_x;
 uint16_t camera_target;
 uint8_t camera_state;
@@ -79,8 +80,8 @@ int32_t proc_wait_timer[NUM_SCRIPT_SLOTS];
 
 // cutscene backup data
 uint8_t cs_room;
-uint8_t cs_cursor_state;
-uint8_t cs_iface_state;
+int8_t cs_cursor_state;
+uint8_t cs_ui_state;
 uint16_t cs_pc;
 
 // room and object data
@@ -96,6 +97,10 @@ uint8_t  screen_update_needed = 0;
 struct cmd_stack_t cmd_stack;
 
 // Private functions
+static void set_proc_state(uint8_t slot, uint8_t state);
+static uint8_t get_proc_state(uint8_t slot);
+static void freeze_non_active_scripts(void);
+static void unfreeze_scripts(void);
 static void process_dialog(uint8_t jiffies_elapsed);
 static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
@@ -189,6 +194,8 @@ __task void vm_mainloop(void)
     }
     while (jiffy_threshold && elapsed_jiffies < jiffy_threshold);
 
+    //VICIV.bordercol = 0x01;
+
     map_cs_diskio();
     diskio_check_motor_off(elapsed_jiffies);
     unmap_cs();
@@ -203,6 +210,10 @@ __task void vm_mainloop(void)
          active_script_slot < NUM_SCRIPT_SLOTS;
          ++active_script_slot)
     {
+      // non-top-level scripts will be executed as childs in other scripts, so skip them here
+      if (proc_parent[active_script_slot] != 0xff) {
+        continue;
+      }
       execute_script_slot(active_script_slot);
     }
 
@@ -210,8 +221,6 @@ __task void vm_mainloop(void)
     update_actors();
     update_camera();
     animate_actors();
-
-    //VICIV.bordercol = 0x00;
 
     if (screen_update_needed) {
       if (screen_update_needed & SCREEN_UPDATE_BG) {
@@ -224,24 +233,50 @@ __task void vm_mainloop(void)
         redraw_actors();
         //VICIV.bordercol = 0x00;
       }
+      //VICIV.bordercol = 0x00;
       map_cs_gfx();
       gfx_update_screen();
       unmap_cs();
       screen_update_needed = 0;
     }
+    //VICIV.bordercol = 0x00;
   }
 }
 
 /**
  * @brief Returns the current state of the active process
  * 
+ * The returned value is the complete state variable of the currently active process.
+ * This includes the state in the lower bits and the additional state flags in the
+ * upper bits.
+ *
  * @return uint8_t The current state of the active process
  *
  * Code section: code_main
  */
-uint8_t vm_get_active_proc_state(void)
+uint8_t vm_get_active_proc_state_and_flags(void)
 {
   return proc_state[active_script_slot];
+}
+
+void vm_change_ui_flags(uint8_t flags)
+{
+  if (flags & UI_FLAGS_APPLY_CURSOR) {
+    cursor_state = flags & UI_FLAGS_ENABLE_CURSOR ? 1 : 0;
+  }
+
+  if (flags & UI_FLAGS_APPLY_FREEZE) {
+    if (flags & UI_FLAGS_ENABLE_FREEZE) {
+      freeze_non_active_scripts();
+    }
+    else {
+      unfreeze_scripts();
+    }
+  }
+
+  if (flags & UI_FLAGS_APPLY_INTERFACE) {
+    ui_state = flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS);
+  }
 }
 
 /**
@@ -264,8 +299,12 @@ void vm_set_current_room(uint8_t room_no)
   debug_out("Deactivating old room %d", vm_read_var8(VAR_SELECTED_ROOM));
   if (vm_read_var(VAR_SELECTED_ROOM) != 0) {
     map_ds_resource(room_res_slot);
-    vm_start_room_script(room_hdr->exit_script_offset + 4);
-    execute_script_slot(active_script_slot);
+    uint16_t exit_script_offset = room_hdr->exit_script_offset;
+    if (exit_script_offset) {
+      vm_start_room_script(exit_script_offset + 4);
+      execute_script_slot(active_script_slot);
+    }
+
     res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_SELECTED_ROOM), 0);
   }
 
@@ -274,6 +313,7 @@ void vm_set_current_room(uint8_t room_no)
   gfx_fade_out();
 
   vm_write_var(VAR_SELECTED_ROOM, room_no);
+  actor_room_changed();
 
   camera_follow_actor_id = 0xff;
   camera_state = 0;
@@ -302,8 +342,11 @@ void vm_set_current_room(uint8_t room_no)
     read_objects();
 
     // run entry script
-    vm_start_room_script(room_hdr->entry_script_offset + 4);
-    execute_script_slot(active_script_slot);
+    uint16_t entry_script_offset = room_hdr->entry_script_offset;
+    if (entry_script_offset) {
+      vm_start_room_script(entry_script_offset + 4);
+      execute_script_slot(active_script_slot);
+    }
   }
 
   redraw_screen();
@@ -349,16 +392,21 @@ void vm_cut_scene_begin(void)
 {
   cs_room = vm_read_var8(VAR_SELECTED_ROOM);
   cs_cursor_state = vm_read_var8(VAR_CURSOR_STATE);
-  cs_iface_state = state_iface;
+  cs_ui_state = ui_state;
+  vm_change_ui_flags(UI_FLAGS_APPLY_FREEZE | UI_FLAGS_ENABLE_FREEZE |
+                     UI_FLAGS_APPLY_CURSOR |
+                     UI_FLAGS_APPLY_INTERFACE);
 }
 
 void vm_cut_scene_end(void)
 {
+  debug_out("cut-scene ended");
   if (vm_read_var8(VAR_SELECTED_ROOM) != cs_room) {
+    debug_out("switching to room %d", cs_room);
     vm_set_current_room(cs_room);
   }
   vm_write_var(VAR_CURSOR_STATE, cs_cursor_state);
-  state_iface = cs_iface_state;
+  vm_change_ui_flags(cs_ui_state | UI_FLAGS_APPLY_CURSOR | UI_FLAGS_APPLY_FREEZE | UI_FLAGS_APPLY_INTERFACE);
 }
 
 /**
@@ -638,6 +686,32 @@ void vm_camera_pan_to(uint8_t x)
  * @{
  */
 
+static void set_proc_state(uint8_t slot, uint8_t state)
+{
+  proc_state[slot] &= ~0x07; // clear state without changing flags
+  proc_state[slot] |= state;
+}
+
+static uint8_t get_proc_state(uint8_t slot)
+{
+  return proc_state[slot] & 0x07;
+}
+
+static void freeze_non_active_scripts(void)
+{
+  for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot) {
+    if (slot != active_script_slot && proc_state[slot] != PROC_STATE_FREE) {
+      proc_state[slot] |= PROC_FLAGS_FROZEN;
+    }
+  }
+}
+static void unfreeze_scripts(void)
+{
+  for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot) {
+    proc_state[slot] &= ~PROC_FLAGS_FROZEN;
+  }
+}
+
 /**
  * @brief Processes the dialog timer
  *
@@ -877,31 +951,25 @@ static void update_script_timers(uint8_t elapsed_jiffies)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
-    if (proc_state[slot] == PROC_STATE_WAITING_FOR_TIMER)
+    if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_TIMER)
     {
       proc_wait_timer[slot] += elapsed_jiffies;
       uint8_t timer_msb = (uint8_t)((uintptr_t)(proc_wait_timer[slot]) >> 24);
       if (timer_msb == 0)
       {
-        proc_state[slot] = PROC_STATE_RUNNING;
+        set_proc_state(slot, PROC_STATE_RUNNING);
       }
     }
   }
-
 }
 
 static void execute_script_slot(uint8_t slot)
 {
   uint32_t map_save = map_get();
 
-  // non-top-level scripts will be executed as childs in other scripts, so skip them here
-  if (proc_parent[slot] != 0xff) {
-    return;
-  }
-
   // walk down to last child
   uint8_t parent = 0xff;
-  while (proc_state[slot] == PROC_STATE_WAITING_FOR_CHILD)
+  while (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD)
   {
     parent = slot;
     slot = proc_child[slot];
@@ -911,7 +979,9 @@ static void execute_script_slot(uint8_t slot)
 
   unmap_cs();
 
-  while (slot != 0xff && proc_state[slot] == PROC_STATE_RUNNING) {
+  // checking for PROC_STATE_RUNNING also implies frozen states won't match and
+  // don't get executed
+  while (slot != 0xff && get_proc_state(slot) == PROC_STATE_RUNNING) {
     active_script_slot = slot;
     if (parallel_script_count == 0) {
       // top-level scripts don't need to save state on stack
@@ -927,7 +997,7 @@ static void execute_script_slot(uint8_t slot)
       // save state on stack for nested scripts
       script_run_slot_stacked(active_script_slot);
     }
-    if (proc_state[slot] == PROC_STATE_WAITING_FOR_CHILD) {
+    if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD) {
       // script has just started a new child script
       debug_out("Script %d has started new child %d", slot, proc_child[slot]);
       slot = proc_child[slot];
@@ -974,7 +1044,7 @@ static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset)
   
   // update the calling script to wait for the child script
   proc_child[active_script_slot] = slot;
-  proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_CHILD;
+  set_proc_state(active_script_slot, PROC_STATE_WAITING_FOR_CHILD);
 
   return slot;
 }
@@ -1122,7 +1192,7 @@ static void update_camera(void)
     return;
   }
 
-  uint16_t max_camera_x = room_width / 8 - 21;
+  uint16_t max_camera_x = room_width / 8 - 20;
 
   if (camera_state & CAMERA_STATE_FOLLOW_ACTOR)
   {
@@ -1180,6 +1250,7 @@ static void update_camera(void)
   }
 
   vm_write_var(VAR_CAMERA_X, camera_x);
+  //debug_out("camera_x: %d", camera_x);
 
   vm_update_bg();
   vm_update_actors();

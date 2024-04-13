@@ -55,7 +55,7 @@ static void wait_for_actor(void);
 static void stop_sound(void);
 static void add(void);
 static void sleep_for(void);
-static void set_camera(void);
+static void camera_at(void);
 static void get_object_at_position(void);
 static void jump_if_smaller(void);
 static void cut_scene(void);
@@ -65,11 +65,13 @@ static void jump_if_smaller_or_equal(void);
 static void increment_or_decrement(void);
 static void jump_if_not_equal(void);
 static void jump_if_object_not_active(void);
+static void pick_up_object(void);
 static void camera_follows_actor(void);
 static void begin_override_or_print_ego(void);
 static void begin_override(void);
-static void cursor_cmd(void);
-static void is_script_running(void);
+static void cursor(void);
+static void stop_script(void);
+static void script_running(void);
 static void current_room(void);
 static void jump_if_greater_or_equal(void);
 static void print_ego(void);
@@ -148,7 +150,7 @@ void script_init(void)
   opcode_jump_table[0x2b] = &sleep_for_variable;
   opcode_jump_table[0x2d] = &put_actor_in_room;
   opcode_jump_table[0x2e] = &sleep_for;
-  opcode_jump_table[0x32] = &set_camera;
+  opcode_jump_table[0x32] = &camera_at;
   opcode_jump_table[0x3e] = &walk_to;
   opcode_jump_table[0x35] = &get_object_at_position;
   opcode_jump_table[0x38] = &jump_if_smaller;
@@ -166,6 +168,7 @@ void script_init(void)
   opcode_jump_table[0x47] = &state_of;
   opcode_jump_table[0x48] = &jump_if_not_equal;
   opcode_jump_table[0x4f] = &jump_if_object_not_active;
+  opcode_jump_table[0x50] = &pick_up_object;
   opcode_jump_table[0x51] = &do_animation;
   opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
@@ -173,10 +176,11 @@ void script_init(void)
   opcode_jump_table[0x59] = &execute_command;
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x5e] = &walk_to;
-  opcode_jump_table[0x60] = &cursor_cmd;
+  opcode_jump_table[0x60] = &cursor;
   opcode_jump_table[0x61] = &put_actor;
+  opcode_jump_table[0x62] = &stop_script;
   opcode_jump_table[0x65] = &draw_object;
-  opcode_jump_table[0x68] = &is_script_running;
+  opcode_jump_table[0x68] = &script_running;
   opcode_jump_table[0x6d] = &put_actor_in_room;
   opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x75] = &get_object_at_position;
@@ -215,7 +219,9 @@ void script_run_active_slot(void)
 
   map_ds_resource(proc_res_slot[active_script_slot]);
   pc = NEAR_U8_PTR(RES_MAPPED) + proc_pc[active_script_slot];
-  while (vm_get_active_proc_state() == PROC_STATE_RUNNING && !(break_script)) {
+  // check for PROC_STATE_RUNNING only will also mean we won't continue executing if
+  // PROC_FLAGS_FROZEN is set.
+  while (vm_get_active_proc_state_and_flags() == PROC_STATE_RUNNING && !(break_script)) {
     opcode = read_byte();
     param_mask = 0x80;
 #ifdef DEBUG_SCRIPTS
@@ -631,6 +637,10 @@ static void resource_cmd(void)
       debug_scr("load-costume %d", resource_id);
       uint8_t slot = res_provide(RES_TYPE_COSTUME, resource_id, 0);
       break;
+    case 0x22:
+      debug_scr("unlock-costume %d", resource_id);
+      res_unlock(RES_TYPE_COSTUME, resource_id, 0);
+      break;
     case 0x23:
       debug_scr("lock-costume %d", resource_id);
       res_lock(RES_TYPE_COSTUME, resource_id, 0);
@@ -638,6 +648,10 @@ static void resource_cmd(void)
     case 0x31:
       debug_scr("load-room %d", resource_id);
       res_provide(RES_TYPE_ROOM, resource_id, 0);
+      break;
+    case 0x32:
+      debug_scr("unlock-room %d", resource_id);
+      res_unlock(RES_TYPE_ROOM, resource_id, 0);
       break;
     case 0x33:
       debug_scr("lock-room %d", resource_id);
@@ -647,6 +661,10 @@ static void resource_cmd(void)
       debug_scr("load-script %d", resource_id);
       res_provide(RES_TYPE_SCRIPT, resource_id, 0);
       break;
+    case 0x52:
+      debug_scr("unlock-script %d", resource_id);
+      res_unlock(RES_TYPE_SCRIPT, resource_id, 0);
+      break;
     case 0x53:
       debug_scr("lock-script %d", resource_id);
       res_lock(RES_TYPE_SCRIPT, resource_id, 0);
@@ -655,11 +673,16 @@ static void resource_cmd(void)
       debug_scr("load-sound %d", resource_id);
       res_provide(RES_TYPE_SOUND, resource_id, 0);
       break;
+    case 0x62:
+      debug_scr("unlock-sound %d", resource_id);
+      res_unlock(RES_TYPE_SOUND, resource_id, 0);
+      break;
     case 0x63:
       debug_scr("lock-sound %d", resource_id);
       res_lock(RES_TYPE_SOUND, resource_id, 0);
       break;
     default:
+      debug_out("unknown sub-opcode %02x", sub_opcode);
       fatal_error(ERR_UNKNOWN_RESOURCE_OPERATION);
   }
 }
@@ -755,7 +778,7 @@ static void say_line(void)
     debug_scr("print-line");
   }
   else {
-    debug_scr("say-line %d");
+    debug_scr("say-line");
   }
   vm_say_line(actor_id);
 }
@@ -808,20 +831,20 @@ static void jump(void)
  */
 static void assign(void)
 {
-  //debug_msg("Assign");
+  debug_scr("assign");
   uint8_t var_idx = read_byte();
   vm_write_var(var_idx, resolve_next_param16());
 }
 
 static void start_sound(void)
 {
-  //debug_msg("Start sound");
+  debug_scr("start-sound");
   volatile uint8_t sound_id = resolve_next_param8();
 }
 
 static void walk_to(void)
 {
-  //debug_msg("Actor walk to");
+  debug_scr("walk-to");
   uint8_t actor_id = resolve_next_param8();
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
@@ -906,18 +929,17 @@ static void put_actor_in_room(void)
  */
 static void sleep_for(void)
 {
-  //debug_msg("sleep-for");
+  debug_msg("sleep-for");
   int32_t negative_ticks = read_int24();
   vm_set_script_wait_timer(negative_ticks);
 }
 
-static void set_camera(void)
+static void camera_at(void)
 {
-  //debug_msg("Set camera");
   uint16_t new_camera_x = resolve_next_param8();
+  debug_scr("camera-at %d", new_camera_x);
   if (new_camera_x != camera_x) {
     camera_x = new_camera_x;
-    debug_scr("Camera x: %d", camera_x);
     vm_update_bg();
     vm_update_actors();
   }
@@ -1204,6 +1226,11 @@ static void jump_if_object_not_active(void)
   }
 }
 
+static void pick_up_object(void)
+{
+  debug_scr("pick-up-object");
+}
+
 static void camera_follows_actor(void)
 {
   //debug_msg("Camera follows actor");
@@ -1280,25 +1307,33 @@ static void add(void)
 }
 
 /**
- * @brief Opcode 0x60: Cursor cmd
+ * @brief Opcode 0x60: Cursor opcode
  * 
  * Reads the cursor state and the state of the interface. The cursor state
  * is stored in VAR_CURSOR_STATE and the interface state is stored in state_iface.
  *
  * Code section: code_script
  */
-static void cursor_cmd(void)
+static void cursor(void)
 {
-  //debug_msg("Cursor cmd");
-  vm_write_var(VAR_CURSOR_STATE, read_byte());
-  state_iface = read_byte();
+  uint16_t param = resolve_next_param16();
+  vm_write_var(VAR_CURSOR_STATE, param & 0xff);
+  vm_change_ui_flags(param >> 8);
+  debug_out("cursor cursor-state %02x ui-flags %02x", param & 0xff, param >> 8);
 }
 
-static void is_script_running(void)
+static void stop_script(void)
 {
-  //debug_msg("Is script running");
+  uint8_t script_id = resolve_next_param8();
+  debug_scr("stop-script %d", script_id);
+  vm_stop_script(script_id);
+}
+
+static void script_running(void)
+{
   uint8_t var_idx = read_byte();
   uint8_t script_id = resolve_next_param8();
+  debug_scr("VAR[%d] = script-running %d", var_idx, script_id);
   if (vm_is_script_running(script_id)) {
     vm_write_var(var_idx, 1);
   }
@@ -1317,7 +1352,7 @@ static void is_script_running(void)
  */
 static void current_room(void)
 {
-  //debug_msg("Load room");
+  debug_msg("current-room");
   uint8_t room_no = read_byte();
   vm_set_current_room(room_no);
   debug_out("Switched to room %d", room_no);
