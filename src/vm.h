@@ -124,7 +124,6 @@ void vm_cut_scene_begin(void);
 void vm_cut_scene_end(void);
 void vm_costume_init();
 void vm_say_line(uint8_t actor_id);
-void vm_actor_place_in_room(uint8_t actor_id, uint8_t room_no);
 uint8_t vm_start_script(uint8_t script_id);
 uint8_t vm_start_room_script(uint16_t room_script_offset);
 uint8_t vm_start_child_script(uint8_t script_id);

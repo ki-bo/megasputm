@@ -666,6 +666,10 @@ void vm_clear_all_other_object_states(uint16_t global_object_id)
 
 void vm_set_camera_follow_actor(uint8_t actor_id)
 {
+  uint8_t room_of_actor = actors.room[actor_id];
+  if (room_of_actor != vm_read_var8(VAR_SELECTED_ROOM)) {
+    vm_set_current_room(room_of_actor);
+  }
   camera_follow_actor_id = actor_id;
   camera_state = CAMERA_STATE_FOLLOW_ACTOR;
 }

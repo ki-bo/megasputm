@@ -32,6 +32,7 @@ static void put_actor(void);
 static void start_music(void);
 static void jump_if_greater(void);
 static void draw_object(void);
+static void assign_array(void);
 static void jump_if_equal(void);
 static void state_of(void);
 static void resource_cmd(void);
@@ -44,7 +45,8 @@ static void random(void);
 static void jump(void);
 static void execute_command(void);
 static void jump_if_not_pickupable(void);
-static void assign(void);
+static void assign_variable(void);
+static void assign_bit_variable(void);
 static void start_sound(void);
 static void walk_to(void);
 static void jump_if_or_if_not_equal_zero(void);
@@ -140,12 +142,14 @@ void script_init(void)
   opcode_jump_table[0x16] = &random;
   opcode_jump_table[0x18] = &jump;
   opcode_jump_table[0x19] = &execute_command;
-  opcode_jump_table[0x1a] = &assign;
+  opcode_jump_table[0x1a] = &assign_variable;
+  opcode_jump_table[0x1b] = &assign_bit_variable;
   opcode_jump_table[0x1c] = &start_sound;
   opcode_jump_table[0x1e] = &walk_to;
   opcode_jump_table[0x20] = &stop_or_break;
   opcode_jump_table[0x21] = &put_actor;
   opcode_jump_table[0x25] = &draw_object;
+  opcode_jump_table[0x26] = &assign_array;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
   opcode_jump_table[0x2b] = &sleep_for_variable;
   opcode_jump_table[0x2d] = &put_actor_in_room;
@@ -175,6 +179,7 @@ void script_init(void)
   opcode_jump_table[0x58] = &begin_override_or_print_ego;
   opcode_jump_table[0x59] = &execute_command;
   opcode_jump_table[0x5a] = &add;
+  opcode_jump_table[0x5b] = &assign_bit_variable;
   opcode_jump_table[0x5e] = &walk_to;
   opcode_jump_table[0x60] = &cursor;
   opcode_jump_table[0x61] = &put_actor;
@@ -570,6 +575,19 @@ static void draw_object(void)
   vm_update_bg();
 }
 
+static void assign_array(void)
+{
+  uint8_t var_idx = read_byte();
+  uint8_t array_size = read_byte();
+  debug_scr("assign array at VAR[%d] (size=%d)", var_idx, array_size);
+  do {
+    uint16_t value = (opcode & 0x80) ? read_word() : read_byte();
+    vm_write_var(var_idx, 0);
+    ++var_idx;
+  } 
+  while (--array_size);
+}
+
 /**
  * @brief Opcode 0x08: Jump if equal
  *
@@ -825,7 +843,7 @@ static void jump(void)
 }
 
 /**
- * @brief Opcode 0x1A: Assign
+ * @brief Opcode 0x1A: Assign variable
  *
  * Assigns a value to a variable. The variable index is read from the script as
  * the first parameter, and the value is read as the next 16-bit value. The value
@@ -835,11 +853,27 @@ static void jump(void)
  *
  * Code section: code_script
  */
-static void assign(void)
+static void assign_variable(void)
 {
-  debug_scr("assign");
+  debug_scr("assign-variable");
   uint8_t var_idx = read_byte();
   vm_write_var(var_idx, resolve_next_param16());
+}
+
+static void assign_bit_variable(void)
+{
+  debug_scr("assign-bit-variable");
+  uint16_t bit_var_hi = read_word() + resolve_next_param8();
+  uint8_t bit_var_lo = bit_var_hi & 0x0f;
+  bit_var_hi >>= 4;
+  if (resolve_next_param8()) {
+    debug_scr("set bit variable %04x.%1x", bit_var_hi, bit_var_lo);
+    vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) | (1 << bit_var_lo));
+  }
+  else {
+    debug_scr("clear bit variable %04x.%1x", bit_var_hi, bit_var_lo);
+    vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) & ~(1 << bit_var_lo));
+  }
 }
 
 static void start_sound(void)
