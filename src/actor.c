@@ -138,13 +138,13 @@ uint8_t actor_next_step(uint8_t local_id)
     local_actors.y_fraction[local_id] = (uint16_t)new_y;
   }
   
-  debug_out("Actor %u position: %u.%u, %u.%u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
-
   if (is_walk_to_done(local_id)) {
     local_actors.x_fraction[local_id] = 0;
     local_actors.y_fraction[local_id] = 0;
     local_actors.walking[local_id] = 0;
   }
+
+  //debug_out("Actor %u position: %u.%u, %u.%u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
 
   return 1;
 }
@@ -268,11 +268,11 @@ void actor_draw(uint8_t local_id)
         uint8_t mirror;
         if (local_actors.direction[local_id] == 0 && !(hdr->disable_mirroring_and_format & 0x80)) {
           mirror = 1;
-          pos_x += dx_level;
+          pos_x -= dx_level + cel_data->width - 16;
         }
         else {
           mirror = 0;
-          pos_x -= dx_level;
+          pos_x += dx_level + 8;
         }
         pos_y += dy_level;
         gfx_draw_cel(pos_x, pos_y, cel_data, mirror);

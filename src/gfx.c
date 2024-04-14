@@ -712,8 +712,8 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
  * relative positioning offsets that already need to be applied to the position provided
  * to this function.
  *
- * @param xpos Horizontal screen position in pixels.
- * @param ypos Vertical screen position in pixels.
+ * @param xpos Horizontal position in pixels relative to left room edge.
+ * @param ypos Vertical screen position in pixels relative to top room edge.
  * @param cel_data Pointer to cel data to decode.
  * @param mirror 0 = no mirroring, 1 = mirror cel horizontally
  *
@@ -721,24 +721,33 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
  */
 void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror)
 {
-  //debug_out(" cel x %d y %d", xpos, ypos);
+  debug_out(" cel x %d y %d width %d height %d", xpos, ypos, cel_data->width, cel_data->height);
   uint8_t width = cel_data->width;
+  uint8_t height = cel_data->height;
+  uint8_t num_char_cols = cel_data->width / 8;
+  uint8_t sub_char_cols = cel_data->width & 0x07;
+  if (sub_char_cols) {
+    ++num_char_cols;
+    if (mirror) {
+      xpos -= 8 - sub_char_cols;
+    }
+  }
   int16_t screen_pos_x = xpos - screen_pixel_offset_x;
-  if (screen_pos_x + width <= 0 || screen_pos_x >= 320) {
+  if (screen_pos_x + width <= 0 || screen_pos_x >= 320 || ypos + height <= 0 || ypos >= GFX_HEIGHT) {
     debug_out("cel out of screen");
     return;
   }
-  uint8_t height = cel_data->height;
-  uint8_t num_char_cols = (cel_data->width + 7) / 8;
-  uint8_t num_char_rows = (cel_data->height + 7) / 8;
+  uint8_t num_char_rows = cel_data->height / 8;
+  if (cel_data->height & 0x07) {
+    ++num_char_rows;
+  }
   uint8_t num_pixel_lines_of_chars = num_char_rows * 8;
-  uint16_t num_chars = num_char_cols * num_char_rows;
-  uint16_t num_bytes = num_chars * 64;
+  uint16_t num_bytes = num_char_cols * num_pixel_lines_of_chars * 8;
   if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
     next_char_data = char_data_start_cels;
   }
-  uint8_t __huge *next_char_data_save = next_char_data;
-  uint16_t char_num = (uint32_t)next_char_data / 64;
+  uint16_t char_num = ((uint32_t)next_char_data) >> 6;
+  uint8_t __huge *next_char_data_save = next_char_data + num_bytes;
   uint8_t run_length_counter = 1;
   uint8_t current_color;
   uint16_t col_addr_inc = (num_pixel_lines_of_chars - 1) * 8;
@@ -747,9 +756,9 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
   uint8_t mask = mirror ? 0x01 << (xpos & 0x07) : 0x80 >> (xpos & 0x07);
   int16_t mask_cur_col = xpos / 8;
   if (mirror) {
-    mask_cur_col += num_char_cols - 1;
-    if (xpos & 0x07) {
-      ++mask_cur_col;
+    mask_cur_col += num_char_cols;
+    if (!(xpos & 0x07)) {
+      --mask_cur_col;
     }
   }
   decode_single_mask_column(mask_cur_col, ypos, height);
@@ -804,7 +813,7 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
     }
   }
   while (x != width);
-  next_char_data = next_char_data_save + num_bytes;
+  next_char_data = next_char_data_save;
 
   place_cel_chars(char_num, screen_pos_x, ypos, num_char_cols, num_char_rows, mirror);
 }
@@ -1019,14 +1028,17 @@ static void place_cel_chars(uint16_t char_num,
 
   // place cel using rrb features
   int8_t char_row = screen_pos_y / 8;
-  if (char_row > 15) {
-    return;
-  }
   screen_pos_x &= 0x3ff;
   int8_t last_but_one_row = height_chars - 2;
   uint8_t shift_y = (uint8_t)screen_pos_y & 0x07;
   if (shift_y) {
     shift_y = 8 - shift_y;
+  }
+  else {
+    --char_row;
+  }
+  if (char_row > 15) {
+    return;
   }
 
   uint8_t rowmask = ~row_masks[shift_y];

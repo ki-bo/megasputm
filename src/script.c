@@ -510,6 +510,12 @@ static void put_actor(void)
   debug_scr("put-actor at %d, %d", x, y);
   actors.x[actor_id] = x;
   actors.y[actor_id] = y;
+  uint8_t local_id = actors.local_id[actor_id];
+  if (local_id != 0xff) {
+    local_actors.x_fraction[local_id] = 0;
+    local_actors.y_fraction[local_id] = 0;
+  }
+  vm_update_actors();
 }
 
 static void start_music(void)
