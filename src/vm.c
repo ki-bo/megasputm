@@ -56,8 +56,6 @@ uint8_t variables_lo[256];
 uint8_t variables_hi[256];
 char message_buffer[256];
 
-uint8_t actor_talking;
-
 volatile uint8_t script_watchdog;
 int8_t cursor_state;
 uint8_t ui_state;
@@ -68,7 +66,9 @@ uint8_t camera_follow_actor_id;
 
 uint8_t active_script_slot;
 uint8_t message_speed = 6;
-uint16_t dialog_timer;
+uint16_t message_timer;
+uint8_t actor_talking;
+
 uint8_t proc_script_id[NUM_SCRIPT_SLOTS];
 uint8_t proc_state[NUM_SCRIPT_SLOTS];
 uint8_t proc_parent[NUM_SCRIPT_SLOTS];
@@ -143,6 +143,7 @@ void vm_init(void)
   camera_x = 20;
   camera_state = 0;
   camera_follow_actor_id = 0xff;
+  actor_talking = 0xff;
 }
 
 /** @} */ // vm_init
@@ -183,7 +184,7 @@ __task void vm_mainloop(void)
   vm_start_script(1);
 
   wait_for_jiffy(); // this resets the elapsed jiffies timer
-  dialog_timer = 0;
+  message_timer = 0;
 
   while (1) {
     script_watchdog = 0;
@@ -445,8 +446,11 @@ void vm_say_line(uint8_t actor_id)
   map_cs_gfx();
   uint8_t num_chars = gfx_print_dialog(talk_color, message_buffer);
   unmap_cs();
-  dialog_timer = 60 + (uint16_t)num_chars * (uint16_t)message_speed;
+  message_timer = 60 + (uint16_t)num_chars * (uint16_t)message_speed;
   vm_write_var(VAR_MESSAGE_GOING, 1);
+  if (actor_id != 0xff) {
+    actor_start_talking(actor_id);
+  }
 }
 
 /**
@@ -744,25 +748,29 @@ static void unfreeze_scripts(void)
  */
 static void process_dialog(uint8_t jiffies_elapsed)
 {
-  if (dialog_timer == 0)
+  if (message_timer == 0)
   {
     return;
   }
 
-  if (dialog_timer >= jiffies_elapsed)
+  if (message_timer >= jiffies_elapsed)
   {
-    dialog_timer -= jiffies_elapsed;
+    message_timer -= jiffies_elapsed;
   }
   else
   {
-    dialog_timer = 0;
+    message_timer = 0;
   }
 
-  if (!dialog_timer) {
+  if (!message_timer) {
     map_cs_gfx();
     gfx_clear_dialog();
     unmap_cs();
     vm_write_var(VAR_MESSAGE_GOING, 0);
+    if (actor_talking != 0xff) {
+      actor_stop_talking(actor_talking);
+      actor_talking = 0xff;
+    }
   }
 }
 

@@ -57,6 +57,8 @@ uint8_t actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);
 uint8_t actor_update_animation(uint8_t local_id);
 void actor_draw(uint8_t local_id);
+void actor_start_talking(uint8_t actor_id);
+void actor_stop_talking(uint8_t actor_id);
 
 // inline main functions
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"

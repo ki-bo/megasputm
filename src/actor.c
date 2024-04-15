@@ -289,6 +289,22 @@ void actor_draw(uint8_t local_id)
   }
 }
 
+void actor_start_talking(uint8_t actor_id)
+{
+  uint8_t local_id = actors.local_id[actor_id];
+  if (local_id != 0xff) {
+    actor_start_animation(local_id, ANIM_TALKING + actors.dir[actor_id]);
+  }
+}
+
+void actor_stop_talking(uint8_t actor_id)
+{
+  uint8_t local_id = actors.local_id[actor_id];
+  if (local_id != 0xff) {
+    actor_start_animation(local_id, ANIM_MOUTH_SHUT + actors.dir[actor_id]);
+  }
+}
+
 /// @} // actor_public
 
 //-----------------------------------------------------------------------------------------------
