@@ -169,7 +169,7 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   map_ds_resource(local_actors.res_slot[local_id]);
 
   __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
-  //debug_out("Local actor %d start animation %d", local_id, animation);
+  debug_out("Local actor %d start animation %d", local_id, animation);
   if (animation >= costume_hdr->num_animations + 1) {
     map_set_ds(save_ds);
     return;
@@ -439,6 +439,9 @@ static void reset_animation(uint8_t local_id)
 
 static void change_direction(uint8_t local_id, uint8_t dir)
 {
+  uint8_t global_id = local_actors.global_id[local_id];
+  actors.dir[global_id] = dir;
+
   __auto_type cel_anim = local_actors.cel_anim[local_id];
   for (uint8_t level = 0; level < 16; ++level) {
     if (cel_anim[level] != 0xff) {
