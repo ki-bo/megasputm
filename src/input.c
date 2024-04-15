@@ -1,4 +1,6 @@
 #include "input.h"
+#include "io.h"
+#include "util.h"
 #include <mega65.h>
 
 //-----------------------------------------------------------------------------------------------
@@ -10,6 +12,7 @@
 uint8_t input_cursor_x;
 uint8_t input_cursor_y;
 uint8_t input_button_pressed;
+uint8_t input_key_pressed;
 
 //-----------------------------------------------------------------------------------------------
 
@@ -75,6 +78,20 @@ void input_update(void)
     input_cursor_x += 1;
   }
   input_button_pressed = !(joy & 0x10) ? INPUT_BUTTON_LEFT : 0;
+
+  // keyboard handling
+  if (input_key_pressed == 0) { // = 0 means previous key was processed
+    uint8_t key_pressed_ascii = ASCIIKEY;
+    if (key_pressed_ascii != 0) {
+      debug_out("key pressed %d", key_pressed_ascii);
+      input_key_pressed = key_pressed_ascii;
+    }
+    else {
+      input_key_pressed = 0;
+    }
+    // writing to register dequeues the last read key
+    ASCIIKEY = 0;
+  }
 }
 
 /** @} */ // input_public

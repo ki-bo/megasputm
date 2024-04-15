@@ -75,6 +75,7 @@ struct __dma {
 
 #define CPU_VECTORS (*(volatile struct __cpu_vectors *) 0xfffa)
 #define FDC         (*(volatile struct __f011 *)        0xd080)
+#define ASCIIKEY    (*(volatile uint8_t *)              0xd610)
 #define DMA         (*(volatile struct __dma *)         0xd700)
 #define RNDGEN      (*(volatile uint8_t *)              0xd7ef)
 #define RNDRDY      (*(volatile uint8_t *)              0xd7fe)

@@ -122,6 +122,7 @@ void vm_set_current_room(uint8_t room_no);
 void vm_set_script_wait_timer(int32_t negative_ticks);
 void vm_cut_scene_begin(void);
 void vm_cut_scene_end(void);
+void vm_begin_override(void);
 void vm_costume_init();
 void vm_say_line(uint8_t actor_id);
 uint8_t vm_start_script(uint8_t script_id);

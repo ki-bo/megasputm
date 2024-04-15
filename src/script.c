@@ -97,7 +97,6 @@ static uint8_t * __attribute__((zpage)) pc;
 
 // private variables
 static void (*opcode_jump_table[128])(void);
-static uint8_t *override_pc;
 static uint8_t break_script = 0;
 static uint8_t backup_opcode;
 static uint8_t backup_param_mask;
@@ -255,6 +254,11 @@ void script_run_slot_stacked(uint8_t slot)
   pc = stack_pc;
   break_script = stack_break_script;
   active_script_slot = stack_active_slot;
+}
+
+uint16_t script_get_current_pc(void)
+{
+  return (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
 }
 
 #pragma clang section text="code"
@@ -1148,7 +1152,6 @@ static void cut_scene(void)
   //debug_msg("cut-scene");
   if (!(opcode & 0x80)) {
     vm_cut_scene_begin();
-    override_pc = NULL;
     reset_command();
   }
   else {
@@ -1328,7 +1331,7 @@ void begin_override_or_print_ego(void)
 static void begin_override(void)
 {
   //debug_msg("Begin override");
-  override_pc = pc;
+  vm_begin_override();
   pc += 3; // Skip the jump command
 }
 

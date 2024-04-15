@@ -144,6 +144,7 @@ uint8_t actor_next_step(uint8_t local_id)
     local_actors.x_fraction[local_id] = 0;
     local_actors.y_fraction[local_id] = 0;
     local_actors.walking[local_id] = 0;
+    actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
   }
 
   //debug_out("Actor %u position: %u.%u, %u.%u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
@@ -410,7 +411,13 @@ static void add_local_actor(uint8_t actor_id)
   debug_out("Actor %d is now in current room with local id %d", actor_id, local_id);
   uint8_t dir = actors.dir[actor_id];
   reset_animation(local_id);
-
+  local_actors.walking[local_id] = 0;
+  local_actors.x_fraction[local_id] = 0;
+  local_actors.y_fraction[local_id] = 0;
+  local_actors.walk_to_x[local_id] = actors.x[actor_id];
+  local_actors.walk_to_y[local_id] = actors.y[actor_id];
+  local_actors.walk_step_x[local_id] = 0;
+  local_actors.walk_step_y[local_id] = 0;
 }
 
 static void remove_local_actor(uint8_t actor_id)

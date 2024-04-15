@@ -82,7 +82,8 @@ int32_t proc_wait_timer[NUM_SCRIPT_SLOTS];
 uint8_t cs_room;
 int8_t cs_cursor_state;
 uint8_t cs_ui_state;
-uint16_t cs_pc;
+uint8_t cs_proc_slot;
+uint16_t cs_override_pc;
 
 // room and object data
 uint8_t  room_res_slot;
@@ -392,6 +393,8 @@ void vm_cut_scene_begin(void)
 {
   cs_room = vm_read_var8(VAR_SELECTED_ROOM);
   cs_cursor_state = vm_read_var8(VAR_CURSOR_STATE);
+  cs_proc_slot = 0xff;
+  cs_override_pc = 0;
   cs_ui_state = ui_state;
   vm_change_ui_flags(UI_FLAGS_APPLY_FREEZE | UI_FLAGS_ENABLE_FREEZE |
                      UI_FLAGS_APPLY_CURSOR |
@@ -407,6 +410,14 @@ void vm_cut_scene_end(void)
   }
   vm_write_var(VAR_CURSOR_STATE, cs_cursor_state);
   vm_change_ui_flags(cs_ui_state | UI_FLAGS_APPLY_CURSOR | UI_FLAGS_APPLY_FREEZE | UI_FLAGS_APPLY_INTERFACE);
+  cs_proc_slot = 0xff;
+  cs_override_pc = 0;
+}
+
+void vm_begin_override(void)
+{
+  cs_proc_slot = active_script_slot;
+  cs_override_pc = script_get_current_pc();
 }
 
 /**
@@ -891,23 +902,35 @@ static void redraw_actors(void)
 
 static void handle_input(void)
 {
+  // mouse cursor handling
   static uint8_t last_input_button_pressed = 0;
 
   vm_write_var(VAR_SCENE_CURSOR_X, input_cursor_x >> 2);
   vm_write_var(VAR_SCENE_CURSOR_Y, (input_cursor_y >> 1) - 8);
 
-  if (input_button_pressed == last_input_button_pressed)
+  if (input_button_pressed != last_input_button_pressed)
   {
-    return;
-  }
-  last_input_button_pressed = input_button_pressed;
+    last_input_button_pressed = input_button_pressed;
 
-  if (input_button_pressed == INPUT_BUTTON_LEFT)
-  {
-    if (input_cursor_y >= 16 && input_cursor_y < 144) {
-      vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SCENE_CLICK);
-      vm_start_script(SCRIPT_ID_INPUT_EVENT);
+    if (input_button_pressed == INPUT_BUTTON_LEFT)
+    {
+      if (input_cursor_y >= 16 && input_cursor_y < 144) {
+        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SCENE_CLICK);
+        vm_start_script(SCRIPT_ID_INPUT_EVENT);
+      }
     }
+  }
+
+  // keyboard handling
+  if (input_key_pressed) {
+    if (input_key_pressed == INPUT_KEY_RUNSTOP || input_key_pressed == INPUT_KEY_ESCAPE) {
+      if (cs_override_pc) {
+        proc_pc[cs_proc_slot] = cs_override_pc;
+        cs_override_pc = 0;
+      }
+    }
+    // ack the key press
+    input_key_pressed = 0;
   }
 }
 
@@ -1123,56 +1146,6 @@ static void update_actors(void)
     if (actor_next_step(i)) {
       screen_update_needed |= SCREEN_UPDATE_ACTORS;
     }
-/*
-    map_ds_resource(local_actors.res_slot[i]);
-
-    __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
-    debug_out("Local actor %d costume %d", i, actors.costume[local_actors.global_id[i]]);
-    debug_out(" num_animations: %d", costume_hdr->num_animations);
-    debug_out(" disable_mirroring: %d", (costume_hdr->enable_mirroring_and_format & 0x80)==0x80);
-    debug_out(" format: %02x", costume_hdr->enable_mirroring_and_format & 0x7f);
-    debug_out(" animation_commands_offset: %d", costume_hdr->animation_commands_offset);
-    for (uint8_t i = 0; i < 16; ++i)
-    {
-      debug_out(" level table offset[%d]: %d", i, costume_hdr->level_table_offsets[i]);
-    }
-    uint8_t num_animations = costume_hdr->num_animations ? costume_hdr->num_animations + 1 : 0;
-    for (uint8_t j = 0; j < costume_hdr->num_animations; ++j)
-    {
-      debug_out(" animation offset[%d]: %d", j, costume_hdr->animation_offsets[j]);
-      __auto_type anim_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_offsets[j]);
-      uint16_t cel_mask = *(uint16_t *)anim_ptr;
-      anim_ptr += 2;
-      debug_out(" cel mask: %04x", cel_mask);
-      for (int8_t k = 15; k > -1; --k)
-      {
-        if (!(cel_mask & 1)) {
-          cel_mask >>= 1;
-          continue;
-        }
-        cel_mask >>= 1;
-        uint8_t cmd_offset = *anim_ptr++;
-        debug_out("  cel: %d", k);
-        debug_out("  cmd offset: %02x", cmd_offset);
-        if (cmd_offset == 0xff) {
-          continue;
-        }
-        uint8_t num_commands = *anim_ptr++;
-        debug_out("  no loop: %d", (num_commands & 0x80)==0x80);
-        num_commands &= 0x7f;
-        ++num_commands;
-        debug_out("  num commands: %d", num_commands);
-        __auto_type cmd_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_commands_offset + cmd_offset);
-        for (uint8_t l = 0; l < num_commands; ++l)
-        {
-          debug_out("   cmd_byte: %02x", *cmd_ptr);
-          ++cmd_ptr;
-        }
-      }
-
-    }
-    fatal_error(1);
-*/
   }
 }
 
