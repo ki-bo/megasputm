@@ -222,7 +222,6 @@ __task void vm_mainloop(void)
     execute_command_stack();
     update_actors();
     update_camera();
-    animate_actors();
 
     if (screen_update_needed) {
       if (screen_update_needed & SCREEN_UPDATE_BG) {
@@ -233,6 +232,7 @@ __task void vm_mainloop(void)
       if (screen_update_needed & SCREEN_UPDATE_ACTORS) {
         //VICIV.bordercol = 0x01;
         redraw_actors();
+        animate_actors();
         //VICIV.bordercol = 0x00;
       }
       //VICIV.bordercol = 0x00;
@@ -935,6 +935,10 @@ static void handle_input(void)
       if (cs_override_pc) {
         proc_pc[cs_proc_slot] = cs_override_pc;
         cs_override_pc = 0;
+        proc_state[cs_proc_slot] &= ~PROC_FLAGS_FROZEN;
+        if (proc_state[cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
+          proc_state[cs_proc_slot] = PROC_STATE_RUNNING;
+        }
       }
     }
     // ack the key press
