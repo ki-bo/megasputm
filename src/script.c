@@ -56,7 +56,7 @@ static void subtract(void);
 static void wait_for_actor(void);
 static void stop_sound(void);
 static void add(void);
-static void sleep_for(void);
+static void sleep_for_or_wait_for_message(void);
 static void camera_at(void);
 static void get_object_at_position(void);
 static void jump_if_smaller(void);
@@ -153,7 +153,7 @@ void script_init(void)
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
   opcode_jump_table[0x2b] = &sleep_for_variable;
   opcode_jump_table[0x2d] = &put_actor_in_room;
-  opcode_jump_table[0x2e] = &sleep_for;
+  opcode_jump_table[0x2e] = &sleep_for_or_wait_for_message;
   opcode_jump_table[0x32] = &camera_at;
   opcode_jump_table[0x3e] = &walk_to;
   opcode_jump_table[0x35] = &get_object_at_position;
@@ -959,19 +959,34 @@ static void put_actor_in_room(void)
 }
 
 /**
- * @brief Opcode 0x2E: sleep-for
+ * @brief Opcode 0x2E/0xAE: sleep-for or wait-for-message
  * 
+ * If the opcode is 0x2E, the script will pause for a certain amount of time.
  * Reads 24 bits of ticks value for the wait timer. Note that the amount
  * of ticks that the script should pause actually needs to be calculated by
  * ticks_to_wait = 0xffffff - param_value.
  *
+ * If the opcode is 0xAE, the script will wait until the current message is
+ * processed. If the message is still going, the script will be paused and
+ * the pc will be decremented to repeat the wait-for-message command in the
+ * next script cycle.
+ *
  * Code section: code_script
  */
-static void sleep_for(void)
+static void sleep_for_or_wait_for_message(void)
 {
-  debug_msg("sleep-for");
-  int32_t negative_ticks = read_int24();
-  vm_set_script_wait_timer(negative_ticks);
+  if (!(opcode & 0x80)) {
+    debug_scr("sleep-for");
+    int32_t negative_ticks = read_int24();
+    vm_set_script_wait_timer(negative_ticks);
+  }
+  else {
+    debug_scr("wait-for-message");
+    if (vm_read_var8(VAR_MESSAGE_GOING)) {
+      --pc;
+      break_script = 1;
+    }
+  }
 }
 
 static void camera_at(void)
@@ -1359,7 +1374,7 @@ static void cursor(void)
   uint16_t param = resolve_next_param16();
   vm_write_var(VAR_CURSOR_STATE, param & 0xff);
   vm_change_ui_flags(param >> 8);
-  debug_out("cursor cursor-state %02x ui-flags %02x", param & 0xff, param >> 8);
+  debug_scr("cursor cursor-state %02x ui-flags %02x", param & 0xff, param >> 8);
 }
 
 static void stop_script(void)
@@ -1392,10 +1407,9 @@ static void script_running(void)
  */
 static void current_room(void)
 {
-  debug_msg("current-room");
   uint8_t room_no = read_byte();
   vm_set_current_room(room_no);
-  debug_out("Switched to room %d", room_no);
+  debug_scr("current-room %d", room_no);
 }
 
 /** 

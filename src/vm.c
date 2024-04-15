@@ -656,7 +656,11 @@ void vm_clear_all_other_object_states(uint16_t global_object_id)
         obj_hdr->pos_x == x && 
        (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
     {
-      global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
+      // This used to be
+      //   global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
+      // but that was triggering a compiler bug leading to memory corruption
+      uint16_t id = obj_hdr->id;
+      global_game_objects[id] &= ~OBJ_STATE;
       debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
     }
   }
@@ -1077,7 +1081,7 @@ static void execute_command_stack(void)
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
 
   uint8_t slot = vm_start_script(SCRIPT_ID_COMMAND);
-  debug_out("Command script verb %d noun1 %d noun2 %d verb_available %d", verb, noun1, noun2, script_offset != 0);
+  debug_out("Command script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
   execute_script_slot(slot);
 }
 
@@ -1091,10 +1095,10 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
   uint8_t *ptr = NEAR_U8_PTR(RES_MAPPED + cur_offset);
   uint8_t script_offset = 0;
 
-  debug_out("Searching for verb %02x in object %d", verb, local_object_id);
+  //debug_out("Searching for verb %02x in object %d", verb, local_object_id);
 
   while (*ptr != 0) {
-    debug_out("Verb %02x, offset %02x", *ptr, *(ptr + 1));
+    //debug_out("Verb %02x, offset %02x", *ptr, *(ptr + 1));
     if (*ptr == verb || *ptr == 0xff) {
       script_offset = *(ptr + 1);
       break;

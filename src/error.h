@@ -24,7 +24,7 @@ typedef enum {
     ERR_EXEC_PARALLEL_SCRIPT = 20,
     ERR_TOO_MANY_LOCAL_ACTORS = 21,
     ERR_COST_BUFSIZE_EXCEEDED = 22,
-    ERR_ANIMATION_NOT_DEFINED = 23,
+    ERR_CHRCOUNT_EXCEEDED = 23,
 } error_code_t;
 
 #endif // __ERROR_H__

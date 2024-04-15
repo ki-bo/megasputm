@@ -8,11 +8,6 @@
 #define MAX_LOCAL_ACTORS    6
 #define ACTOR_NAME_LEN     16
 
-enum {
-  ANIM_STAND = 1,
-  ANIM_WALK = 2
-};
-
 typedef struct {
   uint8_t       sound[NUM_ACTORS];
   uint8_t       palette_idx[NUM_ACTORS];
@@ -31,12 +26,10 @@ typedef struct {
 typedef struct {
   uint8_t       global_id[MAX_LOCAL_ACTORS];
   uint8_t       res_slot[MAX_LOCAL_ACTORS];
-  uint8_t       direction[MAX_LOCAL_ACTORS];
-  uint8_t       cost_anim[MAX_LOCAL_ACTORS];
+  uint8_t       cel_anim[MAX_LOCAL_ACTORS][16];
   uint8_t      *cel_level_cmd_ptr[MAX_LOCAL_ACTORS][16];
   uint8_t       cel_level_cur_cmd[MAX_LOCAL_ACTORS][16];
   uint8_t       cel_level_last_cmd[MAX_LOCAL_ACTORS][16];
-  uint8_t       animation_just_started[MAX_LOCAL_ACTORS];
   uint8_t       walking[MAX_LOCAL_ACTORS];
   uint16_t      x_fraction[MAX_LOCAL_ACTORS];
   uint16_t      y_fraction[MAX_LOCAL_ACTORS];

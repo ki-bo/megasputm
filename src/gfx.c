@@ -23,14 +23,17 @@
 //-----------------------------------------------------------------------------------------------
 
 #pragma clang section rodata="cdata_init"
-const char palette_red[16] = {
+const char palette_red[32] = {
+  0x0, 0x0, 0x0, 0x0,  0xa, 0xa, 0xa, 0xa,  0x5, 0x5, 0x5, 0x5,  0xf, 0xf, 0xf, 0xf,
   0x0, 0x0, 0x0, 0x0,  0xa, 0xa, 0xa, 0xa,  0x5, 0x5, 0x5, 0x5,  0xf, 0xf, 0xf, 0xf
 };
-const char palette_green[16] = {
-  0x0, 0x0, 0xa, 0xa,  0x0, 0x0, 0x5, 0xa,  0x5, 0x5, 0xf, 0xf,  0x5, 0x5, 0xf, 0xf
+const char palette_green[32] = {
+  0x0, 0x0, 0xa, 0xa,  0x0, 0x0, 0x5, 0xa,  0x5, 0x5, 0xf, 0xf,  0x5, 0x5, 0xf, 0xf,
+  0x0, 0x0, 0xa, 0x0,  0x0, 0x0, 0x5, 0xa,  0x5, 0x5, 0xf, 0xf,  0x5, 0x5, 0xf, 0xf
 };
-const char palette_blue[16] = {
-  0x0, 0xa, 0x0, 0xa,  0x0, 0xa, 0x0, 0xa,  0x5, 0xf, 0x5, 0xf,  0x5, 0xf, 0x5, 0xf
+const char palette_blue[32] = {
+  0x0, 0xa, 0x0, 0xa,  0x0, 0xa, 0x0, 0xa,  0x5, 0xf, 0x5, 0xf,  0x5, 0xf, 0x5, 0xf,
+  0x0, 0x0, 0xa, 0xa,  0x0, 0xa, 0x0, 0xa,  0x5, 0xf, 0x5, 0xf,  0x5, 0xf, 0x5, 0xf
 };
 
 //-----------------------------------------------------------------------------------------------
@@ -198,7 +201,7 @@ void gfx_init()
   VICIV.linestep  = CHRCOUNT * 2; // 160 bytes per row (2 bytes per char)
 
   // setup EGA palette
-  for (uint8_t i = 0; i < 16; ++i) {
+  for (uint8_t i = 0; i < sizeof(palette_red); ++i) {
     PALETTE.red[i]   = palette_red[i];
     PALETTE.green[i] = palette_green[i];
     PALETTE.blue[i]  = palette_blue[i];
@@ -453,7 +456,7 @@ void gfx_clear_bg_image(void)
  */
 void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 {
-  debug_out("Decoding bg image, width: %d\n", width)
+  //debug_out("Decoding bg image, width: %d\n", width)
   // when decoding a room background image, we always start over at the
   // beginning of the char data memory
   next_char_data = HUGE_U8_PTR(BG_BITMAP);
@@ -721,7 +724,7 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
  */
 void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror)
 {
-  debug_out(" cel x %d y %d width %d height %d", xpos, ypos, cel_data->width, cel_data->height);
+  //debug_out(" cel x %d y %d width %d height %d", xpos, ypos, cel_data->width, cel_data->height);
   uint8_t width = cel_data->width;
   uint8_t height = cel_data->height;
   uint8_t num_char_cols = cel_data->width / 8;
@@ -734,7 +737,7 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
   }
   int16_t screen_pos_x = xpos - screen_pixel_offset_x;
   if (screen_pos_x + width <= 0 || screen_pos_x >= 320 || ypos + height <= 0 || ypos >= GFX_HEIGHT) {
-    debug_out("cel out of screen");
+    //debug_out("cel out of screen");
     return;
   }
   uint8_t num_char_rows = cel_data->height / 8;
@@ -772,6 +775,9 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
       uint8_t data_byte = *rle_data++;
       run_length_counter = data_byte & 0x0f;
       current_color = data_byte >> 4;
+      if (current_color) {
+        current_color |= 0x10;
+      }
       if (run_length_counter == 0)
       {
         run_length_counter = *rle_data++;
@@ -836,6 +842,9 @@ void gfx_finalize_cel_drawing(void)
   __auto_type colram_start_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
   for (uint8_t y = 0; y < 16; ++y) {
     uint8_t end_of_row = num_chars_at_row[y];
+    if (end_of_row >= CHRCOUNT - 2) {
+      fatal_error(ERR_CHRCOUNT_EXCEEDED);
+    }
     __auto_type screen_ptr = screen_start_ptr + end_of_row;
     __auto_type colram_ptr = colram_start_ptr + end_of_row;
     *screen_ptr++ = 0x0140; // gotox to right screen edge (x=320)
@@ -1084,6 +1093,7 @@ static void place_cel_chars(uint16_t char_num,
           *colram_ptr++ = 0x0f00;
         }
       }
+      num_chars_at_row[char_row] += width_chars + 1;
     }
    if (y == last_but_one_row) {
       rowmask = row_masks[shift_y];
@@ -1092,7 +1102,6 @@ static void place_cel_chars(uint16_t char_num,
     else if (y == -1) {
       gotox_col = 0x0090;
     }
-    num_chars_at_row[char_row] += width_chars + 1;
     ++char_num;
     ++char_row;
     screen_start_ptr += CHRCOUNT;
