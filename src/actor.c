@@ -26,6 +26,7 @@ static void add_local_actor(uint8_t actor_id);
 static void remove_local_actor(uint8_t actor_id);
 static void reset_animation(uint8_t local_id);
 static void change_direction(uint8_t local_id, uint8_t dir);
+static void turn(uint8_t local_id);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -126,6 +127,11 @@ uint8_t actor_next_step(uint8_t local_id)
   }
 
   uint8_t actor_id = local_actors.global_id[local_id];
+  if (local_actors.walk_dir[local_id] != actors.dir[actor_id]) {
+    turn(local_id);
+    return 1;
+  }
+
   int32_t x = actors.x[actor_id] * 0x10000 + local_actors.x_fraction[local_id];
   int32_t y = actors.y[actor_id] * 0x10000 + local_actors.y_fraction[local_id];
 
@@ -379,21 +385,21 @@ static void calculate_step(uint8_t local_id)
   if (abs_x_diff < abs_y_diff) {
     if (y_diff < 0) {
       debug_out("  dir 3")
-      actors.dir[actor_id] = 3;
+      local_actors.walk_dir[local_id] = 3;
     }
     else {
       debug_out("  dir 2")
-      actors.dir[actor_id] = 2;
+      local_actors.walk_dir[local_id] = 2;
     }
   }
   else {
     if (x_diff < 0) {
       debug_out("  dir 0")
-      actors.dir[actor_id] = 0;
+      local_actors.walk_dir[local_id] = 0;
     }
     else {
       debug_out("  dir 1")
-      actors.dir[actor_id] = 1;
+      local_actors.walk_dir[local_id] = 1;
     }
   }
 
@@ -415,7 +421,7 @@ static void calculate_step(uint8_t local_id)
 
   local_actors.walk_step_x[local_id] = x_step;
   local_actors.walk_step_y[local_id] = y_step;
-  debug_out("Actor %d step: %ld, %ld direction: %d", actor_id, x_step, y_step, actors.dir[actor_id]);
+  debug_out("Actor %d step: %ld, %ld direction: %d", actor_id, x_step, y_step, local_actors.walk_dir[actor_id]);
 }
 
 static void add_local_actor(uint8_t actor_id)
@@ -474,6 +480,18 @@ static void change_direction(uint8_t local_id, uint8_t dir)
         actor_start_animation(local_id, new_anim);
       }
     }
+  }
+}
+
+static void turn(uint8_t local_id)
+{
+  uint8_t actor_id = local_actors.global_id[local_id];
+  uint8_t current_dir = actors.dir[actor_id];
+  if (current_dir > 1) {
+    change_direction(local_id, local_actors.walk_dir[local_id]);
+  }
+  else {
+    change_direction(local_id, 2);
   }
 }
 

@@ -33,6 +33,7 @@ typedef struct {
   uint8_t       walking[MAX_LOCAL_ACTORS];
   uint16_t      x_fraction[MAX_LOCAL_ACTORS];
   uint16_t      y_fraction[MAX_LOCAL_ACTORS];
+  uint8_t       walk_dir[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_x[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_y[MAX_LOCAL_ACTORS];
   int32_t       walk_step_x[MAX_LOCAL_ACTORS];
