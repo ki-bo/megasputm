@@ -49,6 +49,7 @@ static void assign_variable(void);
 static void assign_bit_variable(void);
 static void start_sound(void);
 static void walk_to(void);
+static void actor_y(void);
 static void jump_if_or_if_not_equal_zero(void);
 static void sleep_for_variable(void);
 static void put_actor_in_room(void);
@@ -62,7 +63,7 @@ static void get_object_at_position(void);
 static void jump_if_smaller(void);
 static void cut_scene(void);
 static void start_script(void);
-static void get_actor_position_x(void);
+static void actor_x(void);
 static void jump_if_smaller_or_equal(void);
 static void increment_or_decrement(void);
 static void jump_if_not_equal(void);
@@ -147,6 +148,7 @@ void script_init(void)
   opcode_jump_table[0x1e] = &walk_to;
   opcode_jump_table[0x20] = &stop_or_break;
   opcode_jump_table[0x21] = &put_actor;
+  opcode_jump_table[0x23] = &actor_y;
   opcode_jump_table[0x25] = &draw_object;
   opcode_jump_table[0x26] = &assign_array;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
@@ -164,7 +166,7 @@ void script_init(void)
   opcode_jump_table[0x40] = &cut_scene;
   opcode_jump_table[0x41] = &put_actor;
   opcode_jump_table[0x42] = &start_script;
-  opcode_jump_table[0x43] = &get_actor_position_x;
+  opcode_jump_table[0x43] = &actor_x;
   opcode_jump_table[0x44] = &jump_if_smaller_or_equal;
   opcode_jump_table[0x45] = &draw_object;
   opcode_jump_table[0x46] = &increment_or_decrement;
@@ -895,6 +897,14 @@ static void walk_to(void)
   actor_walk_to(actor_id, x, y);
 }
 
+static void actor_y(void)
+{
+  uint8_t var_idx = read_byte();
+  uint8_t actor_id = resolve_next_param8();
+  debug_scr("VAR[%d] = actor-y %d", var_idx, actor_id);
+  vm_write_var(var_idx, actors.y[actor_id]);
+}
+
 /**
  * @brief Opcode 0x28: Jump if equal or not equal zero
  *
@@ -1177,11 +1187,11 @@ static void start_script(void)
   vm_start_script(script_id);
 }
 
-static void get_actor_position_x(void)
+static void actor_x(void)
 {
-  //debug_msg("Assign actor position x");
   uint8_t var_idx = read_byte();
   uint8_t actor_id = resolve_next_param8();
+  debug_scr("VAR[%d] = actor-x %d", var_idx, actor_id);
   vm_write_var(var_idx, actors.x[actor_id]);
 }
 

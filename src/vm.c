@@ -476,6 +476,7 @@ void vm_say_line(uint8_t actor_id)
   message_ptr = message_buffer;
   message_timer = 0;
   vm_write_var(VAR_MESSAGE_GOING, 1);
+  vm_write_var(VAR_MSGLEN, 0);
 }
 
 /**
@@ -797,6 +798,8 @@ static void process_dialog(uint8_t jiffies_elapsed)
       ++timer_chars;
     }
 
+    vm_write_var(VAR_MSGLEN, vm_read_var8(VAR_MSGLEN) + timer_chars);
+
     print_message_ptr = message_ptr;
     screen_update_needed |= SCREEN_UPDATE_DIALOG;
     message_timer = 60 + (uint16_t)timer_chars * (uint16_t)message_speed;
@@ -827,7 +830,7 @@ static void process_dialog(uint8_t jiffies_elapsed)
     gfx_clear_dialog();
     unmap_cs();
     vm_write_var(VAR_MESSAGE_GOING, 0);
-    stop_all_dialog();
+    vm_write_var(VAR_MSGLEN, 0);
   }
 }
 
@@ -841,6 +844,7 @@ static void stop_all_dialog(void)
   // stop talking animation for all actors
   actor_stop_talking(0xff);
   vm_write_var(VAR_MESSAGE_GOING, 0);
+  vm_write_var(VAR_MSGLEN, 0);
 }
 
 /**
