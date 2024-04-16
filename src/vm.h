@@ -73,8 +73,9 @@ enum {
 };
 
 enum {
-  SCREEN_UPDATE_BG = 1,
-  SCREEN_UPDATE_ACTORS = 2
+  SCREEN_UPDATE_BG     = 1,
+  SCREEN_UPDATE_ACTORS = 2,
+  SCREEN_UPDATE_DIALOG = 4,
 };
 
 enum {

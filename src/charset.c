@@ -1,5 +1,6 @@
 #include "charset.h"
 #include "dma.h"
+#include "util.h"
 
 //-----------------------------------------------------------------------------------------------
 
@@ -7,6 +8,22 @@
 static void copy_chars(uint8_t char_idx_src, uint8_t char_idx_dst, uint16_t num_chars);
 
 //-----------------------------------------------------------------------------------------------
+
+#pragma clang section rodata="cdata_init"
+
+static const uint8_t char_definitions[][9] = {
+  {
+    0x5e,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b11011011,
+    0b11011011,
+    0b00000000
+  }
+};
 
 /**
  * @defgroup charset_init_public Charset Init Public Functions
@@ -30,6 +47,14 @@ void charset_init(void)
 
   // copy quotation mark
   copy_chars(0x22, 0x60, 0x01);
+
+  uint8_t num_char_definitions = sizeof(char_definitions) / sizeof(char_definitions[0]);
+  for (uint8_t c = 0; c < num_char_definitions; ++c) {
+    uint8_t char_idx = char_definitions[c][0];
+    for (uint8_t i = 0; i < 8; ++i) {
+      FAR_U8_PTR(0xff7e000 + char_idx * 8)[i] = char_definitions[c][i + 1];
+    }
+  }
 }
 
 /** @} */ // charset_init_public

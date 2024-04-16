@@ -86,7 +86,6 @@ static uint8_t __huge *char_data_start_cels;
 static uint16_t obj_first_char[MAX_OBJECTS];
 static uint8_t next_obj_slot = 0;
 static uint8_t num_chars_at_row[16];
-static uint8_t screen_update_request = 0;
 static uint8_t masking_cache_iterations[119];
 static uint16_t masking_cache_data_offset[119];
 static uint8_t num_masking_cache_cols = 0;
@@ -284,28 +283,6 @@ volatile uint8_t raster_irq_counter = 0;
 __attribute__((interrupt()))
 static void raster_irq ()
 {
-  static dmalist_single_option_t dmalist_copy_gfx[2] = {
-    {
-      .opt_token  = 0x81,
-      .opt_arg    = 0x00,
-      .command    = 4, // copy + chain
-      .count      = CHRCOUNT * 2 * 16,
-      .src_addr   = BACKBUFFER_SCREEN + CHRCOUNT * 2 * 2,
-      .src_bank   = 0x00,
-      .dst_addr   = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
-      .dst_bank   = BANK(SCREEN_RAM)
-    },
-    {
-      .opt_token  = 0x81,
-      .opt_arg    = 0xff,
-      .command    = 0,
-      .count      = CHRCOUNT * 2 * 16,
-      .src_addr   = BACKBUFFER_COLRAM + CHRCOUNT * 2 * 2,
-      .src_bank   = 0x00,
-      .dst_addr   = LSB16(COLRAM + CHRCOUNT * 2 * 2),
-      .dst_bank   = BANK(COLRAM)
-    }
-  };
 
   uint32_t map_save = map_get();
   unmap_all();
@@ -323,12 +300,6 @@ static void raster_irq ()
     ++script_watchdog;
   }
   update_cursor(script_watchdog == 30);
-
-  if (screen_update_request) {
-    unmap_ds();
-    dma_trigger(&dmalist_copy_gfx);
-    screen_update_request = 0;
-  }
 
   VICIV.irr = VICIV.irr; // ack interrupt
   map_set(map_save);     // restore MAP  
@@ -380,16 +351,6 @@ void gfx_fade_out(void)
 }
 
 /**
- * @brief Fades in the graphics area of the screen.
- *
- * Code section: code_gfx
- */
-void gfx_fade_in(void)
-{
-  gfx_update_screen();
-}
-
-/**
  * @brief Waits for the next jiffy timer increase.
  *
  * The jiffy counter is updated every raster irq. This function will block until the jiffy
@@ -413,7 +374,7 @@ uint8_t gfx_wait_for_jiffy_timer(void)
  *
  * Code section: code_gfx
  */
-void gfx_wait_for_next_frame(void)
+void gfx_wait_vsync(void)
 {
   uint8_t counter = raster_irq_counter;
   while (counter == raster_irq_counter);
@@ -588,35 +549,33 @@ void gfx_clear_dialog(void)
 
 /**
  * @brief Prints a dialog to the screen.
+ *
+ * The text is printed to the dialog area of the screen. The dialog area is located
+ * at the top of the screen and is 2 lines high. The text is printed in the given color.
+ *
+ * If character code 0x01 is encountered in the text, the text will continue on the next
+ * line.
  * 
  * @param color The color palette index of the dialog text.
- * @param text The dialog text as null-terminated ASCII string.
- * @return The number of characters printed.
+ * @param text The dialog text as ASCII string.
+ * @param num_chars The number of characters to print.
  *
  * Code section: code_gfx
  */
-uint8_t gfx_print_dialog(uint8_t color, const char *text)
+void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars)
 {
   gfx_clear_dialog();
   set_dialog_color(color);
 
-  uint8_t num_chars = 0;
   __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
-  for (uint8_t i = 0; i < 80; ++i) {
+  for (uint8_t i = 0; i < num_chars; ++i) {
     char c = text[i];
-    if (c == '\0') {
-      break;
-    }
-    else if (c == 1) {
+    if (c == 1) {
       screen_ptr = FAR_U16_PTR(SCREEN_RAM) + CHRCOUNT;
       continue;
     }
-    *screen_ptr = (uint16_t)c;
-    ++num_chars;
-    ++screen_ptr;
+    *screen_ptr++ = (uint16_t)c;
   }
-
-  return num_chars;
 }
 
 /**
@@ -879,15 +838,37 @@ void gfx_reset_cel_drawing(void)
 /**
  * @brief Copies the backbuffer to the screen.
  *
- * The screen update is done in the interrupt routine to avoid tearing. This function will
- * request it and block until the copying is done.
+ * Copies the backbuffer screen and color RAM to the actual screen and color RAM.
+ * Should be called after gfx_wait_vsync to avoid tearing.
  * 
  * Code section: code_gfx
  */
-void gfx_update_screen(void)
+void gfx_update_main_screen(void)
 {
-  screen_update_request = 1;
-  while (screen_update_request);
+  static dmalist_single_option_t dmalist_copy_gfx[2] = {
+    {
+      .opt_token  = 0x81,
+      .opt_arg    = 0x00,
+      .command    = 4, // copy + chain
+      .count      = CHRCOUNT * 2 * 16,
+      .src_addr   = BACKBUFFER_SCREEN + CHRCOUNT * 2 * 2,
+      .src_bank   = 0x00,
+      .dst_addr   = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
+      .dst_bank   = BANK(SCREEN_RAM)
+    },
+    {
+      .opt_token  = 0x81,
+      .opt_arg    = 0xff,
+      .command    = 0,
+      .count      = CHRCOUNT * 2 * 16,
+      .src_addr   = BACKBUFFER_COLRAM + CHRCOUNT * 2 * 2,
+      .src_bank   = 0x00,
+      .dst_addr   = LSB16(COLRAM + CHRCOUNT * 2 * 2),
+      .dst_bank   = BANK(COLRAM)
+    }
+  };
+
+  dma_trigger(&dmalist_copy_gfx);
 }
 
 /** @} */ // gfx_public

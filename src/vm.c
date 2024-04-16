@@ -54,7 +54,12 @@ struct object_code {
 uint8_t global_game_objects[780];
 uint8_t variables_lo[256];
 uint8_t variables_hi[256];
+
+uint8_t message_color;
 char message_buffer[256];
+char *message_ptr;
+char *print_message_ptr;
+uint8_t print_message_num_chars;
 
 volatile uint8_t script_watchdog;
 int8_t cursor_state;
@@ -103,6 +108,7 @@ static uint8_t get_proc_state(uint8_t slot);
 static void freeze_non_active_scripts(void);
 static void unfreeze_scripts(void);
 static void process_dialog(uint8_t jiffies_elapsed);
+static void stop_all_dialog(void);
 static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
 static void redraw_screen(void);
@@ -119,6 +125,7 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
 static void update_actors(void);
 static void animate_actors(void);
 static void update_camera(void);
+static void override_cutscene(void);
 
 /**
  * @defgroup vm_init VM Init Functions
@@ -202,8 +209,6 @@ __task void vm_mainloop(void)
     diskio_check_motor_off(elapsed_jiffies);
     unmap_cs();
 
-    process_dialog(elapsed_jiffies);
-
     handle_input();
 
     update_script_timers(elapsed_jiffies);
@@ -219,28 +224,39 @@ __task void vm_mainloop(void)
       execute_script_slot(active_script_slot);
     }
 
+    // executes the command script if any commands are in the queue
     execute_command_stack();
+
+    process_dialog(elapsed_jiffies);
     update_actors();
     update_camera();
 
     if (screen_update_needed) {
+      //VICIV.bordercol = 0x01;
       if (screen_update_needed & SCREEN_UPDATE_BG) {
-        //VICIV.bordercol = 0x01;
         redraw_screen();
-        //VICIV.bordercol = 0x00;
       }
       if (screen_update_needed & SCREEN_UPDATE_ACTORS) {
-        //VICIV.bordercol = 0x01;
         redraw_actors();
-        animate_actors();
-        //VICIV.bordercol = 0x00;
       }
+
       //VICIV.bordercol = 0x00;
       map_cs_gfx();
-      gfx_update_screen();
+      gfx_wait_vsync();
+      //VICIV.bordercol = 0x03;
+      if (screen_update_needed & SCREEN_UPDATE_DIALOG) {
+        gfx_print_dialog(message_color, print_message_ptr, print_message_num_chars);
+      }
+
+      if (screen_update_needed & (SCREEN_UPDATE_BG | SCREEN_UPDATE_ACTORS)) {
+        gfx_update_main_screen();
+      }
       unmap_cs();
+
       screen_update_needed = 0;
     }
+
+    animate_actors();
     //VICIV.bordercol = 0x00;
   }
 }
@@ -299,6 +315,7 @@ void vm_set_current_room(uint8_t room_no)
 
   // exit and free old room
   debug_out("Deactivating old room %d", vm_read_var8(VAR_SELECTED_ROOM));
+  stop_all_dialog();
   if (vm_read_var(VAR_SELECTED_ROOM) != 0) {
     map_ds_resource(room_res_slot);
     uint16_t exit_script_offset = room_hdr->exit_script_offset;
@@ -442,15 +459,23 @@ void vm_begin_override(void)
 void vm_say_line(uint8_t actor_id)
 {
   actor_talking = actor_id;
-  uint8_t talk_color = actor_id != 0xff ? actors.talk_color[actor_id] : 0x09;
-  map_cs_gfx();
-  uint8_t num_chars = gfx_print_dialog(talk_color, message_buffer);
-  unmap_cs();
-  message_timer = 60 + (uint16_t)num_chars * (uint16_t)message_speed;
-  vm_write_var(VAR_MESSAGE_GOING, 1);
-  if (actor_id != 0xff) {
+ 
+  if (actor_id == 0xff) {
+    // print-line " " will shut everybody's mouth
+    if (message_buffer[0] == ' ' && message_buffer[1] == '\0') {
+      stop_all_dialog();
+      return;
+    }
+
+    message_color = 0x09;
+  } else {
     actor_start_talking(actor_id);
+    message_color = actors.talk_color[actor_id];
   }
+
+  message_ptr = message_buffer;
+  message_timer = 0;
+  vm_write_var(VAR_MESSAGE_GOING, 1);
 }
 
 /**
@@ -748,8 +773,40 @@ static void unfreeze_scripts(void)
  */
 static void process_dialog(uint8_t jiffies_elapsed)
 {
-  if (message_timer == 0)
+  if (message_ptr == NULL && message_timer == 0)
   {
+    // no new dialog to process and no recent one to handle
+    return;
+  }
+
+  if (message_ptr && message_timer == 0) {
+    print_message_num_chars = 0;
+    uint8_t timer_chars = 0;
+    while (1) {
+      char c = message_ptr[print_message_num_chars];
+      if (c == '\0') {
+        break;
+      }
+      if (c == 0x03) {
+        break;
+      }
+      ++print_message_num_chars;
+      if (c == 0x01 || c == 0x20) {
+        continue;
+      }
+      ++timer_chars;
+    }
+
+    print_message_ptr = message_ptr;
+    screen_update_needed |= SCREEN_UPDATE_DIALOG;
+    message_timer = 60 + (uint16_t)timer_chars * (uint16_t)message_speed;
+    message_ptr += print_message_num_chars;
+    if (*message_ptr == '\0') {
+      message_ptr = NULL;
+    }
+    else if (*message_ptr == 0x03) {
+      ++message_ptr;
+    }
     return;
   }
 
@@ -762,16 +819,28 @@ static void process_dialog(uint8_t jiffies_elapsed)
     message_timer = 0;
   }
 
-  if (!message_timer) {
+  if (!message_timer && !message_ptr) {
+    if (actor_talking != 0xff) {
+      actor_stop_talking(actor_talking);
+    }
     map_cs_gfx();
     gfx_clear_dialog();
     unmap_cs();
     vm_write_var(VAR_MESSAGE_GOING, 0);
-    if (actor_talking != 0xff) {
-      actor_stop_talking(actor_talking);
-      actor_talking = 0xff;
-    }
+    stop_all_dialog();
   }
+}
+
+static void stop_all_dialog(void)
+{
+  map_cs_gfx();
+  gfx_clear_dialog();
+  unmap_cs();
+  message_ptr = NULL;
+  message_timer = 0;
+  // stop talking animation for all actors
+  actor_stop_talking(0xff);
+  vm_write_var(VAR_MESSAGE_GOING, 0);
 }
 
 /**
@@ -932,14 +1001,7 @@ static void handle_input(void)
   // keyboard handling
   if (input_key_pressed) {
     if (input_key_pressed == INPUT_KEY_RUNSTOP || input_key_pressed == INPUT_KEY_ESCAPE) {
-      if (cs_override_pc) {
-        proc_pc[cs_proc_slot] = cs_override_pc;
-        cs_override_pc = 0;
-        proc_state[cs_proc_slot] &= ~PROC_FLAGS_FROZEN;
-        if (proc_state[cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
-          proc_state[cs_proc_slot] = PROC_STATE_RUNNING;
-        }
-      }
+      override_cutscene();
     }
     // ack the key press
     input_key_pressed = 0;
@@ -1247,6 +1309,18 @@ static void update_camera(void)
 
   vm_update_bg();
   vm_update_actors();
+}
+
+static void override_cutscene(void)
+{
+  if (cs_override_pc) {
+    proc_pc[cs_proc_slot] = cs_override_pc;
+    cs_override_pc = 0;
+    proc_state[cs_proc_slot] &= ~PROC_FLAGS_FROZEN;
+    if (proc_state[cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
+      proc_state[cs_proc_slot] = PROC_STATE_RUNNING;
+    }
+  }
 }
 
 /// @} // vm_private

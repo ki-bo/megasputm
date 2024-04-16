@@ -305,9 +305,18 @@ void actor_start_talking(uint8_t actor_id)
 
 void actor_stop_talking(uint8_t actor_id)
 {
-  uint8_t local_id = actors.local_id[actor_id];
-  if (local_id != 0xff) {
+  if (actor_id != 0xff) {
+    uint8_t local_id = actors.local_id[actor_id];
     actor_start_animation(local_id, ANIM_MOUTH_SHUT + actors.dir[actor_id]);
+  }
+  else {
+    // stop talking animation for all local actors
+    for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
+      actor_id = local_actors.global_id[local_id];
+      if (actor_id != 0xff) {
+        actor_start_animation(local_id, ANIM_MOUTH_SHUT + actors.dir[actor_id]);
+      }
+    }
   }
 }
 
