@@ -22,9 +22,9 @@ static inline void apply_map(void);
  *
  * @{
  */
-#pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
+#pragma clang section text="code" rodata="cdata" data="data" bss="zzpage"
 
-union {
+union map_t {
   struct {
     uint8_t a;
     uint8_t x;
@@ -32,7 +32,10 @@ union {
     uint8_t z;
   };
   uint32_t quad;
-} map_regs = {1, 1, 1, 1}; // need to init with non-zero to force it into data section
+};
+
+
+union map_t __attribute__((zpage)) map_regs; // need to init with non-zero to force it into data section
 
 /**
  * @brief Initializes the memory mapping system

@@ -450,6 +450,8 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
  */
 void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 {
+  uint16_t save_ds = map_get_ds();
+
   masking_data_room_offset = bg_masking_offset;
   uint8_t *src = map_ds_room_offset(bg_masking_offset);
   // debug_out("Decode masking buffer, width: %d\n", width);
@@ -503,6 +505,8 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
     }
   }
   num_masking_cache_cols = mask_col;
+
+  map_set_ds(save_ds);
 }
 
 /**
@@ -511,7 +515,7 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
  * The static pointer next_char_data will point to the next byte following the last byte
  * written to the char data memory. That way, object char data will be stored sequentially
  * in memory. We will keep track of object IDs and their corresponding char numbers in
- * 
+ * the obj_first_char array.
  * 
  * @param src Pointer to the encoded object image data.
  * @param width Width of the object image in characters.

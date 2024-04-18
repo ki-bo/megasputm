@@ -14,7 +14,6 @@
 
 uint8_t page_res_type[256];
 uint8_t page_res_index[256];
-uint8_t res_pages_invalidated;
 
 //-----------------------------------------------------------------------------------------------
 
@@ -44,7 +43,6 @@ static uint8_t defragment_memory(void);
 void res_init(void)
 {
   memset(page_res_type, RES_TYPE_NONE, 256);
-  res_pages_invalidated = 0;
 }
 
 /** @} */ // res_init
@@ -96,7 +94,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 
   map_cs_diskio();
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
-  
+ 
   if (chunk_size > MAX_RESOURCE_SIZE) {
     fatal_error(ERR_RESOURCE_TOO_LARGE);
   }
@@ -109,13 +107,6 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   map_set_ds(ds_save);
   
   return page;
-}
-
-void create_object_resource(uint8_t* data, uint16_t size, uint8_t id)
-{
-  uint8_t page = allocate(RES_TYPE_OBJECT, id, (size + 255) / 256);
-  void __far* dest = (void __far*) (RESOURCE_BASE + page * 256);
-  memcpy_to_bank(dest, data, size);
 }
 
 /**
@@ -200,6 +191,7 @@ void res_reset_flags(uint8_t slot, uint8_t flags)
 uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint8_t i = hint;
+  type &= RES_TYPE_MASK;
   do {
     if(page_res_index[i] == id && (page_res_type[i] & RES_TYPE_MASK) == type) {
       return i;
@@ -211,7 +203,7 @@ uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 
 void find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
-  uint16_t result = find_resource(type & RES_TYPE_MASK, id, hint);
+  uint16_t result = find_resource(type, id, hint);
   if (result == 0xffff) {
     return;
   }
@@ -221,7 +213,7 @@ void find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 
 void find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
-  uint16_t result = find_resource(type & RES_TYPE_MASK, id, hint);
+  uint16_t result = find_resource(type, id, hint);
   if (result == 0xffff) {
     return;
   }
@@ -344,8 +336,6 @@ static uint8_t defragment_memory(void)
   for (uint8_t i = 255; i >= write_idx; i--) {
     page_res_type[i] = RES_TYPE_NONE;
   }
-
-  res_pages_invalidated = 1;
 
   return write_idx;
 }

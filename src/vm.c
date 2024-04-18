@@ -324,7 +324,7 @@ void vm_set_current_room(uint8_t room_no)
       execute_script_slot(active_script_slot);
     }
 
-    res_deactivate(RES_TYPE_ROOM, vm_read_var8(VAR_SELECTED_ROOM), 0);
+    res_clear_flags(room_res_slot, RES_ACTIVE_MASK);
   }
 
   map_cs_gfx();
@@ -798,7 +798,7 @@ static void process_dialog(uint8_t jiffies_elapsed)
       ++timer_chars;
     }
 
-    vm_write_var(VAR_MSGLEN, vm_read_var8(VAR_MSGLEN) + timer_chars);
+    vm_write_var(VAR_MSGLEN, vm_read_var8(VAR_MSGLEN) + print_message_num_chars);
 
     print_message_ptr = message_ptr;
     screen_update_needed |= SCREEN_UPDATE_DIALOG;
