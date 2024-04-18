@@ -109,6 +109,7 @@ static uint8_t is_room_object_script(uint8_t slot);
 static void freeze_non_active_scripts(void);
 static void unfreeze_scripts(void);
 static void process_dialog(uint8_t jiffies_elapsed);
+static void stop_current_actor_talking(void);
 static void stop_all_dialog(void);
 static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
@@ -459,6 +460,11 @@ void vm_begin_override(void)
  */
 void vm_say_line(uint8_t actor_id)
 {
+  // check if there is already a message going on
+  if (vm_read_var(VAR_MESSAGE_GOING)) {
+    stop_current_actor_talking();
+  }
+
   actor_talking = actor_id;
  
   if (actor_id == 0xff) {
@@ -830,15 +836,20 @@ static void process_dialog(uint8_t jiffies_elapsed)
   }
 
   if (!message_timer && !message_ptr) {
-    if (actor_talking != 0xff) {
-      actor_stop_talking(actor_talking);
-    }
-    map_cs_gfx();
-    gfx_clear_dialog();
-    unmap_cs();
-    vm_write_var(VAR_MESSAGE_GOING, 0);
-    vm_write_var(VAR_MSGLEN, 0);
+    stop_current_actor_talking();
   }
+}
+
+static void stop_current_actor_talking(void)
+{
+  if (actor_talking != 0xff) {
+    actor_stop_talking(actor_talking);
+  }
+  map_cs_gfx();
+  gfx_clear_dialog();
+  unmap_cs();
+  vm_write_var(VAR_MESSAGE_GOING, 0);
+  vm_write_var(VAR_MSGLEN, 0);
 }
 
 static void stop_all_dialog(void)
