@@ -6,9 +6,20 @@
 #include "memory.h"
 #include "util.h"
 
+//#define HEAP_KILL_INACTIVE 1
+//#define HEAP_DEBUG_OUT 1
+
 //-----------------------------------------------------------------------------------------------
 
 #pragma clang section bss="zdata"
+
+//-----------------------------------------------------------------------------------------------
+
+enum heap_strategy_t {
+  HEAP_STRATEGY_FREE_ONLY,
+  HEAP_STRATEGY_ALLOW_UNLOCKED,
+  HEAP_STRATEGY_ALLOW_LOCKED
+};
 
 //-----------------------------------------------------------------------------------------------
 
@@ -18,11 +29,18 @@ uint8_t page_res_index[256];
 //-----------------------------------------------------------------------------------------------
 
 // Private resource functions
+static void set_flags(uint8_t slot, uint8_t flags);
+static void clear_flags(uint8_t slot, uint8_t flags);
+static void reset_flags(uint8_t slot, uint8_t flags);
 static uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint);
-static void find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
-static void find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
+static uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
+static uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages);
+static uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy);
+static void free_resource(uint8_t slot);
 static uint8_t defragment_memory(void);
+static void clear_inactive_blocks(void);
+static void print_heap(void);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -43,6 +61,7 @@ static uint8_t defragment_memory(void);
 void res_init(void)
 {
   memset(page_res_type, RES_TYPE_NONE, 256);
+  memset(page_res_index, 0, 256);
 }
 
 /** @} */ // res_init
@@ -77,6 +96,9 @@ void res_init(void)
  */
 uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
+#ifdef HEAP_KILL_INACTIVE
+  clear_inactive_blocks();
+#endif
   // will deal with sound later, as those resources are too big to fit into the chipram heap
   // (maybe will use attic ram for those)
   if (type == RES_TYPE_SOUND) {
@@ -94,6 +116,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 
   map_cs_diskio();
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
+  //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
  
   if (chunk_size > MAX_RESOURCE_SIZE) {
     fatal_error(ERR_RESOURCE_TOO_LARGE);
@@ -105,7 +128,10 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   unmap_cs();
 
   map_set_ds(ds_save);
-  
+
+#ifdef HEAP_DEBUG_OUT  
+  print_heap();
+#endif
   return page;
 }
 
@@ -125,6 +151,10 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 {
   find_and_set_flags(type, id, hint, RES_LOCKED_MASK);
+#ifdef HEAP_DEBUG_OUT
+  debug_out("Locking resource type %d id %d", type, id);
+  print_heap();
+#endif
 }
 
 /**
@@ -141,41 +171,55 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 {
-  find_and_clear_flags(type, id, hint, RES_LOCKED_MASK);
+  uint16_t slot = find_and_clear_flags(type, id, hint, RES_LOCKED_MASK);
+  if (slot <= 255 && (page_res_type[slot] & RES_ACTIVE_MASK) == 0) {
+    debug_out("Unlocking resource type %d id %d slot %d", type, id, slot);
+#ifdef HEAP_DEBUG_OUT
+    print_heap();
+#endif
+    //free_resource(slot);
+  }
 }
 
 void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 {
   find_and_set_flags(type, id, hint, RES_ACTIVE_MASK);
+#ifdef HEAP_DEBUG_OUT
+  debug_out("Activating resource type %d id %d", type, id);
+  print_heap();
+#endif
 }
 
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
 {
-  find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
+  uint16_t slot = find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
+  if (slot <= 255 && (page_res_type[slot] & RES_LOCKED_MASK) == 0) {
+#ifdef HEAP_DEBUG_OUT
+    debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
+    print_heap();
+#endif
+    //free_resource(slot);
+  }
 }
 
-void res_set_flags(uint8_t slot, uint8_t flags)
+void res_activate_slot(uint8_t slot)
 {
-  uint8_t current_type_and_flags = page_res_type[slot];
-  res_reset_flags(slot, current_type_and_flags | flags);
+  set_flags(slot, RES_ACTIVE_MASK);
+#ifdef HEAP_DEBUG_OUT
+  debug_out("Activating slot %d", slot);
+  print_heap();
+#endif
 }
 
-void res_clear_flags(uint8_t slot, uint8_t flags)
+void res_deactivate_slot(uint8_t slot)
 {
-  uint8_t current_type_and_flags = page_res_type[slot];
-  res_reset_flags(slot, current_type_and_flags & ~flags);
-}
-
-void res_reset_flags(uint8_t slot, uint8_t flags)
-{
-  uint8_t current_type_and_flags = page_res_type[slot];
-  uint8_t current_id = page_res_index[slot];
-  uint8_t new_type_and_flags = (current_type_and_flags & RES_TYPE_MASK) | flags;
-
-  while (page_res_type[slot] == current_type_and_flags &&
-         page_res_index[slot] == current_id) {
-    page_res_type[slot] = new_type_and_flags;
-    ++slot;
+  clear_flags(slot, RES_ACTIVE_MASK);
+#ifdef HEAP_DEBUG_OUT
+  debug_out("Deactivating slot %d", slot);
+  print_heap();
+#endif
+  if ((page_res_type[slot] & RES_LOCKED_MASK) == 0) {
+    //free_resource(slot);
   }
 }
 
@@ -187,6 +231,31 @@ void res_reset_flags(uint8_t slot, uint8_t flags)
  * @defgroup res_private Resource Private Functions
  * @{
  */
+
+void set_flags(uint8_t slot, uint8_t flags)
+{
+  uint8_t current_type_and_flags = page_res_type[slot];
+  reset_flags(slot, current_type_and_flags | flags);
+}
+
+void clear_flags(uint8_t slot, uint8_t flags)
+{
+  uint8_t current_type_and_flags = page_res_type[slot];
+  reset_flags(slot, current_type_and_flags & ~flags);
+}
+
+void reset_flags(uint8_t slot, uint8_t flags)
+{
+  uint8_t current_type_and_flags = page_res_type[slot];
+  uint8_t current_id = page_res_index[slot];
+  uint8_t new_type_and_flags = (current_type_and_flags & RES_TYPE_MASK) | flags;
+
+  while (page_res_type[slot] == current_type_and_flags &&
+         page_res_index[slot] == current_id) {
+    page_res_type[slot] = new_type_and_flags;
+    ++slot;
+  }
+}
 
 uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 {
@@ -201,24 +270,26 @@ uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
   return 0xffff;
 }
 
-void find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
+uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
   uint16_t result = find_resource(type, id, hint);
   if (result == 0xffff) {
-    return;
+    return result;
   }
   uint8_t slot = (uint8_t) result;
-  res_set_flags(slot, flags);
+  set_flags(slot, flags);
+  return slot;
 }
 
-void find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
+uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
   uint16_t result = find_resource(type, id, hint);
   if (result == 0xffff) {
-    return;
+    return result;
   }
   uint8_t slot = (uint8_t) result;
-  res_clear_flags(slot, flags);
+  clear_flags(slot, flags);
+  return slot;
 }
 
 
@@ -244,100 +315,179 @@ void find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
  */
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 {
-  uint8_t cur_size = 0;
-  uint8_t block_idx = 0;
-  uint8_t num_free_blocks = 0;
-  
-  do {
-    if(page_res_type[block_idx] == RES_TYPE_NONE) {
-      ++num_free_blocks;
-      ++cur_size;
-      if(cur_size == num_pages) {
-        for (uint8_t i = 0; i < num_pages; i++) {
-          page_res_type[block_idx] = type;
-          page_res_index[block_idx] = id;
-          --block_idx;
-        }
-        return block_idx + 1;
-      }
+  uint16_t result;
+
+  result = find_free_block_range(num_pages, HEAP_STRATEGY_FREE_ONLY);
+  if (result != 0xffff) {
+    uint8_t slot = (uint8_t)result;
+    for (uint8_t i = 0; i < num_pages; ++i) {
+      page_res_type[slot + i] = type;
+      page_res_index[slot + i] = id;
     }
-    else {
-      cur_size = 0;
-    }
+    return slot;
   }
-  while (++block_idx != 0);
 
   // At this point, there is no contiguos free block available to allocate
-  // Check whether there is enough free memory to defragment and allocate 
-  if (num_free_blocks >= num_pages) {
-    uint8_t first_free_block = defragment_memory();
-    for (uint8_t i = 0; i < num_pages; i++) {
-      page_res_type[first_free_block + i] = type;
-      page_res_index[first_free_block + i] = id;
+  // Check whether there is enough free memory to if freeing locked memory 
+
+  for (enum heap_strategy_t strategy = HEAP_STRATEGY_ALLOW_UNLOCKED; strategy <= HEAP_STRATEGY_ALLOW_LOCKED; ++strategy) {
+    debug_out("Trying heap allocation strategy %d", strategy);
+    result = find_free_block_range(num_pages, strategy);
+    if (result != 0xffff) {
+      uint8_t slot = (uint8_t)result;
+      for (uint8_t i = 0; i < num_pages; ++i) {
+        if (page_res_type[slot + i] & RES_LOCKED_MASK) {
+          debug_out("warning: freeing locked memory type %d id %d at slot %d", page_res_type[slot + i] & RES_TYPE_MASK, page_res_index[slot + i], slot + i);
+        }
+        // free the locked resource currently occupying the slot
+        free_resource(slot + i);
+        page_res_type[slot + i] = type;
+        page_res_index[slot + i] = id;
+      }
+      return slot;
     }
-    return first_free_block;
   }
 
-  // todo: free unlocked memory at this point and defragment memory
   fatal_error(ERR_OUT_OF_RESOURCE_MEMORY);
 }
 #pragma clang diagnostic pop
 
-/**
- * @brief Defragments resource memory
- *
- * This function defragments the resource memory by moving all allocated
- * blocks to the beginning of the memory and freeing the rest of the memory.
- * 
- * @return uint8_t The number of pages that are now allocated (= the index of the first free page)
- *
- * Code section: code_main
- */
-static uint8_t defragment_memory(void)
+uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
 {
-  debug_msg("Warning: Defragmenting memory");
-  fatal_error(ERR_OUT_OF_RESOURCE_MEMORY);
+  uint8_t current_start = 0;
+  uint8_t best_fit_start = 0;
+  uint16_t best_fit_size = 0x7fff;
+  uint8_t cur_size = 0;
+  uint8_t block_idx = 0;
 
-  static dmalist_t dmalist_res_defrag = {
-    .end_of_options = 0,
-    .command        = 0,
-    .count          = 256,
-    .src_addr       = 0,
-    .src_bank       = 0,
-    .dst_addr       = 0,
-    .dst_bank       = 0
-  };
-
-  uint8_t read_idx = 0;
-  uint8_t write_idx = 0;
-
-  dmalist_res_defrag.src_addr_page = RESOURCE_BASE >> 8;
-  dmalist_res_defrag.dst_addr_page = RESOURCE_BASE >> 8;
-
+  //debug_out("Searching for %d pages of free memory", num_pages);
+  
   do {
-    if (page_res_type[read_idx] == RES_TYPE_NONE) {
-      ++read_idx;
-      ++dmalist_res_defrag.src_addr_page;
+    uint8_t cur_type = page_res_type[block_idx];
+    if(   (strategy == HEAP_STRATEGY_FREE_ONLY      && cur_type == RES_TYPE_NONE)
+       || (strategy == HEAP_STRATEGY_ALLOW_UNLOCKED && (cur_type == RES_TYPE_NONE || (cur_type & (RES_LOCKED_MASK | RES_ACTIVE_MASK)) == 0))
+       || (strategy == HEAP_STRATEGY_ALLOW_LOCKED   && (cur_type == RES_TYPE_NONE || (cur_type & RES_ACTIVE_MASK) == 0)))
+    {
+      if (cur_size == 0) {
+        current_start = block_idx;
+      }
+      ++cur_size;
     }
     else {
-      if (read_idx != write_idx) {
-        page_res_type[write_idx] = page_res_type[read_idx];
-        page_res_index[write_idx] = page_res_index[read_idx];
-        dma_trigger(&dmalist_res_defrag);
+      if (cur_size >= num_pages && cur_size < best_fit_size) {
+        best_fit_start = current_start;
+        best_fit_size = cur_size;
       }
-      ++write_idx;
-      ++dmalist_res_defrag.dst_addr_page;
-      ++read_idx;
-      ++dmalist_res_defrag.src_addr_page;
+      cur_size = 0;
+    }
+
+    if (cur_size == 255) {
+      return current_start;
+    }
+
+    if (block_idx == 255 && cur_size >= num_pages && cur_size < best_fit_size) {
+      best_fit_start = current_start;
+      best_fit_size = cur_size;
+    }
+
+    //debug_out("  block %d, type %02x, index %d, free %d", block_idx, page_res_type[block_idx], page_res_index[block_idx], cur_size);
+  }
+  while (++block_idx != 0); // block_idx will wrap around to 0
+
+  //debug_out("  result: %u, size %u", (uint16_t)best_fit_start, best_fit_size);
+
+  if (best_fit_size == 0x7fff) {
+    return 0xffff;
+  }
+
+  return best_fit_start;
+}
+
+static void free_resource(uint8_t slot)
+{
+  uint8_t type = page_res_type[slot] & RES_TYPE_MASK;
+  if (type == RES_TYPE_NONE) {
+    return;
+  }
+
+  uint8_t id = page_res_index[slot];
+
+  // find first block of resource
+  while (slot != 0) {
+    --slot;
+    if ((page_res_type[slot] & RES_TYPE_MASK) != type || page_res_index[slot] != id) {
+      ++slot;
+      break;
     }
   }
-  while (read_idx != 0);
 
-  for (uint8_t i = 255; i >= write_idx; i--) {
-    page_res_type[i] = RES_TYPE_NONE;
+  debug_out("Freeing resource type %d id %d at slot %d", type, id, slot);
+  // free all blocks of resource
+  while (1) {
+    if ((page_res_type[slot] & RES_TYPE_MASK) == type && page_res_index[slot] == id) {
+      page_res_type[slot] = RES_TYPE_NONE;
+      page_res_index[slot] = 0;
+      ++slot;
+    }
+    else {
+      break;
+    }
   }
+#ifdef HEAP_DEBUG_OUT
+  print_heap();
+#endif
+}
 
-  return write_idx;
+static void clear_inactive_blocks(void)
+{
+  __auto_type block_ptr = HUGE_U8_PTR(HEAP_BASE);
+  uint8_t idx = 0;
+  do {
+    uint8_t locked_or_active = page_res_type[idx] & (RES_LOCKED_MASK | RES_ACTIVE_MASK);
+    if (!locked_or_active) {
+      page_res_type[idx] = RES_TYPE_NONE;
+      page_res_index[idx] = 0;
+      memset_bank((uint8_t __far *)block_ptr, 3, 256);
+    }
+    block_ptr += 256;
+  }
+  while (++idx != 0);
+#ifdef HEAP_DEBUG_OUT
+  print_heap();
+#endif
+}
+
+static void print_heap(void)
+{
+  uint8_t num_pages = 0;
+  uint8_t prev_type = RES_TYPE_NONE;
+  uint8_t prev_id = 0xff;
+  uint8_t idx = 0;
+  debug_out("Heap:");
+  do {
+    if (page_res_type[idx] != prev_type || page_res_index[idx] != prev_id) {
+      if (num_pages) {
+        uint8_t type = prev_type & RES_TYPE_MASK;
+        uint8_t active = prev_type & RES_ACTIVE_MASK;
+        uint8_t locked = prev_type & RES_LOCKED_MASK;
+        if (type == RES_TYPE_NONE) {
+          debug_out(" [%03u] Free: %d", idx - num_pages, num_pages);
+        }
+        else {
+          debug_out(" [%03u] Type: %d, ID: %03d, Pages: %02d, Active: %d, Locked: %d", idx - num_pages, type, prev_id, num_pages, active != 0, locked != 0);
+        }
+      }
+      prev_type = page_res_type[idx];
+      prev_id = page_res_index[idx];
+      num_pages = 1;
+    }
+    else {
+      ++num_pages;
+    }
+  }
+  while (++idx != 0);
+  debug_out(" [%03u] Free: %d", 256 - num_pages, num_pages);
+  debug_out("-------");
 }
 
 /** @} */ // res_private

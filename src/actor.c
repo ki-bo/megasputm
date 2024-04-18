@@ -183,8 +183,6 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   }
   __auto_type anim_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_offsets[animation]);
   uint16_t cel_level_mask = *((uint16_t *)anim_ptr);
-  // todo: remove this dummy write once compiler bug is fixed
-  *((uint16_t *)0xc000) = cel_level_mask;
   anim_ptr += 2;
   for (int8_t level = 0; level < 16; ++level) {
     if (cel_level_mask & 0x8000) {
@@ -345,14 +343,14 @@ static void activate_costume(uint8_t actor_id)
 {
   uint8_t local_id = actors.local_id[actor_id];
   uint8_t res_slot = res_provide(RES_TYPE_COSTUME, actors.costume[actor_id], 0);
-  res_set_flags(res_slot, RES_ACTIVE_MASK);
+  res_activate_slot(res_slot);
   local_actors.res_slot[local_id] = res_slot;
 }
 
 static void deactivate_costume(uint8_t actor_id)
 {
   uint8_t local_id = actors.local_id[actor_id];
-  res_clear_flags(local_actors.res_slot[local_id], RES_ACTIVE_MASK);
+  res_deactivate_slot(local_actors.res_slot[local_id]);
 }
 
 static uint8_t is_walk_to_done(uint8_t local_id)

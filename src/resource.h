@@ -30,6 +30,8 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint);
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint);
 void res_activate(uint8_t type, uint8_t id, uint8_t hint);
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint);
+void res_activate_slot(uint8_t slot);
+void res_deactivate_slot(uint8_t slot);
 void res_set_flags(uint8_t slot, uint8_t flags);
 void res_clear_flags(uint8_t slot, uint8_t flags);
 void res_reset_flags(uint8_t slot, uint8_t flags);

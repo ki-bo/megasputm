@@ -105,6 +105,7 @@ struct cmd_stack_t cmd_stack;
 // Private functions
 static void set_proc_state(uint8_t slot, uint8_t state);
 static uint8_t get_proc_state(uint8_t slot);
+static uint8_t is_room_object_script(uint8_t slot);
 static void freeze_non_active_scripts(void);
 static void unfreeze_scripts(void);
 static void process_dialog(uint8_t jiffies_elapsed);
@@ -324,7 +325,7 @@ void vm_set_current_room(uint8_t room_no)
       execute_script_slot(active_script_slot);
     }
 
-    res_clear_flags(room_res_slot, RES_ACTIVE_MASK);
+    res_deactivate_slot(room_res_slot);
   }
 
   map_cs_gfx();
@@ -346,7 +347,7 @@ void vm_set_current_room(uint8_t room_no)
     debug_out("Activating new room %d", room_no);
     // activate new room data
     room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
-    res_set_flags(room_res_slot, RES_ACTIVE_MASK);
+    res_activate_slot(room_res_slot);
     map_ds_resource(room_res_slot);
     room_width = room_hdr->bg_width;
     uint16_t bg_data_offset = room_hdr->bg_data_offset;
@@ -501,7 +502,7 @@ uint8_t vm_start_script(uint8_t script_id)
   proc_pc[slot] = 4; // skipping script header directly to first opcode
 
   uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
-  res_set_flags(new_page, RES_ACTIVE_MASK);
+  res_activate_slot(new_page);
   proc_res_slot[slot] = new_page;
 
   return slot;
@@ -560,7 +561,10 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
  */
 void vm_stop_active_script()
 {
-  res_deactivate(RES_TYPE_SCRIPT, proc_res_slot[active_script_slot], 0);
+  debug_out("Script %d ended", proc_script_id[active_script_slot]);
+  if (!is_room_object_script(active_script_slot)) {
+    res_deactivate_slot(proc_res_slot[active_script_slot]);
+  }
   proc_state[active_script_slot] = PROC_STATE_FREE;
   uint8_t parent = proc_parent[active_script_slot];
   if (parent != 0xff)
@@ -576,14 +580,16 @@ void vm_stop_script(uint8_t script_id)
   {
     if (proc_state[slot] != PROC_STATE_FREE && proc_script_id[slot] == script_id)
     {
-      res_deactivate(RES_TYPE_SCRIPT, proc_res_slot[slot], 0);
+      debug_out("Stopping script %d", script_id);
+      res_deactivate_slot(proc_res_slot[slot]);
       proc_state[slot] = PROC_STATE_FREE;
       // stop all children
       while (proc_child[slot] != 0xff)
       {
         proc_child[slot] = 0xff;
         slot = proc_child[slot];
-        res_deactivate(RES_TYPE_SCRIPT, proc_res_slot[slot], 0);
+        debug_out("Stopped child script %d", proc_script_id[slot]);
+        res_deactivate_slot(proc_res_slot[slot]);
         proc_state[slot] = PROC_STATE_FREE;
       }
     }
@@ -697,11 +703,7 @@ void vm_clear_all_other_object_states(uint16_t global_object_id)
         obj_hdr->pos_x == x && 
        (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
     {
-      // This used to be
-      //   global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
-      // but that was triggering a compiler bug leading to memory corruption
-      uint16_t id = obj_hdr->id;
-      global_game_objects[id] &= ~OBJ_STATE;
+      global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
       debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
     }
   }
@@ -744,6 +746,11 @@ static void set_proc_state(uint8_t slot, uint8_t state)
 static uint8_t get_proc_state(uint8_t slot)
 {
   return proc_state[slot] & 0x07;
+}
+
+static uint8_t is_room_object_script(uint8_t slot)
+{
+  return proc_script_id[slot] == 0xff;
 }
 
 static void freeze_non_active_scripts(void)
@@ -1108,13 +1115,13 @@ static void execute_script_slot(uint8_t slot)
     }
     if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD) {
       // script has just started a new child script
-      debug_out("Script %d has started new child %d", slot, proc_child[slot]);
+      debug_out("Script in slot %d has started new child in slot %d", slot, proc_child[slot]);
       slot = proc_child[slot];
       continue;
     }
     else if (proc_state[slot] == PROC_STATE_FREE) {
       // script has exited, launch parent script if needed
-      debug_out("Script %d has exited, moving on to parent %d", slot, proc_parent[slot]);
+      debug_out("Script in slot %d has exited, moving on to parent slot %d", slot, proc_parent[slot]);
       slot = proc_parent[slot];
       continue;
     }

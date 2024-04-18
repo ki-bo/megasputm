@@ -6,7 +6,7 @@
 #define INVENTORY_SIZE      0x2000
 #define BACKBUFFER_SCREEN   0xa000
 #define BACKBUFFER_COLRAM   0xb000
-#define RESOURCE_BASE       0x18000UL
+#define HEAP_BASE           0x18000UL
 #define SCREEN_RAM          0x10000UL
 #define COLRAM              0xff80800UL
 #define BG_BITMAP           0x28000
