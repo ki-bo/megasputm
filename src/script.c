@@ -1030,7 +1030,7 @@ static void execute_command(void)
     return;
   }
   else if (command_verb == 0xfd) {
-    debug_scr("  unimplemented command verb 0xfd, needed for load/save");
+    //debug_scr("  unimplemented command verb 0xfd, needed for load/save");
     fatal_error(ERR_UNKNOWN_VERB);
   }
 
@@ -1049,7 +1049,7 @@ static void execute_command(void)
     cmd_stack.noun1[cmd_stack.num_entries] = command_noun1;
     cmd_stack.noun2[cmd_stack.num_entries] = command_noun2;
     ++cmd_stack.num_entries;
-    debug_scr("  verb %d, noun1 %d, noun2 %d, stacksize %d", command_verb, command_noun1, command_noun2, cmd_stack.num_entries);
+    //debug_scr("  verb %d, noun1 %d, noun2 %d, stacksize %d", command_verb, command_noun1, command_noun2, cmd_stack.num_entries);
     return;
 
   case 1:

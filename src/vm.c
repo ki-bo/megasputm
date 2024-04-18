@@ -544,7 +544,7 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
     return 0xff;
   }
 
-  uint8_t script_offset = get_room_object_script_offset(verb, id);
+  uint16_t script_offset = get_room_object_script_offset(verb, id);
   if (script_offset == 0) {
     return 0xff;
   }
