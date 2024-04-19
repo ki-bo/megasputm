@@ -6,7 +6,6 @@
 #include "memory.h"
 #include "util.h"
 
-//#define HEAP_KILL_INACTIVE 1
 //#define HEAP_DEBUG_OUT 1
 
 //-----------------------------------------------------------------------------------------------
@@ -79,8 +78,8 @@ void res_init(void)
  *
  * This function ensures that a resource is available in memory. If the resource
  * is not already in memory, it will be loaded from disk. The function returns
- * the page of the resource in the resource memory, and maps the resource to the
- * data segment.
+ * the page of the resource in the resource memory. Use map_ds_resource() to
+ * map the resource memory to the data segment.
  * 
  * The resource is identified by a type and an id. The type is a combination of
  * the resource type and flags. The resource type is the lower 3 bits of the type
@@ -96,9 +95,6 @@ void res_init(void)
  */
 uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
-#ifdef HEAP_KILL_INACTIVE
-  clear_inactive_blocks();
-#endif
   // will deal with sound later, as those resources are too big to fit into the chipram heap
   // (maybe will use attic ram for those)
   if (type == RES_TYPE_SOUND) {
@@ -139,8 +135,10 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
  * @brief Locks a resource in memory
  *
  * This function locks a resource in memory. The resource will not be overwritten
- * by other resources. This is useful for resources that are used frequently and
- * should not be reloaded from disk.
+ * by other resources if possible. This is useful for resources that are used frequently and
+ * should not be reloaded from disk. However, it is not guaranteed that the resource will
+ * remain in memory. If memory allocations can't be satisfied by just freeing unlocked
+ * resources, locked resources will be freed as well.
  *
  * @param type Resource type and flags
  * @param id Resource ID
@@ -181,6 +179,19 @@ void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
   }
 }
 
+/**
+ * @brief Marks a resource as active, preventing it from being freed
+ *
+ * Activating a resource prevents it from being freed by the resource manager. This is useful
+ * for resources that are currently in use and should not be freed. It is important to deactivate
+ * the resource once it is no longer needed to allow the resource manager to free it.
+ * 
+ * @param type Type of the resource to activate
+ * @param id ID of the resource to activate
+ * @param hint The position in the page list to start searching for the resource
+ *
+ * Code section: code_main
+ */
 void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 {
   find_and_set_flags(type, id, hint, RES_ACTIVE_MASK);
@@ -190,6 +201,18 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 #endif
 }
 
+/**
+ * @brief Deactivates a resource, allowing it to be freed
+ * 
+ * Deactivating a resource allows the resource manager to free it if necessary. This is useful
+ * for resources that are no longer in use and can be freed to make room for other resources.
+ * 
+ * @param type Type of the resource to deactivate
+ * @param id ID of the resource to deactivate
+ * @param hint The position in the page list to start searching for the resource
+ *
+ * Code section: code_main
+ */
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
@@ -202,6 +225,20 @@ void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
   }
 }
 
+/**
+ * @brief Activates a resource slot, preventing it from being freed
+ * 
+ * Activating a resource slot prevents it from being freed by the resource manager. This is useful
+ * for resources that are currently in use and should not be freed. It is important to deactivate
+ * the resource once it is no longer needed to allow the resource manager to free it.
+ * 
+ * It is the whole resource starting at the provided slot that is activated. Thus, all pages
+ * of the resource are getting marked as active.
+ * 
+ * @param slot Starting page of the resource to activate
+ *
+ * Code section: code_main
+ */
 void res_activate_slot(uint8_t slot)
 {
   set_flags(slot, RES_ACTIVE_MASK);
@@ -211,6 +248,19 @@ void res_activate_slot(uint8_t slot)
 #endif
 }
 
+/**
+ * @brief Deactivates a resource slot, allowing it to be freed
+ * 
+ * Deactivating a resource slot allows the resource manager to free it if necessary. This is useful
+ * for resources that are no longer in use and can be freed to make room for other resources.
+ * 
+ * It is the whole resource starting at the provided slot that is deactivated. Thus, all pages
+ * of the resource are getting marked as inactive.
+ * 
+ * @param slot Starting page of the resource to deactivate
+ *
+ * Code section: code_main
+ */
 void res_deactivate_slot(uint8_t slot)
 {
   clear_flags(slot, RES_ACTIVE_MASK);
@@ -232,18 +282,48 @@ void res_deactivate_slot(uint8_t slot)
  * @{
  */
 
+/**
+ * @brief Sets flags for a resource
+ *
+ * This function sets the specified flags for a resource.
+ *
+ * @param slot Index of the first page of the resource
+ * @param flags Flags to set
+ *
+ * Code section: code_main
+ */
 void set_flags(uint8_t slot, uint8_t flags)
 {
   uint8_t current_type_and_flags = page_res_type[slot];
   reset_flags(slot, current_type_and_flags | flags);
 }
 
+/**
+ * @brief Clears flags for a resource
+ *
+ * This function clears the specified flags for a resource.
+ *
+ * @param slot Index of the first page of the resource
+ * @param flags Flags to clear
+ *
+ * Code section: code_main
+ */
 void clear_flags(uint8_t slot, uint8_t flags)
 {
   uint8_t current_type_and_flags = page_res_type[slot];
   reset_flags(slot, current_type_and_flags & ~flags);
 }
 
+/**
+ * @brief Resets flags for a resource
+ *
+ * This function resets all flags of a resource to the specified flags.
+ *
+ * @param slot Index of the first page of the resource
+ * @param flags New flags to set
+ *
+ * Code section: code_main
+ */
 void reset_flags(uint8_t slot, uint8_t flags)
 {
   uint8_t current_type_and_flags = page_res_type[slot];
@@ -257,6 +337,21 @@ void reset_flags(uint8_t slot, uint8_t flags)
   }
 }
 
+/**
+ * @brief Finds a resource in memory
+ *
+ * This function finds a resource in memory. If hint is non-zero, the function
+ * will start searching at the hint position. Be careful to make sure that the
+ * hint is not pointing to the middle of a resource, as the function will not
+ * check for that and might return a non-starting page of the resource.
+ *
+ * @param type Type of the resource
+ * @param id ID of the resource
+ * @param hint The position in the page list to start searching for the resource
+ * @return uint16_t Index of the first page of the resource, or 0xffff if not found
+ *
+ * Code section: code_main
+ */
 uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint8_t i = hint;
@@ -270,6 +365,22 @@ uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
   return 0xffff;
 }
 
+/**
+ * @brief Finds a resource and sets flags
+ *
+ * This function finds a resource in memory and sets the specified flags. If hint is non-zero,
+ * the function will start searching at the hint position. Be careful to make sure that the
+ * hint is not pointing to the middle of a resource, as the function will not check for that
+ * and might return a non-starting page of the resource.
+ *
+ * @param type Type of the resource
+ * @param id ID of the resource
+ * @param hint The position in the page list to start searching for the resource
+ * @param flags Flags to set
+ * @return uint16_t Index of the first page of the resource, or 0xffff if not found
+ *
+ * Code section: code_main
+ */
 uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
   uint16_t result = find_resource(type, id, hint);
@@ -281,6 +392,22 @@ uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flag
   return slot;
 }
 
+/**
+ * @brief Finds a resource and clears flags
+ *
+ * This function finds a resource in memory and clears the specified flags. If hint is non-zero,
+ * the function will start searching at the hint position. Be careful to make sure that the
+ * hint is not pointing to the middle of a resource, as the function will not check for that
+ * and might return a non-starting page of the resource.
+ *
+ * @param type Type of the resource
+ * @param id ID of the resource
+ * @param hint The position in the page list to start searching for the resource
+ * @param flags Flags to clear
+ * @return uint16_t Index of the first page of the resource, or 0xffff if not found
+ *
+ * Code section: code_main
+ */
 uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
   uint16_t result = find_resource(type, id, hint);
@@ -300,11 +427,11 @@ uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t fl
  * 
  * This function allocates memory for the specified resource.
  * If a free block of memory is available, the function will allocate
- * there. If not, it will defragment the memory and allocate directly
- * after the last allocated block.
+ * there. If not, it will try to free locked memory to make room.
+ * If no unlocked memory can be freed, it will free locked memory.
+ * Active resources will not be freed.
  *
- * @note Pages of resources already allocated before
- *       might have moved after calling this function.
+ * If no memory can be freed, the function will call fatal_error().
  *
  * @param type Type and flags of the resource
  * @param id ID of the resource
@@ -329,7 +456,6 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 
   // At this point, there is no contiguos free block available to allocate
   // Check whether there is enough free memory to if freeing locked memory 
-
   for (enum heap_strategy_t strategy = HEAP_STRATEGY_ALLOW_UNLOCKED; strategy <= HEAP_STRATEGY_ALLOW_LOCKED; ++strategy) {
     debug_out("Trying heap allocation strategy %d", strategy);
     result = find_free_block_range(num_pages, strategy);
@@ -352,6 +478,23 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 }
 #pragma clang diagnostic pop
 
+/**
+ * @brief Finds a free block range in memory
+ *
+ * This function finds a free block range in memory with a best-fit strategy. The function
+ * will search for a block of memory that is at least num_pages long. The strategy parameter
+ * determines how the function will search for free memory. If the strategy is HEAP_STRATEGY_FREE_ONLY,
+ * the function will only consider free memory pages. If the strategy is HEAP_STRATEGY_ALLOW_UNLOCKED,
+ * the function will consider free and unlocked memory pages. If the strategy is HEAP_STRATEGY_ALLOW_LOCKED,
+ * the function will consider free, unlocked and locked memory pages. Pages marked as active will not be
+ * considered in any case.
+ *
+ * @param num_pages Number of pages to find
+ * @param strategy Strategy to use when searching for free memory
+ * @return uint16_t Index of the first page of the free block range, or 0xffff if not found
+ *
+ * Code section: code_main
+ */
 uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
 {
   uint8_t current_start = 0;
@@ -403,6 +546,18 @@ uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
   return best_fit_start;
 }
 
+/**
+ * @brief Frees a resource in memory
+ *
+ * This function frees the resource in memory that covers the specified slot. The function
+ * will free all pages of the resource, searching back for the start of the resource.
+ *
+ * If the page is marked as free already (RES_TYPE_NONE), the function will do nothing.
+ *
+ * @param slot Index of a page of the resource
+ *
+ * Code section: code_main
+ */
 static void free_resource(uint8_t slot)
 {
   uint8_t type = page_res_type[slot] & RES_TYPE_MASK;
@@ -438,25 +593,17 @@ static void free_resource(uint8_t slot)
 #endif
 }
 
-static void clear_inactive_blocks(void)
-{
-  __auto_type block_ptr = HUGE_U8_PTR(HEAP_BASE);
-  uint8_t idx = 0;
-  do {
-    uint8_t locked_or_active = page_res_type[idx] & (RES_LOCKED_MASK | RES_ACTIVE_MASK);
-    if (!locked_or_active) {
-      page_res_type[idx] = RES_TYPE_NONE;
-      page_res_index[idx] = 0;
-      memset_bank((uint8_t __far *)block_ptr, 3, 256);
-    }
-    block_ptr += 256;
-  }
-  while (++idx != 0);
-#ifdef HEAP_DEBUG_OUT
-  print_heap();
-#endif
-}
-
+/**
+ * @brief Prints out a summary of the current heap state
+ *
+ * This function prints out a summary of the current heap state. It will print out
+ * the type, ID, number of pages, active flag and locked flag for each block range.
+ *
+ * This is a debug function and regular output of it can be activated by uncommenting
+ * the HEAP_DEBUG_OUT define at the top of this file.
+ *
+ * Code section: code_main 
+ */
 static void print_heap(void)
 {
   uint8_t num_pages = 0;
