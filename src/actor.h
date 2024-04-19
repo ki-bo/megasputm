@@ -33,11 +33,16 @@ typedef struct {
   uint8_t       walking[MAX_LOCAL_ACTORS];
   uint16_t      x_fraction[MAX_LOCAL_ACTORS];
   uint16_t      y_fraction[MAX_LOCAL_ACTORS];
+  uint8_t       cur_box[MAX_LOCAL_ACTORS];
   uint8_t       walk_dir[MAX_LOCAL_ACTORS];
+  uint8_t       walk_to_box[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_x[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_y[MAX_LOCAL_ACTORS];
   int32_t       walk_step_x[MAX_LOCAL_ACTORS];
   int32_t       walk_step_y[MAX_LOCAL_ACTORS];
+  uint8_t       next_box[MAX_LOCAL_ACTORS];
+  uint8_t       next_x[MAX_LOCAL_ACTORS];
+  uint8_t       next_y[MAX_LOCAL_ACTORS];
 } local_actors_t;
 
 //-----------------------------------------------------------------------------------------------
@@ -53,6 +58,7 @@ void actor_init(void);
 // main functions
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
 void actor_room_changed(void);
+void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y);
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y);
 uint8_t actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);

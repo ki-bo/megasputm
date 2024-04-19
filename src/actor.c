@@ -27,6 +27,10 @@ static void remove_local_actor(uint8_t actor_id);
 static void reset_animation(uint8_t local_id);
 static void change_direction(uint8_t local_id, uint8_t dir);
 static void turn(uint8_t local_id);
+static void correct_walk_to_position(uint8_t local_id);
+static uint16_t get_corrected_box_position(struct walk_box *box, uint8_t *x, uint8_t *y);
+static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, uint8_t yc);
+
 
 //-----------------------------------------------------------------------------------------------
 
@@ -98,6 +102,25 @@ void actor_room_changed(void)
   map_set_ds(save_ds);
 }
 
+void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y)
+{
+  actors.x[actor_id] = x;
+  actors.y[actor_id] = y;
+  uint8_t local_id = actors.local_id[actor_id];
+  if (local_id != 0xff) {
+    local_actors.x_fraction[local_id] = 0;
+    local_actors.y_fraction[local_id] = 0;
+    local_actors.walk_to_x[local_id] = x;
+    local_actors.walk_to_y[local_id] = y;
+    correct_walk_to_position(local_id);
+    actors.x[actor_id] = local_actors.walk_to_x[local_id];
+    actors.y[actor_id] = local_actors.walk_to_y[local_id];
+  }
+  
+  vm_update_actors();
+
+}
+
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
 {
   if (!actor_is_in_current_room(actor_id)) {
@@ -111,6 +134,7 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
   local_actors.y_fraction[local_id] = 0;
   local_actors.walk_to_x[local_id]  = x;
   local_actors.walk_to_y[local_id]  = y;
+  correct_walk_to_position(local_id);
   local_actors.walking[local_id]    = !is_walk_to_done(local_id);
 
   if (local_actors.walking[local_id]) {
@@ -440,6 +464,7 @@ static void add_local_actor(uint8_t actor_id)
   debug_out("Actor %d is now in current room with local id %d", actor_id, local_id);
   uint8_t dir = actors.dir[actor_id];
   reset_animation(local_id);
+
   local_actors.walking[local_id] = 0;
   local_actors.x_fraction[local_id] = 0;
   local_actors.y_fraction[local_id] = 0;
@@ -447,6 +472,12 @@ static void add_local_actor(uint8_t actor_id)
   local_actors.walk_to_y[local_id] = actors.y[actor_id];
   local_actors.walk_step_x[local_id] = 0;
   local_actors.walk_step_y[local_id] = 0;
+
+  debug_out("Actor position: %d, %d", actors.x[actor_id], actors.y[actor_id]);
+  correct_walk_to_position(local_id);
+  local_actors.cur_box[local_id] = local_actors.walk_to_box[local_id];
+  actors.x[actor_id] = local_actors.walk_to_x[local_id];
+  actors.y[actor_id] = local_actors.walk_to_y[local_id];
 }
 
 static void remove_local_actor(uint8_t actor_id)
@@ -500,6 +531,128 @@ static void turn(uint8_t local_id)
   else {
     change_direction(local_id, 2);
   }
+}
+
+static void correct_walk_to_position(uint8_t local_id)
+{
+  uint16_t save_ds = map_get_ds();
+  map_ds_resource(room_res_slot);
+
+  uint8_t walk_to_x = local_actors.walk_to_x[local_id];
+  uint8_t walk_to_y = local_actors.walk_to_y[local_id];
+
+  uint16_t min_distance = 0xffff;
+  uint8_t corr_pos_x;
+  uint8_t corr_pos_y;
+  uint8_t dest_walk_box;
+
+  struct walk_box *walk_box = walk_boxes;
+
+  for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx) {
+    uint8_t walk_box_x = walk_to_x;
+    uint8_t walk_box_y = walk_to_y;
+    uint16_t distance = get_corrected_box_position(walk_box, &walk_box_x, &walk_box_y);
+    debug_out("  box %d: %d, %d distance %d", box_idx, walk_box_x, walk_box_y, distance)
+    if (distance < min_distance) {
+      min_distance = distance;
+      corr_pos_x = walk_box_x;
+      corr_pos_y = walk_box_y;
+      dest_walk_box = box_idx;
+    }
+    ++walk_box;
+  }
+
+  debug_out("Corrected position %d, %d walk box %d", corr_pos_x, corr_pos_y, dest_walk_box);
+
+  local_actors.walk_to_box[local_id] = dest_walk_box;
+  local_actors.walk_to_x[local_id] = corr_pos_x;
+  local_actors.walk_to_y[local_id] = corr_pos_y;  
+
+  map_set_ds(save_ds);
+}
+
+static uint16_t get_corrected_box_position(struct walk_box *box, uint8_t *x, uint8_t *y)
+{
+  uint8_t xc = *x;
+  uint8_t yc = *y;
+  uint8_t yn;
+  uint8_t x_left;
+  uint8_t x_right;
+  uint8_t y_top = box->top_y;
+  uint8_t y_bottom = box->bottom_y;
+
+  debug_out("Correcting for position %d, %d", xc, yc);
+
+  if (yc >= y_bottom) {
+    debug_out("  below box");
+    yc = y_bottom;
+    x_left = box->bottomleft_x;
+    x_right = box->bottomright_x;
+  }
+  else if (yc < y_top) {
+    debug_out("  above box");
+    yc = y_top;
+    x_left = box->topleft_x;
+    x_right = box->topright_x;
+  }
+  else if (xc < box->topleft_x || xc < box->bottomleft_x) {
+    debug_out("  left of box");
+    x_left = binary_search_xy(box->topleft_x, box->bottomleft_x, box->top_y, box->bottom_y, yc);
+    x_right = x_left;
+  }
+  else if (xc > box->topright_x || xc > box->bottomright_x) {
+    debug_out("  right of box");
+    x_left = binary_search_xy(box->topright_x, box->bottomright_x, box->top_y, box->bottom_y, yc);
+    x_right = x_left;
+  }
+  else {
+    debug_out("  inside box");
+    x_left = box->topleft_x;
+    x_right = box->topright_x;
+  }
+
+  if (xc < x_left) {
+    xc = x_left;
+  }
+  else if (xc > x_right) {
+    xc = x_right;
+  }
+
+  debug_out("  corrected position %d, %d", xc, yc);
+
+  uint8_t diff_x = abs(xc - *x);
+  uint8_t diff_y = abs(yc - *y);
+  debug_out("  diff %d, %d", diff_x, diff_y);
+  if (diff_x < diff_y) {
+    diff_x >>= 1;
+    diff_y >>= 2;
+  }
+  else {
+    diff_y >>= 3;
+  }
+
+  *x = xc;
+  *y = yc;
+
+  return diff_x + diff_y;
+}
+
+static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, uint8_t yc)
+{
+  uint8_t yn = y1;
+  uint8_t xc = x1;
+  while (yn != yc) {
+    debug_out("yn %d yc %d y1 %d y2 %d x1 %d x2 %d", yn, yc, y1, y2, x1, x2);
+    if (yn > yc) {
+      xc = (x1 + xc) / 2;
+      yn = (y1 + yn) / 2;
+    }
+    else if (yn < yc) {
+      xc = (xc + x2) / 2;
+      yn = (yn + y2) / 2;
+    }
+  }
+  return xc;
 }
 
 /// @} // actor_private

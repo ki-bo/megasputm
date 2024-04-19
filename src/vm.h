@@ -90,6 +90,17 @@ enum {
 	UI_FLAGS_ENABLE_VERBS     = 0x80
 };
 
+struct walk_box {
+  uint8_t top_y;
+  uint8_t bottom_y;
+  uint8_t topleft_x;
+  uint8_t topright_x;
+  uint8_t bottomleft_x;
+  uint8_t bottomright_x;
+  uint8_t mask;
+  uint8_t flags;
+};
+
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];
@@ -107,6 +118,11 @@ extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
 extern uint8_t room_res_slot;
+
+extern uint8_t          num_walk_boxes;
+extern struct walk_box *walk_boxes;
+extern uint8_t         *walk_box_matrix;
+
 
 struct cmd_stack_t {
   uint8_t  num_entries;

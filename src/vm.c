@@ -26,7 +26,7 @@ struct room_header {
   uint16_t unused3;
   uint16_t unused4;
   uint8_t  num_objects;
-  uint8_t  boxes_offset;
+  uint8_t  walk_boxes_offset;
   uint8_t  num_sounds;
   uint8_t  num_scripts;
   uint16_t exit_script_offset;
@@ -91,13 +91,16 @@ uint8_t cs_proc_slot;
 uint16_t cs_override_pc;
 
 // room and object data
-uint8_t  room_res_slot;
-uint16_t room_width;
-uint8_t  num_objects;
-uint8_t  obj_page[MAX_OBJECTS];
-uint8_t  obj_offset[MAX_OBJECTS];
-uint16_t obj_id[MAX_OBJECTS];
-uint8_t  screen_update_needed = 0;
+uint8_t          room_res_slot;
+uint16_t         room_width;
+uint8_t          num_objects;
+uint8_t          obj_page[MAX_OBJECTS];
+uint8_t          obj_offset[MAX_OBJECTS];
+uint16_t         obj_id[MAX_OBJECTS];
+uint8_t          screen_update_needed = 0;
+uint8_t          num_walk_boxes;
+struct walk_box *walk_boxes;
+uint8_t         *walk_box_matrix;
 
 // command queue
 struct cmd_stack_t cmd_stack;
@@ -113,6 +116,7 @@ static void stop_current_actor_talking(void);
 static void stop_all_dialog(void);
 static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
+static void read_walk_boxes(void);
 static void redraw_screen(void);
 static void redraw_actors(void);
 static void handle_input(void);
@@ -334,7 +338,6 @@ void vm_set_current_room(uint8_t room_no)
   gfx_fade_out();
 
   vm_write_var(VAR_SELECTED_ROOM, room_no);
-  actor_room_changed();
 
   camera_follow_actor_id = 0xff;
   camera_state = 0;
@@ -361,6 +364,8 @@ void vm_set_current_room(uint8_t room_no)
     map_ds_resource(room_res_slot);
 
     read_objects();
+    read_walk_boxes();
+    actor_room_changed();
 
     // run entry script
     uint16_t entry_script_offset = room_hdr->entry_script_offset;
@@ -937,6 +942,38 @@ static void read_objects(void)
 
     // reset ds back to room header
     map_ds_resource(room_res_slot);
+  }
+}
+
+static void read_walk_boxes(void)
+{
+  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
+  __auto_type box_ptr = NEAR_U8_PTR(RES_MAPPED + room_hdr->walk_boxes_offset);
+  num_walk_boxes = *box_ptr++;
+  walk_boxes = (struct walk_box *)box_ptr;
+  debug_out("Reading %d walk boxes", num_walk_boxes);
+  for (uint8_t i = 0; i < num_walk_boxes; ++i) {
+    __auto_type box = (struct walk_box *)box_ptr;
+    box_ptr += sizeof(struct walk_box);
+    debug_out("Walk box %d:", i);
+    debug_out("  uy:  %d", box->top_y);
+    debug_out("  ly:  %d", box->bottom_y);
+    debug_out("  ulx: %d", box->topleft_x);
+    debug_out("  urx: %d", box->topright_x);
+    debug_out("  llx: %d", box->bottomleft_x);
+    debug_out("  lrx: %d", box->bottomright_x);
+    debug_out("  mask: %02x", box->mask);
+    debug_out("  flags: %02x", box->flags);
+  }
+  walk_box_matrix = box_ptr;
+  for (uint8_t i = 0; i < num_walk_boxes; ++i) {
+    debug_out("  row offset %d = %d", i, *box_ptr++);
+  }
+  for (uint8_t src_box = 0; src_box < num_walk_boxes; ++src_box) {
+    for (uint8_t dst_box = 0; dst_box < num_walk_boxes; ++dst_box) {
+      uint8_t next_box = *box_ptr++;
+      debug_out("  box matrix[%d][%d] = %d", src_box, dst_box, next_box);
+    }
   }
 }
 
