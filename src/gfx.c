@@ -16,7 +16,7 @@
 //-----------------------------------------------------------------------------------------------
 
 #define GFX_HEIGHT 128
-#define CHRCOUNT 80
+#define CHRCOUNT 120
 #define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
 #define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
 
@@ -800,11 +800,13 @@ void gfx_finalize_cel_drawing(void)
 {
   uint16_t save_ds = map_get_ds();
   unmap_ds();
+  static uint8_t max_end_of_row = 0;
 
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
   __auto_type colram_start_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
   for (uint8_t y = 0; y < 16; ++y) {
     uint8_t end_of_row = num_chars_at_row[y];
+    max_end_of_row = max(max_end_of_row, end_of_row);
     if (end_of_row >= CHRCOUNT - 2) {
       fatal_error(ERR_CHRCOUNT_EXCEEDED);
     }
@@ -812,15 +814,17 @@ void gfx_finalize_cel_drawing(void)
     __auto_type colram_ptr = colram_start_ptr + end_of_row;
     *screen_ptr++ = 0x0140; // gotox to right screen edge (x=320)
     *colram_ptr++ = 0x0010;
+    *screen_ptr = 0; // clear first char of next column
     // fill remaining bytes of row with zeros to prevent accidential gotox rendering
     uint8_t remaining_bytes = (CHRCOUNT - end_of_row - 1) * 2;
-    memset(screen_ptr, 0, remaining_bytes);
+    //memset(screen_ptr, 0, remaining_bytes);
     memset(colram_ptr, 0, remaining_bytes);
     // set next row pointers
     screen_start_ptr += CHRCOUNT;
     colram_start_ptr += CHRCOUNT;
   }
 
+  debug_out("max_end_of_row: %d", max_end_of_row);
   map_set_ds(save_ds);
 }
 

@@ -58,6 +58,7 @@ static void wait_for_actor(void);
 static void stop_sound(void);
 static void add(void);
 static void sleep_for_or_wait_for_message(void);
+static void assign_from_bit_variable(void);
 static void camera_at(void);
 static void get_object_at_position(void);
 static void jump_if_smaller(void);
@@ -155,6 +156,7 @@ void script_init(void)
   opcode_jump_table[0x2b] = &sleep_for_variable;
   opcode_jump_table[0x2d] = &put_actor_in_room;
   opcode_jump_table[0x2e] = &sleep_for_or_wait_for_message;
+  opcode_jump_table[0x31] = &assign_from_bit_variable;
   opcode_jump_table[0x32] = &camera_at;
   opcode_jump_table[0x3e] = &walk_to;
   opcode_jump_table[0x35] = &get_object_at_position;
@@ -994,6 +996,27 @@ static void sleep_for_or_wait_for_message(void)
       break_script = 1;
     }
   }
+}
+
+/**
+ * @brief Opcode 0x31: assign from bit variable
+ *
+ * Reads a variable index and a 16-bit value. The value is used as a bit variable
+ * and the bit is assigned to the variable index. The bit variable is read from
+ * the script as the first parameter.
+ *
+ * Variant opcodes: 0xB1
+ *
+ * Code section: code_script
+ */
+static void assign_from_bit_variable(void)
+{
+  uint8_t var_idx = read_byte();
+  uint16_t bit_var_hi = read_word() + resolve_next_param8();
+  uint8_t bit_var_lo = bit_var_hi & 0x0f;
+  bit_var_hi >>= 4;
+  debug_scr("VAR[%d] = bit-variable %04x.%1x", var_idx, bit_var_hi, bit_var_lo);
+  vm_write_var(var_idx, (vm_read_var(bit_var_hi) >> bit_var_lo) & 1);
 }
 
 static void camera_at(void)

@@ -562,7 +562,7 @@ static void correct_walk_to_position(uint8_t local_id)
     ++walk_box;
   }
 
-  debug_out("Corrected position %d, %d walk box %d", corr_pos_x, corr_pos_y, dest_walk_box);
+  debug_out("Final corrected position %d, %d walk box %d", corr_pos_x, corr_pos_y, dest_walk_box);
 
   local_actors.walk_to_box[local_id] = dest_walk_box;
   local_actors.walk_to_x[local_id] = corr_pos_x;
@@ -644,12 +644,12 @@ static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, 
   while (yn != yc) {
     debug_out("yn %d yc %d y1 %d y2 %d x1 %d x2 %d", yn, yc, y1, y2, x1, x2);
     if (yn > yc) {
-      xc = (x1 + xc) / 2;
-      yn = (y1 + yn) / 2;
+      xc = (uint8_t)(x1 + xc) >> 1;
+      yn = (uint8_t)(y1 + yn) >> 1;
     }
     else if (yn < yc) {
-      xc = (xc + x2) / 2;
-      yn = (yn + y2) / 2;
+      xc = (uint8_t)(xc + x2) >> 1;
+      yn = (uint8_t)(yn + y2) >> 1;
     }
   }
   return xc;
