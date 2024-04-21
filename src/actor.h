@@ -47,6 +47,14 @@ typedef struct {
 
 //-----------------------------------------------------------------------------------------------
 
+enum {
+  WALKING_STATE_STOPPED,
+  WALKING_STATE_STARTING,
+  WALKING_STATE_CONTINUE 
+};
+
+//-----------------------------------------------------------------------------------------------
+
 extern actors_t actors;
 extern local_actors_t local_actors;
 

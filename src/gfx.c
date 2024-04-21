@@ -273,10 +273,13 @@ volatile uint8_t raster_irq_counter = 0;
 /**
  * @brief Raster interrupt routine.
  * 
- * This function is called every frame. It copies the backbuffer screen and color
- * RAM to the actual screen and color RAM. It also updates the cursor position and
- * appearance. A raster_irq timer is updated which will drive the timing of the non-
- * interrupt main loop and scripts.
+ * This function is called every frame. It updates the cursor position and
+ * appearance. A raster_irq counter is updated which will drive the timing 
+ * of the non-interrupt main loop and scripts. It is also used as vsync
+ * trigger to control the timing of the screen updates.
+ *
+ * This irq function is placed in the code section to make sure it is always
+ * visible and never overlayed by other banked code or data.
  *
  * Code section: code
  */
@@ -824,7 +827,7 @@ void gfx_finalize_cel_drawing(void)
     colram_start_ptr += CHRCOUNT;
   }
 
-  debug_out("max_end_of_row: %d", max_end_of_row);
+  //debug_out("max_end_of_row: %d", max_end_of_row);
   map_set_ds(save_ds);
 }
 
@@ -939,23 +942,22 @@ static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
  * @brief Updates the cursor.
  *
  * This function is called every frame by the raster interrupt. It updates the cursor position and
- * appearance. It will hide and show the cursor based on VAR_CURSOR_STATE.
+ * appearance. It will hide and show the cursor based on ui_state flag UI_FLAGS_ENABLE_CURSOR.
  *
  * Code section: code_gfx
  */
 void update_cursor(uint8_t snail_override)
 {
-  uint8_t cursor_state = vm_read_var8(VAR_CURSOR_STATE);
-  // VAR_CURSOR_STATE bit 0 = hide/show cursor
-  if (!(cursor_state & 0x01)) {
+  if (!(ui_state & UI_FLAGS_ENABLE_CURSOR) || vm_read_var8(VAR_CURSOR_STATE) == 0) {
     VICII.spr_ena = 0x00;
     return;
   }
 
+  uint8_t cursor_image = snail_override ? 2 : vm_read_var8(VAR_CURSOR_STATE);
   uint16_t spr_pos_x = (input_cursor_x + 12) * 2 - HOTSPOT_OFFSET_X;
   uint8_t  spr_pos_y = (input_cursor_y + 50)     - HOTSPOT_OFFSET_Y;
-  // VAR_CURSOR_STATE bit 1 = snail/regular cursor
-  if (cursor_state & 0x02 && !snail_override) {
+  // cursor_image bit 1 = snail/regular cursor
+  if (!snail_override) {
     // enable sprite 2 only = regular cursor
     VICII.spr_ena  = 0x02;
     VICII.spr1_x   = LSB(spr_pos_x);
@@ -969,7 +971,6 @@ void update_cursor(uint8_t snail_override)
     VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x01;
     VICII.spr0_y   = spr_pos_y;
   }
-
 
   static const uint8_t cursor_color_rotate[] = { 8, 7, 15, 7 };
   static uint8_t cursor_color_index = 0;

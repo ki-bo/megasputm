@@ -78,6 +78,7 @@ static void stop_script(void);
 static void script_running(void);
 static void current_room(void);
 static void jump_if_greater_or_equal(void);
+static void verb(void);
 static void print_ego(void);
 static void unimplemented_opcode(void);
 
@@ -194,6 +195,7 @@ void script_init(void)
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &execute_command;
+  opcode_jump_table[0x7a] = &verb;
   opcode_jump_table[0x7e] = &walk_to;
   opcode_jump_table[0x7f] = &jump_if_not_pickupable;
 }
@@ -497,10 +499,10 @@ static void stop_or_break(void)
     break_script = 1;
   }
   else if (opcode == 0x20){
-    debug_scr("stop-music");
+    //debug_scr("stop-music");
   }
   else {
-    debug_scr("stop-script");
+    //debug_scr("stop-script");
     vm_stop_active_script();
   }
 }
@@ -528,7 +530,7 @@ static void start_music(void)
 {
   //debug_msg("Start music");
   uint8_t music_id = resolve_next_param8();
-  debug_scr("start-music %d", music_id);
+  //debug_scr("start-music %d", music_id);
 }
 
 /**
@@ -551,7 +553,7 @@ static void jump_if_greater(void)
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
-  debug_scr("if (VAR[%d]=%d <= %d(ind))", var_idx, vm_read_var(var_idx), value);
+  //debug_scr("if (VAR[%d]=%d <= %d(ind))", var_idx, vm_read_var(var_idx), value);
   if (vm_read_var(var_idx) > value) {
     pc += offset;
   }
@@ -565,11 +567,11 @@ static void draw_object(void)
   uint8_t y = resolve_next_param8();
 
   if (x != 255 || y != 255) {
-    debug_scr("draw-object %d at %d, %d", obj_id, x, y);
+    //debug_scr("draw-object %d at %d, %d", obj_id, x, y);
     fatal_error(ERR_NOT_IMPLEMENTED);
   }
 
-  debug_scr("draw-object %d", obj_id);
+  //debug_scr("draw-object %d", obj_id);
   global_game_objects[obj_id] |= OBJ_STATE;
   vm_clear_all_other_object_states(obj_id);
 
@@ -580,7 +582,7 @@ static void assign_array(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t array_size = read_byte();
-  debug_scr("assign array at VAR[%d] (size=%d)", var_idx, array_size);
+  //debug_scr("assign array at VAR[%d] (size=%d)", var_idx, array_size);
   do {
     uint16_t value = (opcode & 0x80) ? read_word() : read_byte();
     vm_write_var(var_idx, 0);
@@ -1465,6 +1467,33 @@ static void jump_if_greater_or_equal(void)
   if (vm_read_var(var_idx) >= value) {
     pc += offset;
   }
+}
+
+static void verb(void)
+{
+  uint8_t verb_id = read_byte();
+
+  if (!verb_id) {
+    // delete verb
+    uint8_t slot = resolve_next_param8();
+    debug_scr("delete-verb %d", slot);
+    vm_delete_verb(slot);
+    return;
+  }
+  
+  if (verb_id == 0xff) {
+    fatal_error(ERR_UNKNOWN_VERB);
+  }
+
+  // add verb
+  uint8_t x = read_byte();
+  uint8_t y = read_byte();
+  uint8_t slot = resolve_next_param8();
+  pc += 1; // skip next byte, seems to be unused
+  char *verb_name = vm_verb_get_name(slot);
+  read_null_terminated_string(verb_name);
+
+  debug_scr("verb %d at %d, %d in slot %d, name: \"%s\"", verb_id, x, y, slot, verb_name);
 }
 
 /**

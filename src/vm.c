@@ -49,6 +49,12 @@ struct object_code {
   uint8_t  name_offset;
 };
 
+struct verb {
+  uint8_t id[MAX_VERBS];
+  uint8_t state[MAX_VERBS];
+  char    name[MAX_VERBS][9];
+};
+
 #pragma clang section bss="zdata"
 
 uint8_t global_game_objects[780];
@@ -62,7 +68,6 @@ char *print_message_ptr;
 uint8_t print_message_num_chars;
 
 volatile uint8_t script_watchdog;
-int8_t cursor_state;
 uint8_t ui_state;
 uint16_t camera_x;
 uint16_t camera_target;
@@ -101,6 +106,9 @@ uint8_t          screen_update_needed = 0;
 uint8_t          num_walk_boxes;
 struct walk_box *walk_boxes;
 uint8_t         *walk_box_matrix;
+
+// verb data
+struct verb verbs;
 
 // command queue
 struct cmd_stack_t cmd_stack;
@@ -157,6 +165,12 @@ void vm_init(void)
   camera_state = 0;
   camera_follow_actor_id = 0xff;
   actor_talking = 0xff;
+  ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
+  vm_write_var(VAR_CURSOR_STATE, 3);
+
+  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+    verbs.id[i] = 0xff;
+  }
 }
 
 /** @} */ // vm_init
@@ -235,6 +249,7 @@ __task void vm_mainloop(void)
 
     process_dialog(elapsed_jiffies);
     update_actors();
+    animate_actors();
     update_camera();
 
     if (screen_update_needed) {
@@ -262,7 +277,6 @@ __task void vm_mainloop(void)
       screen_update_needed = 0;
     }
 
-    animate_actors();
     //VICIV.bordercol = 0x00;
   }
 }
@@ -285,10 +299,6 @@ uint8_t vm_get_active_proc_state_and_flags(void)
 
 void vm_change_ui_flags(uint8_t flags)
 {
-  if (flags & UI_FLAGS_APPLY_CURSOR) {
-    cursor_state = flags & UI_FLAGS_ENABLE_CURSOR ? 1 : 0;
-  }
-
   if (flags & UI_FLAGS_APPLY_FREEZE) {
     if (flags & UI_FLAGS_ENABLE_FREEZE) {
       freeze_non_active_scripts();
@@ -298,9 +308,17 @@ void vm_change_ui_flags(uint8_t flags)
     }
   }
 
-  if (flags & UI_FLAGS_APPLY_INTERFACE) {
-    ui_state = flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS);
+  if (flags & UI_FLAGS_APPLY_CURSOR) {
+    ui_state = (ui_state & ~UI_FLAGS_ENABLE_CURSOR) | (flags & UI_FLAGS_ENABLE_CURSOR);
   }
+
+  if (flags & UI_FLAGS_APPLY_INTERFACE) {
+    ui_state = (ui_state & ~(UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS)) |
+                (flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS));
+  }
+
+  debug_out("UI state enable-cursor: %d", ui_state & UI_FLAGS_ENABLE_CURSOR);
+  debug_out("cursor state: %d", vm_read_var8(VAR_CURSOR_STATE));
 }
 
 /**
@@ -437,6 +455,8 @@ void vm_cut_scene_end(void)
   vm_change_ui_flags(cs_ui_state | UI_FLAGS_APPLY_CURSOR | UI_FLAGS_APPLY_FREEZE | UI_FLAGS_APPLY_INTERFACE);
   cs_proc_slot = 0xff;
   cs_override_pc = 0;
+
+  debug_out("  cursor state %d, ui state %d", vm_read_var8(VAR_CURSOR_STATE), ui_state);
 }
 
 void vm_begin_override(void)
@@ -737,6 +757,21 @@ void vm_camera_pan_to(uint8_t x)
   camera_target = x;
   camera_follow_actor_id = 0xff;
   camera_state = CAMERA_STATE_MOVE_TO_TARGET_POS;
+}
+
+void vm_delete_verb(uint8_t slot)
+{
+  verbs.id[slot] = 0xff;
+}
+
+void vm_verb_set_state(uint8_t slot, uint8_t state)
+{
+  verbs.state[slot] = state;
+}
+
+char *vm_verb_get_name(uint8_t slot)
+{
+  return verbs.name[slot];
 }
 
 /// @} // vm_public
@@ -1349,7 +1384,7 @@ static void update_camera(void)
     }
   }
   else {
-    if (camera_target <= camera_x - 10 && camera_x >= 20)
+    if (camera_target <= camera_x - 10 && camera_x > 20)
     {
       debug_msg("Camera start moving left");
       --camera_x;

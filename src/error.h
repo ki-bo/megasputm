@@ -25,6 +25,7 @@ typedef enum {
     ERR_TOO_MANY_LOCAL_ACTORS = 21,
     ERR_COST_BUFSIZE_EXCEEDED = 22,
     ERR_CHRCOUNT_EXCEEDED = 23,
+    ERR_UNKNOWN_CURSOR_IMAGE = 24,
 } error_code_t;
 
 #endif // __ERROR_H__

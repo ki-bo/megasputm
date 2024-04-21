@@ -5,6 +5,7 @@
 
 #define NUM_SCRIPT_SLOTS     32
 #define MAX_OBJECTS          57
+#define MAX_VERBS            22
 #define CMD_STACK_SIZE        6
 
 enum {
@@ -90,6 +91,10 @@ enum {
 	UI_FLAGS_ENABLE_VERBS     = 0x80
 };
 
+enum {
+  VERB_STATE_DELETED = 0x80
+};
+
 struct walk_box {
   uint8_t top_y;
   uint8_t bottom_y;
@@ -107,7 +112,6 @@ extern uint8_t variables_hi[256];
 extern char message_buffer[256];
 
 extern volatile uint8_t script_watchdog;
-extern int8_t cursor_state;
 extern uint8_t ui_state;
 extern uint16_t camera_x;
 
@@ -156,6 +160,9 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 void vm_clear_all_other_object_states(uint16_t global_object_id);
 void vm_set_camera_follow_actor(uint8_t actor_id);
 void vm_camera_pan_to(uint8_t x);
+void vm_delete_verb(uint8_t slot);
+void vm_verb_set_state(uint8_t slot, uint8_t state);
+char *vm_verb_get_name(uint8_t slot);
 
 static inline uint16_t vm_read_var(uint8_t var)
 {

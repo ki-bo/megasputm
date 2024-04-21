@@ -135,25 +135,39 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
   local_actors.walk_to_x[local_id]  = x;
   local_actors.walk_to_y[local_id]  = y;
   correct_walk_to_position(local_id);
-  local_actors.walking[local_id]    = !is_walk_to_done(local_id);
-
-  if (local_actors.walking[local_id]) {
-    calculate_step(local_id);
+  if (is_walk_to_done(local_id)) {
+    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
+    return;
   }
 
-  actor_start_animation(local_id, ANIM_WALKING + actors.dir[actor_id]);
+  local_actors.walking[local_id] = WALKING_STATE_STARTING;
+  calculate_step(local_id);
 }
 
 uint8_t actor_next_step(uint8_t local_id)
 {
-  if (!local_actors.walking[local_id]) {
+  if (local_actors.walking[local_id] == WALKING_STATE_STOPPED) {
     return 0;
   }
 
   uint8_t actor_id = local_actors.global_id[local_id];
+  if (local_actors.walking[local_id] == WALKING_STATE_STARTING) {
+    actor_start_animation(local_id, ANIM_WALKING + actors.dir[actor_id]);
+    local_actors.walking[local_id] = WALKING_STATE_CONTINUE;
+    return 1;
+  }
+
   if (local_actors.walk_dir[local_id] != actors.dir[actor_id]) {
     turn(local_id);
     return 1;
+  }
+
+  if (is_walk_to_done(local_id)) {
+    local_actors.x_fraction[local_id] = 0;
+    local_actors.y_fraction[local_id] = 0;
+    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
+    actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
+    return 0;
   }
 
   int32_t x = actors.x[actor_id] * 0x10000 + local_actors.x_fraction[local_id];
@@ -170,13 +184,6 @@ uint8_t actor_next_step(uint8_t local_id)
     local_actors.y_fraction[local_id] = (uint16_t)new_y;
   }
   
-  if (is_walk_to_done(local_id)) {
-    local_actors.x_fraction[local_id] = 0;
-    local_actors.y_fraction[local_id] = 0;
-    local_actors.walking[local_id] = 0;
-    actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
-  }
-
   //debug_out("Actor %u position: %u.%u, %u.%u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
 
   return 1;
@@ -406,7 +413,7 @@ static void calculate_step(uint8_t local_id)
   debug_out("From %d, %d to %d, %d x_diff %d y_diff %d", x, y, walk_to_x, walk_to_y, x_diff, y_diff);
 
   if (x_diff == 0 && y_diff == 0) {
-    local_actors.walking[local_id] = 0;
+    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
     return;
   }
 
@@ -465,7 +472,7 @@ static void add_local_actor(uint8_t actor_id)
   uint8_t dir = actors.dir[actor_id];
   reset_animation(local_id);
 
-  local_actors.walking[local_id] = 0;
+  local_actors.walking[local_id] = WALKING_STATE_STOPPED;
   local_actors.x_fraction[local_id] = 0;
   local_actors.y_fraction[local_id] = 0;
   local_actors.walk_to_x[local_id] = actors.x[actor_id];
