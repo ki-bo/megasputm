@@ -1306,13 +1306,8 @@ static void update_actors(void)
 {
   for (uint8_t i = 0; i < MAX_LOCAL_ACTORS; ++i)
   {
-    if (local_actors.global_id[i] == 0xff)
-    {
-      continue;
-    }
-
-    if (actor_next_step(i)) {
-      screen_update_needed |= SCREEN_UPDATE_ACTORS;
+    if (local_actors.global_id[i] != 0xff) {
+      actor_next_step(i);
     }
   }
 }
@@ -1322,14 +1317,9 @@ static void animate_actors(void)
   uint8_t redraw_needed = 0;
   for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id)
   {
-    if (local_actors.global_id[local_id] == 0xff)
-    {
-      continue;
+    if (local_actors.global_id[local_id] != 0xff) {
+      actor_update_animation(local_id);
     }
-    redraw_needed |= actor_update_animation(local_id);
-  }
-  if (redraw_needed) {
-    screen_update_needed |= SCREEN_UPDATE_ACTORS;
   }
 }
 
@@ -1360,18 +1350,22 @@ static void update_camera(void)
   if (camera_state & CAMERA_STATE_MOVING) {
     if (camera_target > camera_x) {
       //debug_msg("Camera continue moving right");
-      camera_x += 1;
-      if (camera_x > max_camera_x) {
-        camera_x = max_camera_x;
+      if (camera_x < max_camera_x) {
+        camera_x += 1;
+      }
+      else {
         camera_state &= ~CAMERA_STATE_MOVING;
+        return;
       }
     }
     else if (camera_target < camera_x) {
       //debug_msg("Camera continue moving left");
-      camera_x -= 1;
-      if (camera_x < 20) {
-        camera_x = 20;
+      if (camera_x > 20) {
+        camera_x -= 1;
+      }
+      else {
         camera_state &= ~CAMERA_STATE_MOVING;
+        return;
       }
     }
     else {
@@ -1395,6 +1389,9 @@ static void update_camera(void)
       debug_msg("Camera start moving right");
       ++camera_x;
       camera_state |= CAMERA_STATE_MOVING;
+    }
+    else {
+      return;
     }
   }
 
