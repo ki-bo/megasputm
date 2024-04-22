@@ -463,8 +463,6 @@ static void calculate_step(uint8_t local_id)
 
   local_actors.walk_step_x[local_id] = x_step;
   local_actors.walk_step_y[local_id] = y_step;
-  local_actors.x_fraction[local_id] = 0x8000;
-  local_actors.y_fraction[local_id] = 0x8000;
   debug_out("Actor %d step: %ld, %ld direction: %d", actor_id, x_step, y_step, local_actors.walk_dir[actor_id]);
 }
 
