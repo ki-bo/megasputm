@@ -1477,7 +1477,7 @@ static void verb(void)
     // delete verb
     uint8_t slot = resolve_next_param8();
     debug_scr("delete-verb %d", slot);
-    vm_delete_verb(slot);
+    vm_verb_delete(slot);
     return;
   }
   
@@ -1490,6 +1490,7 @@ static void verb(void)
   uint8_t y = read_byte();
   uint8_t slot = resolve_next_param8();
   pc += 1; // skip next byte, seems to be unused
+  vm_verb_new(slot, verb_id, x, y);
   char *verb_name = vm_verb_get_name(slot);
   read_null_terminated_string(verb_name);
 

@@ -64,18 +64,6 @@ void debug_msg2(char* msg)
 #endif
 }
 
-void *memcpy(void *dest, const void *src, size_t n)
-{
-  global_dma_list.command  = 0;      // DMA copy command
-  global_dma_list.count    = n;
-  global_dma_list.src_addr = (uint16_t)src;
-  global_dma_list.src_bank = 0;
-  global_dma_list.dst_addr = (uint16_t)dest;
-  global_dma_list.dst_bank = 0;
-  dma_trigger(&global_dma_list);
-  return dest;
-}
-
 void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n)
 {
   global_dma_list.command  = 0;      // DMA copy command
@@ -98,17 +86,6 @@ void __far *memcpy_bank(void __far *dest, const void __far *src, size_t n)
   global_dma_list.dst_bank   = BANK(dest);
   dma_trigger(&global_dma_list);
   return dest; 
-}
-
-void *memset(void *s, int c, size_t n)
-{
-  global_dma_list.command   = 0x03;      // DMA fill command
-  global_dma_list.count     = n;
-  global_dma_list.fill_byte = LSB(c);
-  global_dma_list.dst_addr  = LSB16(s);
-  global_dma_list.dst_bank  = 0;
-  dma_trigger(&global_dma_list);
-  return s;
 }
 
 void __far *memset_bank(void __far *s, int c, size_t n)

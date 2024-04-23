@@ -22,6 +22,8 @@ __task void main(void)
   global_init();
 
   // Use diskio module to load the main code to section code_main at 0x4000
+  // Be aware that this is overwriting both init code and init bss in memory.
+  // So init needs to be complete at this point and can't be called anymore.
   map_cs_diskio();
   diskio_load_file("M01", (uint8_t __far *)(0x2000));  // load script parser code
   diskio_load_file("M02", (uint8_t __far *)(0x4000));  // load main code

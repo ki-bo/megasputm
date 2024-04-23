@@ -4,7 +4,7 @@
 #include "error.h"
 #include "map.h"
 #include "memory.h"
-#include "util.h"
+#include <string.h>
 
 //#define HEAP_DEBUG_OUT 1
 
@@ -170,13 +170,10 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_LOCKED_MASK);
-  if (slot <= 255 && (page_res_type[slot] & RES_ACTIVE_MASK) == 0) {
-    debug_out("Unlocking resource type %d id %d slot %d", type, id, slot);
 #ifdef HEAP_DEBUG_OUT
-    print_heap();
+  debug_out("Unlocking resource type %d id %d slot %d", type, id, slot);
+  print_heap();
 #endif
-    //free_resource(slot);
-  }
 }
 
 /**
@@ -216,13 +213,10 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
-  if (slot <= 255 && (page_res_type[slot] & RES_LOCKED_MASK) == 0) {
 #ifdef HEAP_DEBUG_OUT
-    debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
-    print_heap();
+  debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
+  print_heap();
 #endif
-    //free_resource(slot);
-  }
 }
 
 /**
@@ -268,9 +262,18 @@ void res_deactivate_slot(uint8_t slot)
   debug_out("Deactivating slot %d", slot);
   print_heap();
 #endif
-  if ((page_res_type[slot] & RES_LOCKED_MASK) == 0) {
-    //free_resource(slot);
-  }
+}
+
+uint8_t res_reserve_heap(uint8_t size_blocks)
+{
+  uint8_t slot = allocate(RES_TYPE_HEAP, 0, size_blocks);
+  set_flags(slot, RES_ACTIVE_MASK);
+  return slot;
+}
+
+void res_free_heap(uint8_t slot)
+{
+  free_resource(slot);
 }
 
 /** @} */ // res_public

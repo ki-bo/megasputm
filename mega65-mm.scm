@@ -34,7 +34,7 @@
         )
 
         ; memory for init program (will be discarded once executed)
-        (memory init (address (#x8000 . #x8fff))
+        (memory init (address (#x4000 . #x4fff))
                 (scatter-to init_copy)
                 (section 
                         code_init
@@ -44,7 +44,7 @@
         )
 
         ; temporary memory for init program (will be discarded when init is done)
-        (memory bssram-init (address (#x9000 . #x9fff))
+        (memory bssram-init (address (#x5000 . #x5fff))
                 (section 
                         bss_init
                 )

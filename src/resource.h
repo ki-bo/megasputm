@@ -10,7 +10,8 @@ enum res_type_t {
     RES_TYPE_ROOM,
     RES_TYPE_COSTUME,
     RES_TYPE_SCRIPT,
-    RES_TYPE_SOUND
+    RES_TYPE_SOUND,
+    RES_TYPE_HEAP
 };
 
 enum res_type_flags_t {
@@ -35,5 +36,7 @@ void res_deactivate_slot(uint8_t slot);
 void res_set_flags(uint8_t slot, uint8_t flags);
 void res_clear_flags(uint8_t slot, uint8_t flags);
 void res_reset_flags(uint8_t slot, uint8_t flags);
+uint8_t res_reserve_heap(uint8_t size_blocks);
+void res_free_heap(uint8_t slot);
 
 #endif // __RESOURCE_H

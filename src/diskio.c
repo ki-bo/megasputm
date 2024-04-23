@@ -4,8 +4,8 @@
 #include "io.h"
 #include "map.h"
 #include "resource.h"
-#include "util.h"
 #include "vm.h"
+#include <string.h>
 #include <stdint.h>
 
 //-----------------------------------------------------------------------------------------------
@@ -122,7 +122,9 @@ static void led_and_motor_off(void);
  */
 void diskio_init(void)
 {
+  debug_out("room track list memset: %u", sizeof(room_track_list));
   memset(room_track_list, 0, sizeof(room_track_list));
+  debug_out("room track list memset: %u", sizeof(room_block_list));
   memset(room_block_list, 0, sizeof(room_block_list));
   invalidate_disk_cache();
   last_physical_track = 255;

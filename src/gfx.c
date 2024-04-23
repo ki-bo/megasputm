@@ -8,9 +8,9 @@
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
-#include "util.h"
 #include "vm.h"
 #include <mega65.h>
+#include <string.h>
 #include <stdint.h>
 
 //-----------------------------------------------------------------------------------------------

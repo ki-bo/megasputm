@@ -218,7 +218,7 @@ relocate_init:
 		.word (.sectionSize init_copy)	; count
 		.word (.sectionStart init_copy)	; source
 		.byte 0				; source bank
-		.word 0x8000			; destination
+		.word 0x4000			; destination
 		.byte 0				; destination bank
 		.byte 0				; cmd high
 		.byte 0				; modulo / ignored

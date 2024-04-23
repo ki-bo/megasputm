@@ -52,6 +52,8 @@ struct object_code {
 struct verb {
   uint8_t id[MAX_VERBS];
   uint8_t state[MAX_VERBS];
+  uint8_t x[MAX_VERBS];
+  uint8_t y[MAX_VERBS];
   char    name[MAX_VERBS][9];
 };
 
@@ -759,7 +761,13 @@ void vm_camera_pan_to(uint8_t x)
   camera_state = CAMERA_STATE_MOVE_TO_TARGET_POS;
 }
 
-void vm_delete_verb(uint8_t slot)
+void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y)
+{
+  verbs.id[slot] = verb_id;
+
+}
+
+void vm_verb_delete(uint8_t slot)
 {
   verbs.id[slot] = 0xff;
 }
