@@ -4,6 +4,11 @@
 #include "costume.h"
 #include <stdint.h>
 
+enum verb_style {
+  VERB_STYLE_NORMAL,
+  VERB_STYLE_HIGHLIGHTED,
+};
+
 // code_init functions
 void gfx_init(void);
 
@@ -24,5 +29,8 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
 void gfx_finalize_cel_drawing(void);
 void gfx_reset_cel_drawing(void);
 void gfx_update_main_screen(void);
+void gfx_print_verb(uint8_t x, uint8_t y, const char *name, enum verb_style style);
+void gfx_change_verb_style(uint8_t x, uint8_t y, uint8_t size, enum verb_style style);
+void gfx_hide_verbs(void);
 
 #endif // __GFX_H

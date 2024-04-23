@@ -99,7 +99,7 @@ __call_heap_initialize:
 		lda #.byte1 (.sectionSize heap)
 		sta zp:_Zp+5
 		.extern __heap_initialize, __default_heap
-		jsr __heap_initialize
+		;jsr __heap_initialize
 
 		.section startup, root, noreorder
 		.extern main

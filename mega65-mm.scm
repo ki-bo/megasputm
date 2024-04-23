@@ -2,6 +2,7 @@
 '(
         (block stack (size #x100)) 
         (block cstack (size #x7fa))
+        (block heap (size #x200))
 
         (memory zeropage (address (#x2 . #xff))  (qualifier zpage)
 	        (section (registers (#x2. #x7f)))
@@ -65,6 +66,13 @@
                         code_main
                         cdata_main
                         data_main
+                )
+        )
+
+        ; banked-to memory section for heap
+        (memory heap-banked (address (#x8000 . #x81ff))
+                (section
+                        heap
                 )
         )
 

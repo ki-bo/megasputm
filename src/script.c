@@ -1490,11 +1490,9 @@ static void verb(void)
   uint8_t y = read_byte();
   uint8_t slot = resolve_next_param8();
   pc += 1; // skip next byte, seems to be unused
-  vm_verb_new(slot, verb_id, x, y);
-  char *verb_name = vm_verb_get_name(slot);
-  read_null_terminated_string(verb_name);
-
-  debug_scr("verb %d at %d, %d in slot %d, name: \"%s\"", verb_id, x, y, slot, verb_name);
+  char name[80];
+  read_null_terminated_string(name);
+  vm_verb_new(slot, verb_id, x, y, name);
 }
 
 /**

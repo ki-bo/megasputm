@@ -4,6 +4,7 @@
 #include "dma.h"
 #include "diskio.h"
 #include "gfx.h"
+#include "heap.h"
 #include "input.h"
 #include "map.h"
 #include "util.h"
@@ -46,6 +47,7 @@ void global_init(void)
 
   // init main engine code
   res_init();
+  heap_init();
   script_init();
   actor_init();
   vm_init();

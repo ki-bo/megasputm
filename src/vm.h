@@ -79,6 +79,7 @@ enum {
   SCREEN_UPDATE_BG     = 1,
   SCREEN_UPDATE_ACTORS = 2,
   SCREEN_UPDATE_DIALOG = 4,
+  SCREEN_UPDATE_VERBS  = 8
 };
 
 enum {
@@ -161,7 +162,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 void vm_clear_all_other_object_states(uint16_t global_object_id);
 void vm_set_camera_follow_actor(uint8_t actor_id);
 void vm_camera_pan_to(uint8_t x);
-void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y);
+void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name);
 void vm_verb_delete(uint8_t slot);
 void vm_verb_set_state(uint8_t slot, uint8_t state);
 char *vm_verb_get_name(uint8_t slot);

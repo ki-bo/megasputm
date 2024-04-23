@@ -11,6 +11,7 @@
 #include "script.h"
 #include "util.h"
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <mega65.h>
 
@@ -50,11 +51,12 @@ struct object_code {
 };
 
 struct verb {
-  uint8_t id[MAX_VERBS];
-  uint8_t state[MAX_VERBS];
-  uint8_t x[MAX_VERBS];
-  uint8_t y[MAX_VERBS];
-  char    name[MAX_VERBS][9];
+  uint8_t  id[MAX_VERBS];
+  uint8_t  state[MAX_VERBS];
+  uint8_t  x[MAX_VERBS];
+  uint8_t  y[MAX_VERBS];
+  uint8_t  len[MAX_VERBS];
+  char    *name[MAX_VERBS];
 };
 
 #pragma clang section bss="zdata"
@@ -111,6 +113,7 @@ uint8_t         *walk_box_matrix;
 
 // verb data
 struct verb verbs;
+uint8_t prev_verb_highlighted;
 
 // command queue
 struct cmd_stack_t cmd_stack;
@@ -142,6 +145,8 @@ static void update_actors(void);
 static void animate_actors(void);
 static void update_camera(void);
 static void override_cutscene(void);
+static void update_verb_interface(void);
+static void update_verb_highlighting(void);
 
 /**
  * @defgroup vm_init VM Init Functions
@@ -173,6 +178,7 @@ void vm_init(void)
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
     verbs.id[i] = 0xff;
   }
+  prev_verb_highlighted = 0xff;
 }
 
 /** @} */ // vm_init
@@ -274,10 +280,17 @@ __task void vm_mainloop(void)
       if (screen_update_needed & (SCREEN_UPDATE_BG | SCREEN_UPDATE_ACTORS)) {
         gfx_update_main_screen();
       }
+
+      if (screen_update_needed & SCREEN_UPDATE_VERBS) {
+        update_verb_interface();
+      }
+
       unmap_cs();
 
       screen_update_needed = 0;
     }
+
+    update_verb_highlighting();
 
     //VICIV.bordercol = 0x00;
   }
@@ -317,6 +330,7 @@ void vm_change_ui_flags(uint8_t flags)
   if (flags & UI_FLAGS_APPLY_INTERFACE) {
     ui_state = (ui_state & ~(UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS)) |
                 (flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS));
+    screen_update_needed |= SCREEN_UPDATE_VERBS;
   }
 
   debug_out("UI state enable-cursor: %d", ui_state & UI_FLAGS_ENABLE_CURSOR);
@@ -761,15 +775,31 @@ void vm_camera_pan_to(uint8_t x)
   camera_state = CAMERA_STATE_MOVE_TO_TARGET_POS;
 }
 
-void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y)
+void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name)
 {
-  verbs.id[slot] = verb_id;
+  uint16_t save_ds = map_get_ds();
+  map_ds_heap();
 
+  verbs.id[slot] = verb_id;
+  verbs.x[slot] = x;
+  verbs.y[slot] = y;
+
+  uint8_t len = strlen(name);
+  verbs.len[slot] = len;
+  ++len; // include null terminator
+  verbs.name[slot] = (char *)malloc(len);
+  strcpy(verbs.name[slot], name);
+
+  screen_update_needed |= SCREEN_UPDATE_VERBS;
+
+  map_set_ds(save_ds);
 }
 
 void vm_verb_delete(uint8_t slot)
 {
   verbs.id[slot] = 0xff;
+  free(verbs.name[slot]);
+  verbs.name[slot] = NULL;
 }
 
 void vm_verb_set_state(uint8_t slot, uint8_t state)
@@ -1419,6 +1449,59 @@ static void override_cutscene(void)
     if (proc_state[cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
       proc_state[cs_proc_slot] = PROC_STATE_RUNNING;
     }
+  }
+}
+
+static void update_verb_interface(void)
+{
+  if (ui_state & UI_FLAGS_ENABLE_VERBS) {
+    //debug_out("Updating verbs");
+    map_ds_heap();
+    for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+      if (verbs.id[i] != 0xff) {
+        gfx_print_verb(verbs.x[i], verbs.y[i], verbs.name[i], VERB_STYLE_NORMAL);
+      }
+    }
+    unmap_ds();
+  }
+  else {
+    //debug_out("Hiding verbs");
+    gfx_hide_verbs();
+  }
+}
+
+static void update_verb_highlighting(void)
+{
+  uint8_t cur_verb = 0xff;
+  uint8_t row = input_cursor_y >> 3;
+  if (row >= 19 && row <= 21) {
+    uint8_t col = input_cursor_x >> 2;
+    for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+      if (verbs.id[i] != 0xff) {
+        if (row == verbs.y[i] && col >= verbs.x[i] && col < verbs.x[i] + verbs.len[i]) {
+          cur_verb = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (cur_verb != prev_verb_highlighted) {
+    map_cs_gfx();
+    if (prev_verb_highlighted != 0xff) {
+      gfx_change_verb_style(verbs.x[prev_verb_highlighted], 
+                            verbs.y[prev_verb_highlighted], 
+                            verbs.len[prev_verb_highlighted], 
+                            VERB_STYLE_NORMAL);
+    }
+    if (cur_verb != 0xff) {
+      gfx_change_verb_style(verbs.x[cur_verb], 
+                            verbs.y[cur_verb], 
+                            verbs.len[cur_verb], 
+                            VERB_STYLE_HIGHLIGHTED);
+    }
+    unmap_cs();
+    prev_verb_highlighted = cur_verb;
   }
 }
 
