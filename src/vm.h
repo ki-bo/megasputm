@@ -102,6 +102,22 @@ enum {
   VERB_STATE_DELETED = 0x80
 };
 
+struct object_code {
+  uint16_t chunk_size;
+  uint8_t  unused1;
+  uint8_t  unused2;
+  uint16_t id;
+  uint8_t  unused3;
+  uint8_t  pos_x;
+  uint8_t  pos_y_and_parent_state;
+  uint8_t  width;
+  uint8_t  parent;
+  uint8_t  walk_to_x;
+  uint8_t  walk_to_y;
+  uint8_t  height_and_actor_dir;
+  uint8_t  name_offset;
+};
+
 struct walk_box {
   uint8_t top_y;
   uint8_t bottom_y;
@@ -130,6 +146,9 @@ extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
 extern uint8_t room_res_slot;
 
+extern uint8_t          obj_page[MAX_OBJECTS];
+extern uint8_t          obj_offset[MAX_OBJECTS];
+extern uint16_t         obj_id[MAX_OBJECTS];
 extern uint8_t          num_walk_boxes;
 extern struct walk_box *walk_boxes;
 extern uint8_t         *walk_box_matrix;
@@ -165,7 +184,9 @@ uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_bg(void);
 void vm_update_actors(void);
 void vm_update_sentence(void);
+struct object_code *vm_get_object_hdr(uint16_t object_id);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
+uint8_t vm_get_local_object_id(uint16_t global_object_id);
 void vm_clear_all_other_object_states(uint16_t global_object_id);
 void vm_set_camera_follow_actor(uint8_t actor_id);
 void vm_camera_pan_to(uint8_t x);

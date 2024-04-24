@@ -145,6 +145,26 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
   calculate_step(local_id);
 }
 
+void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
+{
+  uint16_t save_ds = map_get_ds();
+
+  __auto_type object_hdr = vm_get_object_hdr(object_id);
+  if (!object_hdr) {
+    return;
+  }
+
+  uint8_t x = object_hdr->pos_x;
+  uint8_t y = object_hdr->pos_y_and_parent_state & 0x7f;
+  uint8_t height = object_hdr->height_and_actor_dir;
+  uint8_t actor_dir = height & 0x03;
+  height >>= 3;
+
+  actor_walk_to(actor_id, x, y);
+
+  map_set_ds(save_ds);
+}
+
 void actor_next_step(uint8_t local_id)
 {
   if (local_actors.walking[local_id] == WALKING_STATE_STOPPED) {

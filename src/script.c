@@ -61,6 +61,7 @@ static void sleep_for_or_wait_for_message(void);
 static void assign_from_bit_variable(void);
 static void camera_at(void);
 static void get_object_at_position(void);
+static void walk_to_object(void);
 static void jump_if_smaller(void);
 static void cut_scene(void);
 static void start_script(void);
@@ -159,6 +160,7 @@ void script_init(void)
   opcode_jump_table[0x32] = &camera_at;
   opcode_jump_table[0x3e] = &walk_to;
   opcode_jump_table[0x35] = &get_object_at_position;
+  opcode_jump_table[0x36] = &walk_to_object;
   opcode_jump_table[0x38] = &jump_if_smaller;
   opcode_jump_table[0x39] = &do_sentence;
   opcode_jump_table[0x3a] = &subtract;
@@ -191,6 +193,7 @@ void script_init(void)
   opcode_jump_table[0x6d] = &put_actor_in_room;
   opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x75] = &get_object_at_position;
+  opcode_jump_table[0x76] = &walk_to_object;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &do_sentence;
   opcode_jump_table[0x7a] = &verb;
@@ -1079,8 +1082,6 @@ static void do_sentence(void)
 
   case 2:
     debug_msg("  print sentence on screen");
-    debug_out("  cursentverb %d", sentence_verb);
-    debug_out("  verb %d, noun1 %d, noun2 %d, stacksize %d", sentence_verb, sentence_noun1, sentence_noun2, sentence_stack.num_entries);
     // prepare a new sentence for printing on screen
     vm_write_var(VAR_SENTENCE_VERB, sentence_verb);
     vm_write_var(VAR_SENTENCE_NOUN1, sentence_noun1);
@@ -1098,6 +1099,14 @@ static void get_object_at_position(void)
   uint8_t y = resolve_next_param8();
   uint16_t obj_id = vm_get_object_at(x, y);
   vm_write_var(var_idx, obj_id);
+}
+
+static void walk_to_object(void)
+{
+  //debug_msg("Walk to object");
+  uint8_t actor_id = resolve_next_param8();
+  uint16_t obj_id = resolve_next_param16();
+  actor_walk_to_object(actor_id, obj_id);
 }
 
 /**

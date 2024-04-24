@@ -34,22 +34,6 @@ struct room_header {
   uint16_t entry_script_offset;  
 };
 
-struct object_code {
-  uint16_t chunk_size;
-  uint8_t  unused1;
-  uint8_t  unused2;
-  uint16_t id;
-  uint8_t  unused3;
-  uint8_t  pos_x;
-  uint8_t  pos_y_and_parent_state;
-  uint8_t  width;
-  uint8_t  parent;
-  uint8_t  walk_to_x;
-  uint8_t  walk_to_y;
-  uint8_t  height_and_actor_dir;
-  uint8_t  name_offset;
-};
-
 struct verb {
   uint8_t  id[MAX_VERBS];
   uint8_t  state[MAX_VERBS];
@@ -140,7 +124,6 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
 static void execute_script_slot(uint8_t slot);
-static uint8_t get_local_object_id(uint16_t global_object_id);
 static const char *get_object_name(uint16_t global_object_id);
 static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset);
 static void execute_sentence_stack(void);
@@ -602,7 +585,7 @@ uint8_t vm_start_child_script(uint8_t script_id)
 
 uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
 {
-  uint8_t id = get_local_object_id(global_object_id);
+  uint8_t id = vm_get_local_object_id(global_object_id);
   if (id == 0xff) {
     return 0xff;
   }
@@ -706,6 +689,17 @@ void vm_update_sentence(void)
   screen_update_needed |= SCREEN_UPDATE_SENTENCE;
 }
 
+struct object_code *vm_get_object_hdr(uint16_t object_id)
+{
+  uint8_t id = vm_get_local_object_id(object_id);
+  if (id == 0xff) {
+    return NULL;
+  }
+
+  map_ds_resource(obj_page[id]);
+  return (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[id]);
+}
+
 uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 {
   // save DS
@@ -741,6 +735,19 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
   return found_obj_id;
 }
 
+uint8_t vm_get_local_object_id(uint16_t global_object_id)
+{
+  for (uint8_t i = 0; i < num_objects; ++i)
+  {
+    if (obj_id[i] == global_object_id)
+    {
+      return i;
+    }
+  }
+
+  return 0xff;
+}
+
 /**
  * @brief Clears state of objects matching position and size
  *
@@ -753,7 +760,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
  */
 void vm_clear_all_other_object_states(uint16_t global_object_id)
 {
-  uint8_t local_object_id = get_local_object_id(global_object_id);
+  uint8_t local_object_id = vm_get_local_object_id(global_object_id);
   if (local_object_id == 0xff)
   {
     return;
@@ -1311,22 +1318,9 @@ static void execute_script_slot(uint8_t slot)
   map_set(map_save);
 }
 
-static uint8_t get_local_object_id(uint16_t global_object_id)
-{
-  for (uint8_t i = 0; i < num_objects; ++i)
-  {
-    if (obj_id[i] == global_object_id)
-    {
-      return i;
-    }
-  }
-
-  return 0xff;
-}
-
 static const char *get_object_name(uint16_t global_object_id)
 {
-  uint8_t local_id = get_local_object_id(global_object_id);
+  uint8_t local_id = vm_get_local_object_id(global_object_id);
   if (local_id == 0xff) {
     return NULL;
   }
@@ -1373,7 +1367,7 @@ static void execute_sentence_stack(void)
   vm_write_var(VAR_CURRENT_NOUN2, noun2);
   
   uint8_t script_offset = 0;
-  uint8_t local_object_id = get_local_object_id(noun1);
+  uint8_t local_object_id = vm_get_local_object_id(noun1);
   if (local_object_id != 0xff) {
     script_offset = get_room_object_script_offset(verb, local_object_id);
   }
@@ -1705,7 +1699,6 @@ static void select_verb(uint8_t verb_id)
 {
   vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_VERB_SELECT);
   vm_write_var(VAR_SELECTED_VERB, verb_id);
-  debug_out("  selverb %d", verb_id);
   vm_start_script(SCRIPT_ID_INPUT_EVENT);
   screen_update_needed |= SCREEN_UPDATE_SENTENCE;
 }
