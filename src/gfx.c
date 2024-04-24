@@ -17,8 +17,8 @@
 
 #define GFX_HEIGHT 128
 #define CHRCOUNT 120
-#define SCREEN_RAM_VERBS (SCREEN_RAM + CHRCOUNT * 2 * 18)
-#define COLRAM_VERBS (COLRAM + CHRCOUNT * 2 * 18)
+#define SCREEN_RAM_SENTENCE (SCREEN_RAM + CHRCOUNT * 2 * 18)
+#define SCREEN_RAM_VERBS (SCREEN_RAM + CHRCOUNT * 2 * 19)
 #define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
 #define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
 
@@ -153,6 +153,7 @@ static void place_cel_chars(uint16_t char_num,
                             uint8_t height_chars,
                             uint8_t mirror);
 static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines);
+static uint16_t text_style_to_color(enum text_style style);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -899,10 +900,9 @@ void gfx_update_main_screen(void)
   dma_trigger(&dmalist_copy_gfx);
 }
 
-void gfx_print_verb(uint8_t x, uint8_t y, const char *name, enum verb_style style)
+void gfx_print_interface_text(uint8_t x, uint8_t y, const char *name, enum text_style style)
 {
-  uint16_t col = style == VERB_STYLE_NORMAL ? 0x0200 : 0x0e00;
-  //debug_out("print verb at x: %d y: %d name %s", x, y, name);
+  uint16_t col = text_style_to_color(style);
   uint16_t __far *screen_ptr = FAR_U16_PTR(SCREEN_RAM) + times_chrcount[y] + x;
   uint16_t __far *colram_ptr = FAR_U16_PTR(COLRAM) + times_chrcount[y] + x;
   while (*name) {
@@ -911,20 +911,35 @@ void gfx_print_verb(uint8_t x, uint8_t y, const char *name, enum verb_style styl
   }
 }
 
-void gfx_change_verb_style(uint8_t x, uint8_t y, uint8_t size, enum verb_style style)
+void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, enum text_style style)
 {
-  uint16_t col = style == VERB_STYLE_NORMAL ? 0x0200 : 0x0e00;
+  uint16_t col = text_style_to_color(style);
   uint16_t __far *colram_ptr = FAR_U16_PTR(COLRAM) + times_chrcount[y] + x;
   while (size--) {
     *colram_ptr++ = col;
   }
 }
 
+void gfx_hide_sentence(void)
+{
+  static const dmalist_t dmalist_clear_sentence = {
+    .command  = 0,
+    .count    = 40 - 2,
+    .src_addr = LSB16(SCREEN_RAM_SENTENCE),
+    .src_bank = BANK(SCREEN_RAM_SENTENCE),
+    .dst_addr = LSB16(SCREEN_RAM_SENTENCE + 2),
+    .dst_bank = BANK(SCREEN_RAM_SENTENCE + 2),
+  };
+
+  *FAR_U16_PTR(SCREEN_RAM_SENTENCE) = 0x0020;
+  dma_trigger(&dmalist_clear_sentence);
+}
+
 void gfx_hide_verbs(void)
 {
   static const dmalist_t dmalist_clear_verbs = {
     .command  = 0,
-    .count    = CHRCOUNT * 2 * 4 - 2,
+    .count    = CHRCOUNT * 2 * 3 - 2,
     .src_addr = LSB16(SCREEN_RAM_VERBS),
     .src_bank = BANK(SCREEN_RAM_VERBS),
     .dst_addr = LSB16(SCREEN_RAM_VERBS + 2),
@@ -1217,6 +1232,20 @@ static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_
     }
   }
   map_set_ds(save_ds);
+}
+
+static uint16_t text_style_to_color(enum text_style style)
+{
+  switch (style) {
+    case TEXT_STYLE_NORMAL:
+      return 0x0200;
+    case TEXT_STYLE_HIGHLIGHTED:
+      return 0x0e00;
+    case TEXT_STYLE_SENTENCE:
+      return 0x0500;
+    default:
+      return 0x0200;
+  }
 }
 
 /** @} */ // gfx_private

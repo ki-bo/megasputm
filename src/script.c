@@ -43,7 +43,7 @@ static void actor_ops(void);
 static void say_line(void);
 static void random(void);
 static void jump(void);
-static void execute_command(void);
+static void do_sentence(void);
 static void jump_if_not_pickupable(void);
 static void assign_variable(void);
 static void assign_bit_variable(void);
@@ -81,8 +81,6 @@ static void jump_if_greater_or_equal(void);
 static void verb(void);
 static void print_ego(void);
 static void unimplemented_opcode(void);
-
-static void reset_command(void);
 
 //----------------------------------------------------------------------
 
@@ -143,7 +141,7 @@ void script_init(void)
   opcode_jump_table[0x14] = &say_line;
   opcode_jump_table[0x16] = &random;
   opcode_jump_table[0x18] = &jump;
-  opcode_jump_table[0x19] = &execute_command;
+  opcode_jump_table[0x19] = &do_sentence;
   opcode_jump_table[0x1a] = &assign_variable;
   opcode_jump_table[0x1b] = &assign_bit_variable;
   opcode_jump_table[0x1c] = &start_sound;
@@ -162,7 +160,7 @@ void script_init(void)
   opcode_jump_table[0x3e] = &walk_to;
   opcode_jump_table[0x35] = &get_object_at_position;
   opcode_jump_table[0x38] = &jump_if_smaller;
-  opcode_jump_table[0x39] = &execute_command;
+  opcode_jump_table[0x39] = &do_sentence;
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x3b] = &wait_for_actor;
   opcode_jump_table[0x3c] = &stop_sound;
@@ -181,7 +179,7 @@ void script_init(void)
   opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
   opcode_jump_table[0x58] = &begin_override_or_print_ego;
-  opcode_jump_table[0x59] = &execute_command;
+  opcode_jump_table[0x59] = &do_sentence;
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x5b] = &assign_bit_variable;
   opcode_jump_table[0x5e] = &walk_to;
@@ -194,7 +192,7 @@ void script_init(void)
   opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
-  opcode_jump_table[0x79] = &execute_command;
+  opcode_jump_table[0x79] = &do_sentence;
   opcode_jump_table[0x7a] = &verb;
   opcode_jump_table[0x7e] = &walk_to;
   opcode_jump_table[0x7f] = &jump_if_not_pickupable;
@@ -842,7 +840,7 @@ static void random(void)
 static void jump(void)
 {
   pc += read_word(); // will effectively jump backwards if the offset is negative
-  debug_scr("jump %03x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5));
+  debug_scr("jump %03x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
 }
 
 /**
@@ -858,23 +856,23 @@ static void jump(void)
  */
 static void assign_variable(void)
 {
-  debug_scr("assign-variable");
+  //debug_scr("assign-variable");
   uint8_t var_idx = read_byte();
   vm_write_var(var_idx, resolve_next_param16());
 }
 
 static void assign_bit_variable(void)
 {
-  debug_scr("assign-bit-variable");
+  //debug_scr("assign-bit-variable");
   uint16_t bit_var_hi = read_word() + resolve_next_param8();
   uint8_t bit_var_lo = bit_var_hi & 0x0f;
   bit_var_hi >>= 4;
   if (resolve_next_param8()) {
-    debug_scr("set bit variable %04x.%1x", bit_var_hi, bit_var_lo);
+    //debug_scr("set bit variable %04x.%1x", bit_var_hi, bit_var_lo);
     vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) | (1 << bit_var_lo));
   }
   else {
-    debug_scr("clear bit variable %04x.%1x", bit_var_hi, bit_var_lo);
+    //debug_scr("clear bit variable %04x.%1x", bit_var_hi, bit_var_lo);
     vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) & ~(1 << bit_var_lo));
   }
 }
@@ -1032,59 +1030,62 @@ static void camera_at(void)
   }
 }
 
-static void execute_command(void)
+static void do_sentence(void)
 {
-  //debug_msg("Execute command");
-  uint8_t command_verb = resolve_next_param8();
+  //debug_scr("do-sentence");
+  uint8_t sentence_verb = resolve_next_param8();
 
-  if (command_verb == 0xfb) {
-    debug_scr("  command_verb: %d = RESET", command_verb);
-    reset_command();
+  if (sentence_verb == 0xfb) {
+    debug_scr("  sentence_verb: %d = RESET", sentence_verb);
+    vm_revert_sentence();
     return;
   }
-  else if (command_verb == 0xfc) {
-    debug_scr("  command_verb: %d = STOP", command_verb);
-    vm_stop_script(SCRIPT_ID_COMMAND);
+  else if (sentence_verb == 0xfc) {
+    debug_scr("  sentence_verb: %d = STOP", sentence_verb);
+    vm_stop_script(SCRIPT_ID_SENTENCE);
     return;
   }
-  else if (command_verb == 0xfd) {
-    //debug_scr("  unimplemented command verb 0xfd, needed for load/save");
+  else if (sentence_verb == 0xfd) {
+    //debug_scr("  unimplemented sentence verb 0xfd, needed for load/save");
     fatal_error(ERR_UNKNOWN_VERB);
   }
 
-  uint16_t command_noun1 = resolve_next_param16();
-  uint16_t command_noun2 = resolve_next_param16();
+  uint16_t sentence_noun1 = resolve_next_param16();
+  uint16_t sentence_noun2 = resolve_next_param16();
 
   uint8_t sub_opcode = read_byte();
   switch (sub_opcode) {
   case 0:
-    // put command into cmd stack
-    debug_msg("  put command into cmd stack");
-    if (cmd_stack.num_entries == CMD_STACK_SIZE) {
+    // put sentence into cmd stack
+    debug_msg("  put sentence into sentence stack");
+    if (sentence_stack.num_entries == CMD_STACK_SIZE) {
       fatal_error(ERR_CMD_STACK_OVERFLOW);
     }
-    cmd_stack.verb[cmd_stack.num_entries] = command_verb;
-    cmd_stack.noun1[cmd_stack.num_entries] = command_noun1;
-    cmd_stack.noun2[cmd_stack.num_entries] = command_noun2;
-    ++cmd_stack.num_entries;
-    //debug_scr("  verb %d, noun1 %d, noun2 %d, stacksize %d", command_verb, command_noun1, command_noun2, cmd_stack.num_entries);
+    sentence_stack.verb[sentence_stack.num_entries] = sentence_verb;
+    sentence_stack.noun1[sentence_stack.num_entries] = sentence_noun1;
+    sentence_stack.noun2[sentence_stack.num_entries] = sentence_noun2;
+    ++sentence_stack.num_entries;
+    debug_out("  verb %d, noun1 %d, noun2 %d, stacksize %d", sentence_verb, sentence_noun1, sentence_noun2, sentence_stack.num_entries);
     return;
 
   case 1:
-    // execute a command directly
-    debug_msg("  execute a command directly");
-    vm_write_var(VAR_COMMAND_VERB, command_verb);
-    vm_write_var(VAR_COMMAND_NOUN1, command_noun1);
-    vm_write_var(VAR_COMMAND_NOUN2, command_noun2);
-    vm_start_object_script(command_verb, command_noun1);
+    // execute a sentence directly
+    debug_msg("  execute a sentence directly");
+    vm_write_var(VAR_CURRENT_VERB, sentence_verb);
+    vm_write_var(VAR_CURRENT_NOUN1, sentence_noun1);
+    vm_write_var(VAR_CURRENT_NOUN2, sentence_noun2);
+    vm_start_object_script(sentence_verb, sentence_noun1);
     break;
 
   case 2:
-    //debug_msg("  print sentence on screen");
+    debug_msg("  print sentence on screen");
+    debug_out("  cursentverb %d", sentence_verb);
+    debug_out("  verb %d, noun1 %d, noun2 %d, stacksize %d", sentence_verb, sentence_noun1, sentence_noun2, sentence_stack.num_entries);
     // prepare a new sentence for printing on screen
-    vm_write_var(VAR_SENTENCE_VERB, command_verb);
-    vm_write_var(VAR_SENTENCE_NOUN1, command_noun1);
-    vm_write_var(VAR_SENTENCE_NOUN2, command_noun2);
+    vm_write_var(VAR_SENTENCE_VERB, sentence_verb);
+    vm_write_var(VAR_SENTENCE_NOUN1, sentence_noun1);
+    vm_write_var(VAR_SENTENCE_NOUN2, sentence_noun2);
+    vm_update_sentence();
   }
   
 }
@@ -1180,7 +1181,7 @@ static void cut_scene(void)
   //debug_msg("cut-scene");
   if (!(opcode & 0x80)) {
     vm_cut_scene_begin();
-    reset_command();
+    vm_revert_sentence();
   }
   else {
     //debug_msg("end of cut-scene");
@@ -1527,13 +1528,4 @@ static void unimplemented_opcode(void)
 {
   debug_out("Unimplemented opcode: %02x at %04x", opcode, (uint16_t)(pc - 1));
   fatal_error(ERR_UNKNOWN_OPCODE);
-}
-
-static void reset_command(void)
-{
-  //debug_msg("Reset command");
-  vm_write_var(VAR_SENTENCE_VERB, vm_read_var(VAR_DEFAULT_VERB));
-  vm_write_var(VAR_SENTENCE_NOUN1, 0);
-  vm_write_var(VAR_SENTENCE_NOUN2, 0);
-  vm_write_var(VAR_SENTENCE_PREPOSITION, 0);
 }

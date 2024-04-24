@@ -24,9 +24,11 @@ enum {
 };
 
 enum {
-  INPUT_EVENT_VERB_SELECT = 1,
-  INPUT_EVENT_SCENE_CLICK = 2,
-  INPUT_EVENT_KEYPRESS    = 4
+  INPUT_EVENT_VERB_SELECT     = 1,
+  INPUT_EVENT_SCENE_CLICK     = 2,
+  INPUT_EVENT_INVENTORY_CLICK = 3,
+  INPUT_EVENT_KEYPRESS        = 4,
+  INPUT_EVENT_SENTENCE_CLICK  = 5   // seems to be only relevant for Zak McKracken
 };
 
 enum {
@@ -36,9 +38,9 @@ enum {
   VAR_SELECTED_ROOM = 4,
   VAR_MACHINE_SPEED = 6,
   VAR_MSGLEN = 7,
-  VAR_COMMAND_VERB = 8,
-  VAR_COMMAND_NOUN1 = 9,
-  VAR_COMMAND_NOUN2 = 10,
+  VAR_CURRENT_VERB = 8,
+  VAR_CURRENT_NOUN1 = 9,
+  VAR_CURRENT_NOUN2 = 10,
   VAR_NUMBER_OF_ACTORS = 11,
   VAR_VALID_VERB = 18,
   VAR_CURSOR_STATE = 21,
@@ -50,6 +52,8 @@ enum {
   VAR_SCENE_CURSOR_X = 30,
   VAR_SCENE_CURSOR_Y = 31,
   VAR_INPUT_EVENT = 32,
+  VAR_SELECTED_VERB = 33,
+  VAR_CLICKED_NOUN = 35,
   VAR_DEFAULT_VERB = 38,
   VAR_CUTSCENEEXIT_KEY = 40,
 };
@@ -65,7 +69,7 @@ enum {
 };
 
 enum {
-  SCRIPT_ID_COMMAND = 2,
+  SCRIPT_ID_SENTENCE = 2,
   SCRIPT_ID_INPUT_EVENT = 4
 };
 
@@ -76,10 +80,11 @@ enum {
 };
 
 enum {
-  SCREEN_UPDATE_BG     = 1,
-  SCREEN_UPDATE_ACTORS = 2,
-  SCREEN_UPDATE_DIALOG = 4,
-  SCREEN_UPDATE_VERBS  = 8
+  SCREEN_UPDATE_BG       = 0x01,
+  SCREEN_UPDATE_ACTORS   = 0x02,
+  SCREEN_UPDATE_DIALOG   = 0x04,
+  SCREEN_UPDATE_VERBS    = 0x08,
+  SCREEN_UPDATE_SENTENCE = 0x10
 };
 
 enum {
@@ -130,13 +135,13 @@ extern struct walk_box *walk_boxes;
 extern uint8_t         *walk_box_matrix;
 
 
-struct cmd_stack_t {
+struct sentence_stack_t {
   uint8_t  num_entries;
   uint8_t  verb[CMD_STACK_SIZE];
   uint16_t noun1[CMD_STACK_SIZE];
   uint16_t noun2[CMD_STACK_SIZE];
 };
-extern struct cmd_stack_t cmd_stack;
+extern struct sentence_stack_t sentence_stack;
 
 void vm_init(void);
 __task void vm_mainloop(void);
@@ -155,13 +160,16 @@ uint8_t vm_start_child_script(uint8_t script_id);
 uint8_t vm_start_object_script(uint8_t verb, uint16_t object);
 void vm_stop_active_script(void);
 void vm_stop_script(uint8_t script_id);
+uint8_t vm_get_script_slot_by_script_id(uint8_t script_id);
 uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_bg(void);
 void vm_update_actors(void);
+void vm_update_sentence(void);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 void vm_clear_all_other_object_states(uint16_t global_object_id);
 void vm_set_camera_follow_actor(uint8_t actor_id);
 void vm_camera_pan_to(uint8_t x);
+void vm_revert_sentence(void);
 void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name);
 void vm_verb_delete(uint8_t slot);
 void vm_verb_set_state(uint8_t slot, uint8_t state);

@@ -113,10 +113,13 @@ uint8_t         *walk_box_matrix;
 
 // verb data
 struct verb verbs;
-uint8_t prev_verb_highlighted;
 
-// command queue
-struct cmd_stack_t cmd_stack;
+// sentence queue
+struct sentence_stack_t sentence_stack;
+char sentence_text[41];
+uint8_t prev_sentence_highlighted = 0;
+uint8_t prev_verb_highlighted = 0xff;
+uint8_t sentence_length;
 
 // Private functions
 static void set_proc_state(uint8_t slot, uint8_t state);
@@ -138,15 +141,23 @@ static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
 static void execute_script_slot(uint8_t slot);
 static uint8_t get_local_object_id(uint16_t global_object_id);
+static const char *get_object_name(uint16_t global_object_id);
 static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset);
-static void execute_command_stack(void);
+static void execute_sentence_stack(void);
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
 static void update_actors(void);
 static void animate_actors(void);
 static void update_camera(void);
 static void override_cutscene(void);
+static void update_sentence_line(void);
+static void update_sentence_highlighting(void);
+static void add_string_to_sentence(const char *str, uint8_t prepend_space);
 static void update_verb_interface(void);
 static void update_verb_highlighting(void);
+static uint8_t get_hovered_verb_slot(void);
+static uint8_t get_verb_slot_by_id(uint8_t verb_id);
+static void select_verb(uint8_t verb_id);
+static const char *get_preposition_name(uint8_t preposition);
 
 /**
  * @defgroup vm_init VM Init Functions
@@ -178,7 +189,6 @@ void vm_init(void)
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
     verbs.id[i] = 0xff;
   }
-  prev_verb_highlighted = 0xff;
 }
 
 /** @} */ // vm_init
@@ -252,8 +262,8 @@ __task void vm_mainloop(void)
       execute_script_slot(active_script_slot);
     }
 
-    // executes the command script if any commands are in the queue
-    execute_command_stack();
+    // executes the sentence script if any sentences are in the queue
+    execute_sentence_stack();
 
     process_dialog(elapsed_jiffies);
     update_actors();
@@ -285,11 +295,16 @@ __task void vm_mainloop(void)
         update_verb_interface();
       }
 
+      if (screen_update_needed & SCREEN_UPDATE_SENTENCE) {
+        update_sentence_line();
+      }
+
       unmap_cs();
 
       screen_update_needed = 0;
     }
 
+    update_sentence_highlighting();
     update_verb_highlighting();
 
     //VICIV.bordercol = 0x00;
@@ -330,11 +345,11 @@ void vm_change_ui_flags(uint8_t flags)
   if (flags & UI_FLAGS_APPLY_INTERFACE) {
     ui_state = (ui_state & ~(UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS)) |
                 (flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS));
-    screen_update_needed |= SCREEN_UPDATE_VERBS;
+    screen_update_needed |= SCREEN_UPDATE_SENTENCE | SCREEN_UPDATE_VERBS;
   }
 
-  debug_out("UI state enable-cursor: %d", ui_state & UI_FLAGS_ENABLE_CURSOR);
-  debug_out("cursor state: %d", vm_read_var8(VAR_CURSOR_STATE));
+  //debug_out("UI state enable-cursor: %d", ui_state & UI_FLAGS_ENABLE_CURSOR);
+  //debug_out("cursor state: %d", vm_read_var8(VAR_CURSOR_STATE));
 }
 
 /**
@@ -354,7 +369,7 @@ void vm_set_current_room(uint8_t room_no)
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
 
   // exit and free old room
-  debug_out("Deactivating old room %d", vm_read_var8(VAR_SELECTED_ROOM));
+  //debug_out("Deactivating old room %d", vm_read_var8(VAR_SELECTED_ROOM));
   stop_all_dialog();
   if (vm_read_var(VAR_SELECTED_ROOM) != 0) {
     map_ds_resource(room_res_slot);
@@ -382,7 +397,7 @@ void vm_set_current_room(uint8_t room_no)
     num_objects = 0;
   }
   else {
-    debug_out("Activating new room %d", room_no);
+    //debug_out("Activating new room %d", room_no);
     // activate new room data
     room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
     res_activate_slot(room_res_slot);
@@ -462,9 +477,9 @@ void vm_cut_scene_begin(void)
 
 void vm_cut_scene_end(void)
 {
-  debug_out("cut-scene ended");
+  //debug_out("cut-scene ended");
   if (vm_read_var8(VAR_SELECTED_ROOM) != cs_room) {
-    debug_out("switching to room %d", cs_room);
+    //debug_out("switching to room %d", cs_room);
     vm_set_current_room(cs_room);
   }
   vm_write_var(VAR_CURSOR_STATE, cs_cursor_state);
@@ -472,7 +487,7 @@ void vm_cut_scene_end(void)
   cs_proc_slot = 0xff;
   cs_override_pc = 0;
 
-  debug_out("  cursor state %d, ui state %d", vm_read_var8(VAR_CURSOR_STATE), ui_state);
+  //debug_out("  cursor state %d, ui state %d", vm_read_var8(VAR_CURSOR_STATE), ui_state);
 }
 
 void vm_begin_override(void)
@@ -541,7 +556,14 @@ uint8_t vm_start_script(uint8_t script_id)
 {
   debug_out("Starting new top-level script %d", script_id);
 
-  uint8_t slot = find_free_script_slot();
+  uint8_t slot = vm_get_script_slot_by_script_id(script_id);
+  if (slot != 0xff) {
+    proc_state[slot] = PROC_STATE_RUNNING;
+    proc_pc[slot] = 4; // skipping script header directly to first opcode
+    return slot;
+  }
+
+  slot = find_free_script_slot();
   proc_script_id[slot] = script_id;
   proc_state[slot] = PROC_STATE_RUNNING;
   proc_parent[slot] = 0xff;
@@ -643,17 +665,22 @@ void vm_stop_script(uint8_t script_id)
   }
 }
 
-uint8_t vm_is_script_running(uint8_t script_id)
+uint8_t vm_get_script_slot_by_script_id(uint8_t script_id)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
     if (proc_state[slot] != PROC_STATE_FREE && proc_script_id[slot] == script_id)
     {
-      return 1;
+      return slot;
     }
   }
 
-  return 0;
+  return 0xff;
+}
+
+uint8_t vm_is_script_running(uint8_t script_id)
+{
+  return vm_get_script_slot_by_script_id(script_id) != 0xff;
 }
 
 /**
@@ -672,6 +699,11 @@ void vm_update_bg(void)
 void vm_update_actors(void)
 {
   screen_update_needed |= SCREEN_UPDATE_ACTORS;
+}
+
+void vm_update_sentence(void)
+{
+  screen_update_needed |= SCREEN_UPDATE_SENTENCE;
 }
 
 uint16_t vm_get_object_at(uint8_t x, uint8_t y)
@@ -751,7 +783,7 @@ void vm_clear_all_other_object_states(uint16_t global_object_id)
        (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
     {
       global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
-      debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
+      //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
     }
   }
 
@@ -773,6 +805,15 @@ void vm_camera_pan_to(uint8_t x)
   camera_target = x;
   camera_follow_actor_id = 0xff;
   camera_state = CAMERA_STATE_MOVE_TO_TARGET_POS;
+}
+
+void vm_revert_sentence(void)
+{
+  //debug_out("revert-sentence");
+  vm_write_var(VAR_SENTENCE_VERB, vm_read_var(VAR_DEFAULT_VERB));
+  vm_write_var(VAR_SENTENCE_NOUN1, 0);
+  vm_write_var(VAR_SENTENCE_NOUN2, 0);
+  vm_write_var(VAR_SENTENCE_PREPOSITION, 0);
 }
 
 void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name)
@@ -1024,28 +1065,28 @@ static void read_walk_boxes(void)
   __auto_type box_ptr = NEAR_U8_PTR(RES_MAPPED + room_hdr->walk_boxes_offset);
   num_walk_boxes = *box_ptr++;
   walk_boxes = (struct walk_box *)box_ptr;
-  debug_out("Reading %d walk boxes", num_walk_boxes);
+  //debug_out("Reading %d walk boxes", num_walk_boxes);
   for (uint8_t i = 0; i < num_walk_boxes; ++i) {
     __auto_type box = (struct walk_box *)box_ptr;
     box_ptr += sizeof(struct walk_box);
-    debug_out("Walk box %d:", i);
-    debug_out("  uy:  %d", box->top_y);
-    debug_out("  ly:  %d", box->bottom_y);
-    debug_out("  ulx: %d", box->topleft_x);
-    debug_out("  urx: %d", box->topright_x);
-    debug_out("  llx: %d", box->bottomleft_x);
-    debug_out("  lrx: %d", box->bottomright_x);
-    debug_out("  mask: %02x", box->mask);
-    debug_out("  flags: %02x", box->flags);
+    // debug_out("Walk box %d:", i);
+    // debug_out("  uy:  %d", box->top_y);
+    // debug_out("  ly:  %d", box->bottom_y);
+    // debug_out("  ulx: %d", box->topleft_x);
+    // debug_out("  urx: %d", box->topright_x);
+    // debug_out("  llx: %d", box->bottomleft_x);
+    // debug_out("  lrx: %d", box->bottomright_x);
+    // debug_out("  mask: %02x", box->mask);
+    // debug_out("  flags: %02x", box->flags);
   }
   walk_box_matrix = box_ptr;
   for (uint8_t i = 0; i < num_walk_boxes; ++i) {
-    debug_out("  row offset %d = %d", i, *box_ptr++);
+    //debug_out("  row offset %d = %d", i, *box_ptr++);
   }
   for (uint8_t src_box = 0; src_box < num_walk_boxes; ++src_box) {
     for (uint8_t dst_box = 0; dst_box < num_walk_boxes; ++dst_box) {
       uint8_t next_box = *box_ptr++;
-      debug_out("  box matrix[%d][%d] = %d", src_box, dst_box, next_box);
+      //debug_out("  box matrix[%d][%d] = %d", src_box, dst_box, next_box);
     }
   }
 }
@@ -1127,6 +1168,16 @@ static void handle_input(void)
         vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SCENE_CLICK);
         vm_start_script(SCRIPT_ID_INPUT_EVENT);
       }
+      else if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
+        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SENTENCE_CLICK);
+        vm_start_script(SCRIPT_ID_INPUT_EVENT);
+      }
+      else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
+        uint8_t verb_slot = get_hovered_verb_slot();
+        if (verb_slot != 0xff) {
+          select_verb(verbs.id[verb_slot]);
+        }
+      }
     }
   }
 
@@ -1134,6 +1185,10 @@ static void handle_input(void)
   if (input_key_pressed) {
     if (input_key_pressed == INPUT_KEY_RUNSTOP || input_key_pressed == INPUT_KEY_ESCAPE) {
       override_cutscene();
+    }
+    else {
+      //vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
+      //vm_start_script(SCRIPT_ID_INPUT_EVENT);
     }
     // ack the key press
     input_key_pressed = 0;
@@ -1269,6 +1324,21 @@ static uint8_t get_local_object_id(uint16_t global_object_id)
   return 0xff;
 }
 
+static const char *get_object_name(uint16_t global_object_id)
+{
+  uint8_t local_id = get_local_object_id(global_object_id);
+  if (local_id == 0xff) {
+    return NULL;
+  }
+
+  uint8_t res_slot = obj_page[local_id];
+  uint16_t offset = obj_offset[local_id];
+  map_ds_resource(res_slot);
+  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + offset);
+  uint16_t name_offset = obj_hdr->name_offset;
+  return ((const char *)obj_hdr) + name_offset;
+}
+
 static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset)
 {
   uint8_t slot = find_free_script_slot();
@@ -1286,21 +1356,21 @@ static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset)
   return slot;
 }
 
-static void execute_command_stack(void)
+static void execute_sentence_stack(void)
 {
-  if (cmd_stack.num_entries == 0)
+  if (sentence_stack.num_entries == 0)
   {
     return;
   }
 
-  --cmd_stack.num_entries;
-  uint8_t verb = cmd_stack.verb[cmd_stack.num_entries];
-  uint16_t noun1 = cmd_stack.noun1[cmd_stack.num_entries];
-  uint16_t noun2 = cmd_stack.noun2[cmd_stack.num_entries];
+  --sentence_stack.num_entries;
+  uint8_t verb = sentence_stack.verb[sentence_stack.num_entries];
+  uint16_t noun1 = sentence_stack.noun1[sentence_stack.num_entries];
+  uint16_t noun2 = sentence_stack.noun2[sentence_stack.num_entries];
 
-  vm_write_var(VAR_COMMAND_VERB, verb);
-  vm_write_var(VAR_COMMAND_NOUN1, noun1);
-  vm_write_var(VAR_COMMAND_NOUN2, noun2);
+  vm_write_var(VAR_CURRENT_VERB, verb);
+  vm_write_var(VAR_CURRENT_NOUN1, noun1);
+  vm_write_var(VAR_CURRENT_NOUN2, noun2);
   
   uint8_t script_offset = 0;
   uint8_t local_object_id = get_local_object_id(noun1);
@@ -1309,8 +1379,8 @@ static void execute_command_stack(void)
   }
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
 
-  uint8_t slot = vm_start_script(SCRIPT_ID_COMMAND);
-  debug_out("Command script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
+  uint8_t slot = vm_start_script(SCRIPT_ID_SENTENCE);
+  debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
   execute_script_slot(slot);
 }
 
@@ -1452,6 +1522,112 @@ static void override_cutscene(void)
   }
 }
 
+static void update_sentence_line(void)
+{
+  if (!(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
+    map_cs_gfx();
+    gfx_hide_sentence();
+    unmap_cs();
+    return;
+  }
+
+  uint16_t save_ds = map_get_ds();
+
+  sentence_length = 0;
+
+  debug_out("Printing sentence");
+  uint8_t verb_slot = get_verb_slot_by_id(vm_read_var8(VAR_SENTENCE_VERB));
+  debug_out("  Verb id %d slot %d", vm_read_var8(VAR_SENTENCE_VERB), verb_slot);
+  if (verb_slot != 0xff) {
+    map_ds_heap();
+    add_string_to_sentence(verbs.name[verb_slot], 0);
+  }
+
+  uint16_t noun1 = vm_read_var(VAR_SENTENCE_NOUN1);
+  if (noun1) {
+    const char *noun1_name = get_object_name(noun1);
+    if (noun1_name) {
+      debug_out("  Noun1 name: %s", noun1_name);
+    }
+    add_string_to_sentence(noun1_name, 1);
+  }
+  
+  uint8_t preposition = vm_read_var8(VAR_SENTENCE_PREPOSITION);
+  if (preposition) {
+    const char *preposition_name = get_preposition_name(preposition);
+    if (preposition_name) {
+      debug_out("  Preposition name: %s", preposition_name);
+    }
+    add_string_to_sentence(preposition_name, 1);
+  }
+
+  uint16_t noun2 = vm_read_var(VAR_SENTENCE_NOUN2);
+  if (noun2) {
+    const char *noun2_name = get_object_name(noun2);
+    if (noun2_name) {
+      debug_out("  Noun2 name: %s", noun2_name);
+    }
+    add_string_to_sentence(noun2_name, 1);
+  }
+
+  uint8_t num_chars = sentence_length;
+  while (num_chars < 40) {
+    sentence_text[num_chars] = '@';
+    ++num_chars;
+  }  
+  sentence_text[40] = '\0';
+
+  map_cs_gfx();
+  gfx_print_interface_text(0, 18, sentence_text, TEXT_STYLE_SENTENCE);
+  unmap_cs();
+
+  prev_sentence_highlighted = 0;
+
+  map_set_ds(save_ds);
+}
+
+static void update_sentence_highlighting(void)
+{
+  if (!(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
+    return;
+  }
+
+  if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
+    if (!prev_sentence_highlighted) {
+      map_cs_gfx();
+      gfx_change_interface_text_style(0, 18, 40, TEXT_STYLE_HIGHLIGHTED);
+      unmap_cs();
+      prev_sentence_highlighted = 1;
+    }
+  }
+  else {
+    if (prev_sentence_highlighted) {
+      map_cs_gfx();
+      gfx_change_interface_text_style(0, 18, 40, TEXT_STYLE_SENTENCE);
+      unmap_cs();
+      prev_sentence_highlighted = 0;
+    }
+  }
+}
+
+static void add_string_to_sentence(const char *str, uint8_t prepend_space)
+{
+  if (!str) {
+    return;
+  }
+
+  if (prepend_space && sentence_length < 40) {
+    sentence_text[sentence_length++] = ' ';
+  }
+  while (*str != '\0' && sentence_length < 40) {
+    if (*str == '@') {
+      ++str;
+      continue;
+    }
+    sentence_text[sentence_length++] = *str++;
+  }
+}
+
 static void update_verb_interface(void)
 {
   if (ui_state & UI_FLAGS_ENABLE_VERBS) {
@@ -1459,9 +1635,10 @@ static void update_verb_interface(void)
     map_ds_heap();
     for (uint8_t i = 0; i < MAX_VERBS; ++i) {
       if (verbs.id[i] != 0xff) {
-        gfx_print_verb(verbs.x[i], verbs.y[i], verbs.name[i], VERB_STYLE_NORMAL);
+        gfx_print_interface_text(verbs.x[i], verbs.y[i], verbs.name[i], TEXT_STYLE_NORMAL);
       }
     }
+    prev_verb_highlighted = 0xff;
     unmap_ds();
   }
   else {
@@ -1472,37 +1649,71 @@ static void update_verb_interface(void)
 
 static void update_verb_highlighting(void)
 {
+  if (!(ui_state & UI_FLAGS_ENABLE_VERBS)) {
+    return;
+  }
+
   uint8_t cur_verb = 0xff;
-  uint8_t row = input_cursor_y >> 3;
-  if (row >= 19 && row <= 21) {
-    uint8_t col = input_cursor_x >> 2;
-    for (uint8_t i = 0; i < MAX_VERBS; ++i) {
-      if (verbs.id[i] != 0xff) {
-        if (row == verbs.y[i] && col >= verbs.x[i] && col < verbs.x[i] + verbs.len[i]) {
-          cur_verb = i;
-          break;
-        }
-      }
-    }
+  if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
+    cur_verb = get_hovered_verb_slot();
   }
 
   if (cur_verb != prev_verb_highlighted) {
     map_cs_gfx();
     if (prev_verb_highlighted != 0xff) {
-      gfx_change_verb_style(verbs.x[prev_verb_highlighted], 
-                            verbs.y[prev_verb_highlighted], 
-                            verbs.len[prev_verb_highlighted], 
-                            VERB_STYLE_NORMAL);
+      gfx_change_interface_text_style(verbs.x[prev_verb_highlighted], 
+                                      verbs.y[prev_verb_highlighted], 
+                                      verbs.len[prev_verb_highlighted], 
+                                      TEXT_STYLE_NORMAL);
     }
     if (cur_verb != 0xff) {
-      gfx_change_verb_style(verbs.x[cur_verb], 
-                            verbs.y[cur_verb], 
-                            verbs.len[cur_verb], 
-                            VERB_STYLE_HIGHLIGHTED);
+      gfx_change_interface_text_style(verbs.x[cur_verb], 
+                                      verbs.y[cur_verb], 
+                                      verbs.len[cur_verb], 
+                                      TEXT_STYLE_HIGHLIGHTED);
     }
     unmap_cs();
     prev_verb_highlighted = cur_verb;
   }
+}
+
+static uint8_t get_hovered_verb_slot(void)
+{
+  uint8_t row = input_cursor_y >> 3;
+  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+    uint8_t col = input_cursor_x >> 2;
+    if (verbs.id[i] != 0xff) {
+      if (row == verbs.y[i] && col >= verbs.x[i] && col < verbs.x[i] + verbs.len[i]) {
+        return i;
+      }
+    }
+  }
+  return 0xff;
+}
+
+static uint8_t get_verb_slot_by_id(uint8_t verb_id)
+{
+  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+    if (verbs.id[i] == verb_id) {
+      return i;
+    }
+  }
+  return 0xff;
+}
+
+static void select_verb(uint8_t verb_id)
+{
+  vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_VERB_SELECT);
+  vm_write_var(VAR_SELECTED_VERB, verb_id);
+  debug_out("  selverb %d", verb_id);
+  vm_start_script(SCRIPT_ID_INPUT_EVENT);
+  screen_update_needed |= SCREEN_UPDATE_SENTENCE;
+}
+
+static const char *get_preposition_name(uint8_t preposition)
+{
+  static const char *prepositions_english[] = { NULL, "in", "with", "on", "to" };
+  return prepositions_english[preposition];
 }
 
 /// @} // vm_private
