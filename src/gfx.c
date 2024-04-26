@@ -172,13 +172,16 @@ static uint16_t text_style_to_color(enum text_style style);
  */
 void gfx_init()
 {
-  VICIV.sdbdrwd_msb &= ~VIC4_HOTREG_MASK;
-  VICII.ctrl1       &= ~0x10; // disable video output
-  VICIV.palsel       = 0x00; // select and map palette 0
-  VICIV.ctrla       |= 0x04; // enable RAM palette
-  VICIV.ctrlb        = VIC4_VFAST_MASK;
-  VICIV.ctrlc       &= ~VIC4_FCLRLO_MASK;
-  VICIV.ctrlc       |= VIC4_FCLRHI_MASK | VIC4_CHR16_MASK;
+  VICIV.sdbdrwd_msb  &= ~VIC4_HOTREG_MASK;
+  VICII.ctrl1        &= ~0x10; // disable video output
+  VICIV.palsel        = 0x00; // select and map palette 0
+  VICIV.ctrla        |= 0x04; // enable RAM palette
+  VICIV.ctrlb         = VIC4_VFAST_MASK;
+  VICIV.ctrlc        &= ~VIC4_FCLRLO_MASK;
+  VICIV.ctrlc        |= VIC4_FCLRHI_MASK | VIC4_CHR16_MASK;
+  VICIV.xpos_msb     &= ~(VIC4_NORRDEL_MASK | VIC4_DBLRR_MASK);
+  VICIV.tbdrpos       = 0x68;
+  VICIV.textypos_lsb  = 0x67; 
 
   memset_bank(FAR_U8_PTR(BG_BITMAP), 0, 0 /* 0 means 64kb */);
   memset_bank(FAR_U8_PTR(COLRAM), 0, 2000);
@@ -835,11 +838,6 @@ void gfx_finalize_cel_drawing(void)
     __auto_type colram_ptr = colram_start_ptr + end_of_row;
     *screen_ptr++ = 0x0140; // gotox to right screen edge (x=320)
     *colram_ptr++ = 0x0010;
-    *screen_ptr = 0; // clear first char of next column
-    // fill remaining bytes of row with zeros to prevent accidential gotox rendering
-    uint8_t remaining_bytes = (CHRCOUNT - end_of_row - 1) * 2;
-    //memset(screen_ptr, 0, remaining_bytes);
-    memset(colram_ptr, 0, remaining_bytes);
     // set next row pointers
     screen_start_ptr += CHRCOUNT;
     colram_start_ptr += CHRCOUNT;
@@ -856,12 +854,38 @@ void gfx_finalize_cel_drawing(void)
  * It will reset the position of the RRB write positions for each character row to the
  * end of the background image.
  * Any new cels drawn will therefore overwrite any previously placed RRB objects.
+ * We also zeroize the colram bytes beyond the 40 background picture chars each row.
+ * This is to prevent accidental gotox back into the visual area.
  *
  * Code section: code_gfx
  */
 void gfx_reset_cel_drawing(void)
 {
   memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
+
+  // Next, zeroise all colram bytes beyond the 40 background picture chars each row.
+  // This is to prevent the RRB to accidently do any gotox back into the visual area.
+  // As we will be beyond the right edge of the screen, anyway, we don't need to 
+  // worry about the screen ram values, as those chars won't be visible, anyway.
+  // The actor drawing will then use these zeroed area to place their actor
+  // cels into, making them visible on the screen with prepended gotox.
+  static dmalist_t dmalist_reset_rrb = {
+    .command        = DMA_CMD_FILL,
+    .count          = (CHRCOUNT - 40) * 2,
+    .src_addr       = 0,
+    .src_bank       = 0,
+    .dst_addr       = 0,
+    .dst_bank       = 0
+  };
+
+  // start at the end of the first row of the background image
+  uint16_t colram_addr = BACKBUFFER_COLRAM + CHRCOUNT * 4 + 40 * 2;
+  DMA.addrmsb = MSB(&dmalist_reset_rrb);
+  for (uint8_t y = 0; y < 16; ++y) {
+    dmalist_reset_rrb.dst_addr = colram_addr;
+    DMA.etrig_mapped = LSB(&dmalist_reset_rrb);
+    colram_addr += CHRCOUNT * 2;
+  }
 }
 
 /**
@@ -920,7 +944,7 @@ void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, enum te
   }
 }
 
-void gfx_hide_sentence(void)
+void gfx_clear_sentence(void)
 {
   static const dmalist_t dmalist_clear_sentence = {
     .command  = 0,
@@ -935,7 +959,7 @@ void gfx_hide_sentence(void)
   dma_trigger(&dmalist_clear_sentence);
 }
 
-void gfx_hide_verbs(void)
+void gfx_clear_verbs(void)
 {
   static const dmalist_t dmalist_clear_verbs = {
     .command  = 0,

@@ -118,7 +118,6 @@ static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
 static void read_walk_boxes(void);
 static void redraw_screen(void);
-static void redraw_actors(void);
 static void handle_input(void);
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t state);
 static uint8_t find_free_script_slot(void);
@@ -168,6 +167,7 @@ void vm_init(void)
   actor_talking = 0xff;
   ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
   vm_write_var(VAR_CURSOR_STATE, 3);
+  vm_write_var(VAR_CURRENT_LIGHTS, 1);
 
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
     verbs.id[i] = 0xff;
@@ -259,7 +259,7 @@ __task void vm_mainloop(void)
         redraw_screen();
       }
       if (screen_update_needed & SCREEN_UPDATE_ACTORS) {
-        redraw_actors();
+        actor_sort_and_draw_all();
       }
 
       //VICIV.bordercol = 0x00;
@@ -708,6 +708,8 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
   uint16_t found_obj_id = 0;
   y >>= 2;
 
+  uint8_t camera_offset = camera_x - 20;
+
   for (uint8_t i = 0; i < num_objects; ++i) {
     map_ds_resource(obj_page[i]);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
@@ -719,7 +721,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 
     uint8_t width = obj_hdr->width;
     uint8_t height = obj_hdr->height_and_actor_dir >> 3;
-    uint8_t obj_x = obj_hdr->pos_x;
+    uint8_t obj_x = obj_hdr->pos_x - camera_offset;
     uint8_t obj_y = obj_hdr->pos_y_and_parent_state & 0x7f;
 
     if (x >= obj_x && x < obj_x + width && y >= obj_y && y < obj_y + height)
@@ -753,19 +755,13 @@ uint8_t vm_get_local_object_id(uint16_t global_object_id)
  *
  * Clears the state of all objects that match the given position and size. The function will
  * iterate over all objects and check if the object is currently active and if the object
- * position and size matches the given parameters. If a match is found, the object state is
+ * position and size matches the one provided. If a match is found, the object state is
  * cleared.
  * 
- * @param global_object_id Object to compare with
+ * @param local_object_id Object in current room to compare with
  */
-void vm_clear_all_other_object_states(uint16_t global_object_id)
+void vm_clear_all_other_object_states(uint8_t local_object_id)
 {
-  uint8_t local_object_id = vm_get_local_object_id(global_object_id);
-  if (local_object_id == 0xff)
-  {
-    return;
-  }
-
   uint16_t ds_save = map_get_ds();
 
   map_ds_resource(obj_page[local_object_id]);
@@ -774,6 +770,7 @@ void vm_clear_all_other_object_states(uint16_t global_object_id)
   uint8_t height = obj_hdr->height_and_actor_dir >> 3;
   uint8_t x = obj_hdr->pos_x;
   uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
+  uint16_t global_object_id = obj_hdr->id;
 
   for (uint8_t i = 0; i < num_objects; ++i)
   {
@@ -805,6 +802,12 @@ void vm_set_camera_follow_actor(uint8_t actor_id)
   }
   camera_follow_actor_id = actor_id;
   camera_state = CAMERA_STATE_FOLLOW_ACTOR;
+}
+
+void vm_set_camera_to(uint8_t x)
+{
+  uint8_t max_camera_x = room_width / 8 - 20;
+  camera_x = min(x, max_camera_x);
 }
 
 void vm_camera_pan_to(uint8_t x)
@@ -845,9 +848,16 @@ void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char
 
 void vm_verb_delete(uint8_t slot)
 {
+  uint16_t save_ds = map_get_ds();
+
   verbs.id[slot] = 0xff;
+  map_ds_heap();
   free(verbs.name[slot]);
   verbs.name[slot] = NULL;
+
+  screen_update_needed |= SCREEN_UPDATE_VERBS;
+
+  map_set_ds(save_ds);
 }
 
 void vm_verb_set_state(uint8_t slot, uint8_t state)
@@ -1115,6 +1125,8 @@ static void redraw_screen(void)
   // draw background
   gfx_draw_bg();
 
+  uint8_t camera_offset = camera_x - 20;
+
   // draw all visible room objects
   for (int8_t i = num_objects - 1; i >= 0; --i)
   {
@@ -1126,33 +1138,12 @@ static void redraw_screen(void)
     }
     uint8_t width = obj_hdr->width;
     uint8_t height = obj_hdr->height_and_actor_dir >> 3;
-    uint8_t x = obj_hdr->pos_x;
+    uint8_t x = obj_hdr->pos_x - camera_offset;
     uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
     unmap_ds();
 
     gfx_draw_object(i, x, y, width, height);
   }
-
-  map_set(map_save);
-}
-
-static void redraw_actors(void)
-{
-  uint32_t map_save = map_get();
-  map_cs_gfx();
-  gfx_reset_cel_drawing();
-
-  // iterate over all actors and draw their current cels on all cel levels
-  for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
-    if (local_actors.global_id[local_id] == 0xff) {
-      // no actor in local actor slot, skip
-      continue;
-    }
-
-    actor_draw(local_id);
-  }
-
-  gfx_finalize_cel_drawing();
 
   map_set(map_save);
 }
@@ -1520,7 +1511,7 @@ static void update_sentence_line(void)
 {
   if (!(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
     map_cs_gfx();
-    gfx_hide_sentence();
+    gfx_clear_sentence();
     unmap_cs();
     return;
   }
@@ -1529,9 +1520,9 @@ static void update_sentence_line(void)
 
   sentence_length = 0;
 
-  debug_out("Printing sentence");
+  //debug_out("Printing sentence");
   uint8_t verb_slot = get_verb_slot_by_id(vm_read_var8(VAR_SENTENCE_VERB));
-  debug_out("  Verb id %d slot %d", vm_read_var8(VAR_SENTENCE_VERB), verb_slot);
+  //debug_out("  Verb id %d slot %d", vm_read_var8(VAR_SENTENCE_VERB), verb_slot);
   if (verb_slot != 0xff) {
     map_ds_heap();
     add_string_to_sentence(verbs.name[verb_slot], 0);
@@ -1541,7 +1532,7 @@ static void update_sentence_line(void)
   if (noun1) {
     const char *noun1_name = get_object_name(noun1);
     if (noun1_name) {
-      debug_out("  Noun1 name: %s", noun1_name);
+      //debug_out("  Noun1 name: %s", noun1_name);
     }
     add_string_to_sentence(noun1_name, 1);
   }
@@ -1550,7 +1541,7 @@ static void update_sentence_line(void)
   if (preposition) {
     const char *preposition_name = get_preposition_name(preposition);
     if (preposition_name) {
-      debug_out("  Preposition name: %s", preposition_name);
+      //debug_out("  Preposition name: %s", preposition_name);
     }
     add_string_to_sentence(preposition_name, 1);
   }
@@ -1559,7 +1550,7 @@ static void update_sentence_line(void)
   if (noun2) {
     const char *noun2_name = get_object_name(noun2);
     if (noun2_name) {
-      debug_out("  Noun2 name: %s", noun2_name);
+      //debug_out("  Noun2 name: %s", noun2_name);
     }
     add_string_to_sentence(noun2_name, 1);
   }
@@ -1624,6 +1615,7 @@ static void add_string_to_sentence(const char *str, uint8_t prepend_space)
 
 static void update_verb_interface(void)
 {
+  gfx_clear_verbs();
   if (ui_state & UI_FLAGS_ENABLE_VERBS) {
     //debug_out("Updating verbs");
     map_ds_heap();
@@ -1634,10 +1626,6 @@ static void update_verb_interface(void)
     }
     prev_verb_highlighted = 0xff;
     unmap_ds();
-  }
-  else {
-    //debug_out("Hiding verbs");
-    gfx_hide_verbs();
   }
 }
 

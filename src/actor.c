@@ -25,7 +25,6 @@ static void calculate_step(uint8_t local_id);
 static void add_local_actor(uint8_t actor_id);
 static void remove_local_actor(uint8_t actor_id);
 static void reset_animation(uint8_t local_id);
-static void change_direction(uint8_t local_id, uint8_t dir);
 static void turn(uint8_t local_id);
 static void correct_walk_to_position(uint8_t local_id);
 static uint16_t get_corrected_box_position(struct walk_box *box, uint8_t *x, uint8_t *y);
@@ -133,6 +132,7 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
   local_actors.y_fraction[local_id] = 0;
   local_actors.walk_to_x[local_id]  = x;
   local_actors.walk_to_y[local_id]  = y;
+  local_actors.target_dir[local_id] = 0xff;
   correct_walk_to_position(local_id);
   if (is_walk_to_done(local_id)) {
     local_actors.walking[local_id] = WALKING_STATE_STOPPED;
@@ -154,13 +154,17 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
     return;
   }
 
-  uint8_t x = object_hdr->pos_x;
-  uint8_t y = object_hdr->pos_y_and_parent_state & 0x7f;
-  uint8_t height = object_hdr->height_and_actor_dir;
-  uint8_t actor_dir = height & 0x03;
-  height >>= 3;
+  uint8_t x = object_hdr->walk_to_x;
+  uint8_t y = object_hdr->walk_to_y << 2;
 
   actor_walk_to(actor_id, x, y);
+
+  uint8_t local_id = actors.local_id[actor_id];
+  uint8_t actor_dir = object_hdr->height_and_actor_dir & 0x03;
+  local_actors.target_dir[local_id] = actor_dir;
+  if (local_actors.walking[local_id] == WALKING_STATE_STOPPED) {
+    actor_change_direction(local_id, actor_dir);
+  }
 
   map_set_ds(save_ds);
 }
@@ -180,6 +184,10 @@ void actor_next_step(uint8_t local_id)
     turn(local_id);
   }
   else if (is_walk_to_done(local_id)) {
+    uint8_t target_dir = local_actors.target_dir[local_id];
+    if (target_dir != 0xff && target_dir != actors.dir[actor_id]) {
+      actor_change_direction(local_id, target_dir);
+    }
     local_actors.x_fraction[local_id] = 0;
     local_actors.y_fraction[local_id] = 0;
     local_actors.walking[local_id] = WALKING_STATE_STOPPED;
@@ -211,7 +219,7 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   switch (animation & 0xfc) {
     case 0xf8:
       // keep animation but just change direction
-      change_direction(local_id, animation & 0x03);
+      actor_change_direction(local_id, animation & 0x03);
       return;
   }
 
@@ -301,6 +309,44 @@ void actor_update_animation(uint8_t local_id)
   }
 }
 
+void actor_sort_and_draw_all(void)
+{
+  uint32_t map_save = map_get();
+  map_cs_gfx();
+  gfx_reset_cel_drawing();
+
+  // sorting all local actors
+  uint8_t sorted_actors[MAX_LOCAL_ACTORS];
+  uint8_t num_local_actors = 0;
+  for (uint8_t i = 0; i < NUM_ACTORS; ++i) {
+    if (actors.local_id[i] != 0xff) {
+      sorted_actors[num_local_actors++] = i;
+    }
+  }
+
+  for (uint8_t i = 0; i < num_local_actors; ++i) {
+    for (uint8_t j = 0; j < num_local_actors; ++j) {
+      uint8_t actor_id_i = sorted_actors[i];
+      uint8_t actor_id_j = sorted_actors[j];
+      if (actors.y[actor_id_i] < actors.y[actor_id_j]) {
+        uint8_t tmp = sorted_actors[i];
+        sorted_actors[i] = sorted_actors[j];
+        sorted_actors[j] = tmp;
+      }
+    }
+  }
+
+  // iterate over all sorted actors and draw their current cels on all cel levels
+  for (uint8_t i = 0; i < num_local_actors; ++i) {
+    uint8_t global_id = sorted_actors[i];
+    uint8_t local_id = actors.local_id[global_id];
+    actor_draw(local_id);
+  }
+
+  gfx_finalize_cel_drawing();
+  map_set(map_save);
+}
+
 void actor_draw(uint8_t local_id)
 {
   uint8_t global_id = local_actors.global_id[local_id];
@@ -317,8 +363,8 @@ void actor_draw(uint8_t local_id)
   for (uint8_t level = 0; level < 16; ++level) {
     //debug_out("level %d", level);
     uint8_t cmd_offset = *cel_level_cur_cmd;
-    uint8_t *cmd_ptr = *cel_level_cmd_ptr;
     if (cmd_offset != 0xff) {
+      uint8_t *cmd_ptr = *cel_level_cmd_ptr;
       uint8_t cmd = cmd_ptr[cmd_offset];
       if (cmd < 0x79) {
         __auto_type cel_ptrs_for_cur_level = NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
@@ -368,6 +414,29 @@ void actor_stop_talking(uint8_t actor_id)
       actor_id = local_actors.global_id[local_id];
       if (actor_id != 0xff) {
         actor_start_animation(local_id, ANIM_MOUTH_SHUT + actors.dir[actor_id]);
+      }
+    }
+  }
+}
+
+uint8_t actor_invert_direction(uint8_t dir)
+{
+  static const uint8_t dir_invert[4] = {1, 0, 3, 2};
+  return dir_invert[dir];
+}
+
+void actor_change_direction(uint8_t local_id, uint8_t dir)
+{
+  uint8_t actor_id = local_actors.global_id[local_id];
+  actors.dir[actor_id] = dir;
+
+  __auto_type cel_anim = local_actors.cel_anim[local_id];
+  for (uint8_t level = 0; level < 16; ++level) {
+    if (cel_anim[level] != 0xff) {
+      uint8_t cur_anim = cel_anim[level];
+      if ((cur_anim & 3) != dir) {
+        uint8_t new_anim = (cel_anim[level] & 0xfc) | dir;
+        actor_start_animation(local_id, new_anim);
       }
     }
   }
@@ -535,32 +604,15 @@ static void reset_animation(uint8_t local_id)
   actor_start_animation(local_id, ANIM_MOUTH_SHUT + dir);
 }
 
-static void change_direction(uint8_t local_id, uint8_t dir)
-{
-  uint8_t global_id = local_actors.global_id[local_id];
-  actors.dir[global_id] = dir;
-
-  __auto_type cel_anim = local_actors.cel_anim[local_id];
-  for (uint8_t level = 0; level < 16; ++level) {
-    if (cel_anim[level] != 0xff) {
-      uint8_t cur_anim = cel_anim[level];
-      if ((cur_anim & 3) != dir) {
-        uint8_t new_anim = (cel_anim[level] & 0xfc) | dir;
-        actor_start_animation(local_id, new_anim);
-      }
-    }
-  }
-}
-
 static void turn(uint8_t local_id)
 {
   uint8_t actor_id = local_actors.global_id[local_id];
   uint8_t current_dir = actors.dir[actor_id];
   if (current_dir > 1) {
-    change_direction(local_id, local_actors.walk_dir[local_id]);
+    actor_change_direction(local_id, local_actors.walk_dir[local_id]);
   }
   else {
-    change_direction(local_id, 2);
+    actor_change_direction(local_id, 2);
   }
 }
 
@@ -673,7 +725,7 @@ static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, 
   uint8_t yn = y1;
   uint8_t xc = x1;
   while (yn != yc) {
-    debug_out("yn %d yc %d y1 %d y2 %d x1 %d x2 %d", yn, yc, y1, y2, x1, x2);
+    //debug_out("yn %d yc %d y1 %d y2 %d x1 %d x2 %d", yn, yc, y1, y2, x1, x2);
     if (yn > yc) {
       xc = (uint8_t)(x1 + xc) >> 1;
       yn = (uint8_t)(y1 + yn) >> 1;

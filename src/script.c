@@ -8,6 +8,7 @@
 #include "util.h"
 #include "vm.h"
 #include <stdint.h>
+#include <stdlib.h>
 
 //----------------------------------------------------------------------
 
@@ -26,6 +27,7 @@ static uint32_t read_24bits(void);
 static uint8_t resolve_next_param8(void);
 static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
+static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y);
 
 static void stop_or_break(void);
 static void put_actor(void);
@@ -41,7 +43,7 @@ static void do_animation(void);
 static void camera_pan_to(void);
 static void actor_ops(void);
 static void say_line(void);
-static void random(void);
+static void random_number(void);
 static void jump(void);
 static void do_sentence(void);
 static void jump_if_not_pickupable(void);
@@ -50,6 +52,7 @@ static void assign_bit_variable(void);
 static void start_sound(void);
 static void walk_to(void);
 static void actor_y(void);
+static void come_out_door(void);
 static void jump_if_or_if_not_equal_zero(void);
 static void sleep_for_variable(void);
 static void put_actor_in_room(void);
@@ -60,6 +63,7 @@ static void add(void);
 static void sleep_for_or_wait_for_message(void);
 static void assign_from_bit_variable(void);
 static void camera_at(void);
+static void proximity(void);
 static void get_object_at_position(void);
 static void walk_to_object(void);
 static void jump_if_smaller(void);
@@ -72,7 +76,7 @@ static void jump_if_not_equal(void);
 static void jump_if_object_not_active(void);
 static void pick_up_object(void);
 static void camera_follows_actor(void);
-static void begin_override_or_print_ego(void);
+static void begin_override_or_say_line_selected_actor(void);
 static void begin_override(void);
 static void cursor(void);
 static void stop_script(void);
@@ -80,7 +84,7 @@ static void script_running(void);
 static void current_room(void);
 static void jump_if_greater_or_equal(void);
 static void verb(void);
-static void print_ego(void);
+static void say_line_selected_actor(void);
 static void unimplemented_opcode(void);
 
 //----------------------------------------------------------------------
@@ -140,7 +144,7 @@ void script_init(void)
   opcode_jump_table[0x12] = &camera_pan_to;
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &say_line;
-  opcode_jump_table[0x16] = &random;
+  opcode_jump_table[0x16] = &random_number;
   opcode_jump_table[0x18] = &jump;
   opcode_jump_table[0x19] = &do_sentence;
   opcode_jump_table[0x1a] = &assign_variable;
@@ -150,6 +154,7 @@ void script_init(void)
   opcode_jump_table[0x20] = &stop_or_break;
   opcode_jump_table[0x21] = &put_actor;
   opcode_jump_table[0x23] = &actor_y;
+  opcode_jump_table[0x24] = &come_out_door;
   opcode_jump_table[0x25] = &draw_object;
   opcode_jump_table[0x26] = &assign_array;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
@@ -159,6 +164,7 @@ void script_init(void)
   opcode_jump_table[0x31] = &assign_from_bit_variable;
   opcode_jump_table[0x32] = &camera_at;
   opcode_jump_table[0x3e] = &walk_to;
+  opcode_jump_table[0x34] = &proximity;
   opcode_jump_table[0x35] = &get_object_at_position;
   opcode_jump_table[0x36] = &walk_to_object;
   opcode_jump_table[0x38] = &jump_if_smaller;
@@ -180,7 +186,7 @@ void script_init(void)
   opcode_jump_table[0x51] = &do_animation;
   opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
-  opcode_jump_table[0x58] = &begin_override_or_print_ego;
+  opcode_jump_table[0x58] = &begin_override_or_say_line_selected_actor;
   opcode_jump_table[0x59] = &do_sentence;
   opcode_jump_table[0x5a] = &add;
   opcode_jump_table[0x5b] = &assign_bit_variable;
@@ -188,10 +194,12 @@ void script_init(void)
   opcode_jump_table[0x60] = &cursor;
   opcode_jump_table[0x61] = &put_actor;
   opcode_jump_table[0x62] = &stop_script;
+  opcode_jump_table[0x64] = &come_out_door;
   opcode_jump_table[0x65] = &draw_object;
   opcode_jump_table[0x68] = &script_running;
   opcode_jump_table[0x6d] = &put_actor_in_room;
   opcode_jump_table[0x72] = &current_room;
+  opcode_jump_table[0x74] = &proximity;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x76] = &walk_to_object;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
@@ -445,6 +453,28 @@ static void read_null_terminated_string(char *dest)
   *dest = 0;
 }
 
+static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y)
+{
+  if (object_or_actor_id < vm_read_var(VAR_NUMBER_OF_ACTORS)) {
+    // object1 is an actor
+    *x = actors.x[object_or_actor_id];
+    *y = actors.y[object_or_actor_id];
+    return 1;
+  }
+  else {
+    // object1 is an object
+    __auto_type obj_hdr = vm_get_object_hdr(object_or_actor_id);
+    if (!obj_hdr) {
+      *x = 0xff;
+    } 
+    else {
+      *x = obj_hdr->walk_to_x;
+      *y = obj_hdr->walk_to_y << 2;
+    }
+    return 0;
+  }
+}
+
 /**
  * @brief Reads a string from the script and decodes it.
  * 
@@ -574,9 +604,11 @@ static void draw_object(void)
 
   //debug_scr("draw-object %d", obj_id);
   global_game_objects[obj_id] |= OBJ_STATE;
-  vm_clear_all_other_object_states(obj_id);
-
-  vm_update_bg();
+  uint8_t local_object_id = vm_get_local_object_id(obj_id);
+  if (local_object_id != 0xff) {
+    vm_clear_all_other_object_states(obj_id);
+    vm_update_bg();
+  }
 }
 
 static void assign_array(void)
@@ -638,7 +670,9 @@ static void state_of(void)
     debug_scr("state-of %d is ON", obj_id);
     global_game_objects[obj_id] |= OBJ_STATE;
   }
-  vm_update_bg();
+  if (vm_get_local_object_id(obj_id) != 0xff) {
+    vm_update_bg();
+  }
 }
 
 /**
@@ -812,7 +846,7 @@ static void say_line(void)
 }
 
 /**
- * @brief Opcode 0x16: random
+ * @brief Opcode 0x16: random_number
  * 
  * Creates a random number in the range [0..upper_bound] (including the upper_bound).
  * The random number is stored in the variable that is specified by the first parameter.
@@ -821,7 +855,7 @@ static void say_line(void)
  *
  * Code section: code_script
  */
-static void random(void)
+static void random_number(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t upper_bound = resolve_next_param8();
@@ -882,13 +916,12 @@ static void assign_bit_variable(void)
 
 static void start_sound(void)
 {
-  debug_scr("start-sound");
+  //debug_scr("start-sound");
   volatile uint8_t sound_id = resolve_next_param8();
 }
 
 static void walk_to(void)
 {
-  debug_scr("walk-to");
   uint8_t actor_id = resolve_next_param8();
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
@@ -899,8 +932,39 @@ static void actor_y(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t actor_id = resolve_next_param8();
-  debug_scr("VAR[%d] = actor-y %d", var_idx, actor_id);
   vm_write_var(var_idx, actors.y[actor_id]);
+}
+
+static void come_out_door(void)
+{
+  uint16_t save_ds = map_get_ds();
+
+  uint16_t arrive_at_object_id = resolve_next_param16();
+  uint8_t  new_room_id         = resolve_next_param8();
+
+  uint8_t walk_to_x = read_byte();
+  uint8_t walk_to_y = read_byte();
+
+  uint8_t actor_id = vm_read_var8(VAR_SELECTED_ACTOR);
+  
+  actor_put_in_room(actor_id, new_room_id);
+  vm_set_current_room(new_room_id);
+
+  __auto_type obj_hdr = vm_get_object_hdr(arrive_at_object_id);
+  uint8_t x = obj_hdr->walk_to_x;
+  uint8_t y = obj_hdr->walk_to_y << 2;
+  uint8_t dir = actor_invert_direction(obj_hdr->height_and_actor_dir & 0x03);
+  actor_place_at(actor_id, x, y);
+  actor_change_direction(actors.local_id[actor_id], dir);
+  vm_set_camera_to(actors.x[actor_id]);
+  vm_set_camera_follow_actor(actor_id);
+  vm_revert_sentence();
+
+  if (walk_to_x != 0xff && walk_to_y != 0xff) {
+    actor_walk_to(actor_id, walk_to_x, walk_to_y);
+  }
+
+  map_set_ds(save_ds);
 }
 
 /**
@@ -1031,6 +1095,35 @@ static void camera_at(void)
     vm_update_bg();
     vm_update_actors();
   }
+}
+
+static void proximity(void)
+{
+  uint16_t save_ds = map_get_ds();
+
+  uint8_t var_idx = read_byte();
+  uint16_t object1_id = resolve_next_param16();
+  uint16_t object2_id = resolve_next_param16();
+  uint8_t x1, y1, x2, y2;
+  uint8_t is_actor1 = 0;
+  uint8_t is_actor2 = 0;
+
+  // resolve the positions of the objects (or actors if id < number of actors)
+  is_actor1 = resolve_position(object1_id, &x1, &y1);
+  is_actor2 = resolve_position(object2_id, &x2, &y2);
+
+  // if one of the objects is not found, we set the distance to 0xff (maximum)
+  if (x1 == 0xff || x2 == 0xff) {
+    vm_write_var(var_idx, 0xff);
+    return;
+  }
+
+  // calculate the distance between the two objects
+  uint16_t dx = abs((int16_t)x1 - (int16_t)x2);
+  uint16_t dy = abs((int16_t)y1 - (int16_t)y2);
+  vm_write_var(var_idx, max(dx, dy));
+
+  map_set_ds(save_ds);
 }
 
 static void do_sentence(void)
@@ -1344,13 +1437,13 @@ static void camera_follows_actor(void)
  *
  * Code section: code_script
  */
-void begin_override_or_print_ego(void)
+void begin_override_or_say_line_selected_actor(void)
 {
   if (!(opcode & 0x80)) {
     begin_override();
   }
   else {
-    print_ego();
+    say_line_selected_actor();
   }
 }
 
@@ -1378,9 +1471,12 @@ static void begin_override(void)
  * 
  * Code section: code_script
  */
-static void print_ego(void)
+static void say_line_selected_actor(void)
 {
-  //debug_msg("Print ego");
+  //debug_msg("say-line selected-actor");
+  uint8_t actor_id = vm_read_var8(VAR_SELECTED_ACTOR);
+  read_encoded_string_null_terminated(message_buffer);
+  vm_say_line(actor_id);
 }
 
 /**

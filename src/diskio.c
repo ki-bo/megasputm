@@ -539,10 +539,9 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
  *
  * Code section: code_diskio
  */
-void diskio_continue_resource_loading(void)
+void diskio_continue_resource_loading(uint8_t __huge *target_ptr)
 {
-  uint8_t *target_ptr = NEAR_U8_PTR(0x8000);
-  *(uint16_t *)target_ptr = cur_chunk_size;
+  *(uint16_t __huge *)target_ptr = cur_chunk_size;
   target_ptr += 2;
   cur_chunk_size -= 2;
 
@@ -552,7 +551,7 @@ void diskio_continue_resource_loading(void)
     
     uint8_t bytes_to_read = min(cur_chunk_size, bytes_left_in_block);
     for (uint8_t i = 0; i < bytes_to_read; ++i) {
-      target_ptr[i] = FDC.data ^ 0xff;
+      *target_ptr++ = FDC.data ^ 0xff;
     }
     
     cur_chunk_size -= bytes_to_read;
@@ -562,7 +561,6 @@ void diskio_continue_resource_loading(void)
       next_track = FDC.data;
       next_block = FDC.data;
       cur_block_read_ptr = 0;
-      target_ptr += bytes_to_read;
     }
 
   }

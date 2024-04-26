@@ -85,12 +85,22 @@ extern dmalist_t               global_dma_list;
 extern dmalist_single_option_t global_dma_list_opt1;
 extern dmalist_two_options_t   global_dma_list_opt2;
 
+enum {
+  DMA_CMD_COPY  = 0x00,
+  DMA_CMD_FILL  = 0x03,
+  DMA_CMD_CHAIN = 0x04
+};
+
+enum {
+  DMA_F018A_FLAGS_DST_MODULO = 0x20
+};
+
 // code_init functions
 void dma_init(void);
 
 static inline void dma_trigger(const void *dma_list)
 {
-  DMA.addrbank     = 0;
+
   DMA.addrmsb      = MSB(dma_list);
   DMA.etrig_mapped = LSB(dma_list);
 }

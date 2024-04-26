@@ -42,6 +42,7 @@ enum {
   VAR_CURRENT_NOUN1 = 9,
   VAR_CURRENT_NOUN2 = 10,
   VAR_NUMBER_OF_ACTORS = 11,
+  VAR_CURRENT_LIGHTS = 12,
   VAR_VALID_VERB = 18,
   VAR_CURSOR_STATE = 21,
   VAR_TIMER_NEXT = 25,
@@ -187,8 +188,9 @@ void vm_update_sentence(void);
 struct object_code *vm_get_object_hdr(uint16_t object_id);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 uint8_t vm_get_local_object_id(uint16_t global_object_id);
-void vm_clear_all_other_object_states(uint16_t global_object_id);
+void vm_clear_all_other_object_states(uint8_t local_object_id);
 void vm_set_camera_follow_actor(uint8_t actor_id);
+void vm_set_camera_to(uint8_t x);
 void vm_camera_pan_to(uint8_t x);
 void vm_revert_sentence(void);
 void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name);

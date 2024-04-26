@@ -120,16 +120,10 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
   //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
  
-  if (chunk_size > MAX_RESOURCE_SIZE) {
-    fatal_error(ERR_RESOURCE_TOO_LARGE);
-  }
   uint8_t page = allocate(type, id, (chunk_size + 255) / 256);
-  uint16_t ds_save = map_get_ds();
-  map_ds_resource(page);
-  diskio_continue_resource_loading();
+  __auto_type dest = HUGE_U8_PTR(RESOURCE_BASE + (uint16_t)page * 256);
+  diskio_continue_resource_loading(dest);
   unmap_cs();
-
-  map_set_ds(ds_save);
 
 #ifdef HEAP_DEBUG_OUT  
   print_heap();

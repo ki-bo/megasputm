@@ -10,7 +10,7 @@
 #define SCREEN_RAM          0x10000UL
 #define COLRAM              0xff80800UL
 #define BG_BITMAP           0x28000
-#define SOUND_DATA          0x48000
+#define SOUND_DATA          0x58000
 
 #define HEAP_SIZE           0x200
 

@@ -34,6 +34,7 @@ typedef struct {
   uint16_t      x_fraction[MAX_LOCAL_ACTORS];
   uint16_t      y_fraction[MAX_LOCAL_ACTORS];
   uint8_t       cur_box[MAX_LOCAL_ACTORS];
+  uint8_t       target_dir[MAX_LOCAL_ACTORS];
   uint8_t       walk_dir[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_box[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_x[MAX_LOCAL_ACTORS];
@@ -72,9 +73,12 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id);
 void actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);
 void actor_update_animation(uint8_t local_id);
+void actor_sort_and_draw_all(void);
 void actor_draw(uint8_t local_id);
 void actor_start_talking(uint8_t actor_id);
 void actor_stop_talking(uint8_t actor_id);
+uint8_t actor_invert_direction(uint8_t dir);
+void actor_change_direction(uint8_t local_id, uint8_t dir);
 
 // inline main functions
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
