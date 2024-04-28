@@ -73,6 +73,7 @@ static void actor_x(void);
 static void jump_if_smaller_or_equal(void);
 static void increment_or_decrement(void);
 static void jump_if_not_equal(void);
+static void chain_script(void);
 static void jump_if_object_not_active(void);
 static void pick_up_object(void);
 static void camera_follows_actor(void);
@@ -181,6 +182,7 @@ void script_init(void)
   opcode_jump_table[0x46] = &increment_or_decrement;
   opcode_jump_table[0x47] = &state_of;
   opcode_jump_table[0x48] = &jump_if_not_equal;
+  opcode_jump_table[0x4a] = &chain_script;
   opcode_jump_table[0x4f] = &jump_if_object_not_active;
   opcode_jump_table[0x50] = &pick_up_object;
   opcode_jump_table[0x51] = &do_animation;
@@ -469,7 +471,7 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
     } 
     else {
       *x = obj_hdr->walk_to_x;
-      *y = obj_hdr->walk_to_y << 2;
+      *y = (obj_hdr->walk_to_y & 0x1f) << 2;
     }
     return 0;
   }
@@ -526,7 +528,7 @@ static void read_encoded_string_null_terminated(char *dest)
 static void stop_or_break(void)
 {
   if (opcode == 0x80) {
-    debug_scr("break-here");
+    //debug_scr("break-here");
     break_script = 1;
   }
   else if (opcode == 0x20){
@@ -553,7 +555,7 @@ static void put_actor(void)
   uint8_t actor_id = resolve_next_param8();
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
-  debug_scr("put-actor at %d, %d", x, y);
+  //debug_scr("put-actor at %d, %d", x, y);
   actor_place_at(actor_id, x, y);
 }
 
@@ -642,7 +644,7 @@ static void jump_if_equal(void)
   uint8_t var_idx = read_byte();
   uint16_t value = resolve_next_param16();
   int16_t offset = read_word();
-  debug_scr("if (VAR[%d]=%d != %d(ind))", var_idx, vm_read_var(var_idx), value);
+  //debug_scr("if (VAR[%d]=%d != %d(ind))", var_idx, vm_read_var(var_idx), value);
   if (vm_read_var(var_idx) == value) {
     pc += offset;
   }
@@ -663,11 +665,11 @@ static void state_of(void)
 {
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
-    debug_scr("state-of %d is OFF", obj_id);
+    //debug_scr("state-of %d is OFF", obj_id);
     global_game_objects[obj_id] &= ~OBJ_STATE;
   }
   else {
-    debug_scr("state-of %d is ON", obj_id);
+    //debug_scr("state-of %d is ON", obj_id);
     global_game_objects[obj_id] |= OBJ_STATE;
   }
   if (vm_get_local_object_id(obj_id) != 0xff) {
@@ -952,7 +954,7 @@ static void come_out_door(void)
 
   __auto_type obj_hdr = vm_get_object_hdr(arrive_at_object_id);
   uint8_t x = obj_hdr->walk_to_x;
-  uint8_t y = obj_hdr->walk_to_y << 2;
+  uint8_t y = (obj_hdr->walk_to_y & 0x1f) << 2;
   uint8_t dir = actor_invert_direction(obj_hdr->height_and_actor_dir & 0x03);
   actor_place_at(actor_id, x, y);
   actor_change_direction(actors.local_id[actor_id], dir);
@@ -1388,6 +1390,29 @@ static void jump_if_not_equal(void)
   if (vm_read_var(var_idx) != value) {
     pc += offset;
   }
+}
+
+/**
+ * @brief Opcode 0x4A: Chain script
+ *
+ * Reads a script id and chains the script. The current script will be stopped
+ * immediately and the new script will be started. The new script will run 
+ * instead of the current script in the same script slot. The new script resource
+ * will be loaded and the new script will be started. The script resource will 
+ * be mapped already at the end of this function and the PC will be set to the
+ * beginning of the new script. Therefore, when returning from this function,
+ * the new script will be executed from the beginning.
+ *
+ * Variant opcodes: 0xCA
+ *
+ * Code section: code_script
+ */
+void chain_script(void)
+{
+  //debug_msg("chain-script");
+  uint8_t script_id = resolve_next_param8();
+  vm_chain_script(script_id);
+  pc = NEAR_U8_PTR(RES_MAPPED) + proc_pc[active_script_slot];
 }
 
 /**

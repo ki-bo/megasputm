@@ -604,6 +604,34 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
 }
 
 /**
+ * @brief Chains a script to the currently active script
+ *
+ * Chains a script to the currently active script. The currently active script will be
+ * stopped and the new script will be executed from start in the same slot. The old script 
+ * resource is deactivated and marked free to override if needed.
+ *
+ * @param script_id The id of the script to execute in stead of the currently active script
+ *
+ * Code section: code_main
+ */
+void vm_chain_script(uint8_t script_id)
+{
+  debug_out("Chaining script %d from script %d", script_id, proc_script_id[active_script_slot]);
+
+  if (!is_room_object_script(active_script_slot)) {
+    res_deactivate_slot(proc_res_slot[active_script_slot]);
+  }
+
+  uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+  res_activate_slot(new_page);
+  map_ds_resource(new_page);
+
+  proc_res_slot[active_script_slot] = new_page;
+  proc_pc[active_script_slot] = 4; // skipping script header directly to first opcode
+  proc_script_id[active_script_slot] = script_id;
+}
+
+/**
  * @brief Stops the currently active script
  * 
  * Deactivates the currently active script and sets the process state to PROC_STATE_FREE.

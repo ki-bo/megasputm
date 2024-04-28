@@ -29,7 +29,8 @@ static void turn(uint8_t local_id);
 static void correct_walk_to_position(uint8_t local_id);
 static uint16_t get_corrected_box_position(struct walk_box *box, uint8_t *x, uint8_t *y);
 static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, uint8_t yc);
-
+static void find_closest_point_on_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *x, uint8_t *y);
+static void find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -155,7 +156,7 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
   }
 
   uint8_t x = object_hdr->walk_to_x;
-  uint8_t y = object_hdr->walk_to_y;
+  uint8_t y = (object_hdr->walk_to_y & 0x1f) << 2;
 
   actor_walk_to(actor_id, x, y);
 
@@ -738,6 +739,125 @@ static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, 
     yn = (uint8_t)(y1 + y2) >> 1;
   }
   return xn;
+}
+
+/**
+ * @brief Find the closest point on a line segment to a given point.
+ * 
+ * This function calculates the closest point on a line segment to a given point. The line segment is
+ * defined by two points (x1, y1) and (x2, y2). The given point is (px, py). The closest point on the
+ * line segment is calculated and stored in (px, py).
+ *
+ * If the line is horizontal you need to make sure that x1<=x2. In any case, make sure that y1<=y2.
+ * 
+ * @param x1 The x-coordinate of the first point on the line segment.
+ * @param y1 The y-coordinate of the first point on the line segment.
+ * @param x2 The x-coordinate of the second point on the line segment.
+ * @param y2 The y-coordinate of the second point on the line segment.
+ * @param px The x-coordinate of the given point.
+ * @param py The y-coordinate of the given point.
+ */
+static void find_closest_point_on_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *px, uint8_t *py)
+{
+  // Handle special case: vertical line
+  if (x1 == x2) {
+      *px = x1;
+      if (*py < y1) {
+          *py = y1;
+      } else if (*py > y2) {
+          *py = y2;
+      }
+      // If py is between y1 and y2, it remains unchanged.
+      return;
+  }
+
+  // Handle special case: horizontal line
+  if (y1 == y2) {
+      *py = y1;
+      if (*px < x1) {
+          *px = x1;
+      } else if (*px > x2) {
+          *px = x2;
+      }
+      // If px is between x1 and x2, it remains unchanged.
+      return;
+  }
+
+  // General case: non-vertical, non-horizontal line
+  int16_t dx = x2 - x1;
+  int16_t dy = y2 - y1;
+  int16_t x_diff = *px - x1;
+  int16_t y_diff = *py - y1;
+
+  // Compute the dot product and length squared
+  int16_t dot = dx * x_diff + dy * y_diff;
+  int16_t len_sq = dx * dx + dy * dy;
+
+  // Avoid division by zero
+  if (len_sq == 0) {
+      *px = x1;
+      *py = y1;
+      return;
+  }
+
+  // Calculate the projection factor t
+  int32_t scaled_dot = (int32_t)dot << 8;
+  int16_t t = scaled_dot / len_sq;
+
+  // Clamp t to be within the range [0, 1] in fixed-point format
+  if (t < 0) t = 0;
+  else if (t > 0xff) t = 0xff;
+
+  // Calculate the closest point using the projection factor
+  *px = x1 + ((dx * t) >> 8);
+  *py = y1 + ((dy * t) >> 8);
+
+  // Ensure the point is clamped within the segment
+  if (*px < (x1 < x2 ? x1 : x2)) *px = (x1 < x2 ? x1 : x2);
+  if (*px > (x1 > x2 ? x2 : x1)) *px = (x1 > x2 ? x2 : x1);
+  if (*py < y1) *py = y1; // y1 is always the smaller y-coordinate
+  if (*py > y2) *py = y2; // y2 is always the larger y-coordinate
+}
+
+/**
+ * @brief Find the closest point on the perimeter of a walk box to a given point.
+ * 
+ * This function calculates the closest point on the perimeter of a walk box to a given point. The
+ * walk box is defined by its id. The given point is (px, py). The closest point on the perimeter of
+ * the walk box is calculated and stored in (px, py).
+ *
+ * Be aware that this function won't work properly if the given point is inside the walk box.
+ * 
+ * @param box_id The id of the walk box.
+ * @param px The x-coordinate of the given point.
+ * @param py The y-coordinate of the given point.
+ */
+static void find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
+{
+  struct walk_box *box = &walk_boxes[box_id];
+
+  if (*py <= box->top_y) {
+    // above box
+    find_closest_point_on_line(box->topleft_x, box->top_y, box->topright_x, box->top_y, px, py);
+  }
+  else if (*py >= box->bottom_y) {
+    // below box
+    find_closest_point_on_line(box->bottomleft_x, box->bottom_y, box->bottomright_x, box->bottom_y, px, py);
+  }
+  else {
+    // left of box
+    if (*px < box->topright_x && *px < box->bottomright_x) {
+      uint8_t x1 = min(box->topleft_x, box->bottomleft_x);
+      uint8_t x2 = max(box->topleft_x, box->bottomleft_x);
+      find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);
+    }
+    // right of box
+    else {
+      uint8_t x1 = min(box->topright_x, box->bottomright_x);
+      uint8_t x2 = max(box->topright_x, box->bottomright_x);
+      find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);
+    }
+  }
 }
 
 /// @} // actor_private
