@@ -25,6 +25,7 @@ static void calculate_step(uint8_t local_id);
 static void add_local_actor(uint8_t actor_id);
 static void remove_local_actor(uint8_t actor_id);
 static void reset_animation(uint8_t local_id);
+static void turn_to_walk_to_direction(uint8_t local_id);
 static void turn(uint8_t local_id);
 static void correct_walk_to_position(uint8_t local_id);
 static uint16_t get_corrected_box_position(struct walk_box *box, uint8_t *x, uint8_t *y);
@@ -182,16 +183,20 @@ void actor_next_step(uint8_t local_id)
     local_actors.walking[local_id] = WALKING_STATE_CONTINUE;
   }
   else if (local_actors.walk_dir[local_id] != actors.dir[actor_id]) {
-    turn(local_id);
+    // turn but keep on walking
+    turn_to_walk_to_direction(local_id);
   }
   else if (is_walk_to_done(local_id)) {
     uint8_t target_dir = local_actors.target_dir[local_id];
     if (target_dir != 0xff && target_dir != actors.dir[actor_id]) {
-      actor_change_direction(local_id, target_dir);
+      local_actors.walk_dir[local_id] = target_dir;
+      turn_to_walk_to_direction(local_id);
+    }
+    else {
+      local_actors.walking[local_id] = WALKING_STATE_STOPPED;
     }
     local_actors.x_fraction[local_id] = 0;
     local_actors.y_fraction[local_id] = 0;
-    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
     actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
   }
   else {
@@ -605,16 +610,28 @@ static void reset_animation(uint8_t local_id)
   actor_start_animation(local_id, ANIM_MOUTH_SHUT + dir);
 }
 
-static void turn(uint8_t local_id)
+static void turn_to_walk_to_direction(uint8_t local_id)
 {
-  uint8_t actor_id = local_actors.global_id[local_id];
-  uint8_t current_dir = actors.dir[actor_id];
-  if (current_dir > 1) {
-    actor_change_direction(local_id, local_actors.walk_dir[local_id]);
+  uint8_t actor_id   = local_actors.global_id[local_id];
+  uint8_t target_dir = local_actors.walk_dir[local_id];
+
+  if (target_dir == actor_invert_direction(actors.dir[actor_id])) {
+    // actor is facing the opposite direction of the target direction
+    // use turn to turn around by just 90 degrees
+    turn(local_id);
   }
   else {
-    actor_change_direction(local_id, 2);
+    // actor is facing the wrong direction, but only 90 degrees off
+    actor_change_direction(local_id, target_dir);
   }
+}
+
+static void turn(uint8_t local_id)
+{
+  static const uint8_t turn_dir[4] = {2, 2, 1, 0};
+  uint8_t actor_id = local_actors.global_id[local_id];
+  uint8_t current_dir = actors.dir[actor_id];
+  actor_change_direction(local_id, turn_dir[current_dir]);
 }
 
 static void correct_walk_to_position(uint8_t local_id)
