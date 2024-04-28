@@ -233,7 +233,7 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   map_ds_resource(local_actors.res_slot[local_id]);
 
   __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
-  debug_out("Local actor %d start animation %d", local_id, animation);
+  //debug_out("Local actor %d start animation %d", local_id, animation);
   if (animation >= costume_hdr->num_animations + 1) {
     map_set_ds(save_ds);
     return;
@@ -516,21 +516,21 @@ static void calculate_step(uint8_t local_id)
 
   if (abs_x_diff < abs_y_diff) {
     if (y_diff < 0) {
-      debug_out("  dir 3")
+      //debug_out("  dir 3")
       local_actors.walk_dir[local_id] = 3;
     }
     else {
-      debug_out("  dir 2")
+      //debug_out("  dir 2")
       local_actors.walk_dir[local_id] = 2;
     }
   }
   else {
     if (x_diff < 0) {
-      debug_out("  dir 0")
+      //debug_out("  dir 0")
       local_actors.walk_dir[local_id] = 0;
     }
     else {
-      debug_out("  dir 1")
+      //debug_out("  dir 1")
       local_actors.walk_dir[local_id] = 1;
     }
   }

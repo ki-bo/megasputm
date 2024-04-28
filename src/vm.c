@@ -754,6 +754,10 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
     map_ds_resource(obj_page[i]);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
     //debug_out("Checking object %d at %d, %d state %d - parent_state %d", obj_hdr->id, obj_hdr->pos_x, obj_hdr->pos_y_and_parent_state & 0x7f, global_game_objects[obj_hdr->id] & OBJ_STATE, obj_hdr->pos_y_and_parent_state & 0x80);
+    //debug_out("  obj_state %02x", global_game_objects[obj_hdr->id]);
+    if (global_game_objects[obj_hdr->id] & OBJ_CLASS_DONT_SELECT) {
+      continue;
+    }
     if (obj_hdr->parent != 0) {
       if (!match_parent_object_state(obj_hdr->parent - 1, obj_hdr->pos_y_and_parent_state & 0x80)) {
         continue;
@@ -1415,7 +1419,7 @@ static void execute_sentence_stack(void)
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
 
   uint8_t slot = vm_start_script(SCRIPT_ID_SENTENCE);
-  debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
+  //debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
   execute_script_slot(slot);
 }
 
