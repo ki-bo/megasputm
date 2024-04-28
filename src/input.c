@@ -83,7 +83,7 @@ void input_update(void)
   if (input_key_pressed == 0) { // = 0 means previous key was processed
     uint8_t key_pressed_ascii = ASCIIKEY;
     if (key_pressed_ascii != 0) {
-      debug_out("key pressed %d", key_pressed_ascii);
+      //debug_out("key pressed %d", key_pressed_ascii);
       input_key_pressed = key_pressed_ascii;
     }
     else {

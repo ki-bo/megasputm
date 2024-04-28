@@ -869,7 +869,7 @@ static void load_block(uint8_t track, uint8_t block)
       //       We just rely on the data being in the buffer once BUSY is cleared.
       while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
       if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
-        debug_out("unable to find track %d, sector %d, side %d\n", track, physical_sector, side);
+        //debug_out("unable to find track %d, sector %d, side %d\n", track, physical_sector, side);
         read_error(ERR_SECTOR_NOT_FOUND);
       }
 
@@ -877,7 +877,7 @@ static void load_block(uint8_t track, uint8_t block)
 
       //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
       if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-        debug_out("FDC status: %04x", FDC.status)
+        //debug_out("FDC status: %04x", FDC.status)
         read_error(ERR_SECTOR_DATA_CORRUPT);
       }
 

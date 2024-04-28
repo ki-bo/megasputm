@@ -26,7 +26,7 @@ void gfx_clear_dialog(void);
 void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars);
 void gfx_draw_bg(void);
 void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_t height);
-void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror);
+void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror, uint8_t masking);
 void gfx_finalize_cel_drawing(void);
 void gfx_reset_cel_drawing(void);
 void gfx_update_main_screen(void);

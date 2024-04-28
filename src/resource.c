@@ -460,7 +460,7 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
   // At this point, there is no contiguos free block available to allocate
   // Check whether there is enough free memory to if freeing locked memory 
   for (enum heap_strategy_t strategy = HEAP_STRATEGY_ALLOW_UNLOCKED; strategy <= HEAP_STRATEGY_ALLOW_LOCKED; ++strategy) {
-    debug_out("Trying heap allocation strategy %d", strategy);
+    //debug_out("Trying heap allocation strategy %d", strategy);
     result = find_free_block_range(num_pages, strategy);
     if (result != 0xffff) {
       uint8_t slot = (uint8_t)result;
@@ -579,7 +579,7 @@ static void free_resource(uint8_t slot)
     }
   }
 
-  debug_out("Freeing resource type %d id %d at slot %d", type, id, slot);
+  //debug_out("Freeing resource type %d id %d at slot %d", type, id, slot);
   // free all blocks of resource
   while (1) {
     if ((page_res_type[slot] & RES_TYPE_MASK) == type && page_res_index[slot] == id) {

@@ -44,6 +44,7 @@ typedef struct {
   uint8_t       next_box[MAX_LOCAL_ACTORS];
   uint8_t       next_x[MAX_LOCAL_ACTORS];
   uint8_t       next_y[MAX_LOCAL_ACTORS];
+  uint8_t       masking[MAX_LOCAL_ACTORS];
 } local_actors_t;
 
 //-----------------------------------------------------------------------------------------------

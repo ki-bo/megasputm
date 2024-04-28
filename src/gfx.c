@@ -701,7 +701,7 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
  *
  * Code section: code_gfx
  */
-void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror)
+void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror, uint8_t masking)
 {
   //debug_out(" cel x %d y %d width %d height %d", xpos, ypos, cel_data->width, cel_data->height);
   uint8_t width = cel_data->width;
@@ -711,15 +711,17 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
 
   uint8_t mask;
   int16_t mask_cur_col;
-  if (!mirror) {
-    mask_cur_col = xpos / 8;
-    mask = 0x80 >> (xpos & 0x07);
-  }
-  else {
-    uint16_t right_edge = xpos + width - 1;
-    mask_cur_col = right_edge / 8;
-    uint8_t shift = 7 - (right_edge & 0x07);
-    mask = 0x01 << shift;
+  if (masking) {
+    if (!mirror) {
+      mask_cur_col = xpos / 8;
+      mask = 0x80 >> (xpos & 0x07);
+    }
+    else {
+      uint16_t right_edge = xpos + width - 1;
+      mask_cur_col = right_edge / 8;
+      uint8_t shift = 7 - (right_edge & 0x07);
+      mask = 0x01 << shift;
+    }
   }
 
   if (sub_char_cols) {
@@ -751,7 +753,9 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
   uint16_t col_addr_inc = (num_pixel_lines_of_chars - 1) * 8;
   int16_t x = 0;
   int16_t y = 0;
-  decode_single_mask_column(mask_cur_col, ypos, height);
+  if (masking) {
+    decode_single_mask_column(mask_cur_col, ypos, height);
+  }
   memset_bank((uint8_t __far *)next_char_data, 0, num_bytes);
   dmalist_rle_strip_copy.count = height;
 
@@ -770,7 +774,7 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
         run_length_counter = *rle_data++;
       }
     }
-    if (masking_column[y] & mask) {
+    if (masking && masking_column[y] & mask) {
       color_strip[y] = 0;
     }
     else {
@@ -787,20 +791,22 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
       if (!(x & 0x07)) {
         next_char_data += col_addr_inc;
       }
-      if (mirror) {
-        mask <<= 1;
-        if (!mask) {
-          --mask_cur_col;
-          mask = 0x01;
-          decode_single_mask_column(mask_cur_col, ypos, height);
+      if (masking) {
+        if (mirror) {
+          mask <<= 1;
+          if (!mask) {
+            --mask_cur_col;
+            mask = 0x01;
+            decode_single_mask_column(mask_cur_col, ypos, height);
+          }
         }
-      }
-      else {
-        mask >>= 1;
-        if (!mask) {
-          ++mask_cur_col;
-          mask = 0x80;
-          decode_single_mask_column(mask_cur_col, ypos, height);
+        else {
+          mask >>= 1;
+          if (!mask) {
+            ++mask_cur_col;
+            mask = 0x80;
+            decode_single_mask_column(mask_cur_col, ypos, height);
+          }
         }
       }
     }
