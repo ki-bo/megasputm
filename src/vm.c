@@ -689,9 +689,9 @@ void vm_update_sentence(void)
   screen_update_needed |= SCREEN_UPDATE_SENTENCE;
 }
 
-struct object_code *vm_get_object_hdr(uint16_t object_id)
+struct object_code *vm_get_object_hdr(uint16_t global_object_id)
 {
-  uint8_t id = vm_get_local_object_id(object_id);
+  uint8_t id = vm_get_local_object_id(global_object_id);
   if (id == 0xff) {
     return NULL;
   }
@@ -700,6 +700,19 @@ struct object_code *vm_get_object_hdr(uint16_t object_id)
   return (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[id]);
 }
 
+/**
+ * @brief Returns the object id at the given position
+ *
+ * Returns the object id of the object at the given position. The function will iterate over
+ * all objects and check if the object is currently active and if the object position matches
+ * the one provided. If a match is found, the object id is returned.
+ *
+ * @param x The x position of the object in scene coordinates
+ * @param y The y position of the object in scene coordinates
+ * @return uint16_t The object id of the object at the given position
+ *
+ * Code section: code_main
+ */
 uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 {
   // save DS
@@ -708,11 +721,11 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
   uint16_t found_obj_id = 0;
   y >>= 2;
 
-  uint8_t camera_offset = camera_x - 20;
 
   for (uint8_t i = 0; i < num_objects; ++i) {
     map_ds_resource(obj_page[i]);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
+    //debug_out("Checking object %d at %d, %d state %d - parent_state %d", obj_hdr->id, obj_hdr->pos_x, obj_hdr->pos_y_and_parent_state & 0x7f, global_game_objects[obj_hdr->id] & OBJ_STATE, obj_hdr->pos_y_and_parent_state & 0x80);
     if (obj_hdr->parent != 0) {
       if (!match_parent_object_state(obj_hdr->parent - 1, obj_hdr->pos_y_and_parent_state & 0x80)) {
         continue;
@@ -721,7 +734,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 
     uint8_t width = obj_hdr->width;
     uint8_t height = obj_hdr->height_and_actor_dir >> 3;
-    uint8_t obj_x = obj_hdr->pos_x - camera_offset;
+    uint8_t obj_x = obj_hdr->pos_x;
     uint8_t obj_y = obj_hdr->pos_y_and_parent_state & 0x7f;
 
     if (x >= obj_x && x < obj_x + width && y >= obj_y && y < obj_y + height)
@@ -1153,7 +1166,9 @@ static void handle_input(void)
   // mouse cursor handling
   static uint8_t last_input_button_pressed = 0;
 
-  vm_write_var(VAR_SCENE_CURSOR_X, input_cursor_x >> 2);
+  uint8_t camera_offset = camera_x - 20;
+
+  vm_write_var(VAR_SCENE_CURSOR_X, (input_cursor_x >> 2) + camera_offset);
   vm_write_var(VAR_SCENE_CURSOR_Y, (input_cursor_y >> 1) - 8);
 
   if (input_button_pressed != last_input_button_pressed)
@@ -1163,14 +1178,17 @@ static void handle_input(void)
     if (input_button_pressed == INPUT_BUTTON_LEFT)
     {
       if (input_cursor_y >= 16 && input_cursor_y < 144) {
+        // clicked in gfx scene
         vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SCENE_CLICK);
         vm_start_script(SCRIPT_ID_INPUT_EVENT);
       }
       else if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
+        // clicked on sentence line
         vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SENTENCE_CLICK);
         vm_start_script(SCRIPT_ID_INPUT_EVENT);
       }
       else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
+        // clicked in verb zone
         uint8_t verb_slot = get_hovered_verb_slot();
         if (verb_slot != 0xff) {
           select_verb(verbs.id[verb_slot]);
@@ -1199,15 +1217,19 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t state)
 
   map_ds_resource(obj_page[parent]);
   __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[parent]);
-  if (obj_hdr->parent == 0) {
+  uint8_t new_parent = obj_hdr->parent;
+  uint8_t cur_state = global_game_objects[obj_hdr->id] & OBJ_STATE;
+  //debug_out("  check parent %d state %d - parent_state %d", obj_hdr->id, cur_state, parent_state);
+  if (new_parent == 0) {
     map_set_ds(ds_save);
-    return (obj_hdr->pos_y_and_parent_state & 0x80) == state;
+    //debug_out("  no further parent, result %d", cur_state == state);
+    return cur_state == state;
   }
 
-  uint8_t new_parent = obj_hdr->parent - 1;
-  uint8_t new_state = obj_hdr->pos_y_and_parent_state & 0x80;
+  uint8_t parent_state = obj_hdr->pos_y_and_parent_state & 0x80;
+
   map_set_ds(ds_save);
-  return match_parent_object_state(new_parent, new_state);
+  return match_parent_object_state(new_parent - 1, parent_state);
 }
 
 #pragma clang diagnostic push

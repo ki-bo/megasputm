@@ -185,7 +185,7 @@ uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_bg(void);
 void vm_update_actors(void);
 void vm_update_sentence(void);
-struct object_code *vm_get_object_hdr(uint16_t object_id);
+struct object_code *vm_get_object_hdr(uint16_t global_object_id);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 uint8_t vm_get_local_object_id(uint16_t global_object_id);
 void vm_clear_all_other_object_states(uint8_t local_object_id);

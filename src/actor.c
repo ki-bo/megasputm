@@ -155,7 +155,7 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
   }
 
   uint8_t x = object_hdr->walk_to_x;
-  uint8_t y = object_hdr->walk_to_y << 2;
+  uint8_t y = object_hdr->walk_to_y;
 
   actor_walk_to(actor_id, x, y);
 
@@ -634,8 +634,9 @@ static void correct_walk_to_position(uint8_t local_id)
   for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx) {
     uint8_t walk_box_x = walk_to_x;
     uint8_t walk_box_y = walk_to_y;
+    debug_out("Checking box %d", box_idx);
     uint16_t distance = get_corrected_box_position(walk_box, &walk_box_x, &walk_box_y);
-    debug_out("  box %d: %d, %d distance %d", box_idx, walk_box_x, walk_box_y, distance)
+    debug_out("  walk_box_x,y: %d, %d distance %d", walk_box_x, walk_box_y, distance);
     if (distance < min_distance) {
       min_distance = distance;
       corr_pos_x = walk_box_x;
@@ -704,14 +705,13 @@ static uint16_t get_corrected_box_position(struct walk_box *box, uint8_t *x, uin
   debug_out("  corrected position %d, %d", xc, yc);
 
   uint8_t diff_x = abs(xc - *x);
-  uint8_t diff_y = abs(yc - *y);
+  uint8_t diff_y = abs(yc - *y) >> 2;
   debug_out("  diff %d, %d", diff_x, diff_y);
   if (diff_x < diff_y) {
     diff_x >>= 1;
-    diff_y >>= 2;
   }
   else {
-    diff_y >>= 3;
+    diff_y >>= 1;
   }
 
   *x = xc;
@@ -723,19 +723,21 @@ static uint16_t get_corrected_box_position(struct walk_box *box, uint8_t *x, uin
 static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, uint8_t yc)
 {
   uint8_t yn = y1;
-  uint8_t xc = x1;
+  uint8_t xn = x1;
   while (yn != yc) {
-    //debug_out("yn %d yc %d y1 %d y2 %d x1 %d x2 %d", yn, yc, y1, y2, x1, x2);
+    debug_out("yn %d yc %d y1 %d y2 %d x1 %d x2 %d", yn, yc, y1, y2, x1, x2);
+    xn = (uint8_t)(x1 + x2) >> 1;
     if (yn > yc) {
-      xc = (uint8_t)(x1 + xc) >> 1;
-      yn = (uint8_t)(y1 + yn) >> 1;
+      y2 = yn;
+      x2 = xn;
     }
-    else if (yn < yc) {
-      xc = (uint8_t)(xc + x2) >> 1;
-      yn = (uint8_t)(yn + y2) >> 1;
+    else {
+      y1 = yn;
+      x1 = xn;
     }
+    yn = (uint8_t)(y1 + y2) >> 1;
   }
-  return xc;
+  return xn;
 }
 
 /// @} // actor_private
