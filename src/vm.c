@@ -119,7 +119,7 @@ static void read_objects(void);
 static void read_walk_boxes(void);
 static void redraw_screen(void);
 static void handle_input(void);
-static uint8_t match_parent_object_state(uint8_t parent, uint8_t state);
+static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
 static void execute_script_slot(uint8_t slot);
@@ -1243,24 +1243,28 @@ static void handle_input(void)
   }
 }
 
-static uint8_t match_parent_object_state(uint8_t parent, uint8_t state)
+static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
 {
   uint16_t ds_save = map_get_ds();
-
   map_ds_resource(obj_page[parent]);
-  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[parent]);
-  uint8_t new_parent = obj_hdr->parent;
-  uint8_t cur_state = global_game_objects[obj_hdr->id] & OBJ_STATE;
-  //debug_out("  check parent %d state %d - parent_state %d", obj_hdr->id, cur_state, parent_state);
-  if (new_parent == 0) {
-    map_set_ds(ds_save);
-    //debug_out("  no further parent, result %d", cur_state == state);
-    return cur_state == state;
-  }
 
+  __auto_type obj_hdr  = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[parent]);
+  uint8_t new_parent   = obj_hdr->parent;
+  uint8_t cur_state    = global_game_objects[obj_hdr->id] & OBJ_STATE;
   uint8_t parent_state = obj_hdr->pos_y_and_parent_state & 0x80;
 
   map_set_ds(ds_save);
+
+  //debug_out("  check parent %d state %d - expected_state %d", obj_hdr->id, cur_state, expected_state);
+
+  if (cur_state != expected_state) {
+    return 0;
+  }
+  if (new_parent == 0) {
+    //debug_out("  no further parent, match");
+    return 1;
+  }
+
   return match_parent_object_state(new_parent - 1, parent_state);
 }
 
