@@ -852,7 +852,13 @@ void vm_set_camera_follow_actor(uint8_t actor_id)
 void vm_set_camera_to(uint8_t x)
 {
   uint8_t max_camera_x = room_width / 8 - 20;
-  camera_x = min(x, max_camera_x);
+  if (x > max_camera_x) {
+    x = max_camera_x;
+  }
+  else if (x < 20) {
+    x = 20;
+  }
+  camera_x = x;
 }
 
 void vm_camera_pan_to(uint8_t x)
@@ -1086,19 +1092,20 @@ static void read_objects(void)
     uint8_t msb;
   };
 
+  uint8_t __huge* room_ptr = res_get_huge_ptr(room_res_slot);
+
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
   num_objects = room_hdr->num_objects;
 
-  __auto_type image_offset = (struct offset *)NEAR_U8_PTR(RES_MAPPED + sizeof(struct room_header));
-  __auto_type obj_hdr_offset = image_offset + num_objects;
+  uint16_t *image_offset = NEAR_U16_PTR(RES_MAPPED + sizeof(struct room_header));
+  struct offset *obj_hdr_offset = (struct offset *)(image_offset + num_objects);
 
   for (uint8_t i = 0; i < num_objects; ++i)
   {
     // read object and image offsets
     uint8_t cur_obj_offset = obj_hdr_offset->lsb;
     uint8_t cur_obj_page = room_res_slot + obj_hdr_offset->msb;
-    uint8_t cur_image_offset = image_offset->lsb;
-    uint8_t cur_image_page = room_res_slot + image_offset->msb;
+    uint16_t cur_image_offset = *image_offset;
     ++obj_hdr_offset;
     ++image_offset;
     obj_offset[i] = cur_obj_offset;
@@ -1112,9 +1119,8 @@ static void read_objects(void)
     uint8_t height = obj_hdr->height_and_actor_dir & 0xf8;
 
     // read object image
-    map_ds_resource(cur_image_page);
-    uint8_t *obj_image = NEAR_U8_PTR(RES_MAPPED + cur_image_offset);
-    gfx_decode_object_image(obj_image, width, height); 
+    uint8_t __huge *obj_image = room_ptr + cur_image_offset;
+    gfx_decode_object_image(obj_image, width, height);
 
     // reset ds back to room header
     map_ds_resource(room_res_slot);
@@ -1142,15 +1148,16 @@ static void read_walk_boxes(void)
     // debug_out("  flags: %02x", box->flags);
   }
   walk_box_matrix = box_ptr;
+  /*
   for (uint8_t i = 0; i < num_walk_boxes; ++i) {
-    //debug_out("  row offset %d = %d", i, *box_ptr++);
+    debug_out("  row offset %d = %d", i, *box_ptr++);
   }
   for (uint8_t src_box = 0; src_box < num_walk_boxes; ++src_box) {
     for (uint8_t dst_box = 0; dst_box < num_walk_boxes; ++dst_box) {
       uint8_t next_box = *box_ptr++;
-      //debug_out("  box matrix[%d][%d] = %d", src_box, dst_box, next_box);
+      debug_out("  box matrix[%d][%d] = %d", src_box, dst_box, next_box);
     }
-  }
+  }*/
 }
 
 /**

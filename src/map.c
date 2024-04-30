@@ -204,7 +204,14 @@ void map_cs_gfx(void)
 {
   map_regs.a = 0x20;
   map_regs.x = 0x21;
-  apply_map();}
+  apply_map();
+}
+
+uint8_t *map_ds_ptr(void __huge *ptr)
+{
+  map_set_ds(0x3000 - 0x80 + ((uint32_t)ptr / 256));
+  return (uint8_t *)RES_MAPPED + (uint8_t)ptr;
+}
 
 /**
  * @brief Maps a resource slot to DS (0x8000-0xbfff)
@@ -220,20 +227,14 @@ void map_cs_gfx(void)
 void map_ds_resource(uint8_t res_page)
 {
   // map offset: RESOURCE_MEMORY + page*256 - 0x8000
-  uint16_t offset = 0x3000 + (RESOURCE_BASE / 256) + res_page - 0x80;
-  map_regs.y = LSB(offset);
-  map_regs.z = MSB(offset);
-  apply_map();
+  map_set_ds(0x3000 + (RESOURCE_BASE / 256) + res_page - 0x80);
 }
 
 void map_ds_heap(void)
 {
   // assuming heap will always be at the beginning of the resource memory
   // and is maximum 8kb in size
-  uint16_t offset = 0x1000 + (RESOURCE_BASE / 256) - 0x80;
-  map_regs.y = LSB(offset);
-  map_regs.z = MSB(offset);
-  apply_map();
+  map_set_ds(0x1000 + (RESOURCE_BASE / 256) - 0x80);
 }
 
 /** @} */ // map_public

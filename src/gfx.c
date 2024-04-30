@@ -84,8 +84,14 @@ __attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
 __attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
 static uint8_t color_strip[GFX_HEIGHT];
 static uint8_t __huge *next_char_data;
-static uint8_t __huge *char_data_start_cels;
+static uint8_t __huge *char_data_start_actors;
 static uint16_t obj_first_char[MAX_OBJECTS];
+static uint8_t obj_x[MAX_OBJECTS];
+static uint8_t obj_y[MAX_OBJECTS];
+static uint8_t obj_width[MAX_OBJECTS];
+static uint8_t obj_height[MAX_OBJECTS];
+static uint8_t __huge *obj_mask_data[MAX_OBJECTS];
+static uint8_t num_objects_drawn;
 static uint8_t next_obj_slot = 0;
 static uint8_t num_chars_at_row[16];
 static uint8_t masking_cache_iterations[119];
@@ -94,10 +100,16 @@ static uint8_t num_masking_cache_cols = 0;
 static uint8_t masking_column[GFX_HEIGHT];
 static uint16_t masking_data_room_offset;
 static uint16_t screen_pixel_offset_x;
+static uint8_t actor_width;
+static uint8_t actor_height;
+static uint32_t actor_char_data;
 
-static dmalist_single_option_t dmalist_rle_strip_copy = {
-  .opt_token      = 0x85,                   // destination skip rate
-  .opt_arg        = 0x08,                   // = 8 bytes
+static dmalist_three_options_t dmalist_rle_strip_copy = {
+  .opt_token1     = 0x85,                   // destination skip rate
+  .opt_arg1       = 0x08,                   // = 8 bytes
+  .opt_token2     = 0x86,                   // transparent color handling
+  .opt_arg2       = 0x00,                   // transparent color
+  .opt_token3     = 0x06,                   // enable (6) or disable (7) transparent color handling
   .end_of_options = 0x00,
   .command        = 0,                      // DMA copy command
   .count          = 0,
@@ -142,16 +154,12 @@ static void setup_irq(void);
 // Private interrupt function
 static void raster_irq(void);
 // Private gfx functions
-static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
+static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
 static void decode_masking_buffer(uint8_t *src, uint16_t width, uint16_t height);
 static void update_cursor(uint8_t snail_override);
 static void set_dialog_color(uint8_t color);
-static void place_cel_chars(uint16_t char_num,
-                            int16_t screen_pos_x, 
-                            int8_t screen_pos_y,
-                            uint8_t width_chars,
-                            uint8_t height_chars,
-                            uint8_t mirror);
+static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t screen_pos_y, uint8_t width_chars, uint8_t height_chars);
+static void apply_actor_masking(void);
 static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines);
 static uint16_t text_style_to_color(enum text_style style);
 
@@ -440,7 +448,7 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 
   decode_rle_bitmap(src, width, GFX_HEIGHT);
   
-  char_data_start_cels = next_char_data;
+  char_data_start_actors = next_char_data;
   next_obj_slot = 0;
 }
 
@@ -456,8 +464,6 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
  * masking_cache_data_offset arrays are filled with the data for each column.
  * Those arrays allow starting the actual decoding of the masking data at
  * arbitrary columns.
- *
- * The function will change DS and won't restore it.
  * 
  * @param bg_masking_offset Room offset to background masking data.
  * @param width Width of the masking data in characters.
@@ -539,12 +545,19 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
  *
  * Code section: code_gfx
  */
-void gfx_decode_object_image(uint8_t *src, uint8_t width, uint8_t height)
+void gfx_decode_object_image(uint8_t __huge *src, uint8_t width, uint8_t height)
 {
+  obj_mask_data[next_obj_slot] = next_char_data;
+  uint8_t *mapped_src = map_ds_ptr(src);
+  debug_out("src %08lx mapped to %04x", (uint32_t)src, (uint16_t)mapped_src);
   obj_first_char[next_obj_slot] = (uint32_t)next_char_data / 64;
-  decode_rle_bitmap(src, width, height);
+  uint8_t *mapped_mask_data = decode_rle_bitmap(mapped_src, width, height);
+  debug_out("decoded obj image @%08lx (%04x - %04x)", (uint32_t)src, (uint16_t)mapped_src, (uint16_t)mapped_mask_data);
+  obj_mask_data[next_obj_slot] = src + (uint16_t)(mapped_mask_data - mapped_src);
+  debug_out("  obj_mask_data %08lx", (uint32_t)obj_mask_data[next_obj_slot]);
+
   ++next_obj_slot;
-  char_data_start_cels = next_char_data;
+  char_data_start_actors = next_char_data;
 }
 
 /**
@@ -683,6 +696,110 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
   while (--height);
 }
 
+uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, uint8_t height)
+{
+  static dmalist_t dmalist_clear_actor_chars = {
+    .command  = DMA_CMD_FILL,
+    .count    = 0,
+    .src_addr = 0,
+    .src_bank = 0,
+    .dst_addr = 0,
+    .dst_bank = 0
+  };
+
+  uint16_t left_char_offset = camera_x - 20;
+  screen_pixel_offset_x = left_char_offset * 8;
+  int16_t screen_pos_x = pos_x - screen_pixel_offset_x;
+  if (screen_pos_x >= 320 || screen_pos_x + width < 0 || pos_y + height < 0) {
+    return 0;
+  }
+
+  uint8_t actor_width_chars  = (width  + 7) >> 3;
+  uint8_t actor_height_chars = (height + 7) >> 3;
+
+  actor_width  = actor_width_chars  * 8;
+  actor_height = actor_height_chars * 8;
+
+  uint16_t num_bytes = actor_width * actor_height;
+  //debug_out("actor width: %d, height: %d, num_bytes: %d", actor_width, actor_height, num_bytes);
+
+  if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
+    next_char_data = char_data_start_actors;
+  }
+  actor_char_data = (uint32_t)next_char_data;
+  next_char_data += num_bytes;
+
+  dmalist_clear_actor_chars.count = num_bytes;
+  dmalist_clear_actor_chars.dst_addr = LSB16(actor_char_data);
+  dmalist_clear_actor_chars.dst_bank = BANK(actor_char_data);
+  dma_trigger(&dmalist_clear_actor_chars);
+
+  place_rrb_object(actor_char_data / 64, screen_pos_x, pos_y, actor_width_chars, actor_height_chars);
+  
+  return 1;
+}
+
+void gfx_draw_actor_cel(uint8_t xpos, uint8_t ypos, struct costume_cel *cel_data, uint8_t mirror)
+{
+  //debug_out(" cel x %d y %d width %d height %d", xpos, ypos, cel_data->width, cel_data->height);
+
+  uint8_t width = cel_data->width;
+  uint8_t height = cel_data->height;
+
+  if (mirror) {
+    xpos += width - 1;
+  }
+
+  uint32_t char_data = actor_char_data;
+  if (xpos / 8) {
+    char_data += xpos / 8 * actor_height * 8;
+  }
+  char_data += ypos * 8 + (xpos & 0x07);
+
+  uint16_t char_data_incr = (actor_height - 1) * 8 + 1;
+
+  uint8_t run_length_counter = 1;
+  uint8_t current_color;
+  int16_t x = 0;
+  int16_t y = 0;
+  dmalist_rle_strip_copy.count = height;
+  dmalist_rle_strip_copy.opt_token3 = 0x07;
+
+  uint8_t *rle_data = ((uint8_t *)cel_data) + sizeof(struct costume_cel);
+  do {
+    if (--run_length_counter == 0)
+    {
+      uint8_t data_byte = *rle_data++;
+      run_length_counter = data_byte & 0x0f;
+      current_color = data_byte >> 4;
+      if (current_color) {
+        current_color |= 0x10;
+      }
+      if (run_length_counter == 0)
+      {
+        run_length_counter = *rle_data++;
+      }
+    }
+    color_strip[y] = current_color;
+    ++y;
+    if (y == height) {
+      dmalist_rle_strip_copy.dst_addr = LSB16(char_data);
+      dmalist_rle_strip_copy.dst_bank = BANK(char_data);
+      dma_trigger(&dmalist_rle_strip_copy);
+      y = 0;
+      ++x;
+      if (mirror) {
+        char_data -= ((uint8_t)char_data & 7) == 0 ? char_data_incr : 1;
+      }
+      else {
+        char_data += ((uint8_t)char_data & 7) == 7 ? char_data_incr : 1;
+      }
+    }
+  }
+  while (x != width);
+}
+
+#if 0
 /**
  * @brief Draws an actor cel to the backbuffer.
  * 
@@ -701,7 +818,7 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
  *
  * Code section: code_gfx
  */
-void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror, uint8_t masking)
+void gfx_draw_cel2(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror, uint8_t masking)
 {
   //debug_out(" cel x %d y %d width %d height %d", xpos, ypos, cel_data->width, cel_data->height);
   uint8_t width = cel_data->width;
@@ -744,7 +861,7 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
   uint8_t num_pixel_lines_of_chars = num_char_rows * 8;
   uint16_t num_bytes = num_char_cols * num_pixel_lines_of_chars * 8;
   if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
-    next_char_data = char_data_start_cels;
+    next_char_data = char_data_start_actors;
   }
   uint16_t char_num = ((uint32_t)next_char_data) >> 6;
   uint8_t __huge *next_char_data_save = next_char_data + num_bytes;
@@ -816,6 +933,7 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
 
   place_cel_chars(char_num, screen_pos_x, ypos, num_char_cols, num_char_rows, mirror);
 }
+#endif
 
 /**
  * @brief Finalizes drawing of all actors of the current screen.
@@ -826,7 +944,7 @@ void gfx_draw_cel(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint
  *
  * Code section: code_gfx
  */
-void gfx_finalize_cel_drawing(void)
+void gfx_finalize_actor_drawing(void)
 {
   uint16_t save_ds = map_get_ds();
   unmap_ds();
@@ -865,7 +983,7 @@ void gfx_finalize_cel_drawing(void)
  *
  * Code section: code_gfx
  */
-void gfx_reset_cel_drawing(void)
+void gfx_reset_actor_drawing(void)
 {
   memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
 
@@ -989,7 +1107,7 @@ void gfx_clear_verbs(void)
  * @{
  */
 
-static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
+static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
 {
   uint8_t rle_counter = 1;
   uint8_t keep_color = 0;
@@ -999,6 +1117,7 @@ static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
   uint16_t col_addr_inc = (height - 1) * 8;
 
   dmalist_rle_strip_copy.count = height;
+  dmalist_rle_strip_copy.opt_token3 = 0x06; // disable transparent color handling
 
   do {
     --rle_counter;
@@ -1034,6 +1153,8 @@ static void decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
     }
   } 
   while (x != width);
+
+  return src;
 }
 
 /**
@@ -1114,14 +1235,11 @@ void set_dialog_color(uint8_t color)
   dma_trigger(&dmalist_clear_dialog_colram);
 }
 
-static void place_cel_chars(uint16_t char_num,
-                            int16_t screen_pos_x, 
-                            int8_t screen_pos_y,
-                            uint8_t width_chars,
-                            uint8_t height_chars,
-                            uint8_t mirror)
+static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t screen_pos_y, uint8_t width_chars, uint8_t height_chars)
 {
   static uint8_t row_masks[8] = {0xff, 0x7f, 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01};
+
+  //debug_out("place rrb object: char_num %d, x %d, y %d, width %d, height %d", char_num, screen_pos_x, screen_pos_y, width_chars, height_chars);
 
   // place cel using rrb features
   int8_t char_row = screen_pos_y / 8;
@@ -1160,26 +1278,13 @@ static void place_cel_chars(uint16_t char_num,
       __auto_type colram_ptr = colram_start_ptr + num_chars_cur_row;
       *screen_ptr = screen_pos_x | gotox_scr;
       *colram_ptr = gotox_col;
-      if (mirror) {
-        screen_ptr += width_chars;
-        colram_ptr += width_chars;
-      }
-      else {
-        ++screen_ptr;
-        ++colram_ptr;
-      }
+      ++screen_ptr;
+      ++colram_ptr;
       uint16_t cur_char = char_num;
       for (uint8_t x = 0; x < width_chars; ++x) {
-        *screen_ptr = cur_char;
+        *screen_ptr++ = cur_char;
+        *colram_ptr++ = 0x0f00;
         cur_char += height_chars;
-        if (mirror) {
-          --screen_ptr;
-          *colram_ptr-- = 0x0f40;
-        }
-        else {
-          ++screen_ptr;
-          *colram_ptr++ = 0x0f00;
-        }
       }
       num_chars_at_row[char_row] += width_chars + 1;
     }
@@ -1197,6 +1302,11 @@ static void place_cel_chars(uint16_t char_num,
   }
 
   map_set_ds(save_ds);
+}
+
+static void apply_actor_masking(void)
+{
+
 }
 
 static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines)

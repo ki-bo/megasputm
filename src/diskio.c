@@ -341,6 +341,22 @@ static void invalidate_disk_cache(void)
  */
 #pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
 
+void diskio_switch_to_real_drive(void)
+{
+  *(uint8_t *)(0xd68b) &= ~1;
+  *(uint8_t *)(0xd6a1) |= 1;
+  *NEAR_U8_PTR(0xd696) &= 0x7f; // disable auto-tune
+  FDC.fdc_control |= FDC_MOTOR_MASK | FDC_LED_MASK; // enable LED and motor
+  FDC.command = FDC_CMD_SPINUP;
+  wait_for_busy_clear();
+  while (!(FDC.status & FDC_TK0_MASK)) {
+    // not yet on track 0, so step outwards
+    FDC.command = FDC_CMD_STEP_OUT;
+    wait_for_busy_clear();
+  }
+  current_track = 0;
+}
+
 /**
  * @brief Checks whether drive motor should be turned off
  * 

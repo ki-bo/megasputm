@@ -132,6 +132,17 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 }
 
 /**
+ * @brief Provides a 32 bit pointer to a resource in memory
+ * 
+ * @param slot The page of the resource in the resource memory
+ * @return The 32 bit pointer to the resource
+ */
+uint8_t __huge *res_get_huge_ptr(uint8_t slot)
+{
+  return (uint8_t __huge *)(RESOURCE_BASE + (uint16_t)slot * 256);
+}
+
+/**
  * @brief Locks a resource in memory
  *
  * This function locks a resource in memory. The resource will not be overwritten

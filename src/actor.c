@@ -15,6 +15,19 @@
 actors_t actors;
 local_actors_t local_actors;
 
+static uint16_t            level_pos_x[16];
+static uint8_t             level_pos_y[16];
+static struct costume_cel *cel_data[16];
+
+//-----------------------------------------------------------------------------------------------
+
+enum {
+  WALK_DIR_LEFT,
+  WALK_DIR_RIGHT,
+  WALK_DIR_DOWN,
+  WALK_DIR_UP
+};
+
 //-----------------------------------------------------------------------------------------------
 
 // private functions
@@ -22,6 +35,7 @@ static uint8_t get_free_local_id(void);
 static void activate_costume(uint8_t actor_id);
 static void deactivate_costume(uint8_t actor_id);
 static uint8_t is_walk_to_done(uint8_t local_id);
+static uint8_t is_next_walk_to_point_reached(uint8_t local_id);
 static void calculate_next_box_point(uint8_t local_id);
 static void calculate_step(uint8_t local_id);
 static void add_local_actor(uint8_t actor_id);
@@ -205,6 +219,16 @@ void actor_next_step(uint8_t local_id)
   }
 
   uint8_t actor_id = local_actors.global_id[local_id];
+  uint8_t walk_dir = local_actors.walk_dir[local_id];
+  if (walk_dir < 2 && actors.x[actor_id] == local_actors.next_x[local_id]) {
+    //debug_out("Reached x, correct y %u.%05u to %u", actors.y[actor_id], local_actors.y_fraction[local_id], local_actors.next_y[local_id]);
+    actors.y[actor_id] = local_actors.next_y[local_id];
+  }
+  else if (walk_dir >= 2 && actors.y[actor_id] == local_actors.next_y[local_id]) {
+    //debug_out("Reached y, correct x %u.%05u to %u", actors.x[actor_id], local_actors.x_fraction[local_id], local_actors.next_x[local_id]);
+    actors.x[actor_id] = local_actors.next_x[local_id];
+  }
+
   if (local_actors.walking[local_id] == WALKING_STATE_STARTING) {
     actor_start_animation(local_id, ANIM_WALKING + actors.dir[actor_id]);
     local_actors.walking[local_id] = WALKING_STATE_CONTINUE;
@@ -230,8 +254,9 @@ void actor_next_step(uint8_t local_id)
     uint8_t cur_x = actors.x[actor_id];
     uint8_t cur_y = actors.y[actor_id];
     //debug_out("cur %d, %d next %d, %d", cur_x, cur_y, local_actors.next_x[local_id], local_actors.next_y[local_id]);
-    if (cur_x == local_actors.next_x[local_id] &&
-        cur_y == local_actors.next_y[local_id]) {
+    //if (cur_x == local_actors.next_x[local_id] &&
+    //    cur_y == local_actors.next_y[local_id]) {
+    if (is_next_walk_to_point_reached(local_id)) {
       uint8_t cur_box = local_actors.next_box[local_id];
       uint8_t target_box = local_actors.walk_to_box[local_id];
       local_actors.cur_box[local_id] = cur_box;
@@ -249,18 +274,14 @@ void actor_next_step(uint8_t local_id)
     int32_t x = actors.x[actor_id] * 0x10000 + local_actors.x_fraction[local_id];
     int32_t y = actors.y[actor_id] * 0x10000 + local_actors.y_fraction[local_id];
 
-    if (actors.x[actor_id] != local_actors.next_x[local_id]) {
-      int32_t new_x = x + local_actors.walk_step_x[local_id];
-      actors.x[actor_id] = (uint8_t)(new_x >> 16);
-      local_actors.x_fraction[local_id] = (uint16_t)new_x;
-    }
-    if (actors.y[actor_id] != local_actors.next_y[local_id]) {
-      int32_t new_y = y + local_actors.walk_step_y[local_id];
-      actors.y[actor_id] = (uint8_t)(new_y >> 16);
-      local_actors.y_fraction[local_id] = (uint16_t)new_y;
-    }
+    int32_t new_x = x + local_actors.walk_step_x[local_id];
+    actors.x[actor_id] = (uint8_t)(new_x >> 16);
+    local_actors.x_fraction[local_id] = (uint16_t)new_x;
+    int32_t new_y = y + local_actors.walk_step_y[local_id];
+    actors.y[actor_id] = (uint8_t)(new_y >> 16);
+    local_actors.y_fraction[local_id] = (uint16_t)new_y;
     
-    //debug_out("Actor %u position: %u.%u, %u.%u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
+    //debug_out("Actor %u position: %u.%05u, %u.%05u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
   }
 
   vm_update_actors();
@@ -365,7 +386,7 @@ void actor_sort_and_draw_all(void)
 {
   uint32_t map_save = map_get();
   map_cs_gfx();
-  gfx_reset_cel_drawing();
+  gfx_reset_actor_drawing();
 
   // sorting all local actors
   uint8_t sorted_actors[MAX_LOCAL_ACTORS];
@@ -395,56 +416,113 @@ void actor_sort_and_draw_all(void)
     actor_draw(local_id);
   }
 
-  gfx_finalize_cel_drawing();
+  gfx_finalize_actor_drawing();
   map_set(map_save);
 }
 
 void actor_draw(uint8_t local_id)
 {
   uint8_t global_id = local_actors.global_id[local_id];
-  uint16_t pos_x    = (actors.x[global_id] << 3) + (local_actors.x_fraction[local_id] >> 13);
-  uint8_t pos_y     = actors.y[global_id] << 1;
-  uint8_t masking   = local_actors.masking[local_id];
+  
+  uint16_t pos_x = actors.x[global_id];
+  if (local_actors.x_fraction[local_id] >= 0x8000) { // rounding x position
+    ++pos_x;
+  }
+  pos_x <<= 3; // convert to pixel position
+
+  uint8_t pos_y = actors.y[global_id];
+  if (local_actors.y_fraction[local_id] >= 0x8000) { // rounding y position
+    ++pos_y;
+  }
+  pos_y <<= 1; // convert to pixel position
+
+  uint8_t masking = local_actors.masking[local_id];
+  int16_t min_x   = 0x7fff;
+  uint8_t min_y   = 0xff;
+  int16_t max_x   = 0;
+  uint8_t max_y   = 0;
 
   map_ds_resource(local_actors.res_slot[local_id]);
   __auto_type hdr = (struct costume_header *)RES_MAPPED;
   __auto_type cel_level_cmd_ptr = local_actors.cel_level_cmd_ptr[local_id];
   __auto_type cel_level_cur_cmd = local_actors.cel_level_cur_cmd[local_id];
   __auto_type cel_level_table_offset = hdr->level_table_offsets;
+
+  uint8_t mirror = actors.dir[global_id] == 0 && !(hdr->disable_mirroring_and_format & 0x80);
   int16_t dx = -72;
   int16_t dy = -100;
+
   //debug_out("actor %d local_id %d", global_id, local_id);
   for (uint8_t level = 0; level < 16; ++level) {
     //debug_out("level %d", level);
+    
     uint8_t cmd_offset = *cel_level_cur_cmd;
+    cel_data[level] = NULL;
+
     if (cmd_offset != 0xff) {
       uint8_t *cmd_ptr = *cel_level_cmd_ptr;
       uint8_t cmd = cmd_ptr[cmd_offset];
+
       if (cmd < 0x79) {
         __auto_type cel_ptrs_for_cur_level = NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
-        __auto_type cel_data = (struct costume_cel*)(RES_MAPPED + cel_ptrs_for_cur_level[cmd]);
-        int16_t dx_level = dx + cel_data->offset_x;
-        int16_t dy_level = dy + cel_data->offset_y;
-        dx += cel_data->move_x;
-        dy -= cel_data->move_y;
-        uint8_t mirror;
-        uint16_t level_pos_x = pos_x;
-        uint8_t level_pos_y = pos_y;
-        if (actors.dir[global_id] == 0 && !(hdr->disable_mirroring_and_format & 0x80)) {
-          mirror = 1;
-          level_pos_x -= dx_level + cel_data->width - 16;
+        __auto_type cur_cel_data = (struct costume_cel*)(RES_MAPPED + cel_ptrs_for_cur_level[cmd]);
+        cel_data[level] = cur_cel_data;
+
+        // calculate scene x position in pixels for this actor cel image
+        uint16_t cel_x    = pos_x;
+        int16_t  dx_level = dx + cur_cel_data->offset_x;
+        if (mirror) {
+          cel_x -= dx_level + cur_cel_data->width - 16;
         }
         else {
-          mirror = 0;
-          level_pos_x += dx_level + 8;
+          cel_x += dx_level + 8;
         }
-        level_pos_y += dy_level;
-        gfx_draw_cel(level_pos_x, level_pos_y, cel_data, mirror, masking);
+
+        // calculate scene y position in pixels for this actor cel image
+        int16_t dy_level = dy + cur_cel_data->offset_y;
+        uint8_t cel_y    = pos_y + dy_level;
+        
+        // adjust bounding box for all cels
+        min_x = min(min_x, cel_x);
+        min_y = min(min_y, cel_y);
+        max_x = max(max_x, cel_x + cur_cel_data->width);
+        max_y = max(max_y, cel_y + cur_cel_data->height);
+
+        // remember position for this cel level
+        level_pos_x[level] = cel_x;
+        level_pos_y[level] = cel_y;
+
+        // adjust actor global cel offsets (for offsetting subsequent cels)
+        dx += cur_cel_data->move_x;
+        dy -= cur_cel_data->move_y;
       }
+
     }
     ++cel_level_cmd_ptr;
     ++cel_level_cur_cmd;
     ++cel_level_table_offset;
+  }
+
+  uint8_t width  = max_x - min_x;
+  uint8_t height = max_y - min_y;
+
+  if (!gfx_prepare_actor_drawing(min_x, min_y, width, height)) {
+    // actor is outside of screen
+    return;
+  }
+
+  // pass 2: draw to canvas
+  for (uint8_t level = 0; level < 16; ++level) {
+    if (cel_data[level] != NULL) {
+      uint8_t x = level_pos_x[level] - min_x;
+      uint8_t y = level_pos_y[level] - min_y;
+      gfx_draw_actor_cel(x, y, cel_data[level], mirror);
+    }
+  }
+
+  // pass 3: apply masking
+  if (masking) {
+    //gfx_apply_actor_masking(min_x, min_y, width, height, masking);
   }
 }
 
@@ -541,8 +619,14 @@ static uint8_t is_walk_to_done(uint8_t local_id)
 static uint8_t is_next_walk_to_point_reached(uint8_t local_id)
 {
   uint8_t actor_id = local_actors.global_id[local_id];
-  return (actors.x[actor_id] == local_actors.next_x[local_id] &&
-          actors.y[actor_id] == local_actors.next_y[local_id]);
+
+  if (labs(local_actors.walk_step_x[local_id]) > 65535 && actors.x[actor_id] == local_actors.next_x[local_id]) {
+    return 1;
+  }
+  if (labs(local_actors.walk_step_y[local_id]) > 65535 && actors.y[actor_id] == local_actors.next_y[local_id]) {
+    return 1;
+  }
+  return 0;
 }
 
 static void calculate_next_box_point(uint8_t local_id)
@@ -558,23 +642,23 @@ static void calculate_next_box_point(uint8_t local_id)
   uint8_t cur_x = actors.x[actor_id];
   uint8_t cur_y = actors.y[actor_id];
 
-  debug_out("Next box %d", next_box);
+  //debug_out("Next box %d", next_box);
   find_closest_box_point(next_box, &cur_x, &cur_y);
-  debug_out("Next box point %d, %d", cur_x, cur_y);
+  //debug_out("Next box point %d, %d", cur_x, cur_y);
   uint8_t next_box_x = cur_x;
   uint8_t next_box_y = cur_y;
   find_closest_box_point(cur_box, &cur_x, &cur_y);
-  debug_out("Current box point %d, %d", cur_x, cur_y);
+  //debug_out("Current box point %d, %d", cur_x, cur_y);
   if (abs(cur_x - next_box_x) > 1 || abs(cur_y - next_box_y) > 2) {
     find_closest_box_point(next_box, &cur_x, &cur_y);
     next_box_x = cur_x;
     next_box_y = cur_y;
-    debug_out("Corrected next box point %d, %d", cur_x, cur_y);
+    //debug_out("Corrected next box point %d, %d", cur_x, cur_y);
   }
   local_actors.next_x[local_id] = next_box_x;
   local_actors.next_y[local_id] = next_box_y;
   local_actors.next_box[local_id] = next_box;
-  debug_out("Adapted next box point %d, %d", cur_x, cur_y);
+  //debug_out("Adapted next box point %d, %d", cur_x, cur_y);
 
   map_set_ds(save_ds);
 }
@@ -598,7 +682,7 @@ static void calculate_step(uint8_t local_id)
   int32_t x_step = 0;
   int32_t y_step = 0;
 
-  debug_out("From %d, %d (b%d) to %d, %d (b%d) x_diff %d y_diff %d", x, y, local_actors.cur_box[local_id], next_x, next_y, local_actors.next_box[local_id], x_diff, y_diff);
+  //debug_out("From %d, %d (b%d) to %d, %d (b%d) x_diff %d y_diff %d", x, y, local_actors.cur_box[local_id], next_x, next_y, local_actors.next_box[local_id], x_diff, y_diff);
 
   if (x_diff == 0 && y_diff == 0) {
     local_actors.walking[local_id] = WALKING_STATE_STOPPED;
@@ -668,7 +752,7 @@ static void remove_local_actor(uint8_t actor_id)
   deactivate_costume(actor_id);
   local_actors.global_id[actors.local_id[actor_id]] = 0xff;
   actors.local_id[actor_id] = 0xff;
-  debug_out("Actor %d is no longer in current room", actor_id);
+  //debug_out("Actor %d is no longer in current room", actor_id);
 }
 
 static void reset_animation(uint8_t local_id)
@@ -743,13 +827,13 @@ static uint8_t correct_position_to_closest_box(uint8_t *x, uint8_t *y)
 
   struct walk_box *walk_box = walk_boxes;
 
-  debug_out("Correcting for position %d, %d", *x, *y);
+  //debug_out("Correcting for position %d, %d", *x, *y);
   for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx) {
     uint8_t walk_box_x = *x;
     uint8_t walk_box_y = *y;
-    debug_out("Checking box %d", box_idx);
+    //debug_out("Checking box %d", box_idx);
     uint16_t distance = get_corrected_box_position(walk_box, &walk_box_x, &walk_box_y);
-    debug_out("  walk_box_x,y: %d, %d distance %d", walk_box_x, walk_box_y, distance);
+    //debug_out("  walk_box_x,y: %d, %d distance %d", walk_box_x, walk_box_y, distance);
     if (distance < min_distance) {
       min_distance = distance;
       corr_pos_x = walk_box_x;
@@ -759,7 +843,7 @@ static uint8_t correct_position_to_closest_box(uint8_t *x, uint8_t *y)
     ++walk_box;
   }
 
-  debug_out("Final corrected position %d, %d walk box %d", corr_pos_x, corr_pos_y, dest_walk_box);
+  //debug_out("Final corrected position %d, %d walk box %d", corr_pos_x, corr_pos_y, dest_walk_box);
 
   *x = corr_pos_x;
   *y = corr_pos_y;
@@ -947,28 +1031,28 @@ static void find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
 {
   struct walk_box *box = &walk_boxes[box_id];
 
-  debug_out("Finding closest point on box %d to %d, %d", box_id, *px, *py);
+  //debug_out("Finding closest point on box %d to %d, %d", box_id, *px, *py);
   if (*py <= box->top_y) {
     // above box
-    debug_out("  above box");
+    //debug_out("  above box");
     find_closest_point_on_line(box->topleft_x, box->top_y, box->topright_x, box->top_y, px, py);
   }
   else if (*py >= box->bottom_y) {
     // below box
-    debug_out("  below box");
+    //debug_out("  below box");
     find_closest_point_on_line(box->bottomleft_x, box->bottom_y, box->bottomright_x, box->bottom_y, px, py);
   }
   else {
     // left of box
     if (*px < box->topright_x && *px < box->bottomright_x) {
-      debug_out("  left of box");
+      //debug_out("  left of box");
       uint8_t x1 = min(box->topleft_x, box->bottomleft_x);
       uint8_t x2 = max(box->topleft_x, box->bottomleft_x);
       find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);
     }
     // right of box
     else {
-      debug_out("  right of box");
+      //debug_out("  right of box");
       uint8_t x1 = min(box->topright_x, box->bottomright_x);
       uint8_t x2 = max(box->topright_x, box->bottomright_x);
       find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);

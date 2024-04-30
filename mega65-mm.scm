@@ -100,7 +100,7 @@
                 )
         )
  
-        (memory banked-code-1 (address (#x2000 . #x3bff)) 
+        (memory banked-code-1 (address (#x2000 . #x37ff)) 
                 (scatter-to bank1_4000)
                 (section
                         code_gfx
@@ -109,8 +109,8 @@
                 )
         )
 
-        (memory banked-bss-1 (address (#x3c00 . #x3fff)) 
-                (scatter-to bank1_5c00)
+        (memory banked-bss-1 (address (#x3800 . #x3fff)) 
+                (scatter-to bank1_5800)
                 (section
                         bss_gfx
                 )
@@ -132,7 +132,7 @@
         (memory m1-2 (address (#x14000 . #x15fff))
                 (section 
                         (bank1_4000 #x14000)
-                        (bank1_5c00 #x15c00)
+                        (bank1_5800 #x15800)
                 )
         )
 
