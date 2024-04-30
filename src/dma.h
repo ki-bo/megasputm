@@ -83,7 +83,26 @@ typedef struct
 
 typedef struct 
 {
-    // F018A format DMA request with two options
+    // F018A format DMA request with two options but no 2nd argument
+    uint8_t opt_token1;      // Option token
+    uint8_t opt_arg1;        // Option argument (byte)
+    uint8_t opt_token2;      // Option token
+    uint8_t end_of_options;  // End of options token (0x00)
+    uint8_t command;         // Command (LSB), e.g. DMA_COPY_CMD, DMA_FILL_CMD, etc.
+    uint16_t count;          // Number of bytes to copy
+    union {
+      uint16_t src_addr;     // Source address
+      uint8_t fill_byte;     // Fill byte
+    };
+    uint8_t src_bank;        // Source bank and flags
+    uint16_t dst_addr;       // Destination address
+    uint8_t dst_bank;        // Destination bank and flags
+    uint16_t modulo;
+} dmalist_two_options_no_2nd_arg_t;
+
+typedef struct 
+{
+    // F018A format DMA request with three options but no 3rd argument
     uint8_t opt_token1;      // Option token
     uint8_t opt_arg1;        // Option argument (byte)
     uint8_t opt_token2;      // Option token
@@ -100,7 +119,7 @@ typedef struct
     uint16_t dst_addr;       // Destination address
     uint8_t dst_bank;        // Destination bank and flags
     uint16_t modulo;
-} dmalist_three_options_t;
+} dmalist_three_options_no_3rd_arg_t;
 
 extern dmalist_t               global_dma_list;
 extern dmalist_single_option_t global_dma_list_opt1;

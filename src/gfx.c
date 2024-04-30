@@ -91,6 +91,7 @@ static uint8_t obj_y[MAX_OBJECTS];
 static uint8_t obj_width[MAX_OBJECTS];
 static uint8_t obj_height[MAX_OBJECTS];
 static uint8_t __huge *obj_mask_data[MAX_OBJECTS];
+static uint8_t obj_draw_list[MAX_OBJECTS];
 static uint8_t num_objects_drawn;
 static uint8_t next_obj_slot = 0;
 static uint8_t num_chars_at_row[16];
@@ -104,12 +105,12 @@ static uint8_t actor_width;
 static uint8_t actor_height;
 static uint32_t actor_char_data;
 
-static dmalist_three_options_t dmalist_rle_strip_copy = {
+static dmalist_three_options_no_3rd_arg_t dmalist_rle_strip_copy = {
   .opt_token1     = 0x85,                   // destination skip rate
   .opt_arg1       = 0x08,                   // = 8 bytes
   .opt_token2     = 0x86,                   // transparent color handling
   .opt_arg2       = 0x00,                   // transparent color
-  .opt_token3     = 0x06,                   // enable (6) or disable (7) transparent color handling
+  .opt_token3     = 0x06,                   // enable (7) or disable (6) transparent color handling
   .end_of_options = 0x00,
   .command        = 0,                      // DMA copy command
   .count          = 0,
@@ -155,9 +156,10 @@ static void setup_irq(void);
 static void raster_irq(void);
 // Private gfx functions
 static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
-static void decode_masking_buffer(uint8_t *src, uint16_t width, uint16_t height);
+static void reset_objects(void);
 static void update_cursor(uint8_t snail_override);
 static void set_dialog_color(uint8_t color);
+static uint16_t check_next_char_data_wrap_around(uint8_t width, uint8_t height);
 static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t screen_pos_y, uint8_t width_chars, uint8_t height_chars);
 static void apply_actor_masking(void);
 static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines);
@@ -423,7 +425,7 @@ void gfx_clear_bg_image(void)
   next_char_data = HUGE_U8_PTR(BG_BITMAP) + num_bytes;
 
   // reset object pointers
-  next_obj_slot = 0;
+  reset_objects();
 }
 
 /**
@@ -449,7 +451,8 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
   decode_rle_bitmap(src, width, GFX_HEIGHT);
   
   char_data_start_actors = next_char_data;
-  next_obj_slot = 0;
+  
+  reset_objects();
 }
 
 /**
@@ -538,23 +541,30 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
  * written to the char data memory. That way, object char data will be stored sequentially
  * in memory. We will keep track of object IDs and their corresponding char numbers in
  * the obj_first_char array.
+ *
+ * This function will map DS but won't restore it. It is assumed that the caller will
+ * restore the DS register after calling this function.
  * 
  * @param src Pointer to the encoded object image data.
+ * @param x X scene position of the object image in characters.
+ * @param y Y scene position of the object image in characters.
  * @param width Width of the object image in characters.
  * @param height Height of the object image in characters.
  *
  * Code section: code_gfx
  */
-void gfx_decode_object_image(uint8_t __huge *src, uint8_t width, uint8_t height)
+void gfx_set_object_image(uint8_t __huge *src, uint8_t x, uint8_t y, uint8_t width, uint8_t height)
 {
-  obj_mask_data[next_obj_slot] = next_char_data;
-  uint8_t *mapped_src = map_ds_ptr(src);
-  debug_out("src %08lx mapped to %04x", (uint32_t)src, (uint16_t)mapped_src);
   obj_first_char[next_obj_slot] = (uint32_t)next_char_data / 64;
+  obj_mask_data[next_obj_slot]  = next_char_data;
+  obj_x[next_obj_slot]          = x;
+  obj_y[next_obj_slot]          = y;
+  obj_width[next_obj_slot]      = width;
+  obj_height[next_obj_slot]     = height;
+
+  uint8_t *mapped_src = map_ds_ptr(src);
   uint8_t *mapped_mask_data = decode_rle_bitmap(mapped_src, width, height);
-  debug_out("decoded obj image @%08lx (%04x - %04x)", (uint32_t)src, (uint16_t)mapped_src, (uint16_t)mapped_mask_data);
   obj_mask_data[next_obj_slot] = src + (uint16_t)(mapped_mask_data - mapped_src);
-  debug_out("  obj_mask_data %08lx", (uint32_t)obj_mask_data[next_obj_slot]);
 
   ++next_obj_slot;
   char_data_start_actors = next_char_data;
@@ -639,6 +649,7 @@ void gfx_draw_bg(void)
   }
 
   memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
+  reset_objects();
 
   map_set_ds(ds_save);
 }
@@ -668,6 +679,9 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_
   int8_t row = y;
   uint8_t initial_height = height;
   uint8_t first;
+
+  obj_draw_list[num_objects_drawn++] = local_id;
+  debug_out("Drawing object %d - num_objects_drawn %d", local_id, num_objects_drawn);
 
   do {
     if (row >= 0 && row < 16) {
@@ -720,12 +734,7 @@ uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, ui
   actor_width  = actor_width_chars  * 8;
   actor_height = actor_height_chars * 8;
 
-  uint16_t num_bytes = actor_width * actor_height;
-  //debug_out("actor width: %d, height: %d, num_bytes: %d", actor_width, actor_height, num_bytes);
-
-  if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
-    next_char_data = char_data_start_actors;
-  }
+  uint16_t num_bytes = check_next_char_data_wrap_around(actor_width, actor_height);
   actor_char_data = (uint32_t)next_char_data;
   next_char_data += num_bytes;
 
@@ -763,7 +772,8 @@ void gfx_draw_actor_cel(uint8_t xpos, uint8_t ypos, struct costume_cel *cel_data
   int16_t x = 0;
   int16_t y = 0;
   dmalist_rle_strip_copy.count = height;
-  dmalist_rle_strip_copy.opt_token3 = 0x07;
+  dmalist_rle_strip_copy.opt_token3 = 0x07; // enable transparent color handling
+  dmalist_rle_strip_copy.opt_arg2   = 0x00; // transparent color
 
   uint8_t *rle_data = ((uint8_t *)cel_data) + sizeof(struct costume_cel);
   do {
@@ -799,141 +809,65 @@ void gfx_draw_actor_cel(uint8_t xpos, uint8_t ypos, struct costume_cel *cel_data
   while (x != width);
 }
 
-#if 0
-/**
- * @brief Draws an actor cel to the backbuffer.
- * 
- * The actor cel is drawn to the backbuffer screen memory. The coordinates x and y are
- * the position relative to the visible screen area (top/left being 0,0). If the 
- * mirror parameter is non-zero, the actor cel is drawn mirrored horizontally.
- *
- * The position is relative the the walking location of the actor. However, the cel contains
- * relative positioning offsets that already need to be applied to the position provided
- * to this function.
- *
- * @param xpos Horizontal position in pixels relative to left room edge.
- * @param ypos Vertical screen position in pixels relative to top room edge.
- * @param cel_data Pointer to cel data to decode.
- * @param mirror 0 = no mirroring, 1 = mirror cel horizontally
- *
- * Code section: code_gfx
- */
-void gfx_draw_cel2(int16_t xpos, int16_t ypos, struct costume_cel *cel_data, uint8_t mirror, uint8_t masking)
+void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
 {
-  //debug_out(" cel x %d y %d width %d height %d", xpos, ypos, cel_data->width, cel_data->height);
-  uint8_t width = cel_data->width;
-  uint8_t height = cel_data->height;
-  uint8_t num_char_cols = cel_data->width / 8;
-  uint8_t sub_char_cols = cel_data->width & 0x07;
+  uint32_t next_char_data_save = (uint32_t)next_char_data;
+  uint16_t num_bytes = check_next_char_data_wrap_around(actor_width, actor_height);
+  uint32_t char_data_start = (uint32_t)next_char_data;
 
-  uint8_t mask;
-  int16_t mask_cur_col;
-  if (masking) {
-    if (!mirror) {
-      mask_cur_col = xpos / 8;
-      mask = 0x80 >> (xpos & 0x07);
-    }
-    else {
-      uint16_t right_edge = xpos + width - 1;
-      mask_cur_col = right_edge / 8;
-      uint8_t shift = 7 - (right_edge & 0x07);
-      mask = 0x01 << shift;
-    }
-  }
+  uint8_t  cur_x    = 0;
+  uint8_t  cur_y    = 0;
+  uint8_t  mask     = 0x80;
+  uint16_t col_incr = (actor_height - 1) * 8;
 
-  if (sub_char_cols) {
-    ++num_char_cols;
-    if (mirror) {
-      xpos -= 8 - sub_char_cols;
-    }
-  }
+  decode_single_mask_column(xpos / 8, ypos, actor_height);
+  mask >>= xpos & 7;
+  dmalist_rle_strip_copy.count = actor_height;
+  dmalist_rle_strip_copy.opt_token3 = 0x06; // disable transparent color handling
 
-  int16_t screen_pos_x = xpos - screen_pixel_offset_x;
-  if (screen_pos_x + width <= 0 || screen_pos_x >= 320 || ypos + height <= 0 || ypos >= GFX_HEIGHT) {
-    //debug_out("cel out of screen");
-    return;
-  }
-
-  uint8_t num_char_rows = cel_data->height / 8;
-  if (cel_data->height & 0x07) {
-    ++num_char_rows;
-  }
-  uint8_t num_pixel_lines_of_chars = num_char_rows * 8;
-  uint16_t num_bytes = num_char_cols * num_pixel_lines_of_chars * 8;
-  if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
-    next_char_data = char_data_start_actors;
-  }
-  uint16_t char_num = ((uint32_t)next_char_data) >> 6;
-  uint8_t __huge *next_char_data_save = next_char_data + num_bytes;
-  uint8_t run_length_counter = 1;
-  uint8_t current_color;
-  uint16_t col_addr_inc = (num_pixel_lines_of_chars - 1) * 8;
-  int16_t x = 0;
-  int16_t y = 0;
-  if (masking) {
-    decode_single_mask_column(mask_cur_col, ypos, height);
-  }
-  memset_bank((uint8_t __far *)next_char_data, 0, num_bytes);
-  dmalist_rle_strip_copy.count = height;
-
-  uint8_t *rle_data = ((uint8_t *)cel_data) + sizeof(struct costume_cel);
   do {
-    if (--run_length_counter == 0)
-    {
-      uint8_t data_byte = *rle_data++;
-      run_length_counter = data_byte & 0x0f;
-      current_color = data_byte >> 4;
-      if (current_color) {
-        current_color |= 0x10;
-      }
-      if (run_length_counter == 0)
-      {
-        run_length_counter = *rle_data++;
-      }
-    }
-    if (masking && masking_column[y] & mask) {
-      color_strip[y] = 0;
-    }
-    else {
-      color_strip[y] = current_color;
-    }
-    ++y;
-    if (y == height) {
+    color_strip[cur_y] = (masking_column[cur_y] & mask) ? 0x00 : 0x01;
+    ++cur_y;
+    if (cur_y == actor_height) {
       dmalist_rle_strip_copy.dst_addr = LSB16(next_char_data);
       dmalist_rle_strip_copy.dst_bank = BANK(next_char_data);
       dma_trigger(&dmalist_rle_strip_copy);
-      y = 0;
-      ++x;
       ++next_char_data;
-      if (!(x & 0x07)) {
-        next_char_data += col_addr_inc;
+      if ((((uint8_t)next_char_data) & 0x07) == 0) {
+        next_char_data += col_incr;
       }
-      if (masking) {
-        if (mirror) {
-          mask <<= 1;
-          if (!mask) {
-            --mask_cur_col;
-            mask = 0x01;
-            decode_single_mask_column(mask_cur_col, ypos, height);
-          }
-        }
-        else {
-          mask >>= 1;
-          if (!mask) {
-            ++mask_cur_col;
-            mask = 0x80;
-            decode_single_mask_column(mask_cur_col, ypos, height);
-          }
-        }
+      ++cur_x;
+      cur_y = 0;
+      mask >>= 1;
+      if (!mask) {
+        decode_single_mask_column((xpos + cur_x) / 8, ypos, actor_height);
+        mask = 0x80;
       }
     }
   }
-  while (x != width);
-  next_char_data = next_char_data_save;
+  while (cur_x != actor_width);
 
-  place_cel_chars(char_num, screen_pos_x, ypos, num_char_cols, num_char_rows, mirror);
+  // copy the masking data over the actor char data
+  static dmalist_two_options_no_2nd_arg_t dmalist_apply_masking = {
+    .opt_token1     = 0x86,                   // transparent color handling
+    .opt_arg1       = 0x01,                   // transparent color
+    .opt_token2     = 0x07,                   // enable (7) or disable (6) transparent color handling
+    .end_of_options = 0x00,
+    .command        = 0,                      // DMA copy command
+    .count          = 0,
+    .src_addr       = 0,
+    .src_bank       = 0,
+    .dst_addr       = 0,
+    .dst_bank       = 0
+  };
+
+  dmalist_apply_masking.count    = num_bytes;
+  dmalist_apply_masking.src_addr = LSB16(char_data_start);
+  dmalist_apply_masking.src_bank = BANK(char_data_start);
+  dmalist_apply_masking.dst_addr = LSB16(actor_char_data);
+  dmalist_apply_masking.dst_bank = BANK(actor_char_data);
+  dma_trigger(&dmalist_apply_masking);
 }
-#endif
 
 /**
  * @brief Finalizes drawing of all actors of the current screen.
@@ -1157,6 +1091,13 @@ static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
   return src;
 }
 
+void reset_objects(void)
+{
+  debug_out("Resetting objects");
+  next_obj_slot = 0;
+  num_objects_drawn = 0;
+}
+
 /**
  * @brief Updates the cursor.
  *
@@ -1235,6 +1176,15 @@ void set_dialog_color(uint8_t color)
   dma_trigger(&dmalist_clear_dialog_colram);
 }
 
+static uint16_t check_next_char_data_wrap_around(uint8_t width, uint8_t height)
+{
+  uint16_t num_bytes = width * height;
+  if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
+    next_char_data = char_data_start_actors;
+  }
+  return num_bytes;
+}
+
 static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t screen_pos_y, uint8_t width_chars, uint8_t height_chars)
 {
   static uint8_t row_masks[8] = {0xff, 0x7f, 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01};
@@ -1302,11 +1252,6 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   }
 
   map_set_ds(save_ds);
-}
-
-static void apply_actor_masking(void)
-{
-
 }
 
 static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines)

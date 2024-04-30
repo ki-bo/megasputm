@@ -1115,12 +1115,13 @@ static void read_objects(void)
     map_ds_resource(cur_obj_page);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + cur_obj_offset);
     obj_id[i] = obj_hdr->id;
-    uint8_t width = obj_hdr->width * 8;
-    uint8_t height = obj_hdr->height_and_actor_dir & 0xf8;
 
     // read object image
-    uint8_t __huge *obj_image = room_ptr + cur_image_offset;
-    gfx_decode_object_image(obj_image, width, height);
+    gfx_set_object_image(room_ptr + cur_image_offset, 
+                         obj_hdr->pos_x, 
+                         obj_hdr->pos_y_and_parent_state & 0x7f, 
+                         obj_hdr->width * 8, 
+                         obj_hdr->height_and_actor_dir & 0xf8);
 
     // reset ds back to room header
     map_ds_resource(room_res_slot);

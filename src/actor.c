@@ -522,7 +522,7 @@ void actor_draw(uint8_t local_id)
 
   // pass 3: apply masking
   if (masking) {
-    //gfx_apply_actor_masking(min_x, min_y, width, height, masking);
+    gfx_apply_actor_masking(min_x, min_y, masking);
   }
 }
 
