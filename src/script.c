@@ -1141,6 +1141,7 @@ static void do_sentence(void)
   }
   else if (sentence_verb == 0xfc) {
     debug_scr("  sentence_verb: %d = STOP", sentence_verb);
+    sentence_stack.num_entries = 0;
     vm_stop_script(SCRIPT_ID_SENTENCE);
     return;
   }
