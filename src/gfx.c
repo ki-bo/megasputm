@@ -100,7 +100,10 @@ static uint16_t masking_cache_data_offset[119];
 static uint8_t num_masking_cache_cols = 0;
 static uint8_t masking_column[GFX_HEIGHT];
 static uint16_t masking_data_room_offset;
+static uint32_t masking_char_data;
 static uint16_t screen_pixel_offset_x;
+static int16_t actor_x;
+static int8_t actor_y;
 static uint8_t actor_width;
 static uint8_t actor_height;
 static uint32_t actor_char_data;
@@ -162,7 +165,8 @@ static void set_dialog_color(uint8_t color);
 static uint16_t check_next_char_data_wrap_around(uint8_t width, uint8_t height);
 static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t screen_pos_y, uint8_t width_chars, uint8_t height_chars);
 static void apply_actor_masking(void);
-static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines);
+static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_lines);
+static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_start, uint8_t num_lines, uint8_t idx_dst);
 static uint16_t text_style_to_color(enum text_style style);
 
 //-----------------------------------------------------------------------------------------------
@@ -546,7 +550,7 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
  * restore the DS register after calling this function.
  * 
  * @param src Pointer to the encoded object image data.
- * @param x X scene position of the object image in characters.
+ * @param x X scene position of the object image in pixels.
  * @param y Y scene position of the object image in characters.
  * @param width Width of the object image in characters.
  * @param height Height of the object image in characters.
@@ -556,14 +560,13 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 void gfx_set_object_image(uint8_t __huge *src, uint8_t x, uint8_t y, uint8_t width, uint8_t height)
 {
   obj_first_char[next_obj_slot] = (uint32_t)next_char_data / 64;
-  obj_mask_data[next_obj_slot]  = next_char_data;
   obj_x[next_obj_slot]          = x;
   obj_y[next_obj_slot]          = y;
   obj_width[next_obj_slot]      = width;
   obj_height[next_obj_slot]     = height;
 
   uint8_t *mapped_src = map_ds_ptr(src);
-  uint8_t *mapped_mask_data = decode_rle_bitmap(mapped_src, width, height);
+  uint8_t *mapped_mask_data = decode_rle_bitmap(mapped_src, width * 8, height * 8);
   obj_mask_data[next_obj_slot] = src + (uint16_t)(mapped_mask_data - mapped_src);
 
   ++next_obj_slot;
@@ -669,24 +672,26 @@ void gfx_draw_bg(void)
  *
  * Code section: code_gfx
  */
-void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y, uint8_t width, uint8_t height)
+void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y)
 {
+  //debug_out("Obj %d at %d, %d", local_id, x, y);
   uint16_t *screen_ptr;
-  uint16_t char_num_row = obj_first_char[local_id];
   uint16_t char_num_col;
-  uint8_t width_save = width;
-  int8_t col;
-  int8_t row = y;
-  uint8_t initial_height = height;
-  uint8_t first;
+  uint16_t char_num_row   = obj_first_char[local_id];
+  uint8_t  width          = obj_width[local_id];
+  uint8_t  height         = obj_height[local_id];
+  uint8_t  initial_width  = width;
+  uint8_t  initial_height = height;
+  int8_t   row            = y;
+  int8_t   col;
+  uint8_t  first;
 
   obj_draw_list[num_objects_drawn++] = local_id;
-  debug_out("Drawing object %d - num_objects_drawn %d", local_id, num_objects_drawn);
 
   do {
     if (row >= 0 && row < 16) {
       screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + times_chrcount[row];
-      width = width_save;
+      width = initial_width;
       col = x;
       char_num_col = char_num_row;
       first = 1;
@@ -721,8 +726,6 @@ uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, ui
     .dst_bank = 0
   };
 
-  uint16_t left_char_offset = camera_x - 20;
-  screen_pixel_offset_x = left_char_offset * 8;
   int16_t screen_pos_x = pos_x - screen_pixel_offset_x;
   if (screen_pos_x >= 320 || screen_pos_x + width < 0 || pos_y + height < 0) {
     return 0;
@@ -731,6 +734,8 @@ uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, ui
   uint8_t actor_width_chars  = (width  + 7) >> 3;
   uint8_t actor_height_chars = (height + 7) >> 3;
 
+  actor_x      = pos_x;
+  actor_y      = pos_y;
   actor_width  = actor_width_chars  * 8;
   actor_height = actor_height_chars * 8;
 
@@ -811,9 +816,9 @@ void gfx_draw_actor_cel(uint8_t xpos, uint8_t ypos, struct costume_cel *cel_data
 
 void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
 {
-  uint32_t next_char_data_save = (uint32_t)next_char_data;
+  __auto_type next_char_data_save = next_char_data;
   uint16_t num_bytes = check_next_char_data_wrap_around(actor_width, actor_height);
-  uint32_t char_data_start = (uint32_t)next_char_data;
+  masking_char_data = (uint32_t)next_char_data;
 
   uint8_t  cur_x    = 0;
   uint8_t  cur_y    = 0;
@@ -862,11 +867,13 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
   };
 
   dmalist_apply_masking.count    = num_bytes;
-  dmalist_apply_masking.src_addr = LSB16(char_data_start);
-  dmalist_apply_masking.src_bank = BANK(char_data_start);
+  dmalist_apply_masking.src_addr = LSB16(masking_char_data);
+  dmalist_apply_masking.src_bank = BANK(masking_char_data);
   dmalist_apply_masking.dst_addr = LSB16(actor_char_data);
   dmalist_apply_masking.dst_bank = BANK(actor_char_data);
   dma_trigger(&dmalist_apply_masking);
+
+  next_char_data = next_char_data_save;
 }
 
 /**
@@ -1093,7 +1100,6 @@ static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
 
 void reset_objects(void)
 {
-  debug_out("Resetting objects");
   next_obj_slot = 0;
   num_objects_drawn = 0;
 }
@@ -1254,9 +1260,9 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   map_set_ds(save_ds);
 }
 
-static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_lines)
+static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_lines)
 {
-  if (col < 0 || col > num_masking_cache_cols) {
+  if (col < 0 || col > num_masking_cache_cols || y_start <= -num_lines) {
     memset_bank(UNBANKED_PTR(masking_column), 0, num_lines);
     return;
   }
@@ -1267,15 +1273,23 @@ static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_
   uint8_t iterations;
   uint8_t fill;
   uint8_t idx_src = 0;
-  uint8_t idx_dst = 0;
+  uint8_t idx_dst_start = 0;
+  int8_t  y_start_save = y_start;
+  uint8_t idx_dst;
+
+  if (y_start < 0) {
+    memset_bank(UNBANKED_PTR(masking_column), 0, -y_start);
+    idx_dst_start = -y_start;
+    y_start = 0;
+  }
+  idx_dst = idx_dst_start;
 
   if (col == 0) {
     iterations = data[idx_src++];
   }
   else {
-    --col;
-    iterations = masking_cache_iterations[(uint8_t)col];
-    data += masking_cache_data_offset[(uint8_t)col];
+    iterations = masking_cache_iterations[(uint8_t)col - 1];
+    data += masking_cache_data_offset[(uint8_t)col - 1];
   }
   fill = iterations & 0x80;
   iterations &= 0x7f;
@@ -1312,11 +1326,62 @@ static void decode_single_mask_column(int16_t col, uint8_t y_start, uint8_t num_
       fill = iterations & 0x80;
       iterations &= 0x7f;
     }
-    else if (!(fill & 0x80)) {
+    else if (!fill) {
       cur_mask = data[idx_src++];
     }
   }
+
+  for (uint8_t local_obj_id = 0; local_obj_id < num_objects_drawn; ++local_obj_id) {
+    decode_object_mask_column(obj_draw_list[local_obj_id], col, y_start_save, num_lines, idx_dst_start);
+  }
+
   map_set_ds(save_ds);
+}
+
+static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_start, uint8_t num_lines, uint8_t idx_dst)
+{
+  uint16_t obj_x1 = obj_x[local_id];
+  uint8_t  obj_x2 = obj_x1 + obj_width[local_id];
+
+  if (obj_x1 > col || obj_x2 <= col) {
+    return;
+  }
+
+  uint8_t obj_y1     = obj_y[local_id] * 8;
+  uint8_t obj_y2     = obj_y1 + obj_height[local_id] * 8;
+  uint8_t iterations = 1;
+  uint8_t cur_mask;
+  uint8_t fill;
+
+  if (obj_y1 > y_start) {
+    idx_dst += obj_y1 - y_start;
+    y_start = obj_y1;
+  }
+  
+  __auto_type src = map_ds_ptr(obj_mask_data[local_id]);
+
+  while (obj_x1 <= col) {
+    for (uint8_t y = obj_y1; y < obj_y2; ++y) {
+      --iterations;
+      if (!iterations) {
+        iterations  = *src++;
+        cur_mask    = *src++;
+        fill        = iterations & 0x80;
+        iterations &= 0x7f;
+      }
+      else if (!fill) {
+        cur_mask = *src++;
+      }
+      if (obj_x1 == col && y >= y_start) {
+        masking_column[idx_dst++] = cur_mask;
+        --num_lines;
+        if (!num_lines) {
+          return;
+        }
+      }
+    }
+    ++obj_x1;
+  }
 }
 
 static uint16_t text_style_to_color(enum text_style style)

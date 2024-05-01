@@ -189,7 +189,7 @@ void vm_update_sentence(void);
 struct object_code *vm_get_object_hdr(uint16_t global_object_id);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 uint8_t vm_get_local_object_id(uint16_t global_object_id);
-void vm_clear_all_other_object_states(uint8_t local_object_id);
+void vm_draw_object(uint8_t local_object_id, uint8_t x, uint8_t y);
 void vm_set_camera_follow_actor(uint8_t actor_id);
 void vm_set_camera_to(uint8_t x);
 void vm_camera_pan_to(uint8_t x);

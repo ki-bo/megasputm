@@ -1,6 +1,7 @@
 #include "script.h"
 #include "actor.h"
 #include "error.h"
+#include "gfx.h"
 #include "io.h"
 #include "map.h"
 #include "memory.h"
@@ -608,8 +609,7 @@ static void draw_object(void)
   global_game_objects[obj_id] |= OBJ_STATE;
   uint8_t local_object_id = vm_get_local_object_id(obj_id);
   if (local_object_id != 0xff) {
-    vm_clear_all_other_object_states(obj_id);
-    vm_update_bg();
+    vm_draw_object(local_object_id, x, y);
   }
 }
 
@@ -674,6 +674,7 @@ static void state_of(void)
   }
   if (vm_get_local_object_id(obj_id) != 0xff) {
     vm_update_bg();
+    vm_update_actors();
   }
 }
 

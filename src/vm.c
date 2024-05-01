@@ -119,6 +119,7 @@ static void read_objects(void);
 static void read_walk_boxes(void);
 static void redraw_screen(void);
 static void handle_input(void);
+static void clear_all_other_object_states(uint8_t local_object_id);
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
@@ -795,48 +796,39 @@ uint8_t vm_get_local_object_id(uint16_t global_object_id)
   return 0xff;
 }
 
-/**
- * @brief Clears state of objects matching position and size
- *
- * Clears the state of all objects that match the given position and size. The function will
- * iterate over all objects and check if the object is currently active and if the object
- * position and size matches the one provided. If a match is found, the object state is
- * cleared.
- * 
- * @param local_object_id Object in current room to compare with
- */
-void vm_clear_all_other_object_states(uint8_t local_object_id)
+void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
 {
-  uint16_t ds_save = map_get_ds();
+  uint16_t save_ds = map_get_ds();
 
-  map_ds_resource(obj_page[local_object_id]);
-  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
-  uint8_t width = obj_hdr->width;
-  uint8_t height = obj_hdr->height_and_actor_dir >> 3;
-  uint8_t x = obj_hdr->pos_x;
-  uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
-  uint16_t global_object_id = obj_hdr->id;
+  clear_all_other_object_states(local_id);
 
-  for (uint8_t i = 0; i < num_objects; ++i)
-  {
-    if (obj_id[i] == global_object_id)
-    {
-      continue;
-    }
+  map_ds_resource(obj_page[local_id]);
+  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_id]);
+  
+  uint8_t width    = obj_hdr->width;
+  uint8_t height   = obj_hdr->height_and_actor_dir >> 3;
 
-    map_ds_resource(obj_page[i]);
-    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
-    if (obj_hdr->width == width && 
-       (obj_hdr->height_and_actor_dir >> 3) == height &&
-        obj_hdr->pos_x == x && 
-       (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
-    {
-      global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
-      //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
-    }
+  if (x == 0xff) {
+    x = obj_hdr->pos_x;
+  }
+  if (y == 0xff) {
+    y = obj_hdr->pos_y_and_parent_state & 0x7f;
   }
 
-  map_set_ds(ds_save);
+  int8_t screen_x = (int8_t)x - camera_x + 20;
+
+  if (screen_x >= 40 || screen_x + width <= 0 || y >= 16) {
+    return;
+  }
+
+  map_cs_gfx();
+  unmap_ds();
+  gfx_draw_object(local_id, screen_x, y);
+  unmap_cs();
+
+  screen_update_needed |= SCREEN_UPDATE_ACTORS;
+
+  map_set_ds(save_ds);
 }
 
 void vm_set_camera_follow_actor(uint8_t actor_id)
@@ -1120,8 +1112,8 @@ static void read_objects(void)
     gfx_set_object_image(room_ptr + cur_image_offset, 
                          obj_hdr->pos_x, 
                          obj_hdr->pos_y_and_parent_state & 0x7f, 
-                         obj_hdr->width * 8, 
-                         obj_hdr->height_and_actor_dir & 0xf8);
+                         obj_hdr->width, 
+                         obj_hdr->height_and_actor_dir >> 3);
 
     // reset ds back to room header
     map_ds_resource(room_res_slot);
@@ -1178,8 +1170,6 @@ static void redraw_screen(void)
   // draw background
   gfx_draw_bg();
 
-  uint8_t camera_offset = camera_x - 20;
-
   // draw all visible room objects
   for (int8_t i = num_objects - 1; i >= 0; --i)
   {
@@ -1189,13 +1179,14 @@ static void redraw_screen(void)
     if (!(global_game_objects[obj_hdr->id] & OBJ_STATE)) {
       continue;
     }
-    uint8_t width = obj_hdr->width;
-    uint8_t height = obj_hdr->height_and_actor_dir >> 3;
-    uint8_t x = obj_hdr->pos_x - camera_offset;
-    uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
+    int8_t screen_x = obj_hdr->pos_x - camera_x + 20;
+    if (screen_x >= 40 || screen_x + obj_hdr->width <= 0) {
+      continue;
+    }
+    int8_t screen_y = obj_hdr->pos_y_and_parent_state & 0x7f;
     unmap_ds();
 
-    gfx_draw_object(i, x, y, width, height);
+    gfx_draw_object(i, screen_x, screen_y);
   }
 
   map_set(map_save);
@@ -1249,6 +1240,52 @@ static void handle_input(void)
     // ack the key press
     input_key_pressed = 0;
   }
+}
+
+/**
+ * @brief Clears state of objects matching position and size
+ *
+ * Clears the state of all objects that match the given position and size. The function will
+ * iterate over all objects and check if the object is currently active and if the object
+ * position and size matches the one provided. If a match is found, the object state is
+ * cleared.
+ * 
+ * @param local_object_id Object in current room to compare with
+ */
+static void clear_all_other_object_states(uint8_t local_object_id)
+{
+  uint16_t ds_save = map_get_ds();
+
+  map_ds_resource(obj_page[local_object_id]);
+  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
+  uint8_t width = obj_hdr->width;
+  uint8_t height = obj_hdr->height_and_actor_dir >> 3;
+  uint8_t x = obj_hdr->pos_x;
+  uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
+  uint16_t global_object_id = obj_hdr->id;
+
+  for (uint8_t i = 0; i < num_objects; ++i)
+  {
+    if (obj_id[i] == global_object_id)
+    {
+      continue;
+    }
+
+    map_ds_resource(obj_page[i]);
+    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
+    if (obj_hdr->width == width && 
+       (obj_hdr->height_and_actor_dir >> 3) == height &&
+        obj_hdr->pos_x == x && 
+       (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
+    {
+      global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
+      // since actors could potentially be affected, we need to redraw those as well
+      screen_update_needed |= SCREEN_UPDATE_ACTORS;
+      //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
+    }
+  }
+
+  map_set_ds(ds_save);
 }
 
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
