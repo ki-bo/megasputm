@@ -1338,7 +1338,7 @@ static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_l
   map_set_ds(save_ds);
 }
 
-static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_start, uint8_t num_lines, uint8_t idx_dst)
+static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_start2, uint8_t num_lines2, uint8_t idx_dst2)
 {
   uint16_t obj_x1 = obj_x[local_id];
   uint8_t  obj_x2 = obj_x1 + obj_width[local_id];
@@ -1353,9 +1353,19 @@ static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_s
   uint8_t cur_mask;
   uint8_t fill;
 
+  // workaround compiler bug treating by value params as by reference
+  uint8_t y_start   = y_start2;
+  uint8_t idx_dst   = idx_dst2;
+  uint8_t num_lines = num_lines2;
+
   if (obj_y1 > y_start) {
-    idx_dst += obj_y1 - y_start;
-    y_start = obj_y1;
+    uint8_t diff = obj_y1 - y_start;
+    if (diff >= num_lines) {
+      return;
+    }
+    num_lines -= diff;
+    idx_dst   += diff;
+    y_start    = obj_y1;
   }
   
   __auto_type src = map_ds_ptr(obj_mask_data[local_id]);
