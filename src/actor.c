@@ -834,7 +834,7 @@ static uint8_t correct_position_to_closest_box(uint8_t *x, uint8_t *y)
     //debug_out("Checking box %d", box_idx);
     uint16_t distance = get_corrected_box_position(walk_box, &walk_box_x, &walk_box_y);
     //debug_out("  walk_box_x,y: %d, %d distance %d", walk_box_x, walk_box_y, distance);
-    if (distance < min_distance) {
+    if (distance <= min_distance) {
       min_distance = distance;
       corr_pos_x = walk_box_x;
       corr_pos_y = walk_box_y;
