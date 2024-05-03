@@ -5,6 +5,7 @@
 #include "error.h"
 #include "gfx.h"
 #include "input.h"
+#include "inventory.h"
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
@@ -93,6 +94,8 @@ uint8_t          obj_offset[MAX_OBJECTS];
 uint16_t         obj_id[MAX_OBJECTS];
 uint8_t          screen_update_needed = 0;
 
+uint8_t inventory_pos;
+
 // verb data
 struct verb verbs;
 
@@ -101,6 +104,7 @@ struct sentence_stack_t sentence_stack;
 char sentence_text[41];
 uint8_t prev_sentence_highlighted = 0;
 uint8_t prev_verb_highlighted = 0xff;
+uint8_t prev_inventory_highlighted = 0xff;
 uint8_t sentence_length;
 
 // Private functions
@@ -139,6 +143,14 @@ static uint8_t get_hovered_verb_slot(void);
 static uint8_t get_verb_slot_by_id(uint8_t verb_id);
 static void select_verb(uint8_t verb_id);
 static const char *get_preposition_name(uint8_t preposition);
+static void update_inventory_interface();
+static void update_inventory_highlighting(void);
+static uint8_t get_hovered_inventory_slot(void);
+static uint8_t inventory_pos_to_x(uint8_t pos);
+static uint8_t inventory_pos_to_y(uint8_t pos);
+static void inventory_scroll_up(void);
+static void inventory_scroll_down(void);
+static void update_inventory_scroll_buttons(void);
 
 /**
  * @defgroup vm_init VM Init Functions
@@ -277,6 +289,10 @@ __task void vm_mainloop(void)
         update_verb_interface();
       }
 
+      if (screen_update_needed & SCREEN_UPDATE_INVENTORY) {
+        update_inventory_interface();
+      }
+
       if (screen_update_needed & SCREEN_UPDATE_SENTENCE) {
         update_sentence_line();
       }
@@ -288,6 +304,7 @@ __task void vm_mainloop(void)
 
     update_sentence_highlighting();
     update_verb_highlighting();
+    update_inventory_highlighting();
 
     //VICIV.bordercol = 0x00;
   }
@@ -536,7 +553,7 @@ void vm_say_line(uint8_t actor_id)
  */
 uint8_t vm_start_script(uint8_t script_id)
 {
-  debug_out("Starting new top-level script %d", script_id);
+  //debug_out("Starting new top-level script %d", script_id);
 
   uint8_t slot = vm_get_script_slot_by_script_id(script_id);
   if (slot != 0xff) {
@@ -561,7 +578,7 @@ uint8_t vm_start_script(uint8_t script_id)
 
 uint8_t vm_start_room_script(uint16_t room_script_offset)
 {
-  debug_out("Starting room script at offset %04x", room_script_offset);
+  //debug_out("Starting room script at offset %04x", room_script_offset);
 
   uint8_t res_slot = room_res_slot + MSB(room_script_offset);
   uint16_t offset = LSB(room_script_offset);
@@ -570,7 +587,7 @@ uint8_t vm_start_room_script(uint16_t room_script_offset)
 
 uint8_t vm_start_child_script(uint8_t script_id)
 {
-  debug_out("Starting script %d as child of slot %d", script_id, active_script_slot);
+  //debug_out("Starting script %d as child of slot %d", script_id, active_script_slot);
 
   uint8_t slot = vm_start_script(script_id);
   proc_parent[slot] = active_script_slot;
@@ -597,7 +614,7 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
   uint8_t res_slot = obj_page[id];
   script_offset += obj_offset[id];
 
-  debug_out("Starting object script %d for verb %d at slot %02x offset %04x", global_object_id, verb, res_slot, script_offset);
+  //debug_out("Starting object script %d for verb %d at slot %02x offset %04x", global_object_id, verb, res_slot, script_offset);
 
   return start_child_script_at_address(res_slot, script_offset);
 }
@@ -615,7 +632,7 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
  */
 void vm_chain_script(uint8_t script_id)
 {
-  debug_out("Chaining script %d from script %d", script_id, proc_script_id[active_script_slot]);
+  //debug_out("Chaining script %d from script %d", script_id, proc_script_id[active_script_slot]);
 
   if (!is_room_object_script(active_script_slot)) {
     res_deactivate_slot(proc_res_slot[active_script_slot]);
@@ -640,7 +657,7 @@ void vm_chain_script(uint8_t script_id)
  */
 void vm_stop_active_script()
 {
-  debug_out("Script %d ended", proc_script_id[active_script_slot]);
+  //debug_out("Script %d ended", proc_script_id[active_script_slot]);
   if (!is_room_object_script(active_script_slot)) {
     res_deactivate_slot(proc_res_slot[active_script_slot]);
   }
@@ -659,7 +676,7 @@ void vm_stop_script(uint8_t script_id)
   {
     if (proc_state[slot] != PROC_STATE_FREE && proc_script_id[slot] == script_id)
     {
-      debug_out("Stopping script %d", script_id);
+      //debug_out("Stopping script %d", script_id);
       res_deactivate_slot(proc_res_slot[slot]);
       proc_state[slot] = PROC_STATE_FREE;
       // stop all children
@@ -667,7 +684,7 @@ void vm_stop_script(uint8_t script_id)
       {
         proc_child[slot] = 0xff;
         slot = proc_child[slot];
-        debug_out("Stopped child script %d", proc_script_id[slot]);
+        //debug_out("Stopped child script %d", proc_script_id[slot]);
         res_deactivate_slot(proc_res_slot[slot]);
         proc_state[slot] = PROC_STATE_FREE;
       }
@@ -721,7 +738,7 @@ void vm_update_inventory(void)
   screen_update_needed |= SCREEN_UPDATE_INVENTORY;
 }
 
-struct object_code *vm_get_object_hdr(uint16_t global_object_id)
+struct object_code *vm_get_room_object_hdr(uint16_t global_object_id)
 {
   uint8_t id = vm_get_local_object_id(global_object_id);
   if (id == 0xff) {
@@ -759,7 +776,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
     //debug_out("Checking object %d at %d, %d state %d - parent_state %d", obj_hdr->id, obj_hdr->pos_x, obj_hdr->pos_y_and_parent_state & 0x7f, global_game_objects[obj_hdr->id] & OBJ_STATE, obj_hdr->pos_y_and_parent_state & 0x80);
     //debug_out("  obj_state %02x", global_game_objects[obj_hdr->id]);
-    if (global_game_objects[obj_hdr->id] & OBJ_CLASS_DONT_SELECT) {
+    if (global_game_objects[obj_hdr->id] & OBJ_CLASS_UNTOUCHABLE) {
       continue;
     }
     if (obj_hdr->parent != 0) {
@@ -1228,6 +1245,25 @@ static void handle_input(void)
           select_verb(verbs.id[verb_slot]);
         }
       }
+      else if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
+        // clicked in inventory zone
+        uint8_t inventory_ui_slot = get_hovered_inventory_slot();
+        if (inventory_ui_slot < 4) {
+          uint8_t inventory_item_id = inventory_pos + inventory_ui_slot;
+          if (inventory_item_id < inv_num_objects) {
+            vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
+            vm_write_var(VAR_CLICKED_NOUN, inv_get_object_id(inventory_item_id));
+            vm_start_script(SCRIPT_ID_INPUT_EVENT);
+            screen_update_needed |= SCREEN_UPDATE_SENTENCE;
+          }
+        }
+        else if (inventory_ui_slot == 4) {
+          inventory_scroll_up();
+        }
+        else if (inventory_ui_slot == 5) {
+          inventory_scroll_down();
+        }
+      }
     }
   }
 
@@ -1395,13 +1431,13 @@ static void execute_script_slot(uint8_t slot)
     }
     if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD) {
       // script has just started a new child script
-      debug_out("Script in slot %d has started new child in slot %d", slot, proc_child[slot]);
+      //debug_out("Script in slot %d has started new child in slot %d", slot, proc_child[slot]);
       slot = proc_child[slot];
       continue;
     }
     else if (proc_state[slot] == PROC_STATE_FREE) {
       // script has exited, launch parent script if needed
-      debug_out("Script in slot %d has exited, moving on to parent slot %d", slot, proc_parent[slot]);
+      //debug_out("Script in slot %d has exited, moving on to parent slot %d", slot, proc_parent[slot]);
       slot = proc_parent[slot];
       continue;
     }
@@ -1417,15 +1453,14 @@ static void execute_script_slot(uint8_t slot)
 
 static const char *get_object_name(uint16_t global_object_id)
 {
-  uint8_t local_id = vm_get_local_object_id(global_object_id);
-  if (local_id == 0xff) {
-    return NULL;
+  struct object_code *obj_hdr = inv_get_object_by_id(global_object_id);
+  if (!obj_hdr) {
+    obj_hdr = vm_get_room_object_hdr(global_object_id);
+    if (!obj_hdr) {
+      return NULL;
+    }
   }
 
-  uint8_t res_slot = obj_page[local_id];
-  uint16_t offset = obj_offset[local_id];
-  map_ds_resource(res_slot);
-  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + offset);
   uint16_t name_offset = obj_hdr->name_offset;
   return ((const char *)obj_hdr) + name_offset;
 }
@@ -1801,6 +1836,127 @@ static const char *get_preposition_name(uint8_t preposition)
 {
   static const char *prepositions_english[] = { NULL, "in", "with", "on", "to" };
   return prepositions_english[preposition];
+}
+
+static void update_inventory_interface()
+{
+  unmap_ds();
+  map_cs_gfx();
+  gfx_clear_inventory();
+  if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
+    uint8_t end_id = min(inv_num_objects, inventory_pos + 4);
+    uint8_t x = 0;
+    uint8_t y = 22;
+    char buf[19];
+    buf[18] = '\0';
+    for (uint8_t i = inventory_pos; i < end_id; ++i) {
+      const char *name = inv_get_object_name(i);
+      for (uint8_t j = 0; j < 18; ++j) {
+        buf[j] = name[j];
+        if (buf[j] == '\0') {
+          break;
+        }
+      }
+      gfx_print_interface_text(x, y, buf, TEXT_STYLE_INVENTORY);
+      x = (i & 1) ? 22 : 0;
+      if (i == 2) {
+        ++y;
+      }
+    }
+
+    update_inventory_scroll_buttons();
+  }
+  unmap_cs();
+}
+
+static void update_inventory_highlighting(void)
+{
+  if (!(ui_state & UI_FLAGS_ENABLE_INVENTORY)) {
+    return;
+  }
+
+  uint8_t cur_inventory = get_hovered_inventory_slot();
+
+  if (cur_inventory != prev_inventory_highlighted) {
+    map_cs_gfx();
+    if (prev_inventory_highlighted != 0xff) {
+      uint8_t style = (prev_inventory_highlighted & 4) ? TEXT_STYLE_INVENTORY_ARROW : TEXT_STYLE_INVENTORY;
+      gfx_change_interface_text_style(inventory_pos_to_x(prev_inventory_highlighted), 
+                                      inventory_pos_to_y(prev_inventory_highlighted), 
+                                      prev_inventory_highlighted & 4 ? 4 : 18, 
+                                      style);
+    }
+    if (cur_inventory != 0xff) {
+      gfx_change_interface_text_style(inventory_pos_to_x(cur_inventory), 
+                                      inventory_pos_to_y(cur_inventory), 
+                                      cur_inventory & 4 ? 4 : 18, 
+                                      TEXT_STYLE_HIGHLIGHTED);
+    }
+    unmap_cs();
+    prev_inventory_highlighted = cur_inventory;
+  }
+}
+
+static uint8_t get_hovered_inventory_slot(void)
+{
+   uint8_t cur_inventory = 0xff;
+  
+  if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
+    if (input_cursor_x >= 22 * 4) {
+      cur_inventory = 1;
+    }
+    else if (input_cursor_x < 18 * 4) {
+      cur_inventory = 0;
+    }
+    else {
+      cur_inventory = 4;
+    }
+    if (cur_inventory != 0xff && input_cursor_y >= 23 * 8) {
+      cur_inventory += cur_inventory < 4 ? 2 : 1;
+    }
+  }
+
+  return cur_inventory;
+}
+
+static uint8_t inventory_pos_to_x(uint8_t pos)
+{
+  if (pos & 4) {
+    return 18;
+  }
+  return (pos & 1) ? 22 : 0;
+}
+
+static uint8_t inventory_pos_to_y(uint8_t pos)
+{
+  return 22 + (pos >> 1);
+}
+
+static void inventory_scroll_up(void)
+{
+  if (inventory_pos) {
+    inventory_pos -= 2;
+    screen_update_needed |= SCREEN_UPDATE_INVENTORY;
+  }
+}
+
+static void inventory_scroll_down(void)
+{
+  if (inventory_pos + 4 < inv_num_objects) {
+    inventory_pos += 2;
+    screen_update_needed |= SCREEN_UPDATE_INVENTORY;
+  }
+}
+
+static void update_inventory_scroll_buttons(void)
+{
+  if (inventory_pos && inventory_pos + 4 < inv_num_objects) {
+    gfx_print_interface_text(19, 22, "\xfc\xfd", TEXT_STYLE_INVENTORY_ARROW);
+  }
+
+  if (inventory_pos + 4 < inv_num_objects) {
+    gfx_print_interface_text(19, 23, "\xfe\xff", TEXT_STYLE_INVENTORY_ARROW);
+  }
 }
 
 /// @} // vm_private

@@ -5,7 +5,6 @@
 #include "resource.h"
 #include "util.h"
 #include "vm.h"
-#include <string.h>
 
 #define INV_MAX_OBJECTS 80
 
@@ -24,8 +23,8 @@ uint8_t            *inv_next_free;
 void inv_init()
 {
   inv_num_objects = 0;
-  inv_objects[0] = NULL;
-  inv_next_free = (void *)INVENTORY_BASE;
+  inv_objects[0]  = NULL;
+  inv_next_free   = (void *)INVENTORY_BASE;
 }
 
  ///@} inv_init
@@ -73,8 +72,23 @@ void inv_add_object(uint8_t local_object_id)
   global_dma_list.dst_bank = 0;
   dma_trigger(&global_dma_list);
 
+  inv_objects[inv_num_objects] = (struct object_code *)inv_next_free;
   ++inv_num_objects;
   inv_next_free += size;
+}
+
+struct object_code *inv_get_object_by_id(uint8_t global_object_id)
+{
+  unmap_ds();
+
+  for (uint8_t i = 0; i < inv_num_objects; ++i) {
+    debug_out("compare %d %d", inv_objects[i]->id, global_object_id);
+    if (inv_objects[i]->id == global_object_id) {
+      return inv_objects[i];
+    }
+  }
+
+  return NULL;
 }
 
 uint8_t inv_object_available(uint16_t id)
@@ -91,6 +105,20 @@ uint8_t inv_object_available(uint16_t id)
   
   map_set_ds(save_ds);
   return result;
+}
+
+const char *inv_get_object_name(uint8_t position)
+{
+  unmap_ds();
+  debug_out("inv_objects %p name_offset %02x", inv_objects[position], inv_objects[position]->name_offset);
+  const char *name_ptr = (const char *)inv_objects[position] + inv_objects[position]->name_offset;
+  return name_ptr;
+}
+
+uint8_t inv_get_object_id(uint8_t position)
+{
+  unmap_ds();
+  return inv_objects[position]->id;
 }
 
 ///@} inv_public

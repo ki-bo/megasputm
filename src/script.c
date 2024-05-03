@@ -64,6 +64,7 @@ static void wait_for_actor(void);
 static void stop_sound(void);
 static void add(void);
 static void sleep_for_or_wait_for_message(void);
+static void jump_if_or_if_not_locked(void);
 static void assign_from_bit_variable(void);
 static void camera_at(void);
 static void proximity(void);
@@ -77,14 +78,16 @@ static void jump_if_smaller_or_equal(void);
 static void increment_or_decrement(void);
 static void jump_if_not_equal(void);
 static void chain_script(void);
-static void jump_if_object_not_active(void);
+static void jump_if_object_active_or_not_active(void);
 static void pick_up_object(void);
 static void camera_follows_actor(void);
 static void begin_override_or_say_line_selected_actor(void);
 static void begin_override(void);
 static void cursor(void);
 static void stop_script(void);
+static void lock_or_unlock(void);
 static void script_running(void);
+static void preposition(void);
 static void current_room(void);
 static void jump_if_greater_or_equal(void);
 static void verb(void);
@@ -143,6 +146,7 @@ void script_init(void)
   opcode_jump_table[0x07] = &state_of;
   opcode_jump_table[0x08] = &jump_if_equal;
   opcode_jump_table[0x0c] = &resource_cmd;
+  opcode_jump_table[0x0f] = &jump_if_object_active_or_not_active;
   opcode_jump_table[0x10] = &owner_of;
   opcode_jump_table[0x11] = &do_animation;
   opcode_jump_table[0x12] = &camera_pan_to;
@@ -161,10 +165,12 @@ void script_init(void)
   opcode_jump_table[0x24] = &come_out_door;
   opcode_jump_table[0x25] = &draw_object;
   opcode_jump_table[0x26] = &assign_array;
+  opcode_jump_table[0x27] = &lock_or_unlock;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
   opcode_jump_table[0x2b] = &sleep_for_variable;
   opcode_jump_table[0x2d] = &put_actor_in_room;
   opcode_jump_table[0x2e] = &sleep_for_or_wait_for_message;
+  opcode_jump_table[0x2f] = &jump_if_or_if_not_locked;
   opcode_jump_table[0x31] = &assign_from_bit_variable;
   opcode_jump_table[0x32] = &camera_at;
   opcode_jump_table[0x3e] = &walk_to;
@@ -186,7 +192,7 @@ void script_init(void)
   opcode_jump_table[0x47] = &state_of;
   opcode_jump_table[0x48] = &jump_if_not_equal;
   opcode_jump_table[0x4a] = &chain_script;
-  opcode_jump_table[0x4f] = &jump_if_object_not_active;
+  opcode_jump_table[0x4f] = &jump_if_object_active_or_not_active;
   opcode_jump_table[0x50] = &pick_up_object;
   opcode_jump_table[0x51] = &do_animation;
   opcode_jump_table[0x52] = &camera_follows_actor;
@@ -201,7 +207,9 @@ void script_init(void)
   opcode_jump_table[0x62] = &stop_script;
   opcode_jump_table[0x64] = &come_out_door;
   opcode_jump_table[0x65] = &draw_object;
+  opcode_jump_table[0x67] = &lock_or_unlock;
   opcode_jump_table[0x68] = &script_running;
+  opcode_jump_table[0x6c] = &preposition;
   opcode_jump_table[0x6d] = &put_actor_in_room;
   opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x74] = &proximity;
@@ -468,13 +476,13 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
   }
   else {
     // is an object
-    __auto_type obj_hdr = vm_get_object_hdr(object_or_actor_id);
+    __auto_type obj_hdr = vm_get_room_object_hdr(object_or_actor_id);
     if (!obj_hdr) {
       *x = 0xff;
     } 
     else {
       *x = obj_hdr->walk_to_x;
-      *y = (obj_hdr->walk_to_y & 0x1f) << 2;
+      *y = (obj_hdr->walk_to_y_and_preposition & 0x1f) << 2;
     }
     return 0;
   }
@@ -955,9 +963,9 @@ static void come_out_door(void)
   actor_put_in_room(actor_id, new_room_id);
   vm_set_current_room(new_room_id);
 
-  __auto_type obj_hdr = vm_get_object_hdr(arrive_at_object_id);
+  __auto_type obj_hdr = vm_get_room_object_hdr(arrive_at_object_id);
   uint8_t x = obj_hdr->walk_to_x;
-  uint8_t y = (obj_hdr->walk_to_y & 0x1f) << 2;
+  uint8_t y = (obj_hdr->walk_to_y_and_preposition & 0x1f) << 2;
   uint8_t dir = actor_invert_direction(obj_hdr->height_and_actor_dir & 0x03);
   actor_place_at(actor_id, x, y);
   actor_change_direction(actors.local_id[actor_id], dir);
@@ -1066,6 +1074,23 @@ static void sleep_for_or_wait_for_message(void)
     if (vm_read_var8(VAR_MESSAGE_GOING)) {
       --pc;
       break_script = 1;
+    }
+  }
+}
+
+static void jump_if_or_if_not_locked(void)
+{
+  uint16_t obj_id = resolve_next_param16();
+  int16_t offset = read_word();
+
+  if (opcode & 0x40) {
+    if (!(global_game_objects[obj_id] & OBJ_CLASS_LOCKED)) {
+      pc += offset;
+    }
+  }
+  else {
+    if (global_game_objects[obj_id] & OBJ_CLASS_LOCKED) {
+      pc += offset;
     }
   }
 }
@@ -1441,13 +1466,20 @@ void chain_script(void)
  *
  * Code section: code_script
  */
-static void jump_if_object_not_active(void)
+static void jump_if_object_active_or_not_active(void)
 {
   //debug_msg("Jump if object not active");
   uint16_t obj_id = resolve_next_param16();
   int16_t offset = read_word();
-  if ((global_game_objects[obj_id] & OBJ_STATE) == 0) {
-    pc += offset;
+  if (opcode & 0x40) {
+    if ((global_game_objects[obj_id] & OBJ_STATE) == 0) {
+      pc += offset;
+    }
+  }
+  else {
+    if (global_game_objects[obj_id] & OBJ_STATE) {
+      pc += offset;
+    }
   }
 }
 
@@ -1473,7 +1505,7 @@ static void pick_up_object(void)
 
   uint8_t *game_object = &global_game_objects[obj_id];
   *game_object &= 0xf0; // clear object owner
-  *game_object |= OBJ_STATE | OBJ_CLASS_DONT_SELECT | vm_read_var8(VAR_SELECTED_ACTOR);
+  *game_object |= OBJ_STATE | OBJ_CLASS_UNTOUCHABLE | vm_read_var8(VAR_SELECTED_ACTOR);
   vm_update_bg();
   vm_update_actors();
   vm_update_inventory();
@@ -1580,6 +1612,19 @@ static void stop_script(void)
   vm_stop_script(script_id);
 }
 
+static void lock_or_unlock(void)
+{
+  uint16_t obj_id = resolve_next_param16();
+  if (opcode & 0x40) {
+    debug_scr("unlock-object %d", obj_id);
+    global_game_objects[obj_id] &= ~OBJ_CLASS_LOCKED;
+  }
+  else {
+    debug_scr("lock-object %d", obj_id);
+    global_game_objects[obj_id] |= OBJ_CLASS_LOCKED;
+  }
+}
+
 static void script_running(void)
 {
   uint8_t var_idx = read_byte();
@@ -1591,6 +1636,32 @@ static void script_running(void)
   else {
     vm_write_var(var_idx, 0);
   }
+}
+
+static void preposition(void)
+{
+  uint8_t var_idx = read_byte();
+  uint16_t obj_id = resolve_next_param16();
+
+  uint16_t save_ds = map_get_ds();
+  uint8_t preposition = 0xff;
+  debug_out("checking preposition for object %d", obj_id);
+  debug_out("sentence_object1 %d", vm_read_var(VAR_SENTENCE_NOUN1));
+  struct object_code *obj_hdr = inv_get_object_by_id(obj_id);
+  debug_out("obj_hde inv %p", obj_hdr);
+  if (obj_hdr == NULL) {
+    obj_hdr = vm_get_room_object_hdr(obj_id);
+    debug_out("obj_hdr vm %p", obj_hdr);
+  }
+
+  if (obj_hdr != NULL) {
+    preposition = obj_hdr->walk_to_y_and_preposition >> 5;
+  }
+
+  debug_out("preposition %d", preposition);
+  vm_write_var(var_idx, preposition);
+  
+  map_set_ds(save_ds);
 }
 
 /**

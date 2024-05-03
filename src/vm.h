@@ -61,7 +61,7 @@ enum {
 
 enum {
   OBJ_CLASS_PICKUPABLE  = 0x10,
-  OBJ_CLASS_DONT_SELECT = 0x20,
+  OBJ_CLASS_UNTOUCHABLE = 0x20,
   OBJ_CLASS_LOCKED      = 0x40,
   // SCUMM defines different meanings for the state bit
   // 0: HERE, CLOSED, R-OPEN,   OFF, R_GONE
@@ -115,7 +115,7 @@ struct object_code {
   uint8_t  width;
   uint8_t  parent;
   uint8_t  walk_to_x;
-  uint8_t  walk_to_y;
+  uint8_t  walk_to_y_and_preposition;
   uint8_t  height_and_actor_dir;
   uint8_t  name_offset;
 };
@@ -140,6 +140,8 @@ extern uint8_t room_res_slot;
 extern uint8_t  obj_page[MAX_OBJECTS];
 extern uint8_t  obj_offset[MAX_OBJECTS];
 extern uint16_t obj_id[MAX_OBJECTS];
+
+extern uint8_t inventory_pos;
 
 struct sentence_stack_t {
   uint8_t  num_entries;
@@ -173,7 +175,7 @@ void vm_update_bg(void);
 void vm_update_actors(void);
 void vm_update_sentence(void);
 void vm_update_inventory(void);
-struct object_code *vm_get_object_hdr(uint16_t global_object_id);
+struct object_code *vm_get_room_object_hdr(uint16_t global_object_id);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 uint8_t vm_get_local_object_id(uint16_t global_object_id);
 void vm_draw_object(uint8_t local_object_id, uint8_t x, uint8_t y);

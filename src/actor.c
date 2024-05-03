@@ -189,13 +189,13 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
 {
   uint16_t save_ds = map_get_ds();
 
-  __auto_type object_hdr = vm_get_object_hdr(object_id);
+  __auto_type object_hdr = vm_get_room_object_hdr(object_id);
   if (!object_hdr) {
     return;
   }
 
   uint8_t x = object_hdr->walk_to_x;
-  uint8_t y = (object_hdr->walk_to_y & 0x1f) << 2;
+  uint8_t y = (object_hdr->walk_to_y_and_preposition & 0x1f) << 2;
 
   actor_walk_to(actor_id, x, y);
 

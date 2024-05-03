@@ -7,7 +7,9 @@
 enum text_style {
   TEXT_STYLE_NORMAL,
   TEXT_STYLE_HIGHLIGHTED,
-  TEXT_STYLE_SENTENCE
+  TEXT_STYLE_SENTENCE,
+  TEXT_STYLE_INVENTORY,
+  TEXT_STYLE_INVENTORY_ARROW
 };
 
 // code_init functions
@@ -36,5 +38,6 @@ void gfx_print_interface_text(uint8_t x, uint8_t y, const char *name, enum text_
 void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, enum text_style style);
 void gfx_clear_sentence(void);
 void gfx_clear_verbs(void);
+void gfx_clear_inventory(void);
 
 #endif // __GFX_H

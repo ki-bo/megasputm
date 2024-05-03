@@ -19,6 +19,7 @@
 #define CHRCOUNT 120
 #define SCREEN_RAM_SENTENCE (SCREEN_RAM + CHRCOUNT * 2 * 18)
 #define SCREEN_RAM_VERBS (SCREEN_RAM + CHRCOUNT * 2 * 19)
+#define SCREEN_RAM_INVENTORY (SCREEN_RAM + CHRCOUNT * 2 * 22)
 #define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
 #define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
 
@@ -1039,6 +1040,21 @@ void gfx_clear_verbs(void)
   dma_trigger(&dmalist_clear_verbs);
 }
 
+void gfx_clear_inventory(void)
+{
+  static const dmalist_t dmalist_clear_inventory = {
+    .command  = 0,
+    .count    = CHRCOUNT * 2 * 2 - 2,
+    .src_addr = LSB16(SCREEN_RAM_INVENTORY),
+    .src_bank = BANK(SCREEN_RAM_INVENTORY),
+    .dst_addr = LSB16(SCREEN_RAM_INVENTORY + 2),
+    .dst_bank = BANK(SCREEN_RAM_INVENTORY + 2),
+  };
+
+  *FAR_U16_PTR(SCREEN_RAM_INVENTORY) = 0x0020;
+  dma_trigger(&dmalist_clear_inventory);
+}
+
 /** @} */ // gfx_public
 
 //-----------------------------------------------------------------------------------------------
@@ -1402,7 +1418,10 @@ static uint16_t text_style_to_color(enum text_style style)
     case TEXT_STYLE_HIGHLIGHTED:
       return 0x0e00;
     case TEXT_STYLE_SENTENCE:
+    case TEXT_STYLE_INVENTORY:
       return 0x0500;
+    case TEXT_STYLE_INVENTORY_ARROW:
+      return 0x0100;
     default:
       return 0x0200;
   }
