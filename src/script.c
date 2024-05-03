@@ -2,12 +2,14 @@
 #include "actor.h"
 #include "error.h"
 #include "gfx.h"
+#include "inventory.h"
 #include "io.h"
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
 #include "util.h"
 #include "vm.h"
+#include "walk_box.h"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -459,13 +461,13 @@ static void read_null_terminated_string(char *dest)
 static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y)
 {
   if (object_or_actor_id < vm_read_var(VAR_NUMBER_OF_ACTORS)) {
-    // object1 is an actor
+    // is an actor
     *x = actors.x[object_or_actor_id];
     *y = actors.y[object_or_actor_id];
     return 1;
   }
   else {
-    // object1 is an object
+    // is an object
     __auto_type obj_hdr = vm_get_object_hdr(object_or_actor_id);
     if (!obj_hdr) {
       *x = 0xff;
@@ -1121,6 +1123,13 @@ static void proximity(void)
     return;
   }
 
+  if (is_actor1 && !is_actor2) {
+    // if object1 is an actor and object2 is an object, we need to correct the walk-to position
+    // of the object to be in the closest box (seems walk-to positions are often outside of
+    // walk boxes, eg. the doorbell in maniac mansion)
+    walkbox_correct_position_to_closest_box(&x2, &y2);
+  }
+
   // calculate the distance between the two objects
   uint16_t dx = abs((int16_t)x1 - (int16_t)x2);
   uint16_t dy = abs((int16_t)y1 - (int16_t)y2);
@@ -1444,7 +1453,30 @@ static void jump_if_object_not_active(void)
 
 static void pick_up_object(void)
 {
-  debug_scr("pick-up-object");
+  uint16_t obj_id = resolve_next_param16();
+  debug_scr("pick-up-object %d", obj_id);
+
+  if (obj_id == 0xffff) {
+    return;
+  }
+
+  if (inv_object_available(obj_id)) {
+    return;
+  }
+
+  uint8_t local_object_id = vm_get_local_object_id(obj_id);
+  if (local_object_id == 0xff) {
+    return;
+  }
+
+  inv_add_object(local_object_id);
+
+  uint8_t *game_object = &global_game_objects[obj_id];
+  *game_object &= 0xf0; // clear object owner
+  *game_object |= OBJ_STATE | OBJ_CLASS_DONT_SELECT | vm_read_var8(VAR_SELECTED_ACTOR);
+  vm_update_bg();
+  vm_update_actors();
+  vm_update_inventory();
 }
 
 static void camera_follows_actor(void)

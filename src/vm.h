@@ -81,11 +81,12 @@ enum {
 };
 
 enum {
-  SCREEN_UPDATE_BG       = 0x01,
-  SCREEN_UPDATE_ACTORS   = 0x02,
-  SCREEN_UPDATE_DIALOG   = 0x04,
-  SCREEN_UPDATE_VERBS    = 0x08,
-  SCREEN_UPDATE_SENTENCE = 0x10
+  SCREEN_UPDATE_BG        = 0x01,
+  SCREEN_UPDATE_ACTORS    = 0x02,
+  SCREEN_UPDATE_DIALOG    = 0x04,
+  SCREEN_UPDATE_VERBS     = 0x08,
+  SCREEN_UPDATE_SENTENCE  = 0x10,
+  SCREEN_UPDATE_INVENTORY = 0x20
 };
 
 enum {
@@ -119,17 +120,6 @@ struct object_code {
   uint8_t  name_offset;
 };
 
-struct walk_box {
-  uint8_t top_y;
-  uint8_t bottom_y;
-  uint8_t topleft_x;
-  uint8_t topright_x;
-  uint8_t bottomleft_x;
-  uint8_t bottomright_x;
-  uint8_t mask;
-  uint8_t flags;
-};
-
 extern uint8_t global_game_objects[780];
 extern uint8_t variables_lo[256];
 extern uint8_t variables_hi[256];
@@ -147,13 +137,9 @@ extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
 
 extern uint8_t room_res_slot;
 
-extern uint8_t          obj_page[MAX_OBJECTS];
-extern uint8_t          obj_offset[MAX_OBJECTS];
-extern uint16_t         obj_id[MAX_OBJECTS];
-extern uint8_t          num_walk_boxes;
-extern struct walk_box *walk_boxes;
-extern uint8_t         *walk_box_matrix;
-
+extern uint8_t  obj_page[MAX_OBJECTS];
+extern uint8_t  obj_offset[MAX_OBJECTS];
+extern uint16_t obj_id[MAX_OBJECTS];
 
 struct sentence_stack_t {
   uint8_t  num_entries;
@@ -186,6 +172,7 @@ uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_bg(void);
 void vm_update_actors(void);
 void vm_update_sentence(void);
+void vm_update_inventory(void);
 struct object_code *vm_get_object_hdr(uint16_t global_object_id);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
 uint8_t vm_get_local_object_id(uint16_t global_object_id);

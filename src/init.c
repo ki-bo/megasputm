@@ -6,6 +6,7 @@
 #include "gfx.h"
 #include "heap.h"
 #include "input.h"
+#include "inventory.h"
 #include "map.h"
 #include "util.h"
 #include "resource.h"
@@ -48,6 +49,7 @@ void global_init(void)
   // init main engine code
   res_init();
   heap_init();
+  inv_init();
   script_init();
   actor_init();
   vm_init();

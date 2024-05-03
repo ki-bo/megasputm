@@ -1,18 +1,25 @@
 #include "inventory.h"
 #include "dma.h"
+#include "map.h"
 #include "memory.h"
+#include "resource.h"
 #include "util.h"
+#include "vm.h"
+#include <string.h>
 
 #define INV_MAX_OBJECTS 80
 
-uint8_t  inv_num_objects;
-uint8_t *inv_objects[INV_MAX_OBJECTS];
-uint8_t *inv_next_free;
+#pragma clang section rodata="cdata_main" data="data_main" bss="zdata"
+
+uint8_t             inv_num_objects;
+struct object_code *inv_objects[INV_MAX_OBJECTS];
+uint8_t            *inv_next_free;
 
 /**
  * @defgroup inv_init Inventory Init Functions
  * @{
  */
+#pragma clang section text="code_init"  rodata="cdata_init" data="data_init" bss="bss_init"
 
 void inv_init()
 {
@@ -27,17 +34,19 @@ void inv_init()
  * @defgroup inv_public Inventory Public Functions
  * @{
  */
-#pragma clang section text="code_main"  rodata="cdata_init" data="data_init" bss="bss_init"
+#pragma clang section text="code_main"  rodata="cdata_main" data="data_main" bss="zdata"
 
 /**
  * @brief Add an object to the inventory.
  * 
- * @param id The global object id.
  * @param object Pointer to the object chunk.
  * @param size Amount of bytes to copy.
  */
-void inv_add_object(uint8_t id, uint8_t __far* object, uint8_t size)
+void inv_add_object(uint8_t local_object_id)
 {
+  __auto_type obj_hdr = (struct object_code __huge *)(res_get_huge_ptr(obj_page[local_object_id]) + obj_offset[local_object_id]);
+  uint16_t size = obj_hdr->chunk_size;
+
   uint16_t free_bytes = INVENTORY_BASE + INVENTORY_SIZE - (uint16_t)inv_next_free;
   if (free_bytes < size) {
     fatal_error(ERR_OUT_OF_INVENTORY_SPACE);
@@ -56,14 +65,32 @@ void inv_add_object(uint8_t id, uint8_t __far* object, uint8_t size)
     .dst_bank       = 0
   };
 
-  dmalist_inv_add_object.count_lsb = size;
-  dmalist_inv_add_object.src_addr = LSB16(object);
-  dmalist_inv_add_object.src_bank = BANK(object);
-  dmalist_inv_add_object.dst_addr = (uint16_t)(inv_next_free);
-  dma_trigger(&dmalist_inv_add_object);
+  global_dma_list.command = 0;
+  global_dma_list.count = size;
+  global_dma_list.src_addr = LSB16(obj_hdr);
+  global_dma_list.src_bank = BANK(obj_hdr);
+  global_dma_list.dst_addr = (uint16_t)inv_next_free;
+  global_dma_list.dst_bank = 0;
+  dma_trigger(&global_dma_list);
 
   ++inv_num_objects;
   inv_next_free += size;
+}
+
+uint8_t inv_object_available(uint16_t id)
+{
+  uint16_t save_ds = map_get_ds();
+  uint8_t result = 0;
+
+  for (uint8_t i = 0; i < inv_num_objects; ++i) {
+    if (inv_objects[i]->id == id) {
+      result = 1;
+      break;
+    }
+  }
+  
+  map_set_ds(save_ds);
+  return result;
 }
 
 ///@} inv_public

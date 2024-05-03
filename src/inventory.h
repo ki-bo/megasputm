@@ -7,6 +7,7 @@
 void inv_init();
 
 //code_main functions
-void inv_add_object(uint8_t id, uint8_t __far* object, uint8_t size);
+void inv_add_object(uint8_t local_object_id);
+uint8_t inv_object_available(uint16_t id);
 
 #endif // __INVENTORY_H

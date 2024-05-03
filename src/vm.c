@@ -10,6 +10,7 @@
 #include "resource.h"
 #include "script.h"
 #include "util.h"
+#include "walk_box.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -91,9 +92,6 @@ uint8_t          obj_page[MAX_OBJECTS];
 uint8_t          obj_offset[MAX_OBJECTS];
 uint16_t         obj_id[MAX_OBJECTS];
 uint8_t          screen_update_needed = 0;
-uint8_t          num_walk_boxes;
-struct walk_box *walk_boxes;
-uint8_t         *walk_box_matrix;
 
 // verb data
 struct verb verbs;
@@ -716,6 +714,11 @@ void vm_update_actors(void)
 void vm_update_sentence(void)
 {
   screen_update_needed |= SCREEN_UPDATE_SENTENCE;
+}
+
+void vm_update_inventory(void)
+{
+  screen_update_needed |= SCREEN_UPDATE_INVENTORY;
 }
 
 struct object_code *vm_get_object_hdr(uint16_t global_object_id)
