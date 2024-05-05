@@ -178,7 +178,6 @@ void vm_init(void)
   actor_talking = 0xff;
   ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
   vm_write_var(VAR_CURSOR_STATE, 3);
-  vm_write_var(VAR_CURRENT_LIGHTS, 1);
 
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
     verbs.id[i] = 0xff;
@@ -374,7 +373,7 @@ void vm_set_current_room(uint8_t room_no)
     map_ds_resource(room_res_slot);
     uint16_t exit_script_offset = room_hdr->exit_script_offset;
     if (exit_script_offset) {
-      vm_start_room_script(exit_script_offset + 4);
+      vm_start_room_script(exit_script_offset);
       execute_script_slot(active_script_slot);
     }
 
@@ -412,13 +411,15 @@ void vm_set_current_room(uint8_t room_no)
     map_ds_resource(room_res_slot);
 
     read_objects();
+    map_cs_main_priv();
     read_walk_boxes();
+    map_cs_gfx();
     actor_room_changed();
 
     // run entry script
     uint16_t entry_script_offset = room_hdr->entry_script_offset;
     if (entry_script_offset) {
-      vm_start_room_script(entry_script_offset + 4);
+      vm_start_room_script(entry_script_offset);
       execute_script_slot(active_script_slot);
     }
   }
@@ -578,7 +579,7 @@ uint8_t vm_start_script(uint8_t script_id)
 
 uint8_t vm_start_room_script(uint16_t room_script_offset)
 {
-  //debug_out("Starting room script at offset %04x", room_script_offset);
+  debug_out("Starting room script at offset %04x", room_script_offset);
 
   uint8_t res_slot = room_res_slot + MSB(room_script_offset);
   uint16_t offset = LSB(room_script_offset);
@@ -1140,6 +1141,7 @@ static void read_objects(void)
   }
 }
 
+#pragma clang section text="code_main_private"
 static void read_walk_boxes(void)
 {
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
@@ -1157,8 +1159,8 @@ static void read_walk_boxes(void)
     // debug_out("  urx: %d", box->topright_x);
     // debug_out("  llx: %d", box->bottomleft_x);
     // debug_out("  lrx: %d", box->bottomright_x);
-    // debug_out("  mask: %02x", box->mask);
-    // debug_out("  flags: %02x", box->flags);
+    //debug_out("  mask: %02x", box->mask);
+    //debug_out("  flags: %02x", box->flags);
   }
   walk_box_matrix = box_ptr;
   /*
@@ -1182,6 +1184,7 @@ static void read_walk_boxes(void)
  *
  * Code section: code_main
  */
+#pragma clang section text="code_main"
 static void redraw_screen(void)
 {
   uint32_t map_save = map_get();
@@ -1400,10 +1403,10 @@ static void execute_script_slot(uint8_t slot)
   uint32_t map_save = map_get();
 
   // walk down to last child
-  uint8_t parent = 0xff;
+  //uint8_t parent = proc_parent[slot];
   while (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD)
   {
-    parent = slot;
+    //parent = slot;
     slot = proc_child[slot];
   }
 
@@ -1421,7 +1424,7 @@ static void execute_script_slot(uint8_t slot)
     }
     else {
       // never execute the script that called us recursively
-      // (remember we can be called from within a script)
+      // (remember we can be called directly from within a script)
       if (active_script_slot == save_active_script_slot) {
         break;
       }

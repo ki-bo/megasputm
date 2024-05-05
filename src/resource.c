@@ -120,14 +120,20 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
   //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
  
+  map_cs_main_priv();
   uint8_t page = allocate(type, id, (chunk_size + 255) / 256);
   __auto_type dest = HUGE_U8_PTR(RESOURCE_BASE + (uint16_t)page * 256);
+  
+  map_cs_diskio();
   diskio_continue_resource_loading(dest);
-  unmap_cs();
 
 #ifdef HEAP_DEBUG_OUT  
+  map_cs_main_priv();
   print_heap();
 #endif
+
+  unmap_cs();
+
   return page;
 }
 
@@ -159,11 +165,13 @@ uint8_t __huge *res_get_huge_ptr(uint8_t slot)
  */
 void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 {
+  uint16_t save_cs = map_cs_main_priv();
   find_and_set_flags(type, id, hint, RES_LOCKED_MASK);
 #ifdef HEAP_DEBUG_OUT
   debug_out("Locking resource type %d id %d", type, id);
   print_heap();
 #endif
+  map_set_cs(save_cs);
 }
 
 /**
@@ -180,11 +188,13 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 {
+  uint16_t save_cs = map_cs_main_priv();
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_LOCKED_MASK);
 #ifdef HEAP_DEBUG_OUT
   debug_out("Unlocking resource type %d id %d slot %d", type, id, slot);
   print_heap();
 #endif
+  map_set_cs(save_cs);
 }
 
 /**
@@ -202,11 +212,13 @@ void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 {
+  uint16_t save_cs = map_cs_main_priv();
   find_and_set_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   debug_out("Activating resource type %d id %d", type, id);
   print_heap();
 #endif
+  map_set_cs(save_cs);
 }
 
 /**
@@ -223,11 +235,13 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
 {
+  uint16_t save_cs = map_cs_main_priv();
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
   print_heap();
 #endif
+  map_set_cs(save_cs);
 }
 
 /**
@@ -246,11 +260,13 @@ void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_activate_slot(uint8_t slot)
 {
+  uint16_t save_cs = map_cs_main_priv();
   set_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   debug_out("Activating slot %d", slot);
   print_heap();
 #endif
+  map_set_cs(save_cs);
 }
 
 /**
@@ -268,23 +284,30 @@ void res_activate_slot(uint8_t slot)
  */
 void res_deactivate_slot(uint8_t slot)
 {
+  
+  uint16_t save_cs = map_cs_main_priv();
   clear_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   debug_out("Deactivating slot %d", slot);
   print_heap();
 #endif
+  map_set_cs(save_cs);
 }
 
 uint8_t res_reserve_heap(uint8_t size_blocks)
 {
+  uint16_t save_cs = map_cs_main_priv();
   uint8_t slot = allocate(RES_TYPE_HEAP, 0, size_blocks);
   set_flags(slot, RES_ACTIVE_MASK);
+  map_set_cs(save_cs);
   return slot;
 }
 
 void res_free_heap(uint8_t slot)
 {
+  uint16_t save_cs = map_cs_main_priv();
   free_resource(slot);
+  map_set_cs(save_cs);
 }
 
 /** @} */ // res_public
@@ -295,6 +318,8 @@ void res_free_heap(uint8_t slot)
  * @defgroup res_private Resource Private Functions
  * @{
  */
+
+#pragma clang section text="code_main_private"
 
 /**
  * @brief Sets flags for a resource

@@ -59,6 +59,14 @@
                         data_script
                 )
         )
+
+        ; memory for private vm code
+        (memory main_private (address (#x3000 . #x3fff))
+                (scatter-to bank0_d000)
+                (section
+                        code_main_private
+                )
+        )
         
         ; memory for main program (loaded after init is done)
         (memory main (address (#x4000 . #x7fff))
@@ -116,6 +124,12 @@
                 )
         )
  
+        (memory m0-3 (address (#xd000 . #xdfff))
+                (section
+                        bank0_d000
+                )
+        )
+
         (memory m1-0 (address (#x10000 . #x11fff))
                 (section 
                         (bank1_0000 #x10000)

@@ -267,6 +267,12 @@ void actor_next_step(uint8_t local_id)
     int32_t new_y = y + local_actors.walk_step_y[local_id];
     actors.y[actor_id] = (uint8_t)(new_y >> 16);
     local_actors.y_fraction[local_id] = (uint16_t)new_y;
+
+    if (is_next_walk_to_point_reached(local_id)) {
+      uint8_t cur_box = local_actors.next_box[local_id];
+      local_actors.cur_box[local_id] = cur_box;
+      local_actors.masking[local_id] = walkbox_get_box_masking(cur_box);
+    }
     
     //debug_out("Actor %u position: %u.%05u, %u.%05u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
   }

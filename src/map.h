@@ -16,6 +16,7 @@ void unmap_cs(void);
 void unmap_ds(void);
 void map_cs_diskio(void);
 void map_cs_gfx(void);
+uint16_t map_cs_main_priv(void);
 uint8_t *map_ds_ptr(void __huge *ptr);
 void map_ds_resource(uint8_t res_page);
 void map_ds_heap(void);

@@ -59,13 +59,13 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
 
   struct walk_box *walk_box = walk_boxes;
 
-  //debug_out("Correcting for position %d, %d", *x, *y);
+  debug_out("Correct pos %d, %d", *x, *y);
   for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx) {
     uint8_t walk_box_x = *x;
     uint8_t walk_box_y = *y;
-    //debug_out("Checking box %d", box_idx);
+    debug_out("Checking box %d", box_idx);
     uint16_t distance = walkbox_get_corrected_box_position(walk_box, &walk_box_x, &walk_box_y);
-    //debug_out("  walk_box_x,y: %d, %d distance %d", walk_box_x, walk_box_y, distance);
+    debug_out("  w_x,y: %d, %d d %d", walk_box_x, walk_box_y, distance);
     if (distance <= min_distance) {
       min_distance = distance;
       corr_pos_x = walk_box_x;
@@ -75,7 +75,7 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
     ++walk_box;
   }
 
-  //debug_out("Final corrected position %d, %d walk box %d", corr_pos_x, corr_pos_y, dest_walk_box);
+  debug_out("Final %d, %d wb %d", corr_pos_x, corr_pos_y, dest_walk_box);
 
   *x = corr_pos_x;
   *y = corr_pos_y;
@@ -109,12 +109,16 @@ uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, ui
   }
   else if (xc < box->topleft_x || xc < box->bottomleft_x) {
     //debug_out("  left of box");
+    uint16_t save_cs = map_cs_main_priv();
     x_left = binary_search_xy(box->topleft_x, box->bottomleft_x, box->top_y, box->bottom_y, yc);
+    map_set_cs(save_cs);
     x_right = x_left;
   }
   else if (xc > box->topright_x || xc > box->bottomright_x) {
     //debug_out("  right of box");
+    uint16_t save_cs = map_cs_main_priv();
     x_left = binary_search_xy(box->topright_x, box->bottomright_x, box->top_y, box->bottom_y, yc);
+    map_set_cs(save_cs);
     x_right = x_left;
   }
   else {
@@ -163,6 +167,9 @@ uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, ui
  */
 void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
 {
+  uint16_t save_cs = map_cs_main_priv();
+
+
   struct walk_box *box = &walk_boxes[box_id];
 
   //debug_out("Finding closest point on box %d to %d, %d", box_id, *px, *py);
@@ -192,6 +199,8 @@ void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
       find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);
     }
   }
+
+  map_set_cs(save_cs);
 }
 
 /** @} */ // walkbox_public
@@ -202,6 +211,7 @@ void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
  * @defgroup walkbox_private Walk Box Private Functions
  * @{
  */
+#pragma clang section text="code_main_private"
 
 static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, uint8_t yc)
 {
@@ -209,7 +219,7 @@ static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, 
   uint8_t xn = x1;
   while (yn != yc) {
     //debug_out("yn %d yc %d y1 %d y2 %d x1 %d x2 %d", yn, yc, y1, y2, x1, x2);
-    xn = (uint8_t)(x1 + x2) >> 1;
+    xn = (x1 + x2) >> 1;
     if (yn > yc) {
       y2 = yn;
       x2 = xn;

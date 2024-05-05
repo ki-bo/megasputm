@@ -35,6 +35,7 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
 static void stop_or_break(void);
 static void put_actor(void);
 static void start_music(void);
+static void actor_room(void);
 static void jump_if_greater(void);
 static void draw_object(void);
 static void assign_array(void);
@@ -62,6 +63,7 @@ static void put_actor_in_room(void);
 static void subtract(void);
 static void wait_for_actor(void);
 static void stop_sound(void);
+static void jump_if_or_if_not_pickupable(void);
 static void add(void);
 static void sleep_for_or_wait_for_message(void);
 static void jump_if_or_if_not_locked(void);
@@ -70,6 +72,7 @@ static void camera_at(void);
 static void proximity(void);
 static void get_object_at_position(void);
 static void walk_to_object(void);
+static void set_or_clear_pickupable(void);
 static void jump_if_smaller(void);
 static void cut_scene(void);
 static void start_script(void);
@@ -88,6 +91,7 @@ static void stop_script(void);
 static void lock_or_unlock(void);
 static void script_running(void);
 static void preposition(void);
+static void lights(void);
 static void current_room(void);
 static void jump_if_greater_or_equal(void);
 static void verb(void);
@@ -141,6 +145,7 @@ void script_init(void)
   opcode_jump_table[0x00] = &stop_or_break;
   opcode_jump_table[0x01] = &put_actor;
   opcode_jump_table[0x02] = &start_music;
+  opcode_jump_table[0x03] = &actor_room;
   opcode_jump_table[0x04] = &jump_if_greater;
   opcode_jump_table[0x05] = &draw_object;
   opcode_jump_table[0x07] = &state_of;
@@ -177,11 +182,13 @@ void script_init(void)
   opcode_jump_table[0x34] = &proximity;
   opcode_jump_table[0x35] = &get_object_at_position;
   opcode_jump_table[0x36] = &walk_to_object;
+  opcode_jump_table[0x37] = &set_or_clear_pickupable;
   opcode_jump_table[0x38] = &jump_if_smaller;
   opcode_jump_table[0x39] = &do_sentence;
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x3b] = &wait_for_actor;
   opcode_jump_table[0x3c] = &stop_sound;
+  opcode_jump_table[0x3f] = &jump_if_or_if_not_pickupable;
   opcode_jump_table[0x40] = &cut_scene;
   opcode_jump_table[0x41] = &put_actor;
   opcode_jump_table[0x42] = &start_script;
@@ -211,10 +218,12 @@ void script_init(void)
   opcode_jump_table[0x68] = &script_running;
   opcode_jump_table[0x6c] = &preposition;
   opcode_jump_table[0x6d] = &put_actor_in_room;
+  opcode_jump_table[0x70] = &lights;
   opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x74] = &proximity;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x76] = &walk_to_object;
+  opcode_jump_table[0x37] = &set_or_clear_pickupable;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &do_sentence;
   opcode_jump_table[0x7a] = &verb;
@@ -577,6 +586,14 @@ static void start_music(void)
   //debug_scr("start-music %d", music_id);
 }
 
+static void actor_room(void)
+{
+  uint8_t var_idx = read_byte();
+  uint8_t actor_id = resolve_next_param8();
+  //debug_scr("actor-room %d", actor_id);
+  vm_write_var(var_idx, actors.room[actor_id]);
+}
+
 /**
  * @brief Opcode 0x04: Jump if greater
  *
@@ -708,56 +725,57 @@ static void resource_cmd(void)
   uint8_t sub_opcode = read_byte();
 
   switch (sub_opcode) {
-    case 0x21:
-      debug_scr("load-costume %d", resource_id);
+    case 0x21: {
+      //debug_scr("load-costume %d", resource_id);
       uint8_t slot = res_provide(RES_TYPE_COSTUME, resource_id, 0);
       break;
+    }
     case 0x22:
-      debug_scr("unlock-costume %d", resource_id);
+      //debug_scr("unlock-costume %d", resource_id);
       res_unlock(RES_TYPE_COSTUME, resource_id, 0);
       break;
     case 0x23:
-      debug_scr("lock-costume %d", resource_id);
+      //debug_scr("lock-costume %d", resource_id);
       res_lock(RES_TYPE_COSTUME, resource_id, 0);
       break;
     case 0x31:
-      debug_scr("load-room %d", resource_id);
+      //debug_scr("load-room %d", resource_id);
       res_provide(RES_TYPE_ROOM, resource_id, 0);
       break;
     case 0x32:
-      debug_scr("unlock-room %d", resource_id);
+      //debug_scr("unlock-room %d", resource_id);
       res_unlock(RES_TYPE_ROOM, resource_id, 0);
       break;
     case 0x33:
-      debug_scr("lock-room %d", resource_id);
+      //debug_scr("lock-room %d", resource_id);
       res_lock(RES_TYPE_ROOM, resource_id, 0);
       break;
     case 0x51:
-      debug_scr("load-script %d", resource_id);
+      //debug_scr("load-script %d", resource_id);
       res_provide(RES_TYPE_SCRIPT, resource_id, 0);
       break;
     case 0x52:
-      debug_scr("unlock-script %d", resource_id);
+      //debug_scr("unlock-script %d", resource_id);
       res_unlock(RES_TYPE_SCRIPT, resource_id, 0);
       break;
     case 0x53:
-      debug_scr("lock-script %d", resource_id);
+      //debug_scr("lock-script %d", resource_id);
       res_lock(RES_TYPE_SCRIPT, resource_id, 0);
       break;
     case 0x61:
-      debug_scr("load-sound %d", resource_id);
+      //debug_scr("load-sound %d", resource_id);
       res_provide(RES_TYPE_SOUND, resource_id, 0);
       break;
     case 0x62:
-      debug_scr("unlock-sound %d", resource_id);
+      //debug_scr("unlock-sound %d", resource_id);
       res_unlock(RES_TYPE_SOUND, resource_id, 0);
       break;
     case 0x63:
-      debug_scr("lock-sound %d", resource_id);
+      //debug_scr("lock-sound %d", resource_id);
       res_lock(RES_TYPE_SOUND, resource_id, 0);
       break;
     default:
-      debug_out("unknown sub-opcode %02x", sub_opcode);
+      //debug_out("unknown sub-opcode %02x", sub_opcode);
       fatal_error(ERR_UNKNOWN_RESOURCE_OPERATION);
   }
 }
@@ -1240,6 +1258,19 @@ static void walk_to_object(void)
   actor_walk_to_object(actor_id, obj_id);
 }
 
+static void set_or_clear_pickupable(void)
+{
+  uint16_t obj_id = resolve_next_param16();
+  if (opcode & 0x40) {
+    debug_scr("clear-pickupable %d", obj_id);
+    global_game_objects[obj_id] &= ~OBJ_CLASS_PICKUPABLE;
+  }
+  else {
+    debug_scr("set-pickupable %d", obj_id);
+    global_game_objects[obj_id] |= OBJ_CLASS_PICKUPABLE;
+  }
+}
+
 /**
  * @brief Opcode 0x38: Jump if smaller
  *
@@ -1307,6 +1338,24 @@ static void stop_sound(void)
   uint8_t sound_id = resolve_next_param8();
 }
 
+static void jump_if_or_if_not_pickupable(void)
+{
+  uint16_t obj_id = resolve_next_param16();
+  int16_t  offset = read_word();
+
+  if (opcode & 0x40) {
+    if (!(global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE)) {
+      pc += offset;
+    }
+  }
+  else {
+    if (global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE) {
+      pc += offset;
+    }
+  }
+}
+
+
 /**
  * @brief Opcode 0x40: Cutscene
  * 
@@ -1343,6 +1392,7 @@ static void start_script(void)
 {
   //debug_msg("Start script");
   uint8_t script_id = resolve_next_param8();
+  debug_scr("start-script %d", script_id);
   vm_start_script(script_id);
 }
 
@@ -1350,7 +1400,7 @@ static void actor_x(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t actor_id = resolve_next_param8();
-  debug_scr("VAR[%d] = actor-x %d", var_idx, actor_id);
+  //debug_scr("VAR[%d] = actor-x %d", var_idx, actor_id);
   vm_write_var(var_idx, actors.x[actor_id]);
 }
 
@@ -1473,11 +1523,13 @@ static void jump_if_object_active_or_not_active(void)
   int16_t offset = read_word();
   if (opcode & 0x40) {
     if ((global_game_objects[obj_id] & OBJ_STATE) == 0) {
+      //debug_scr("jump if object %d not active", obj_id);
       pc += offset;
     }
   }
   else {
     if (global_game_objects[obj_id] & OBJ_STATE) {
+      //debug_scr("jump if object %d active", obj_id);
       pc += offset;
     }
   }
@@ -1486,7 +1538,7 @@ static void jump_if_object_active_or_not_active(void)
 static void pick_up_object(void)
 {
   uint16_t obj_id = resolve_next_param16();
-  debug_scr("pick-up-object %d", obj_id);
+  //debug_scr("pick-up-object %d", obj_id);
 
   if (obj_id == 0xffff) {
     return;
@@ -1602,13 +1654,13 @@ static void cursor(void)
   uint16_t param = resolve_next_param16();
   vm_write_var(VAR_CURSOR_STATE, param & 0xff);
   vm_change_ui_flags(param >> 8);
-  debug_scr("cursor cursor-state %02x ui-flags %02x", param & 0xff, param >> 8);
+  //debug_scr("cursor cursor-state %02x ui-flags %02x", param & 0xff, param >> 8);
 }
 
 static void stop_script(void)
 {
   uint8_t script_id = resolve_next_param8();
-  debug_scr("stop-script %d", script_id);
+  //debug_scr("stop-script %d", script_id);
   vm_stop_script(script_id);
 }
 
@@ -1616,11 +1668,11 @@ static void lock_or_unlock(void)
 {
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
-    debug_scr("unlock-object %d", obj_id);
+    //debug_scr("unlock-object %d", obj_id);
     global_game_objects[obj_id] &= ~OBJ_CLASS_LOCKED;
   }
   else {
-    debug_scr("lock-object %d", obj_id);
+    //debug_scr("lock-object %d", obj_id);
     global_game_objects[obj_id] |= OBJ_CLASS_LOCKED;
   }
 }
@@ -1645,23 +1697,33 @@ static void preposition(void)
 
   uint16_t save_ds = map_get_ds();
   uint8_t preposition = 0xff;
-  debug_out("checking preposition for object %d", obj_id);
-  debug_out("sentence_object1 %d", vm_read_var(VAR_SENTENCE_NOUN1));
   struct object_code *obj_hdr = inv_get_object_by_id(obj_id);
-  debug_out("obj_hde inv %p", obj_hdr);
   if (obj_hdr == NULL) {
     obj_hdr = vm_get_room_object_hdr(obj_id);
-    debug_out("obj_hdr vm %p", obj_hdr);
   }
 
   if (obj_hdr != NULL) {
     preposition = obj_hdr->walk_to_y_and_preposition >> 5;
   }
 
-  debug_out("preposition %d", preposition);
   vm_write_var(var_idx, preposition);
   
   map_set_ds(save_ds);
+}
+
+static void lights(void)
+{
+  uint8_t x = resolve_next_param8();
+  uint8_t y = read_byte();
+  uint8_t z = read_byte();
+
+  if (!z) {
+    debug_scr("lights are %d", x);
+    vm_write_var(VAR_CURRENT_LIGHTS, x);
+  }
+  else if (z == 1) {
+    //debug_out("flashlight not implemented");
+  }
 }
 
 /**
@@ -1676,7 +1738,7 @@ static void current_room(void)
 {
   uint8_t room_no = read_byte();
   vm_set_current_room(room_no);
-  debug_scr("current-room %d", room_no);
+  //debug_scr("current-room %d", room_no);
 }
 
 /** 
@@ -1712,7 +1774,7 @@ static void verb(void)
   if (!verb_id) {
     // delete verb
     uint8_t slot = resolve_next_param8();
-    debug_scr("delete-verb %d", slot);
+    //debug_scr("delete-verb %d", slot);
     vm_verb_delete(slot);
     return;
   }
