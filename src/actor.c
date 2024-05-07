@@ -218,19 +218,42 @@ void actor_next_step(uint8_t local_id)
   uint8_t actor_id = local_actors.global_id[local_id];
   uint8_t walk_dir = local_actors.walk_dir[local_id];
   if (walk_dir < 2 && actors.x[actor_id] == local_actors.next_x[local_id]) {
-    //debug_out("Reached x, correct y %u.%05u to %u", actors.y[actor_id], local_actors.y_fraction[local_id], local_actors.next_y[local_id]);
+    debug_out("Reached x, correct y %u.%05u to %u", actors.y[actor_id], local_actors.y_fraction[local_id], local_actors.next_y[local_id]);
     actors.y[actor_id] = local_actors.next_y[local_id];
   }
   else if (walk_dir >= 2 && actors.y[actor_id] == local_actors.next_y[local_id]) {
-    //debug_out("Reached y, correct x %u.%05u to %u", actors.x[actor_id], local_actors.x_fraction[local_id], local_actors.next_x[local_id]);
+    debug_out("Reached y, correct x %u.%05u to %u", actors.x[actor_id], local_actors.x_fraction[local_id], local_actors.next_x[local_id]);
     actors.x[actor_id] = local_actors.next_x[local_id];
   }
 
+    // uint8_t cur_x = actors.x[actor_id];
+    // uint8_t cur_y = actors.y[actor_id];
+    //debug_out("cur %d, %d next %d, %d", cur_x, cur_y, local_actors.next_x[local_id], local_actors.next_y[local_id]);
+    //if (cur_x == local_actors.next_x[local_id] &&
+    //    cur_y == local_actors.next_y[local_id]) {
+  if (is_next_walk_to_point_reached(local_id)) {
+    uint8_t cur_box = local_actors.next_box[local_id];
+    uint8_t target_box = local_actors.walk_to_box[local_id];
+    local_actors.cur_box[local_id] = cur_box;
+    local_actors.masking[local_id] = walkbox_get_box_masking(cur_box);
+    if (cur_box == target_box) {
+      debug_out("Reached target box %d", cur_box);
+      local_actors.next_x[local_id] = local_actors.walk_to_x[local_id];
+      local_actors.next_y[local_id] = local_actors.walk_to_y[local_id];
+    }
+    else {
+      calculate_next_box_point(local_id);
+    }
+    calculate_step(local_id);
+  }
+
   if (local_actors.walking[local_id] == WALKING_STATE_STARTING) {
+    debug_out("Start walking");
     actor_start_animation(local_id, ANIM_WALKING + actors.dir[actor_id]);
     local_actors.walking[local_id] = WALKING_STATE_CONTINUE;
   }
   else if (local_actors.walk_dir[local_id] != actors.dir[actor_id]) {
+    debug_out("Turn");
     // turn but keep on walking
     turn_to_walk_to_direction(local_id);
   }
@@ -238,26 +261,6 @@ void actor_next_step(uint8_t local_id)
     stop_walking(local_id);
   }
   else {
-    uint8_t cur_x = actors.x[actor_id];
-    uint8_t cur_y = actors.y[actor_id];
-    //debug_out("cur %d, %d next %d, %d", cur_x, cur_y, local_actors.next_x[local_id], local_actors.next_y[local_id]);
-    //if (cur_x == local_actors.next_x[local_id] &&
-    //    cur_y == local_actors.next_y[local_id]) {
-    if (is_next_walk_to_point_reached(local_id)) {
-      uint8_t cur_box = local_actors.next_box[local_id];
-      uint8_t target_box = local_actors.walk_to_box[local_id];
-      local_actors.cur_box[local_id] = cur_box;
-      local_actors.masking[local_id] = walkbox_get_box_masking(cur_box);
-      if (cur_box == target_box) {
-        local_actors.next_x[local_id] = local_actors.walk_to_x[local_id];
-        local_actors.next_y[local_id] = local_actors.walk_to_y[local_id];
-      }
-      else {
-        calculate_next_box_point(local_id);
-      }
-      calculate_step(local_id);
-    }
-
     int32_t x = actors.x[actor_id] * 0x10000 + local_actors.x_fraction[local_id];
     int32_t y = actors.y[actor_id] * 0x10000 + local_actors.y_fraction[local_id];
 
@@ -274,7 +277,7 @@ void actor_next_step(uint8_t local_id)
       local_actors.masking[local_id] = walkbox_get_box_masking(cur_box);
     }
     
-    //debug_out("Actor %u position: %u.%05u, %u.%05u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
+    debug_out("Actor %u position: %u.%05u, %u.%05u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
   }
 
   vm_update_actors();
@@ -286,6 +289,11 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
     case 0xf8:
       // keep animation but just change direction
       actor_change_direction(local_id, animation & 0x03);
+      return;
+    case 0xfc:
+      // stop walk-to animation
+      local_actors.target_dir[local_id] = 0xff;   // keep direction as is when stopping
+      stop_walking(local_id);
       return;
   }
 
@@ -630,12 +638,11 @@ static uint8_t is_next_walk_to_point_reached(uint8_t local_id)
 {
   uint8_t actor_id = local_actors.global_id[local_id];
 
-  if (labs(local_actors.walk_step_x[local_id]) > 65535 && actors.x[actor_id] == local_actors.next_x[local_id]) {
+  if (actors.x[actor_id] == local_actors.next_x[local_id] &&
+      actors.y[actor_id] == local_actors.next_y[local_id]) {
     return 1;
   }
-  if (labs(local_actors.walk_step_y[local_id]) > 65535 && actors.y[actor_id] == local_actors.next_y[local_id]) {
-    return 1;
-  }
+
   return 0;
 }
 
@@ -644,8 +651,14 @@ static void stop_walking(uint8_t local_id)
   uint8_t actor_id = local_actors.global_id[local_id];
   uint8_t target_dir = local_actors.target_dir[local_id];
   if (target_dir != 0xff && target_dir != actors.dir[actor_id]) {
-    local_actors.walk_dir[local_id] = target_dir;
-    turn_to_walk_to_direction(local_id);
+    if (local_actors.walk_dir[local_id] != target_dir) {
+      // Only adjust walk_dir in this animation step, so that the actor first just stops, and then
+      // will turn to the target direction in the next animation step.
+      local_actors.walk_dir[local_id] = target_dir;
+    }
+    else {
+      turn_to_walk_to_direction(local_id);
+    }
   }
   else {
     local_actors.walking[local_id] = WALKING_STATE_STOPPED;
@@ -675,14 +688,8 @@ static void calculate_next_box_point(uint8_t local_id)
   uint8_t next_box_y = cur_y;
   walkbox_find_closest_box_point(cur_box, &cur_x, &cur_y);
   //debug_out("Current box point %d, %d", cur_x, cur_y);
-  if (abs(cur_x - next_box_x) > 1 || abs(cur_y - next_box_y) > 2) {
-    walkbox_find_closest_box_point(next_box, &cur_x, &cur_y);
-    next_box_x = cur_x;
-    next_box_y = cur_y;
-    //debug_out("Corrected next box point %d, %d", cur_x, cur_y);
-  }
-  local_actors.next_x[local_id] = next_box_x;
-  local_actors.next_y[local_id] = next_box_y;
+  local_actors.next_x[local_id] = cur_x;
+  local_actors.next_y[local_id] = cur_y;
   local_actors.next_box[local_id] = next_box;
   //debug_out("Adapted next box point %d, %d", cur_x, cur_y);
 
@@ -708,10 +715,11 @@ static void calculate_step(uint8_t local_id)
   int32_t x_step = 0;
   int32_t y_step = 0;
 
-  //debug_out("From %d, %d (b%d) to %d, %d (b%d) x_diff %d y_diff %d", x, y, local_actors.cur_box[local_id], next_x, next_y, local_actors.next_box[local_id], x_diff, y_diff);
+  debug_out("From %d, %d (b%d) to %d, %d (b%d) x_diff %d y_diff %d", x, y, local_actors.cur_box[local_id], next_x, next_y, local_actors.next_box[local_id], x_diff, y_diff);
 
   if (x_diff == 0 && y_diff == 0) {
-    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
+    local_actors.walk_step_x[local_id] = 0;
+    local_actors.walk_step_y[local_id] = 0;
     return;
   }
 

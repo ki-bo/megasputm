@@ -343,7 +343,7 @@ void vm_change_ui_flags(uint8_t flags)
   if (flags & UI_FLAGS_APPLY_INTERFACE) {
     ui_state = (ui_state & ~(UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS)) |
                 (flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS));
-    screen_update_needed |= SCREEN_UPDATE_SENTENCE | SCREEN_UPDATE_VERBS;
+    screen_update_needed |= SCREEN_UPDATE_SENTENCE | SCREEN_UPDATE_VERBS | SCREEN_UPDATE_INVENTORY;
   }
 
   //debug_out("UI state enable-cursor: %d", ui_state & UI_FLAGS_ENABLE_CURSOR);
@@ -1487,7 +1487,7 @@ static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset)
 
 static void execute_sentence_stack(void)
 {
-  if (sentence_stack.num_entries == 0)
+  if (sentence_stack.num_entries == 0 || vm_is_script_running(SCRIPT_ID_SENTENCE))
   {
     return;
   }
@@ -1509,7 +1509,7 @@ static void execute_sentence_stack(void)
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
 
   uint8_t slot = vm_start_script(SCRIPT_ID_SENTENCE);
-  //debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
+  debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
   execute_script_slot(slot);
 }
 

@@ -42,6 +42,7 @@ static void assign_array(void);
 static void jump_if_equal(void);
 static void state_of(void);
 static void resource_cmd(void);
+static void walk_to_actor(void);
 static void owner_of(void);
 static void do_animation(void);
 static void camera_pan_to(void);
@@ -151,6 +152,7 @@ void script_init(void)
   opcode_jump_table[0x07] = &state_of;
   opcode_jump_table[0x08] = &jump_if_equal;
   opcode_jump_table[0x0c] = &resource_cmd;
+  opcode_jump_table[0x0d] = &walk_to_actor;
   opcode_jump_table[0x0f] = &jump_if_object_active_or_not_active;
   opcode_jump_table[0x10] = &owner_of;
   opcode_jump_table[0x11] = &do_animation;
@@ -199,6 +201,7 @@ void script_init(void)
   opcode_jump_table[0x47] = &state_of;
   opcode_jump_table[0x48] = &jump_if_not_equal;
   opcode_jump_table[0x4a] = &chain_script;
+  opcode_jump_table[0x4d] = &walk_to_actor;
   opcode_jump_table[0x4f] = &jump_if_object_active_or_not_active;
   opcode_jump_table[0x50] = &pick_up_object;
   opcode_jump_table[0x51] = &do_animation;
@@ -778,6 +781,34 @@ static void resource_cmd(void)
       //debug_out("unknown sub-opcode %02x", sub_opcode);
       fatal_error(ERR_UNKNOWN_RESOURCE_OPERATION);
   }
+}
+
+static void walk_to_actor(void)
+{
+  uint8_t actor_id1 = resolve_next_param8();
+  uint8_t actor_id2 = resolve_next_param8();
+  uint8_t target_distance = read_byte();
+
+  if (actor_id1 >= vm_read_var8(VAR_NUMBER_OF_ACTORS) || 
+      actor_id2 >= vm_read_var8(VAR_NUMBER_OF_ACTORS) ||
+      actors.room[actor_id1] != vm_read_var8(VAR_SELECTED_ROOM) || 
+      actors.room[actor_id1] != actors.room[actor_id2]) {
+    return;
+  }
+
+  uint8_t x  = actors.x[actor_id2];
+  uint8_t y  = actors.y[actor_id2];
+  uint8_t cx = actors.x[actor_id1];
+  uint8_t cy = actors.y[actor_id1];
+
+  if (cx < x) {
+    x -= target_distance;
+  }
+  else {
+    x += target_distance;
+  }
+
+  actor_walk_to(actor_id1, x, y);
 }
 
 static void owner_of(void)
