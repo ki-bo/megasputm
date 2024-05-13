@@ -6,13 +6,9 @@
 #include "util.h"
 #include "vm.h"
 
-#define INV_MAX_OBJECTS 80
-
 #pragma clang section rodata="cdata_main" data="data_main" bss="zdata"
 
-uint8_t             inv_num_objects;
-struct object_code *inv_objects[INV_MAX_OBJECTS];
-uint8_t            *inv_next_free;
+
 
 /**
  * @defgroup inv_init Inventory Init Functions
@@ -22,9 +18,6 @@ uint8_t            *inv_next_free;
 
 void inv_init()
 {
-  inv_num_objects = 0;
-  inv_objects[0]  = NULL;
-  inv_next_free   = (void *)INVENTORY_BASE;
 }
 
  ///@} inv_init
@@ -46,11 +39,11 @@ void inv_add_object(uint8_t local_object_id)
   __auto_type obj_hdr = (struct object_code __huge *)(res_get_huge_ptr(obj_page[local_object_id]) + obj_offset[local_object_id]);
   uint16_t size = obj_hdr->chunk_size;
 
-  uint16_t free_bytes = INVENTORY_BASE + INVENTORY_SIZE - (uint16_t)inv_next_free;
+  uint16_t free_bytes = INVENTORY_BASE + INVENTORY_SIZE - (uint16_t)vm_state.inv_next_free;
   if (free_bytes < size) {
     fatal_error(ERR_OUT_OF_INVENTORY_SPACE);
   }
-  else if (inv_num_objects == INV_MAX_OBJECTS) {
+  else if (vm_state.inv_num_objects == MAX_INVENTORY) {
     fatal_error(ERR_TOO_MANY_INVENTORY_OBJECTS);
   }
 
@@ -68,23 +61,23 @@ void inv_add_object(uint8_t local_object_id)
   global_dma_list.count = size;
   global_dma_list.src_addr = LSB16(obj_hdr);
   global_dma_list.src_bank = BANK(obj_hdr);
-  global_dma_list.dst_addr = (uint16_t)inv_next_free;
+  global_dma_list.dst_addr = (uint16_t)vm_state.inv_next_free;
   global_dma_list.dst_bank = 0;
   dma_trigger(&global_dma_list);
 
-  inv_objects[inv_num_objects] = (struct object_code *)inv_next_free;
-  ++inv_num_objects;
-  inv_next_free += size;
+  vm_state.inv_objects[vm_state.inv_num_objects] = (struct object_code *)vm_state.inv_next_free;
+  ++vm_state.inv_num_objects;
+  vm_state.inv_next_free += size;
 }
 
 struct object_code *inv_get_object_by_id(uint8_t global_object_id)
 {
   unmap_ds();
 
-  for (uint8_t i = 0; i < inv_num_objects; ++i) {
-    debug_out("compare %d %d", inv_objects[i]->id, global_object_id);
-    if (inv_objects[i]->id == global_object_id) {
-      return inv_objects[i];
+  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
+    debug_out("compare %d %d", vm_state.inv_objects[i]->id, global_object_id);
+    if (vm_state.inv_objects[i]->id == global_object_id) {
+      return vm_state.inv_objects[i];
     }
   }
 
@@ -96,8 +89,8 @@ uint8_t inv_object_available(uint16_t id)
   uint16_t save_ds = map_get_ds();
   uint8_t result = 0;
 
-  for (uint8_t i = 0; i < inv_num_objects; ++i) {
-    if (inv_objects[i]->id == id) {
+  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
+    if (vm_state.inv_objects[i]->id == id) {
       result = 1;
       break;
     }
@@ -110,15 +103,15 @@ uint8_t inv_object_available(uint16_t id)
 const char *inv_get_object_name(uint8_t position)
 {
   unmap_ds();
-  debug_out("inv_objects %p name_offset %02x", inv_objects[position], inv_objects[position]->name_offset);
-  const char *name_ptr = (const char *)inv_objects[position] + inv_objects[position]->name_offset;
+  debug_out("inv_objects %p name_offset %02x", vm_state.inv_objects[position], vm_state.inv_objects[position]->name_offset);
+  const char *name_ptr = (const char *)vm_state.inv_objects[position] + vm_state.inv_objects[position]->name_offset;
   return name_ptr;
 }
 
 uint8_t inv_get_object_id(uint8_t position)
 {
   unmap_ds();
-  return inv_objects[position]->id;
+  return vm_state.inv_objects[position]->id;
 }
 
 ///@} inv_public

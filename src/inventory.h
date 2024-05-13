@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-extern uint8_t inv_num_objects;
-
 // code_init functions
 void inv_init();
 

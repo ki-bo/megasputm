@@ -27,7 +27,9 @@ void res_init(void);
 
 // code_main functions
 uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint);
+void res_deactivate_and_unlock_all(void);
 uint8_t __huge *res_get_huge_ptr(uint8_t slot);
+void res_reset(void);
 void res_lock(uint8_t type, uint8_t id, uint8_t hint);
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint);
 void res_activate(uint8_t type, uint8_t id, uint8_t hint);

@@ -4,6 +4,7 @@
 #include "error.h"
 #include "map.h"
 #include "memory.h"
+#include <stdint.h>
 #include <string.h>
 
 //#define HEAP_DEBUG_OUT 1
@@ -116,6 +117,8 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   }
   while(i != hint);
 
+  uint16_t save_cs = map_get_cs();
+
   map_cs_diskio();
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
   //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
@@ -132,9 +135,30 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   print_heap();
 #endif
 
-  unmap_cs();
+  map_set_cs(save_cs);
 
   return page;
+}
+
+/**
+ * @brief Deactivates all resources in memory
+ *
+ * This function deactivates all resources in memory, except for heap resources.
+ *
+ * Code section: code_main
+ */
+void res_deactivate_and_unlock_all(void)
+{
+  uint8_t i = 0;
+  do {
+    if ((page_res_type[i] & RES_TYPE_MASK) != RES_TYPE_HEAP) {
+      page_res_type[i] &= ~(RES_ACTIVE_MASK | RES_LOCKED_MASK);
+    }
+  }
+  while (++i != 0);
+  uint16_t save_cs = map_cs_main_priv();
+  print_heap();
+  map_set_cs(save_cs);
 }
 
 /**

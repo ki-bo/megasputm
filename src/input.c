@@ -1,6 +1,7 @@
 #include "input.h"
 #include "io.h"
 #include "util.h"
+#include "vm.h"
 #include <mega65.h>
 
 //-----------------------------------------------------------------------------------------------
@@ -8,6 +9,11 @@
 #pragma clang section bss="zdata"
 
 //-----------------------------------------------------------------------------------------------
+
+enum {
+    INPUT_ASCII_RUNSTOP = 0x03,
+    INPUT_ASCII_ESCAPE  = 0x1b
+};
 
 uint8_t input_cursor_x;
 uint8_t input_cursor_y;
@@ -83,8 +89,18 @@ void input_update(void)
   if (input_key_pressed == 0) { // = 0 means previous key was processed
     uint8_t key_pressed_ascii = ASCIIKEY;
     if (key_pressed_ascii != 0) {
-      //debug_out("key pressed %d", key_pressed_ascii);
-      input_key_pressed = key_pressed_ascii;
+      if (key_pressed_ascii == INPUT_ASCII_ESCAPE || key_pressed_ascii == INPUT_ASCII_RUNSTOP) {
+        input_key_pressed = vm_read_var8(VAR_CUTSCENEEXIT_KEY);
+      }
+      else if (key_pressed_ascii >= 0xf1 && key_pressed_ascii <= 0xfe) {
+        // handling function keys
+        input_key_pressed = key_pressed_ascii - 0xf0;
+      }
+      else if (key_pressed_ascii >= 0x61 && key_pressed_ascii <= 0x7a) {
+        // handling A-Z keys
+        input_key_pressed = key_pressed_ascii;
+      }
+      //debug_out("key pressed %d = %d", key_pressed_ascii, input_key_pressed);
     }
     else {
       input_key_pressed = 0;

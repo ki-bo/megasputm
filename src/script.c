@@ -49,7 +49,7 @@ static void camera_pan_to(void);
 static void actor_ops(void);
 static void say_line(void);
 static void random_number(void);
-static void jump(void);
+static void jump_or_restart(void);
 static void do_sentence(void);
 static void jump_if_not_pickupable(void);
 static void assign_variable(void);
@@ -160,7 +160,7 @@ void script_init(void)
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &say_line;
   opcode_jump_table[0x16] = &random_number;
-  opcode_jump_table[0x18] = &jump;
+  opcode_jump_table[0x18] = &jump_or_restart;
   opcode_jump_table[0x19] = &do_sentence;
   opcode_jump_table[0x1a] = &assign_variable;
   opcode_jump_table[0x1b] = &assign_bit_variable;
@@ -262,7 +262,7 @@ void script_run_active_slot(void)
   break_script = 0;
 
   map_ds_resource(proc_res_slot[active_script_slot]);
-  pc = NEAR_U8_PTR(RES_MAPPED) + proc_pc[active_script_slot];
+  pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
   // check for PROC_STATE_RUNNING only will also mean we won't continue executing if
   // PROC_FLAGS_FROZEN is set.
   while (vm_get_active_proc_state_and_flags() == PROC_STATE_RUNNING && !(break_script)) {
@@ -274,7 +274,7 @@ void script_run_active_slot(void)
     exec_opcode(opcode);
   }
 
-  proc_pc[active_script_slot] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
+  vm_state.proc_pc[active_script_slot] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
   --parallel_script_count;
 }
 
@@ -636,7 +636,7 @@ static void draw_object(void)
   }
 
   //debug_scr("draw-object %d", obj_id);
-  global_game_objects[obj_id] |= OBJ_STATE;
+  vm_state.global_game_objects[obj_id] |= OBJ_STATE;
   uint8_t local_object_id = vm_get_local_object_id(obj_id);
   if (local_object_id != 0xff) {
     vm_draw_object(local_object_id, x, y);
@@ -696,11 +696,11 @@ static void state_of(void)
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
     //debug_scr("state-of %d is OFF", obj_id);
-    global_game_objects[obj_id] &= ~OBJ_STATE;
+    vm_state.global_game_objects[obj_id] &= ~OBJ_STATE;
   }
   else {
     //debug_scr("state-of %d is ON", obj_id);
-    global_game_objects[obj_id] |= OBJ_STATE;
+    vm_state.global_game_objects[obj_id] |= OBJ_STATE;
   }
   if (vm_get_local_object_id(obj_id) != 0xff) {
     vm_update_bg();
@@ -815,8 +815,8 @@ static void owner_of(void)
 {
   uint8_t var_idx = read_byte();
   uint16_t obj_id = resolve_next_param16();
-  debug_scr("owner-of %d is %d", obj_id, global_game_objects[obj_id] & 0x0f);
-  vm_write_var(var_idx, global_game_objects[obj_id] & 0x0f);
+  debug_scr("owner-of %d is %d", obj_id, vm_state.global_game_objects[obj_id] & 0x0f);
+  vm_write_var(var_idx, vm_state.global_game_objects[obj_id] & 0x0f);
 }
 
 static void do_animation(void)
@@ -928,18 +928,28 @@ static void random_number(void)
 }
 
 /**
- * @brief Opcode 0x18: Jump
+ * @brief Opcode 0x18: Jump or restart
  * 
+ * Opcode 0x18:
  * Reads a 16 bit offset value and jumps to the new pc. An offset of 0 means
  * that the script will continue with the next opcode. The offset is signed
  * two-complement.
  *
+ * Opcide 0x98:
+ * Will restart the game from the beginning.
+ *
  * Code section: code_script
  */
-static void jump(void)
+static void jump_or_restart(void)
 {
-  pc += read_word(); // will effectively jump backwards if the offset is negative
-  debug_scr("jump %03x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
+  if (!(opcode & 0x80)) {
+    pc += read_word(); // will effectively jump backwards if the offset is negative
+    debug_scr("jump %03x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
+  }
+  else {
+    debug_scr("restart");
+    vm_restart_game();
+  }
 }
 
 /**
@@ -1133,12 +1143,12 @@ static void jump_if_or_if_not_locked(void)
   int16_t offset = read_word();
 
   if (opcode & 0x40) {
-    if (!(global_game_objects[obj_id] & OBJ_CLASS_LOCKED)) {
+    if (!(vm_state.global_game_objects[obj_id] & OBJ_CLASS_LOCKED)) {
       pc += offset;
     }
   }
   else {
-    if (global_game_objects[obj_id] & OBJ_CLASS_LOCKED) {
+    if (vm_state.global_game_objects[obj_id] & OBJ_CLASS_LOCKED) {
       pc += offset;
     }
   }
@@ -1294,11 +1304,11 @@ static void set_or_clear_pickupable(void)
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
     debug_scr("clear-pickupable %d", obj_id);
-    global_game_objects[obj_id] &= ~OBJ_CLASS_PICKUPABLE;
+    vm_state.global_game_objects[obj_id] &= ~OBJ_CLASS_PICKUPABLE;
   }
   else {
     debug_scr("set-pickupable %d", obj_id);
-    global_game_objects[obj_id] |= OBJ_CLASS_PICKUPABLE;
+    vm_state.global_game_objects[obj_id] |= OBJ_CLASS_PICKUPABLE;
   }
 }
 
@@ -1375,12 +1385,12 @@ static void jump_if_or_if_not_pickupable(void)
   int16_t  offset = read_word();
 
   if (opcode & 0x40) {
-    if (!(global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE)) {
+    if (!(vm_state.global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE)) {
       pc += offset;
     }
   }
   else {
-    if (global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE) {
+    if (vm_state.global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE) {
       pc += offset;
     }
   }
@@ -1529,7 +1539,7 @@ void chain_script(void)
   //debug_msg("chain-script");
   uint8_t script_id = resolve_next_param8();
   vm_chain_script(script_id);
-  pc = NEAR_U8_PTR(RES_MAPPED) + proc_pc[active_script_slot];
+  pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
 }
 
 /**
@@ -1553,13 +1563,13 @@ static void jump_if_object_active_or_not_active(void)
   uint16_t obj_id = resolve_next_param16();
   int16_t offset = read_word();
   if (opcode & 0x40) {
-    if ((global_game_objects[obj_id] & OBJ_STATE) == 0) {
+    if ((vm_state.global_game_objects[obj_id] & OBJ_STATE) == 0) {
       //debug_scr("jump if object %d not active", obj_id);
       pc += offset;
     }
   }
   else {
-    if (global_game_objects[obj_id] & OBJ_STATE) {
+    if (vm_state.global_game_objects[obj_id] & OBJ_STATE) {
       //debug_scr("jump if object %d active", obj_id);
       pc += offset;
     }
@@ -1586,7 +1596,7 @@ static void pick_up_object(void)
 
   inv_add_object(local_object_id);
 
-  uint8_t *game_object = &global_game_objects[obj_id];
+  uint8_t *game_object = &vm_state.global_game_objects[obj_id];
   *game_object &= 0xf0; // clear object owner
   *game_object |= OBJ_STATE | OBJ_CLASS_UNTOUCHABLE | vm_read_var8(VAR_SELECTED_ACTOR);
   vm_update_bg();
@@ -1700,11 +1710,11 @@ static void lock_or_unlock(void)
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
     //debug_scr("unlock-object %d", obj_id);
-    global_game_objects[obj_id] &= ~OBJ_CLASS_LOCKED;
+    vm_state.global_game_objects[obj_id] &= ~OBJ_CLASS_LOCKED;
   }
   else {
     //debug_scr("lock-object %d", obj_id);
-    global_game_objects[obj_id] |= OBJ_CLASS_LOCKED;
+    vm_state.global_game_objects[obj_id] |= OBJ_CLASS_LOCKED;
   }
 }
 
@@ -1842,7 +1852,7 @@ static void jump_if_not_pickupable(void)
   //debug_msg("Jump if can not pick up object");
   uint16_t obj_id = resolve_next_param16();
   int16_t offset = read_word();
-  if ((global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE) == 0) {
+  if ((vm_state.global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE) == 0) {
     pc += offset;
   }
 }

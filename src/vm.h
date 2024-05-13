@@ -7,6 +7,7 @@
 #define NUM_SCRIPT_SLOTS     32
 #define MAX_OBJECTS          57
 #define MAX_VERBS            22
+#define MAX_INVENTORY        80
 #define CMD_STACK_SIZE        6
 
 enum {
@@ -56,6 +57,7 @@ enum {
   VAR_SELECTED_VERB = 33,
   VAR_CLICKED_NOUN = 35,
   VAR_DEFAULT_VERB = 38,
+  VAR_CURRENT_KEY = 39,
   VAR_CUTSCENEEXIT_KEY = 40,
 };
 
@@ -104,6 +106,15 @@ enum {
   VERB_STATE_DELETED = 0x80
 };
 
+struct verb {
+  uint8_t  id[MAX_VERBS];
+  uint8_t  state[MAX_VERBS];
+  uint8_t  x[MAX_VERBS];
+  uint8_t  y[MAX_VERBS];
+  uint8_t  len[MAX_VERBS];
+  char    *name[MAX_VERBS];
+};
+
 struct object_code {
   uint16_t chunk_size;
   uint8_t  unused1;
@@ -120,27 +131,41 @@ struct object_code {
   uint8_t  name_offset;
 };
 
-extern uint8_t global_game_objects[780];
-extern uint8_t variables_lo[256];
-extern uint8_t variables_hi[256];
-extern char message_buffer[256];
+struct vm
+{
+  uint8_t global_game_objects[780];
+  uint8_t variables_lo[256];
+  uint8_t variables_hi[256];
 
+  uint8_t message_speed;
+
+  uint8_t  proc_script_id[NUM_SCRIPT_SLOTS];
+  uint8_t  proc_state[NUM_SCRIPT_SLOTS];
+  uint8_t  proc_parent[NUM_SCRIPT_SLOTS];
+  uint8_t  proc_child[NUM_SCRIPT_SLOTS];
+  uint8_t  proc_type[NUM_SCRIPT_SLOTS];
+  uint16_t proc_pc[NUM_SCRIPT_SLOTS];
+  int32_t  proc_wait_timer[NUM_SCRIPT_SLOTS];
+
+  // verb data
+  struct verb verbs;
+  
+  uint8_t             inv_num_objects;
+  struct object_code *inv_objects[MAX_INVENTORY];
+  uint8_t            *inv_next_free;
+};
+
+extern struct vm vm_state;
+extern char message_buffer[256];
 extern volatile uint8_t script_watchdog;
 extern uint8_t ui_state;
 extern uint16_t camera_x;
-
 extern uint8_t active_script_slot;
-extern uint8_t proc_script_id[NUM_SCRIPT_SLOTS];
-extern uint8_t proc_state[NUM_SCRIPT_SLOTS];
 extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
-extern uint16_t proc_pc[NUM_SCRIPT_SLOTS];
-
 extern uint8_t room_res_slot;
-
 extern uint8_t  obj_page[MAX_OBJECTS];
 extern uint8_t  obj_offset[MAX_OBJECTS];
 extern uint16_t obj_id[MAX_OBJECTS];
-
 extern uint8_t inventory_pos;
 
 struct sentence_stack_t {
@@ -152,6 +177,7 @@ struct sentence_stack_t {
 extern struct sentence_stack_t sentence_stack;
 
 void vm_init(void);
+void vm_restart_game(void);
 __task void vm_mainloop(void);
 uint8_t vm_get_active_proc_state_and_flags(void);
 void vm_change_ui_flags(uint8_t flags);
@@ -191,19 +217,19 @@ char *vm_verb_get_name(uint8_t slot);
 static inline uint16_t vm_read_var(uint8_t var)
 {
   volatile uint16_t value;
-  value = variables_lo[var] | (variables_hi[var] << 8);
+  value = vm_state.variables_lo[var] | (vm_state.variables_hi[var] << 8);
   return value;
 }
 
 static inline uint8_t vm_read_var8(uint8_t var)
 {
-  return variables_lo[var];
+  return vm_state.variables_lo[var];
 }
 
 static inline void vm_write_var(uint8_t var, uint16_t value)
 {
-  variables_lo[var] = LSB(value);
-  variables_hi[var] = MSB(value);
+  vm_state.variables_lo[var] = LSB(value);
+  vm_state.variables_hi[var] = MSB(value);
   /*__asm volatile(" lda %[val]\n"
                  " sta variables_lo, x\n"
                  " lda %[val]+1\n"

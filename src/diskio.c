@@ -288,7 +288,7 @@ static void load_index(void)
     }
   }
 
-  memcpy(&global_game_objects, &lfl_index_file_contents.global_game_objects, sizeof(lfl_index_file_contents.global_game_objects));
+  memcpy(&vm_state.global_game_objects, &lfl_index_file_contents.global_game_objects, sizeof(lfl_index_file_contents.global_game_objects));
   for (uint8_t i = 0; i < sizeof(lfl_index.room_disk_num); ++i) {
     lfl_index.room_disk_num[i] = lfl_index_file_contents.room_disk_num[i];
     lfl_index.room_offset[i] = lfl_index_file_contents.room_offset[i];
@@ -435,6 +435,69 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
     address += 254;
   }
   
+  release_drive();
+}
+
+/**
+ * @brief Loads the global game objects from disk into memory.
+ *
+ * The global game objects are stored in the index file 00.lfl. The function
+ * will load the global game objects from the index file into memory.
+ *
+ * Code section: code_diskio
+ */
+void diskio_load_game_objects(void)
+{
+  uint8_t bytes_left_in_block;
+  next_track = room_track_list[0];
+  next_block = room_block_list[0];
+  int16_t num_bytes_left;
+
+  acquire_drive();
+
+  uint8_t first = 1;
+  uint16_t bytes_read = 0;
+  uint8_t *address = (uint8_t *)&vm_state.global_game_objects;
+
+  while (next_track != 0 && num_bytes_left > 0) {
+    load_block(next_track, next_block);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    if (next_track == 0) {
+      bytes_left_in_block = next_block - 1;
+    }
+    else {
+      bytes_left_in_block = 254;
+    }
+
+    if (first) {
+      first = 0;
+
+      // skip magic number, 2 bytes
+      FDC.data;
+      FDC.data;
+
+      // number of global game objects, 2 bytes
+      num_bytes_left = FDC.data ^ 0xff;
+      num_bytes_left |= (FDC.data ^ 0xff) << 8;
+
+      num_bytes_left <<= 1;
+      bytes_left_in_block -= 4;
+      
+      debug_out("num_bytes_left %d", num_bytes_left);
+    }
+
+    while (bytes_left_in_block-- != 0 && num_bytes_left-- != 0) {
+      *address = FDC.data ^ 0xff;
+      ++address;
+      ++bytes_read;
+    }
+
+    debug_out("  num_bytes_left: %d", num_bytes_left);
+  }
+
+  debug_out("read %d bytes of global game objects", bytes_read);
+
   release_drive();
 }
 

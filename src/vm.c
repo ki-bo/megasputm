@@ -36,26 +36,11 @@ struct room_header {
   uint16_t entry_script_offset;  
 };
 
-struct verb {
-  uint8_t  id[MAX_VERBS];
-  uint8_t  state[MAX_VERBS];
-  uint8_t  x[MAX_VERBS];
-  uint8_t  y[MAX_VERBS];
-  uint8_t  len[MAX_VERBS];
-  char    *name[MAX_VERBS];
-};
-
 #pragma clang section bss="zdata"
 
-uint8_t global_game_objects[780];
-uint8_t variables_lo[256];
-uint8_t variables_hi[256];
-
-uint8_t message_color;
-char message_buffer[256];
-char *message_ptr;
-char *print_message_ptr;
-uint8_t print_message_num_chars;
+struct vm vm_state;
+uint8_t reset_game;
+uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 
 volatile uint8_t script_watchdog;
 uint8_t ui_state;
@@ -65,18 +50,14 @@ uint8_t camera_state;
 uint8_t camera_follow_actor_id;
 
 uint8_t active_script_slot;
-uint8_t message_speed = 6;
 uint16_t message_timer;
 uint8_t actor_talking;
 
-uint8_t proc_script_id[NUM_SCRIPT_SLOTS];
-uint8_t proc_state[NUM_SCRIPT_SLOTS];
-uint8_t proc_parent[NUM_SCRIPT_SLOTS];
-uint8_t proc_child[NUM_SCRIPT_SLOTS];
-uint8_t proc_type[NUM_SCRIPT_SLOTS];
-uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
-uint16_t proc_pc[NUM_SCRIPT_SLOTS];
-int32_t proc_wait_timer[NUM_SCRIPT_SLOTS];
+uint8_t message_color;
+char message_buffer[256];
+char *message_ptr;
+char *print_message_ptr;
+uint8_t print_message_num_chars;
 
 // cutscene backup data
 uint8_t cs_room;
@@ -86,28 +67,26 @@ uint8_t cs_proc_slot;
 uint16_t cs_override_pc;
 
 // room and object data
-uint8_t          room_res_slot;
-uint16_t         room_width;
-uint8_t          num_objects;
-uint8_t          obj_page[MAX_OBJECTS];
-uint8_t          obj_offset[MAX_OBJECTS];
-uint16_t         obj_id[MAX_OBJECTS];
-uint8_t          screen_update_needed = 0;
-
-uint8_t inventory_pos;
-
-// verb data
-struct verb verbs;
+uint8_t  room_res_slot;
+uint16_t room_width;
+uint8_t  num_objects;
+uint8_t  obj_page[MAX_OBJECTS];
+uint8_t  obj_offset[MAX_OBJECTS];
+uint16_t obj_id[MAX_OBJECTS];
+uint8_t  screen_update_needed;
 
 // sentence queue
 struct sentence_stack_t sentence_stack;
 char sentence_text[41];
-uint8_t prev_sentence_highlighted = 0;
-uint8_t prev_verb_highlighted = 0xff;
-uint8_t prev_inventory_highlighted = 0xff;
+uint8_t prev_sentence_highlighted;
+uint8_t prev_verb_highlighted;
+uint8_t prev_inventory_highlighted;
 uint8_t sentence_length;
 
+uint8_t inventory_pos;
+
 // Private functions
+static void reset_game_state(void);
 static void set_proc_state(uint8_t slot, uint8_t state);
 static uint8_t get_proc_state(uint8_t slot);
 static uint8_t is_room_object_script(uint8_t slot);
@@ -169,7 +148,7 @@ void vm_init(void)
 {
   for (active_script_slot = 0; active_script_slot < NUM_SCRIPT_SLOTS; ++active_script_slot)
   {
-    proc_state[active_script_slot] = PROC_STATE_FREE;
+    vm_state.proc_state[active_script_slot] = PROC_STATE_FREE;
   }
 
   camera_x = 20;
@@ -178,9 +157,12 @@ void vm_init(void)
   actor_talking = 0xff;
   ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
   vm_write_var(VAR_CURSOR_STATE, 3);
+  vm_state.message_speed = 6;
+  prev_verb_highlighted = 0xff;
+  prev_inventory_highlighted = 0xff;
 
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
-    verbs.id[i] = 0xff;
+    vm_state.verbs.id[i] = 0xff;
   }
 }
 
@@ -193,6 +175,34 @@ void vm_init(void)
  * @{
  */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
+
+void vm_restart_game(void)
+{
+  static const char restart_str[] = "Are you sure you want to restart? (y/n)";
+  map_cs_gfx();
+  gfx_print_dialog(2, restart_str, sizeof(restart_str) - 1);
+  unmap_cs();
+
+  while (1) {
+    if (input_key_pressed) {
+      debug_out("key %d", input_key_pressed);
+      if (input_key_pressed == 'y') {
+        reset_game = 1;
+        break;
+      }
+      else if (input_key_pressed == 'n') {
+        break;
+      }
+      else {
+        input_key_pressed = 0;
+      }
+    }
+  }
+  
+  map_cs_gfx();
+  gfx_clear_dialog();
+  unmap_cs();
+}
 
 /**
  * @brief Main loop of the virtual machine
@@ -219,12 +229,21 @@ __task void vm_mainloop(void)
   gfx_start();
   unmap_cs();
 
-  vm_start_script(1);
-
-  wait_for_jiffy(); // this resets the elapsed jiffies timer
-  message_timer = 0;
+  reset_game = 1;
 
   while (1) {
+    if (reset_game) {
+      reset_game = 0;
+      unmap_all();
+      map_cs_gfx();
+      gfx_fade_out();
+      gfx_clear_bg_image();
+      gfx_reset_actor_drawing();
+      map_cs_diskio();
+      reset_game_state();
+      unmap_cs();
+    }
+  
     script_watchdog = 0;
 
     uint8_t elapsed_jiffies = 0;
@@ -249,7 +268,7 @@ __task void vm_mainloop(void)
          ++active_script_slot)
     {
       // non-top-level scripts will be executed as childs in other scripts, so skip them here
-      if (proc_parent[active_script_slot] != 0xff) {
+      if (vm_state.proc_parent[active_script_slot] != 0xff) {
         continue;
       }
       execute_script_slot(active_script_slot);
@@ -322,7 +341,7 @@ __task void vm_mainloop(void)
  */
 uint8_t vm_get_active_proc_state_and_flags(void)
 {
-  return proc_state[active_script_slot];
+  return vm_state.proc_state[active_script_slot];
 }
 
 void vm_change_ui_flags(uint8_t flags)
@@ -451,8 +470,8 @@ void vm_set_current_room(uint8_t room_no)
  */
 void vm_set_script_wait_timer(int32_t negative_ticks)
 {
-  proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_TIMER;
-  proc_wait_timer[active_script_slot] = negative_ticks;
+  vm_state.proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_TIMER;
+  vm_state.proc_wait_timer[active_script_slot] = negative_ticks;
 }
 
 /**
@@ -558,17 +577,17 @@ uint8_t vm_start_script(uint8_t script_id)
 
   uint8_t slot = vm_get_script_slot_by_script_id(script_id);
   if (slot != 0xff) {
-    proc_state[slot] = PROC_STATE_RUNNING;
-    proc_pc[slot] = 4; // skipping script header directly to first opcode
+    vm_state.proc_state[slot] = PROC_STATE_RUNNING;
+    vm_state.proc_pc[slot] = 4; // skipping script header directly to first opcode
     return slot;
   }
 
   slot = find_free_script_slot();
-  proc_script_id[slot] = script_id;
-  proc_state[slot] = PROC_STATE_RUNNING;
-  proc_parent[slot] = 0xff;
-  proc_child[slot] = 0xff;
-  proc_pc[slot] = 4; // skipping script header directly to first opcode
+  vm_state.proc_script_id[slot] = script_id;
+  vm_state.proc_state[slot] = PROC_STATE_RUNNING;
+  vm_state.proc_parent[slot] = 0xff;
+  vm_state.proc_child[slot] = 0xff;
+  vm_state.proc_pc[slot] = 4; // skipping script header directly to first opcode
 
   uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
   res_activate_slot(new_page);
@@ -591,11 +610,11 @@ uint8_t vm_start_child_script(uint8_t script_id)
   //debug_out("Starting script %d as child of slot %d", script_id, active_script_slot);
 
   uint8_t slot = vm_start_script(script_id);
-  proc_parent[slot] = active_script_slot;
+  vm_state.proc_parent[slot] = active_script_slot;
   
   // update the calling script to wait for the child script
-  proc_child[active_script_slot] = slot;
-  proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_CHILD;
+  vm_state.proc_child[active_script_slot] = slot;
+  vm_state.proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_CHILD;
 
   return slot;
 }
@@ -633,7 +652,7 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
  */
 void vm_chain_script(uint8_t script_id)
 {
-  //debug_out("Chaining script %d from script %d", script_id, proc_script_id[active_script_slot]);
+  //debug_out("Chaining script %d from script %d", script_id, vm.proc_script_id[active_script_slot]);
 
   if (!is_room_object_script(active_script_slot)) {
     res_deactivate_slot(proc_res_slot[active_script_slot]);
@@ -644,8 +663,8 @@ void vm_chain_script(uint8_t script_id)
   map_ds_resource(new_page);
 
   proc_res_slot[active_script_slot] = new_page;
-  proc_pc[active_script_slot] = 4; // skipping script header directly to first opcode
-  proc_script_id[active_script_slot] = script_id;
+  vm_state.proc_pc[active_script_slot] = 4; // skipping script header directly to first opcode
+  vm_state.proc_script_id[active_script_slot] = script_id;
 }
 
 /**
@@ -658,16 +677,16 @@ void vm_chain_script(uint8_t script_id)
  */
 void vm_stop_active_script()
 {
-  //debug_out("Script %d ended", proc_script_id[active_script_slot]);
+  //debug_out("Script %d ended", vm.proc_script_id[active_script_slot]);
   if (!is_room_object_script(active_script_slot)) {
     res_deactivate_slot(proc_res_slot[active_script_slot]);
   }
-  proc_state[active_script_slot] = PROC_STATE_FREE;
-  uint8_t parent = proc_parent[active_script_slot];
+  vm_state.proc_state[active_script_slot] = PROC_STATE_FREE;
+  uint8_t parent = vm_state.proc_parent[active_script_slot];
   if (parent != 0xff)
   {
-    proc_state[parent] = PROC_STATE_RUNNING;
-    proc_child[parent] = 0xff;
+    vm_state.proc_state[parent] = PROC_STATE_RUNNING;
+    vm_state.proc_child[parent] = 0xff;
   }
 }
 
@@ -675,19 +694,19 @@ void vm_stop_script(uint8_t script_id)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
-    if (proc_state[slot] != PROC_STATE_FREE && proc_script_id[slot] == script_id)
+    if (vm_state.proc_state[slot] != PROC_STATE_FREE && vm_state.proc_script_id[slot] == script_id)
     {
       //debug_out("Stopping script %d", script_id);
       res_deactivate_slot(proc_res_slot[slot]);
-      proc_state[slot] = PROC_STATE_FREE;
+      vm_state.proc_state[slot] = PROC_STATE_FREE;
       // stop all children
-      while (proc_child[slot] != 0xff)
+      while (vm_state.proc_child[slot] != 0xff)
       {
-        proc_child[slot] = 0xff;
-        slot = proc_child[slot];
-        //debug_out("Stopped child script %d", proc_script_id[slot]);
+        vm_state.proc_child[slot] = 0xff;
+        slot = vm_state.proc_child[slot];
+        //debug_out("Stopped child script %d", vm.proc_script_id[slot]);
         res_deactivate_slot(proc_res_slot[slot]);
-        proc_state[slot] = PROC_STATE_FREE;
+        vm_state.proc_state[slot] = PROC_STATE_FREE;
       }
     }
   }
@@ -697,7 +716,7 @@ uint8_t vm_get_script_slot_by_script_id(uint8_t script_id)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
-    if (proc_state[slot] != PROC_STATE_FREE && proc_script_id[slot] == script_id)
+    if (vm_state.proc_state[slot] != PROC_STATE_FREE && vm_state.proc_script_id[slot] == script_id)
     {
       return slot;
     }
@@ -777,7 +796,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
     //debug_out("Checking object %d at %d, %d state %d - parent_state %d", obj_hdr->id, obj_hdr->pos_x, obj_hdr->pos_y_and_parent_state & 0x7f, global_game_objects[obj_hdr->id] & OBJ_STATE, obj_hdr->pos_y_and_parent_state & 0x80);
     //debug_out("  obj_state %02x", global_game_objects[obj_hdr->id]);
-    if (global_game_objects[obj_hdr->id] & OBJ_CLASS_UNTOUCHABLE) {
+    if (vm_state.global_game_objects[obj_hdr->id] & OBJ_CLASS_UNTOUCHABLE) {
       continue;
     }
     if (obj_hdr->parent != 0) {
@@ -895,15 +914,15 @@ void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char
   uint16_t save_ds = map_get_ds();
   map_ds_heap();
 
-  verbs.id[slot] = verb_id;
-  verbs.x[slot] = x;
-  verbs.y[slot] = y;
+  vm_state.verbs.id[slot] = verb_id;
+  vm_state.verbs.x[slot] = x;
+  vm_state.verbs.y[slot] = y;
 
   uint8_t len = strlen(name);
-  verbs.len[slot] = len;
+  vm_state.verbs.len[slot] = len;
   ++len; // include null terminator
-  verbs.name[slot] = (char *)malloc(len);
-  strcpy(verbs.name[slot], name);
+  vm_state.verbs.name[slot] = (char *)malloc(len);
+  strcpy(vm_state.verbs.name[slot], name);
 
   screen_update_needed |= SCREEN_UPDATE_VERBS;
 
@@ -914,10 +933,10 @@ void vm_verb_delete(uint8_t slot)
 {
   uint16_t save_ds = map_get_ds();
 
-  verbs.id[slot] = 0xff;
+  vm_state.verbs.id[slot] = 0xff;
   map_ds_heap();
-  free(verbs.name[slot]);
-  verbs.name[slot] = NULL;
+  free(vm_state.verbs.name[slot]);
+  vm_state.verbs.name[slot] = NULL;
 
   screen_update_needed |= SCREEN_UPDATE_VERBS;
 
@@ -926,12 +945,12 @@ void vm_verb_delete(uint8_t slot)
 
 void vm_verb_set_state(uint8_t slot, uint8_t state)
 {
-  verbs.state[slot] = state;
+  vm_state.verbs.state[slot] = state;
 }
 
 char *vm_verb_get_name(uint8_t slot)
 {
-  return verbs.name[slot];
+  return vm_state.verbs.name[slot];
 }
 
 /// @} // vm_public
@@ -943,34 +962,94 @@ char *vm_verb_get_name(uint8_t slot)
  * @{
  */
 
+#pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
+static void reset_game_state(void)
+{
+  diskio_load_game_objects();
+  for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
+    vm_state.proc_state[i] = PROC_STATE_FREE;
+    vm_state.proc_script_id[i] = 0xff;
+    vm_state.proc_parent[i] = 0xff;
+    vm_state.proc_child[i] = 0xff;
+    vm_state.proc_wait_timer[i] = 0;
+  }
+
+  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+    vm_state.verbs.id[i] = 0xff;
+    map_ds_heap();
+    if (vm_state.verbs.name[i]) {
+      free(vm_state.verbs.name[i]);
+      vm_state.verbs.name[i] = NULL;
+    }
+    unmap_ds();
+  }
+  res_deactivate_and_unlock_all();
+
+  uint8_t var_idx = 0;
+  do {
+    vm_write_var(var_idx, 0);
+  }
+  while (++var_idx != 0);
+
+  for (uint8_t i = 0; i < NUM_ACTORS; ++i) {
+    actors.local_id[i] = 0xff;
+    actors.room[i] = 0;
+    if (i < MAX_LOCAL_ACTORS) {
+      local_actors.global_id[i] = 0xff;
+    }
+  }
+
+  vm_state.inv_num_objects = 0;
+  vm_state.inv_objects[0]  = NULL;
+  vm_state.inv_next_free   = (void *)INVENTORY_BASE;
+
+  camera_x = 20;
+  camera_state = 0;
+  camera_follow_actor_id = 0xff;
+  actor_talking = 0xff;
+  ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
+  vm_write_var(VAR_CURSOR_STATE, 3);
+  vm_state.message_speed = 6;
+  message_timer = 0;
+  message_ptr = NULL;
+  print_message_ptr = NULL;
+  prev_verb_highlighted = 0xff;
+  prev_inventory_highlighted = 0xff;
+
+  vm_start_script(1);
+
+  wait_for_jiffy(); // this resets the elapsed jiffies timer
+}
+
+#pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 static void set_proc_state(uint8_t slot, uint8_t state)
 {
-  proc_state[slot] &= ~0x07; // clear state without changing flags
-  proc_state[slot] |= state;
+  vm_state.proc_state[slot] &= ~0x07; // clear state without changing flags
+  vm_state.proc_state[slot] |= state;
 }
 
 static uint8_t get_proc_state(uint8_t slot)
 {
-  return proc_state[slot] & 0x07;
+  return vm_state.proc_state[slot] & 0x07;
 }
 
 static uint8_t is_room_object_script(uint8_t slot)
 {
-  return proc_script_id[slot] == 0xff;
+  return vm_state.proc_script_id[slot] == 0xff;
 }
 
 static void freeze_non_active_scripts(void)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot) {
-    if (slot != active_script_slot && proc_state[slot] != PROC_STATE_FREE) {
-      proc_state[slot] |= PROC_FLAGS_FROZEN;
+    if (slot != active_script_slot && vm_state.proc_state[slot] != PROC_STATE_FREE) {
+      vm_state.proc_state[slot] |= PROC_FLAGS_FROZEN;
     }
   }
 }
 static void unfreeze_scripts(void)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot) {
-    proc_state[slot] &= ~PROC_FLAGS_FROZEN;
+    vm_state.proc_state[slot] &= ~PROC_FLAGS_FROZEN;
   }
 }
 
@@ -1015,7 +1094,7 @@ static void process_dialog(uint8_t jiffies_elapsed)
 
     print_message_ptr = message_ptr;
     screen_update_needed |= SCREEN_UPDATE_DIALOG;
-    message_timer = 60 + (uint16_t)timer_chars * (uint16_t)message_speed;
+    message_timer = 60 + (uint16_t)timer_chars * (uint16_t)vm_state.message_speed;
     message_ptr += print_message_num_chars;
     if (*message_ptr == '\0') {
       message_ptr = NULL;
@@ -1078,9 +1157,10 @@ static void stop_all_dialog(void)
  */
 static uint8_t wait_for_jiffy(void)
 {
+  uint16_t save_cs = map_get_cs();
   map_cs_gfx();
   uint8_t num_jiffies_elapsed = gfx_wait_for_jiffy_timer();
-  unmap_cs();
+  map_set_cs(save_cs);
   return num_jiffies_elapsed;
 }
 
@@ -1159,8 +1239,8 @@ static void read_walk_boxes(void)
     // debug_out("  urx: %d", box->topright_x);
     // debug_out("  llx: %d", box->bottomleft_x);
     // debug_out("  lrx: %d", box->bottomright_x);
-    //debug_out("  mask: %02x", box->mask);
-    //debug_out("  flags: %02x", box->flags);
+    // debug_out("  mask: %02x", box->mask);
+    // debug_out("  flags: %02x", box->flags);
   }
   walk_box_matrix = box_ptr;
   /*
@@ -1199,7 +1279,7 @@ static void redraw_screen(void)
     map_ds_resource(obj_page[i]);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
     // OBJ_STATE is used to determine visibility of object in this room
-    if (!(global_game_objects[obj_hdr->id] & OBJ_STATE)) {
+    if (!(vm_state.global_game_objects[obj_hdr->id] & OBJ_STATE)) {
       continue;
     }
     int8_t screen_x = obj_hdr->pos_x - camera_x + 20;
@@ -1245,7 +1325,7 @@ static void handle_input(void)
         // clicked in verb zone
         uint8_t verb_slot = get_hovered_verb_slot();
         if (verb_slot != 0xff) {
-          select_verb(verbs.id[verb_slot]);
+          select_verb(vm_state.verbs.id[verb_slot]);
         }
       }
       else if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
@@ -1253,7 +1333,7 @@ static void handle_input(void)
         uint8_t inventory_ui_slot = get_hovered_inventory_slot();
         if (inventory_ui_slot < 4) {
           uint8_t inventory_item_id = inventory_pos + inventory_ui_slot;
-          if (inventory_item_id < inv_num_objects) {
+          if (inventory_item_id < vm_state.inv_num_objects) {
             vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
             vm_write_var(VAR_CLICKED_NOUN, inv_get_object_id(inventory_item_id));
             vm_start_script(SCRIPT_ID_INPUT_EVENT);
@@ -1272,12 +1352,13 @@ static void handle_input(void)
 
   // keyboard handling
   if (input_key_pressed) {
-    if (input_key_pressed == INPUT_KEY_RUNSTOP || input_key_pressed == INPUT_KEY_ESCAPE) {
+    if (input_key_pressed == vm_read_var8(VAR_CUTSCENEEXIT_KEY)) {
       override_cutscene();
     }
     else {
-      //vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
-      //vm_start_script(SCRIPT_ID_INPUT_EVENT);
+      vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
+      vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
+      vm_start_script(SCRIPT_ID_INPUT_EVENT);
     }
     // ack the key press
     input_key_pressed = 0;
@@ -1320,7 +1401,7 @@ static void clear_all_other_object_states(uint8_t local_object_id)
         obj_hdr->pos_x == x && 
        (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
     {
-      global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
+      vm_state.global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
       // since actors could potentially be affected, we need to redraw those as well
       screen_update_needed |= SCREEN_UPDATE_ACTORS;
       //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
@@ -1337,7 +1418,7 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
 
   __auto_type obj_hdr  = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[parent]);
   uint8_t new_parent   = obj_hdr->parent;
-  uint8_t cur_state    = global_game_objects[obj_hdr->id] & OBJ_STATE;
+  uint8_t cur_state    = vm_state.global_game_objects[obj_hdr->id] & OBJ_STATE;
   uint8_t parent_state = obj_hdr->pos_y_and_parent_state & 0x80;
 
   map_set_ds(ds_save);
@@ -1372,7 +1453,7 @@ static uint8_t find_free_script_slot(void)
   uint8_t slot;
   for (slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
-    if (proc_state[slot] == PROC_STATE_FREE)
+    if (vm_state.proc_state[slot] == PROC_STATE_FREE)
     {
       return slot;
     }
@@ -1388,8 +1469,8 @@ static void update_script_timers(uint8_t elapsed_jiffies)
   {
     if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_TIMER)
     {
-      proc_wait_timer[slot] += elapsed_jiffies;
-      uint8_t timer_msb = (uint8_t)((uintptr_t)(proc_wait_timer[slot]) >> 24);
+      vm_state.proc_wait_timer[slot] += elapsed_jiffies;
+      uint8_t timer_msb = (uint8_t)((uintptr_t)(vm_state.proc_wait_timer[slot]) >> 24);
       if (timer_msb == 0)
       {
         set_proc_state(slot, PROC_STATE_RUNNING);
@@ -1403,11 +1484,11 @@ static void execute_script_slot(uint8_t slot)
   uint32_t map_save = map_get();
 
   // walk down to last child
-  //uint8_t parent = proc_parent[slot];
+  //uint8_t parent = vm.proc_parent[slot];
   while (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD)
   {
     //parent = slot;
-    slot = proc_child[slot];
+    slot = vm_state.proc_child[slot];
   }
 
   uint8_t save_active_script_slot = active_script_slot;
@@ -1434,14 +1515,14 @@ static void execute_script_slot(uint8_t slot)
     }
     if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD) {
       // script has just started a new child script
-      //debug_out("Script in slot %d has started new child in slot %d", slot, proc_child[slot]);
-      slot = proc_child[slot];
+      //debug_out("Script in slot %d has started new child in slot %d", slot, vm.proc_child[slot]);
+      slot = vm_state.proc_child[slot];
       continue;
     }
-    else if (proc_state[slot] == PROC_STATE_FREE) {
+    else if (vm_state.proc_state[slot] == PROC_STATE_FREE) {
       // script has exited, launch parent script if needed
-      //debug_out("Script in slot %d has exited, moving on to parent slot %d", slot, proc_parent[slot]);
-      slot = proc_parent[slot];
+      //debug_out("Script in slot %d has exited, moving on to parent slot %d", slot, vm.proc_parent[slot]);
+      slot = vm_state.proc_parent[slot];
       continue;
     }
     // in all other cases, the script will resume in the next cycle
@@ -1471,15 +1552,15 @@ static const char *get_object_name(uint16_t global_object_id)
 static uint8_t start_child_script_at_address(uint8_t res_slot, uint16_t offset)
 {
   uint8_t slot = find_free_script_slot();
-  proc_script_id[slot] = 0xff; // room scripts have no id
-  proc_state[slot] = PROC_STATE_RUNNING;
-  proc_parent[slot] = active_script_slot;
-  proc_child[slot] = 0xff;
+  vm_state.proc_script_id[slot] = 0xff; // room scripts have no id
+  vm_state.proc_state[slot] = PROC_STATE_RUNNING;
+  vm_state.proc_parent[slot] = active_script_slot;
+  vm_state.proc_child[slot] = 0xff;
   proc_res_slot[slot] = res_slot;
-  proc_pc[slot] = offset;
+  vm_state.proc_pc[slot] = offset;
   
   // update the calling script to wait for the child script
-  proc_child[active_script_slot] = slot;
+  vm_state.proc_child[active_script_slot] = slot;
   set_proc_state(active_script_slot, PROC_STATE_WAITING_FOR_CHILD);
 
   return slot;
@@ -1509,7 +1590,7 @@ static void execute_sentence_stack(void)
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
 
   uint8_t slot = vm_start_script(SCRIPT_ID_SENTENCE);
-  debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
+  //debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
   execute_script_slot(slot);
 }
 
@@ -1642,11 +1723,11 @@ static void update_camera(void)
 static void override_cutscene(void)
 {
   if (cs_override_pc) {
-    proc_pc[cs_proc_slot] = cs_override_pc;
+    vm_state.proc_pc[cs_proc_slot] = cs_override_pc;
     cs_override_pc = 0;
-    proc_state[cs_proc_slot] &= ~PROC_FLAGS_FROZEN;
-    if (proc_state[cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
-      proc_state[cs_proc_slot] = PROC_STATE_RUNNING;
+    vm_state.proc_state[cs_proc_slot] &= ~PROC_FLAGS_FROZEN;
+    if (vm_state.proc_state[cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
+      vm_state.proc_state[cs_proc_slot] = PROC_STATE_RUNNING;
     }
   }
 }
@@ -1669,7 +1750,7 @@ static void update_sentence_line(void)
   //debug_out("  Verb id %d slot %d", vm_read_var8(VAR_SENTENCE_VERB), verb_slot);
   if (verb_slot != 0xff) {
     map_ds_heap();
-    add_string_to_sentence(verbs.name[verb_slot], 0);
+    add_string_to_sentence(vm_state.verbs.name[verb_slot], 0);
   }
 
   uint16_t noun1 = vm_read_var(VAR_SENTENCE_NOUN1);
@@ -1764,8 +1845,8 @@ static void update_verb_interface(void)
     //debug_out("Updating verbs");
     map_ds_heap();
     for (uint8_t i = 0; i < MAX_VERBS; ++i) {
-      if (verbs.id[i] != 0xff) {
-        gfx_print_interface_text(verbs.x[i], verbs.y[i], verbs.name[i], TEXT_STYLE_NORMAL);
+      if (vm_state.verbs.id[i] != 0xff) {
+        gfx_print_interface_text(vm_state.verbs.x[i], vm_state.verbs.y[i], vm_state.verbs.name[i], TEXT_STYLE_NORMAL);
       }
     }
     prev_verb_highlighted = 0xff;
@@ -1787,15 +1868,15 @@ static void update_verb_highlighting(void)
   if (cur_verb != prev_verb_highlighted) {
     map_cs_gfx();
     if (prev_verb_highlighted != 0xff) {
-      gfx_change_interface_text_style(verbs.x[prev_verb_highlighted], 
-                                      verbs.y[prev_verb_highlighted], 
-                                      verbs.len[prev_verb_highlighted], 
+      gfx_change_interface_text_style(vm_state.verbs.x[prev_verb_highlighted], 
+                                      vm_state.verbs.y[prev_verb_highlighted], 
+                                      vm_state.verbs.len[prev_verb_highlighted], 
                                       TEXT_STYLE_NORMAL);
     }
     if (cur_verb != 0xff) {
-      gfx_change_interface_text_style(verbs.x[cur_verb], 
-                                      verbs.y[cur_verb], 
-                                      verbs.len[cur_verb], 
+      gfx_change_interface_text_style(vm_state.verbs.x[cur_verb], 
+                                      vm_state.verbs.y[cur_verb], 
+                                      vm_state.verbs.len[cur_verb], 
                                       TEXT_STYLE_HIGHLIGHTED);
     }
     unmap_cs();
@@ -1808,8 +1889,8 @@ static uint8_t get_hovered_verb_slot(void)
   uint8_t row = input_cursor_y >> 3;
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
     uint8_t col = input_cursor_x >> 2;
-    if (verbs.id[i] != 0xff) {
-      if (row == verbs.y[i] && col >= verbs.x[i] && col < verbs.x[i] + verbs.len[i]) {
+    if (vm_state.verbs.id[i] != 0xff) {
+      if (row == vm_state.verbs.y[i] && col >= vm_state.verbs.x[i] && col < vm_state.verbs.x[i] + vm_state.verbs.len[i]) {
         return i;
       }
     }
@@ -1820,7 +1901,7 @@ static uint8_t get_hovered_verb_slot(void)
 static uint8_t get_verb_slot_by_id(uint8_t verb_id)
 {
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
-    if (verbs.id[i] == verb_id) {
+    if (vm_state.verbs.id[i] == verb_id) {
       return i;
     }
   }
@@ -1847,7 +1928,7 @@ static void update_inventory_interface()
   map_cs_gfx();
   gfx_clear_inventory();
   if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
-    uint8_t end_id = min(inv_num_objects, inventory_pos + 4);
+    uint8_t end_id = min(vm_state.inv_num_objects, inventory_pos + 4);
     uint8_t x = 0;
     uint8_t y = 22;
     char buf[19];
@@ -1945,7 +2026,7 @@ static void inventory_scroll_up(void)
 
 static void inventory_scroll_down(void)
 {
-  if (inventory_pos + 4 < inv_num_objects) {
+  if (inventory_pos + 4 < vm_state.inv_num_objects) {
     inventory_pos += 2;
     screen_update_needed |= SCREEN_UPDATE_INVENTORY;
   }
@@ -1953,11 +2034,11 @@ static void inventory_scroll_down(void)
 
 static void update_inventory_scroll_buttons(void)
 {
-  if (inventory_pos && inventory_pos + 4 < inv_num_objects) {
+  if (inventory_pos && inventory_pos + 4 < vm_state.inv_num_objects) {
     gfx_print_interface_text(19, 22, "\xfc\xfd", TEXT_STYLE_INVENTORY_ARROW);
   }
 
-  if (inventory_pos + 4 < inv_num_objects) {
+  if (inventory_pos + 4 < vm_state.inv_num_objects) {
     gfx_print_interface_text(19, 23, "\xfe\xff", TEXT_STYLE_INVENTORY_ARROW);
   }
 }
