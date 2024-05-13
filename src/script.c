@@ -301,6 +301,11 @@ uint16_t script_get_current_pc(void)
   return (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
 }
 
+void script_break(void)
+{
+  break_script = 1;
+}
+
 #pragma clang section text="code"
 
 /**
@@ -1020,6 +1025,12 @@ static void come_out_door(void)
   uint8_t actor_id = vm_read_var8(VAR_SELECTED_ACTOR);
   
   actor_put_in_room(actor_id, new_room_id);
+
+  // Changing room will break the current script (and terminate it if we are a room script).
+  // The current opcode will continue to be executed (this function), but the script
+  // will not continue its execution cycle afterwards. Also, the resource of this 
+  // script might be deleted from memory already if it was a room script. Therefore,
+  // we must not access any further script bytes anymore past this point.
   vm_set_current_room(new_room_id);
 
   __auto_type obj_hdr = vm_get_room_object_hdr(arrive_at_object_id);

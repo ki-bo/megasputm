@@ -65,6 +65,8 @@
                 (scatter-to bank0_d000)
                 (section
                         code_main_private
+                        cdata_main_private
+                        data_main_private
                 )
         )
         

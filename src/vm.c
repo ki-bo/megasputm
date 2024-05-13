@@ -97,10 +97,8 @@ static void stop_current_actor_talking(void);
 static void stop_all_dialog(void);
 static uint8_t wait_for_jiffy(void);
 static void read_objects(void);
-static void read_walk_boxes(void);
 static void redraw_screen(void);
 static void handle_input(void);
-static void clear_all_other_object_states(uint8_t local_object_id);
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
@@ -111,14 +109,12 @@ static void execute_sentence_stack(void);
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
 static void update_actors(void);
 static void animate_actors(void);
-static void update_camera(void);
 static void override_cutscene(void);
 static void update_sentence_line(void);
 static void update_sentence_highlighting(void);
 static void add_string_to_sentence(const char *str, uint8_t prepend_space);
 static void update_verb_interface(void);
 static void update_verb_highlighting(void);
-static uint8_t get_hovered_verb_slot(void);
 static uint8_t get_verb_slot_by_id(uint8_t verb_id);
 static void select_verb(uint8_t verb_id);
 static const char *get_preposition_name(uint8_t preposition);
@@ -130,6 +126,13 @@ static uint8_t inventory_pos_to_y(uint8_t pos);
 static void inventory_scroll_up(void);
 static void inventory_scroll_down(void);
 static void update_inventory_scroll_buttons(void);
+
+// Private functions (code_main_private)
+static void read_walk_boxes(void);
+static void clear_all_other_object_states(uint8_t local_object_id);
+static void update_camera(void);
+static uint8_t get_hovered_verb_slot(void);
+
 
 /**
  * @defgroup vm_init VM Init Functions
@@ -280,7 +283,9 @@ __task void vm_mainloop(void)
     process_dialog(elapsed_jiffies);
     update_actors();
     animate_actors();
+    map_cs_main_priv();
     update_camera();
+    unmap_cs();
 
     if (screen_update_needed) {
       //VICIV.bordercol = 0x01;
@@ -384,6 +389,13 @@ void vm_set_current_room(uint8_t room_no)
   uint16_t ds_save = map_get_ds();
 
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
+
+  // break current script
+  // If it is a room script, it will automatically be stopped after the execution of the current opcode.
+  // Be aware that exiting a room could free up the resource with the current script code if it was part of the room data.
+  // Thus, the script must not try to read any further script bytes after the room switch. That is the reason we
+  // break the script here (which will also stop it if it is a room script - see execute_script_slot() ).
+  script_break();
 
   // exit and free old room
   //debug_out("Deactivating old room %d", vm_read_var8(VAR_SELECTED_ROOM));
@@ -598,7 +610,7 @@ uint8_t vm_start_script(uint8_t script_id)
 
 uint8_t vm_start_room_script(uint16_t room_script_offset)
 {
-  debug_out("Starting room script at offset %04x", room_script_offset);
+  //debug_out("Starting room script at offset %04x", room_script_offset);
 
   uint8_t res_slot = room_res_slot + MSB(room_script_offset);
   uint16_t offset = LSB(room_script_offset);
@@ -619,16 +631,16 @@ uint8_t vm_start_child_script(uint8_t script_id)
   return slot;
 }
 
-uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
+void vm_start_object_script(uint8_t verb, uint16_t global_object_id)
 {
   uint8_t id = vm_get_local_object_id(global_object_id);
   if (id == 0xff) {
-    return 0xff;
+    return;
   }
 
   uint16_t script_offset = get_room_object_script_offset(verb, id);
   if (script_offset == 0) {
-    return 0xff;
+    return;
   }
 
   uint8_t res_slot = obj_page[id];
@@ -636,7 +648,8 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
 
   //debug_out("Starting object script %d for verb %d at slot %02x offset %04x", global_object_id, verb, res_slot, script_offset);
 
-  return start_child_script_at_address(res_slot, script_offset);
+  uint8_t child_script_slot = start_child_script_at_address(res_slot, script_offset);
+  execute_script_slot(child_script_slot);
 }
 
 /**
@@ -652,7 +665,7 @@ uint8_t vm_start_object_script(uint8_t verb, uint16_t global_object_id)
  */
 void vm_chain_script(uint8_t script_id)
 {
-  //debug_out("Chaining script %d from script %d", script_id, vm.proc_script_id[active_script_slot]);
+  //debug_out("Chaining script %d from script %d", script_id, vm_state.proc_script_id[active_script_slot]);
 
   if (!is_room_object_script(active_script_slot)) {
     res_deactivate_slot(proc_res_slot[active_script_slot]);
@@ -840,7 +853,9 @@ void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
 {
   uint16_t save_ds = map_get_ds();
 
+  map_cs_main_priv();
   clear_all_other_object_states(local_id);
+  unmap_cs();
 
   map_ds_resource(obj_page[local_id]);
   __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_id]);
@@ -858,6 +873,7 @@ void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
   int8_t screen_x = (int8_t)x - camera_x + 20;
 
   if (screen_x >= 40 || screen_x + width <= 0 || y >= 16) {
+    map_set_ds(save_ds);
     return;
   }
 
@@ -1046,6 +1062,7 @@ static void freeze_non_active_scripts(void)
     }
   }
 }
+
 static void unfreeze_scripts(void)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot) {
@@ -1221,40 +1238,6 @@ static void read_objects(void)
   }
 }
 
-#pragma clang section text="code_main_private"
-static void read_walk_boxes(void)
-{
-  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
-  __auto_type box_ptr = NEAR_U8_PTR(RES_MAPPED + room_hdr->walk_boxes_offset);
-  num_walk_boxes = *box_ptr++;
-  walk_boxes = (struct walk_box *)box_ptr;
-  //debug_out("Reading %d walk boxes", num_walk_boxes);
-  for (uint8_t i = 0; i < num_walk_boxes; ++i) {
-    __auto_type box = (struct walk_box *)box_ptr;
-    box_ptr += sizeof(struct walk_box);
-    // debug_out("Walk box %d:", i);
-    // debug_out("  uy:  %d", box->top_y);
-    // debug_out("  ly:  %d", box->bottom_y);
-    // debug_out("  ulx: %d", box->topleft_x);
-    // debug_out("  urx: %d", box->topright_x);
-    // debug_out("  llx: %d", box->bottomleft_x);
-    // debug_out("  lrx: %d", box->bottomright_x);
-    // debug_out("  mask: %02x", box->mask);
-    // debug_out("  flags: %02x", box->flags);
-  }
-  walk_box_matrix = box_ptr;
-  /*
-  for (uint8_t i = 0; i < num_walk_boxes; ++i) {
-    debug_out("  row offset %d = %d", i, *box_ptr++);
-  }
-  for (uint8_t src_box = 0; src_box < num_walk_boxes; ++src_box) {
-    for (uint8_t dst_box = 0; dst_box < num_walk_boxes; ++dst_box) {
-      uint8_t next_box = *box_ptr++;
-      debug_out("  box matrix[%d][%d] = %d", src_box, dst_box, next_box);
-    }
-  }*/
-}
-
 /**
  * @brief Redraws the screen
  *
@@ -1264,7 +1247,6 @@ static void read_walk_boxes(void)
  *
  * Code section: code_main
  */
-#pragma clang section text="code_main"
 static void redraw_screen(void)
 {
   uint32_t map_save = map_get();
@@ -1323,7 +1305,9 @@ static void handle_input(void)
       }
       else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
         // clicked in verb zone
+        map_cs_main_priv();
         uint8_t verb_slot = get_hovered_verb_slot();
+        unmap_cs();
         if (verb_slot != 0xff) {
           select_verb(vm_state.verbs.id[verb_slot]);
         }
@@ -1363,52 +1347,6 @@ static void handle_input(void)
     // ack the key press
     input_key_pressed = 0;
   }
-}
-
-/**
- * @brief Clears state of objects matching position and size
- *
- * Clears the state of all objects that match the given position and size. The function will
- * iterate over all objects and check if the object is currently active and if the object
- * position and size matches the one provided. If a match is found, the object state is
- * cleared.
- * 
- * @param local_object_id Object in current room to compare with
- */
-static void clear_all_other_object_states(uint8_t local_object_id)
-{
-  uint16_t ds_save = map_get_ds();
-
-  map_ds_resource(obj_page[local_object_id]);
-  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
-  uint8_t width = obj_hdr->width;
-  uint8_t height = obj_hdr->height_and_actor_dir >> 3;
-  uint8_t x = obj_hdr->pos_x;
-  uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
-  uint16_t global_object_id = obj_hdr->id;
-
-  for (uint8_t i = 0; i < num_objects; ++i)
-  {
-    if (obj_id[i] == global_object_id)
-    {
-      continue;
-    }
-
-    map_ds_resource(obj_page[i]);
-    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
-    if (obj_hdr->width == width && 
-       (obj_hdr->height_and_actor_dir >> 3) == height &&
-        obj_hdr->pos_x == x && 
-       (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
-    {
-      vm_state.global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
-      // since actors could potentially be affected, we need to redraw those as well
-      screen_update_needed |= SCREEN_UPDATE_ACTORS;
-      //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
-    }
-  }
-
-  map_set_ds(ds_save);
 }
 
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
@@ -1484,10 +1422,8 @@ static void execute_script_slot(uint8_t slot)
   uint32_t map_save = map_get();
 
   // walk down to last child
-  //uint8_t parent = vm.proc_parent[slot];
   while (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD)
   {
-    //parent = slot;
     slot = vm_state.proc_child[slot];
   }
 
@@ -1512,6 +1448,10 @@ static void execute_script_slot(uint8_t slot)
 
       // save state on stack for nested scripts
       script_run_slot_stacked(active_script_slot);
+      // stacked scripts shall always terminate after one cycle
+      if (get_proc_state(active_script_slot) != PROC_STATE_FREE) {
+        vm_stop_active_script();
+      }
     }
     if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD) {
       // script has just started a new child script
@@ -1639,85 +1579,6 @@ static void animate_actors(void)
       actor_update_animation(local_id);
     }
   }
-}
-
-static void update_camera(void)
-{
-  if (camera_state == CAMERA_STATE_FOLLOW_ACTOR && camera_follow_actor_id == 0xff)
-  {
-    camera_state = 0;
-    return;
-  }
-
-  uint16_t max_camera_x = room_width / 8 - 20;
-
-  if (camera_state & CAMERA_STATE_FOLLOW_ACTOR)
-  {
-    camera_target = actors.x[camera_follow_actor_id];
-    //debug_out("Camera following actor %d at x %d, cur camera: %d", camera_follow_actor_id, camera_target, camera_x);
-  }
-  else if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS)
-  {
-    //debug_out("Camera moving to target %d", camera_target);
-  }
-  else
-  {
-    return;
-  }
-
-  if (camera_state & CAMERA_STATE_MOVING) {
-    if (camera_target > camera_x) {
-      //debug_msg("Camera continue moving right");
-      if (camera_x < max_camera_x) {
-        camera_x += 1;
-      }
-      else {
-        camera_state &= ~CAMERA_STATE_MOVING;
-        return;
-      }
-    }
-    else if (camera_target < camera_x) {
-      //debug_msg("Camera continue moving left");
-      if (camera_x > 20) {
-        camera_x -= 1;
-      }
-      else {
-        camera_state &= ~CAMERA_STATE_MOVING;
-        return;
-      }
-    }
-    else {
-      debug_msg("Camera reached target");
-      camera_state &= ~CAMERA_STATE_MOVING;
-      if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS) {
-        camera_state &= ~CAMERA_STATE_MOVE_TO_TARGET_POS;
-      }
-      return;
-    }
-  }
-  else {
-    if (camera_target <= camera_x - 10 && camera_x > 20)
-    {
-      debug_msg("Camera start moving left");
-      --camera_x;
-      camera_state |= CAMERA_STATE_MOVING;
-    }
-    else if (camera_target >= camera_x + 10 && camera_x < max_camera_x)
-    {
-      debug_msg("Camera start moving right");
-      ++camera_x;
-      camera_state |= CAMERA_STATE_MOVING;
-    }
-    else {
-      return;
-    }
-  }
-
-  vm_write_var(VAR_CAMERA_X, camera_x);
-  //debug_out("camera_x: %d", camera_x);
-
-  vm_update_bg();
-  vm_update_actors();
 }
 
 static void override_cutscene(void)
@@ -1862,6 +1723,7 @@ static void update_verb_highlighting(void)
 
   uint8_t cur_verb = 0xff;
   if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
+    map_cs_main_priv();
     cur_verb = get_hovered_verb_slot();
   }
 
@@ -1879,23 +1741,10 @@ static void update_verb_highlighting(void)
                                       vm_state.verbs.len[cur_verb], 
                                       TEXT_STYLE_HIGHLIGHTED);
     }
-    unmap_cs();
     prev_verb_highlighted = cur_verb;
   }
-}
 
-static uint8_t get_hovered_verb_slot(void)
-{
-  uint8_t row = input_cursor_y >> 3;
-  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
-    uint8_t col = input_cursor_x >> 2;
-    if (vm_state.verbs.id[i] != 0xff) {
-      if (row == vm_state.verbs.y[i] && col >= vm_state.verbs.x[i] && col < vm_state.verbs.x[i] + vm_state.verbs.len[i]) {
-        return i;
-      }
-    }
-  }
-  return 0xff;
+  unmap_cs();
 }
 
 static uint8_t get_verb_slot_by_id(uint8_t verb_id)
@@ -2044,5 +1893,180 @@ static void update_inventory_scroll_buttons(void)
 }
 
 /// @} // vm_private
+
+#pragma clang section text="code_main_private"
+static void read_walk_boxes(void)
+{
+  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
+  __auto_type box_ptr = NEAR_U8_PTR(RES_MAPPED + room_hdr->walk_boxes_offset);
+  num_walk_boxes = *box_ptr++;
+  walk_boxes = (struct walk_box *)box_ptr;
+  //debug_out("Reading %d walk boxes", num_walk_boxes);
+  for (uint8_t i = 0; i < num_walk_boxes; ++i) {
+    __auto_type box = (struct walk_box *)box_ptr;
+    box_ptr += sizeof(struct walk_box);
+    // debug_out("Walk box %d:", i);
+    // debug_out("  uy:  %d", box->top_y);
+    // debug_out("  ly:  %d", box->bottom_y);
+    // debug_out("  ulx: %d", box->topleft_x);
+    // debug_out("  urx: %d", box->topright_x);
+    // debug_out("  llx: %d", box->bottomleft_x);
+    // debug_out("  lrx: %d", box->bottomright_x);
+    // debug_out("  mask: %02x", box->mask);
+    // debug_out("  flags: %02x", box->flags);
+  }
+  walk_box_matrix = box_ptr;
+  /*
+  for (uint8_t i = 0; i < num_walk_boxes; ++i) {
+    debug_out("  row offset %d = %d", i, *box_ptr++);
+  }
+  for (uint8_t src_box = 0; src_box < num_walk_boxes; ++src_box) {
+    for (uint8_t dst_box = 0; dst_box < num_walk_boxes; ++dst_box) {
+      uint8_t next_box = *box_ptr++;
+      debug_out("  box matrix[%d][%d] = %d", src_box, dst_box, next_box);
+    }
+  }*/
+}
+
+/**
+ * @brief Clears state of objects matching position and size
+ *
+ * Clears the state of all objects that match the given position and size. The function will
+ * iterate over all objects and check if the object is currently active and if the object
+ * position and size matches the one provided. If a match is found, the object state is
+ * cleared.
+ * 
+ * @param local_object_id Object in current room to compare with
+ */
+static void clear_all_other_object_states(uint8_t local_object_id)
+{
+  uint16_t ds_save = map_get_ds();
+
+  map_ds_resource(obj_page[local_object_id]);
+  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
+  uint8_t width = obj_hdr->width;
+  uint8_t height = obj_hdr->height_and_actor_dir >> 3;
+  uint8_t x = obj_hdr->pos_x;
+  uint8_t y = obj_hdr->pos_y_and_parent_state & 0x7f;
+  uint16_t global_object_id = obj_hdr->id;
+
+  for (uint8_t i = 0; i < num_objects; ++i)
+  {
+    if (obj_id[i] == global_object_id)
+    {
+      continue;
+    }
+
+    map_ds_resource(obj_page[i]);
+    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
+    if (obj_hdr->width == width && 
+       (obj_hdr->height_and_actor_dir >> 3) == height &&
+        obj_hdr->pos_x == x && 
+       (obj_hdr->pos_y_and_parent_state & 0x7f) == y)
+    {
+      vm_state.global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
+      // since actors could potentially be affected, we need to redraw those as well
+      screen_update_needed |= SCREEN_UPDATE_ACTORS;
+      //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
+    }
+  }
+
+  map_set_ds(ds_save);
+}
+
+static void update_camera(void)
+{
+  if (camera_state == CAMERA_STATE_FOLLOW_ACTOR && camera_follow_actor_id == 0xff)
+  {
+    camera_state = 0;
+    return;
+  }
+
+  uint16_t max_camera_x = room_width / 8 - 20;
+
+  if (camera_state & CAMERA_STATE_FOLLOW_ACTOR)
+  {
+    camera_target = actors.x[camera_follow_actor_id];
+    //debug_out("Camera following actor %d at x %d, cur camera: %d", camera_follow_actor_id, camera_target, camera_x);
+  }
+  else if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS)
+  {
+    //debug_out("Camera moving to target %d", camera_target);
+  }
+  else
+  {
+    return;
+  }
+
+  if (camera_state & CAMERA_STATE_MOVING) {
+    if (camera_target > camera_x) {
+      //debug_msg("Camera continue moving right");
+      if (camera_x < max_camera_x) {
+        camera_x += 1;
+      }
+      else {
+        camera_state &= ~CAMERA_STATE_MOVING;
+        return;
+      }
+    }
+    else if (camera_target < camera_x) {
+      //debug_msg("Camera continue moving left");
+      if (camera_x > 20) {
+        camera_x -= 1;
+      }
+      else {
+        camera_state &= ~CAMERA_STATE_MOVING;
+        return;
+      }
+    }
+    else {
+      debug_msg("Camera reached target");
+      camera_state &= ~CAMERA_STATE_MOVING;
+      if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS) {
+        camera_state &= ~CAMERA_STATE_MOVE_TO_TARGET_POS;
+      }
+      return;
+    }
+  }
+  else {
+    if (camera_target <= camera_x - 10 && camera_x > 20)
+    {
+      debug_msg("Camera start moving left");
+      --camera_x;
+      camera_state |= CAMERA_STATE_MOVING;
+    }
+    else if (camera_target >= camera_x + 10 && camera_x < max_camera_x)
+    {
+      debug_msg("Camera start moving right");
+      ++camera_x;
+      camera_state |= CAMERA_STATE_MOVING;
+    }
+    else {
+      return;
+    }
+  }
+
+  vm_write_var(VAR_CAMERA_X, camera_x);
+  //debug_out("camera_x: %d", camera_x);
+
+  vm_update_bg();
+  vm_update_actors();
+}
+
+static uint8_t get_hovered_verb_slot(void)
+{
+  uint8_t row = input_cursor_y >> 3;
+  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+    uint8_t col = input_cursor_x >> 2;
+    if (vm_state.verbs.id[i] != 0xff) {
+      if (row == vm_state.verbs.y[i] && col >= vm_state.verbs.x[i] && col < vm_state.verbs.x[i] + vm_state.verbs.len[i]) {
+        return i;
+      }
+    }
+  }
+  return 0xff;
+}
+
+
 
 //-----------------------------------------------------------------------------------------------

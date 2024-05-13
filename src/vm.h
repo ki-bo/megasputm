@@ -191,7 +191,7 @@ void vm_say_line(uint8_t actor_id);
 uint8_t vm_start_script(uint8_t script_id);
 uint8_t vm_start_room_script(uint16_t room_script_offset);
 uint8_t vm_start_child_script(uint8_t script_id);
-uint8_t vm_start_object_script(uint8_t verb, uint16_t object);
+void vm_start_object_script(uint8_t verb, uint16_t object);
 void vm_chain_script(uint8_t script_id);
 void vm_stop_active_script(void);
 void vm_stop_script(uint8_t script_id);

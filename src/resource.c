@@ -192,7 +192,7 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint)
   uint16_t save_cs = map_cs_main_priv();
   find_and_set_flags(type, id, hint, RES_LOCKED_MASK);
 #ifdef HEAP_DEBUG_OUT
-  debug_out("Locking resource type %d id %d", type, id);
+  //debug_out("Locking resource type %d id %d", type, id);
   print_heap();
 #endif
   map_set_cs(save_cs);
@@ -215,7 +215,7 @@ void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
   uint16_t save_cs = map_cs_main_priv();
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_LOCKED_MASK);
 #ifdef HEAP_DEBUG_OUT
-  debug_out("Unlocking resource type %d id %d slot %d", type, id, slot);
+  //debug_out("Unlocking resource type %d id %d slot %d", type, id, slot);
   print_heap();
 #endif
   map_set_cs(save_cs);
@@ -239,7 +239,7 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint)
   uint16_t save_cs = map_cs_main_priv();
   find_and_set_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
-  debug_out("Activating resource type %d id %d", type, id);
+  //debug_out("Activating resource type %d id %d", type, id);
   print_heap();
 #endif
   map_set_cs(save_cs);
@@ -262,7 +262,7 @@ void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
   uint16_t save_cs = map_cs_main_priv();
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
-  debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
+  //debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
   print_heap();
 #endif
   map_set_cs(save_cs);
@@ -287,7 +287,7 @@ void res_activate_slot(uint8_t slot)
   uint16_t save_cs = map_cs_main_priv();
   set_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
-  debug_out("Activating slot %d", slot);
+  //debug_out("Activating slot %d", slot);
   print_heap();
 #endif
   map_set_cs(save_cs);
@@ -312,7 +312,7 @@ void res_deactivate_slot(uint8_t slot)
   uint16_t save_cs = map_cs_main_priv();
   clear_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
-  debug_out("Deactivating slot %d", slot);
+  //debug_out("Deactivating slot %d", slot);
   print_heap();
 #endif
   map_set_cs(save_cs);
@@ -343,7 +343,7 @@ void res_free_heap(uint8_t slot)
  * @{
  */
 
-#pragma clang section text="code_main_private"
+#pragma clang section text="code_main_private" rodata="cdata_main_private" data="data_main_private"
 
 /**
  * @brief Sets flags for a resource
