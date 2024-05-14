@@ -63,6 +63,7 @@ uint8_t print_message_num_chars;
 uint8_t cs_room;
 int8_t cs_cursor_state;
 uint8_t cs_ui_state;
+uint8_t cs_camera_state;
 uint8_t cs_proc_slot;
 uint16_t cs_override_pc;
 
@@ -158,7 +159,7 @@ void vm_init(void)
   camera_state = 0;
   camera_follow_actor_id = 0xff;
   actor_talking = 0xff;
-  ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
+  ui_state = 0;
   vm_write_var(VAR_CURSOR_STATE, 3);
   vm_state.message_speed = 6;
   prev_verb_highlighted = 0xff;
@@ -368,6 +369,17 @@ void vm_change_ui_flags(uint8_t flags)
     ui_state = (ui_state & ~(UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS)) |
                 (flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS));
     screen_update_needed |= SCREEN_UPDATE_SENTENCE | SCREEN_UPDATE_VERBS | SCREEN_UPDATE_INVENTORY;
+    map_cs_gfx();
+    if (screen_update_needed & SCREEN_UPDATE_SENTENCE && !(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
+      gfx_clear_sentence();
+    }
+    if (screen_update_needed & SCREEN_UPDATE_VERBS && !(ui_state & UI_FLAGS_ENABLE_VERBS)) {
+      gfx_clear_verbs();
+    }
+    if (screen_update_needed & SCREEN_UPDATE_INVENTORY && !(ui_state & UI_FLAGS_ENABLE_INVENTORY)) {
+      gfx_clear_inventory();
+    }
+    unmap_cs();
   }
 
   //debug_out("UI state enable-cursor: %d", ui_state & UI_FLAGS_ENABLE_CURSOR);
@@ -390,12 +402,14 @@ void vm_set_current_room(uint8_t room_no)
 
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
 
-  // break current script
-  // If it is a room script, it will automatically be stopped after the execution of the current opcode.
-  // Be aware that exiting a room could free up the resource with the current script code if it was part of the room data.
+  // break current script (in case it is a room/object script)
+  // If it is a room script, the break will automatically stop it after the execution of the current opcode.
+  // Be aware that exiting a room could free up the resource of the current script if it was part of the room data.
   // Thus, the script must not try to read any further script bytes after the room switch. That is the reason we
   // break the script here (which will also stop it if it is a room script - see execute_script_slot() ).
-  script_break();
+  if (vm_state.proc_script_id[active_script_slot] == 0xff) {
+    script_break();
+  }
 
   // exit and free old room
   //debug_out("Deactivating old room %d", vm_read_var8(VAR_SELECTED_ROOM));
@@ -416,10 +430,6 @@ void vm_set_current_room(uint8_t room_no)
   gfx_fade_out();
 
   vm_write_var(VAR_SELECTED_ROOM, room_no);
-
-  camera_follow_actor_id = 0xff;
-  camera_state = 0;
-  camera_x = 20;
 
   if (room_no == 0) {
     gfx_clear_bg_image();
@@ -456,7 +466,7 @@ void vm_set_current_room(uint8_t room_no)
   }
 
   redraw_screen();
-  screen_update_needed |= SCREEN_UPDATE_BG;
+  vm_update_bg();
   unmap_cs();
 
   // restore DS
@@ -500,6 +510,7 @@ void vm_cut_scene_begin(void)
   cs_cursor_state = vm_read_var8(VAR_CURSOR_STATE);
   cs_proc_slot = 0xff;
   cs_override_pc = 0;
+  cs_camera_state = camera_state;
   cs_ui_state = ui_state;
   vm_change_ui_flags(UI_FLAGS_APPLY_FREEZE | UI_FLAGS_ENABLE_FREEZE |
                      UI_FLAGS_APPLY_CURSOR |
@@ -509,6 +520,10 @@ void vm_cut_scene_begin(void)
 void vm_cut_scene_end(void)
 {
   //debug_out("cut-scene ended");
+  camera_state = cs_camera_state;
+  if (camera_state == CAMERA_STATE_FOLLOW_ACTOR) {
+    vm_set_camera_follow_actor(vm_read_var8(VAR_SELECTED_ACTOR));
+  }
   if (vm_read_var8(VAR_SELECTED_ROOM) != cs_room) {
     //debug_out("switching to room %d", cs_room);
     vm_set_current_room(cs_room);
@@ -615,20 +630,6 @@ uint8_t vm_start_room_script(uint16_t room_script_offset)
   uint8_t res_slot = room_res_slot + MSB(room_script_offset);
   uint16_t offset = LSB(room_script_offset);
   return start_child_script_at_address(res_slot, offset);
-}
-
-uint8_t vm_start_child_script(uint8_t script_id)
-{
-  //debug_out("Starting script %d as child of slot %d", script_id, active_script_slot);
-
-  uint8_t slot = vm_start_script(script_id);
-  vm_state.proc_parent[slot] = active_script_slot;
-  
-  // update the calling script to wait for the child script
-  vm_state.proc_child[active_script_slot] = slot;
-  vm_state.proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_CHILD;
-
-  return slot;
 }
 
 void vm_start_object_script(uint8_t verb, uint16_t global_object_id)
@@ -756,6 +757,11 @@ void vm_update_bg(void)
   screen_update_needed |= SCREEN_UPDATE_BG;
 }
 
+void vm_update_dialog(void)
+{
+  screen_update_needed |= SCREEN_UPDATE_DIALOG;
+}
+
 void vm_update_actors(void)
 {
   screen_update_needed |= SCREEN_UPDATE_ACTORS;
@@ -764,6 +770,11 @@ void vm_update_actors(void)
 void vm_update_sentence(void)
 {
   screen_update_needed |= SCREEN_UPDATE_SENTENCE;
+}
+
+void vm_update_verbs(void)
+{
+  screen_update_needed |= SCREEN_UPDATE_VERBS;
 }
 
 void vm_update_inventory(void)
@@ -818,10 +829,10 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
       }
     }
 
-    uint8_t width = obj_hdr->width;
+    uint8_t width  = obj_hdr->width;
     uint8_t height = obj_hdr->height_and_actor_dir >> 3;
-    uint8_t obj_x = obj_hdr->pos_x;
-    uint8_t obj_y = obj_hdr->pos_y_and_parent_state & 0x7f;
+    uint8_t obj_x  = obj_hdr->pos_x;
+    uint8_t obj_y  = obj_hdr->pos_y_and_parent_state & 0x7f;
 
     if (x >= obj_x && x < obj_x + width && y >= obj_y && y < obj_y + height)
     {
@@ -860,8 +871,8 @@ void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
   map_ds_resource(obj_page[local_id]);
   __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_id]);
   
-  uint8_t width    = obj_hdr->width;
-  uint8_t height   = obj_hdr->height_and_actor_dir >> 3;
+  uint8_t width  = obj_hdr->width;
+  uint8_t height = obj_hdr->height_and_actor_dir >> 3;
 
   if (x == 0xff) {
     x = obj_hdr->pos_x;
@@ -882,7 +893,7 @@ void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
   gfx_draw_object(local_id, screen_x, y);
   unmap_cs();
 
-  screen_update_needed |= SCREEN_UPDATE_ACTORS;
+  vm_update_actors();
 
   map_set_ds(save_ds);
 }
@@ -892,9 +903,10 @@ void vm_set_camera_follow_actor(uint8_t actor_id)
   uint8_t room_of_actor = actors.room[actor_id];
   if (room_of_actor != vm_read_var8(VAR_SELECTED_ROOM)) {
     vm_set_current_room(room_of_actor);
+    vm_set_camera_to(actors.x[actor_id]);
   }
   camera_follow_actor_id = actor_id;
-  camera_state = CAMERA_STATE_FOLLOW_ACTOR;
+  camera_state           = CAMERA_STATE_FOLLOW_ACTOR;
 }
 
 void vm_set_camera_to(uint8_t x)
@@ -906,14 +918,20 @@ void vm_set_camera_to(uint8_t x)
   else if (x < 20) {
     x = 20;
   }
-  camera_x = x;
+
+  if (camera_x != x) {
+    camera_x = x;
+    vm_update_bg();
+    vm_update_actors();
+  }
+  camera_state = 0;
 }
 
 void vm_camera_pan_to(uint8_t x)
 {
-  camera_target = x;
+  camera_target          = x;
   camera_follow_actor_id = 0xff;
-  camera_state = CAMERA_STATE_MOVE_TO_TARGET_POS;
+  camera_state           = CAMERA_STATE_MOVE_TO_TARGET_POS;
 }
 
 void vm_revert_sentence(void)
@@ -931,8 +949,8 @@ void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char
   map_ds_heap();
 
   vm_state.verbs.id[slot] = verb_id;
-  vm_state.verbs.x[slot] = x;
-  vm_state.verbs.y[slot] = y;
+  vm_state.verbs.x[slot]  = x;
+  vm_state.verbs.y[slot]  = y;
 
   uint8_t len = strlen(name);
   vm_state.verbs.len[slot] = len;
@@ -940,7 +958,7 @@ void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char
   vm_state.verbs.name[slot] = (char *)malloc(len);
   strcpy(vm_state.verbs.name[slot], name);
 
-  screen_update_needed |= SCREEN_UPDATE_VERBS;
+  vm_update_verbs();
 
   map_set_ds(save_ds);
 }
@@ -954,7 +972,7 @@ void vm_verb_delete(uint8_t slot)
   free(vm_state.verbs.name[slot]);
   vm_state.verbs.name[slot] = NULL;
 
-  screen_update_needed |= SCREEN_UPDATE_VERBS;
+  vm_update_verbs();
 
   map_set_ds(save_ds);
 }
@@ -1110,7 +1128,7 @@ static void process_dialog(uint8_t jiffies_elapsed)
     vm_write_var(VAR_MSGLEN, vm_read_var8(VAR_MSGLEN) + print_message_num_chars);
 
     print_message_ptr = message_ptr;
-    screen_update_needed |= SCREEN_UPDATE_DIALOG;
+    vm_update_dialog();
     message_timer = 60 + (uint16_t)timer_chars * (uint16_t)vm_state.message_speed;
     message_ptr += print_message_num_chars;
     if (*message_ptr == '\0') {
@@ -1321,7 +1339,7 @@ static void handle_input(void)
             vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
             vm_write_var(VAR_CLICKED_NOUN, inv_get_object_id(inventory_item_id));
             vm_start_script(SCRIPT_ID_INPUT_EVENT);
-            screen_update_needed |= SCREEN_UPDATE_SENTENCE;
+            vm_update_sentence();
           }
         }
         else if (inventory_ui_slot == 4) {
@@ -1762,7 +1780,7 @@ static void select_verb(uint8_t verb_id)
   vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_VERB_SELECT);
   vm_write_var(VAR_SELECTED_VERB, verb_id);
   vm_start_script(SCRIPT_ID_INPUT_EVENT);
-  screen_update_needed |= SCREEN_UPDATE_SENTENCE;
+  vm_update_sentence();
 }
 
 static const char *get_preposition_name(uint8_t preposition)
@@ -1869,7 +1887,7 @@ static void inventory_scroll_up(void)
 {
   if (inventory_pos) {
     inventory_pos -= 2;
-    screen_update_needed |= SCREEN_UPDATE_INVENTORY;
+    vm_update_inventory();
   }
 }
 
@@ -1877,7 +1895,7 @@ static void inventory_scroll_down(void)
 {
   if (inventory_pos + 4 < vm_state.inv_num_objects) {
     inventory_pos += 2;
-    screen_update_needed |= SCREEN_UPDATE_INVENTORY;
+    vm_update_inventory();
   }
 }
 
@@ -1966,7 +1984,7 @@ static void clear_all_other_object_states(uint8_t local_object_id)
     {
       vm_state.global_game_objects[obj_hdr->id] &= ~OBJ_STATE;
       // since actors could potentially be affected, we need to redraw those as well
-      screen_update_needed |= SCREEN_UPDATE_ACTORS;
+      vm_update_actors();
       //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
     }
   }
@@ -2020,7 +2038,7 @@ static void update_camera(void)
       }
     }
     else {
-      debug_msg("Camera reached target");
+      //debug_msg("Camera reached target");
       camera_state &= ~CAMERA_STATE_MOVING;
       if (camera_state & CAMERA_STATE_MOVE_TO_TARGET_POS) {
         camera_state &= ~CAMERA_STATE_MOVE_TO_TARGET_POS;
@@ -2031,13 +2049,13 @@ static void update_camera(void)
   else {
     if (camera_target <= camera_x - 10 && camera_x > 20)
     {
-      debug_msg("Camera start moving left");
+      //debug_msg("Camera start moving left");
       --camera_x;
       camera_state |= CAMERA_STATE_MOVING;
     }
     else if (camera_target >= camera_x + 10 && camera_x < max_camera_x)
     {
-      debug_msg("Camera start moving right");
+      //debug_msg("Camera start moving right");
       ++camera_x;
       camera_state |= CAMERA_STATE_MOVING;
     }

@@ -144,7 +144,6 @@ void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y)
     actors.x[actor_id] = x;
     actors.y[actor_id] = y;
   }
-  
 }
 
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
@@ -218,11 +217,11 @@ void actor_next_step(uint8_t local_id)
   uint8_t actor_id = local_actors.global_id[local_id];
   uint8_t walk_dir = local_actors.walk_dir[local_id];
   if (walk_dir < 2 && actors.x[actor_id] == local_actors.next_x[local_id]) {
-    debug_out("Reached x, correct y %u.%05u to %u", actors.y[actor_id], local_actors.y_fraction[local_id], local_actors.next_y[local_id]);
+    //debug_out("Reached x, correct y %u.%05u to %u", actors.y[actor_id], local_actors.y_fraction[local_id], local_actors.next_y[local_id]);
     actors.y[actor_id] = local_actors.next_y[local_id];
   }
   else if (walk_dir >= 2 && actors.y[actor_id] == local_actors.next_y[local_id]) {
-    debug_out("Reached y, correct x %u.%05u to %u", actors.x[actor_id], local_actors.x_fraction[local_id], local_actors.next_x[local_id]);
+    //debug_out("Reached y, correct x %u.%05u to %u", actors.x[actor_id], local_actors.x_fraction[local_id], local_actors.next_x[local_id]);
     actors.x[actor_id] = local_actors.next_x[local_id];
   }
 
@@ -237,7 +236,7 @@ void actor_next_step(uint8_t local_id)
     local_actors.cur_box[local_id] = cur_box;
     local_actors.masking[local_id] = walkbox_get_box_masking(cur_box);
     if (cur_box == target_box) {
-      debug_out("Reached target box %d", cur_box);
+      //debug_out("Reached target box %d", cur_box);
       local_actors.next_x[local_id] = local_actors.walk_to_x[local_id];
       local_actors.next_y[local_id] = local_actors.walk_to_y[local_id];
     }
@@ -248,12 +247,12 @@ void actor_next_step(uint8_t local_id)
   }
 
   if (local_actors.walking[local_id] == WALKING_STATE_STARTING) {
-    debug_out("Start walking");
+    //debug_out("Start walking");
     actor_start_animation(local_id, ANIM_WALKING + actors.dir[actor_id]);
     local_actors.walking[local_id] = WALKING_STATE_CONTINUE;
   }
   else if (local_actors.walk_dir[local_id] != actors.dir[actor_id]) {
-    debug_out("Turn");
+    //debug_out("Turn");
     // turn but keep on walking
     turn_to_walk_to_direction(local_id);
   }
@@ -277,7 +276,7 @@ void actor_next_step(uint8_t local_id)
       local_actors.masking[local_id] = walkbox_get_box_masking(cur_box);
     }
     
-    debug_out("Actor %u position: %u.%05u, %u.%05u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
+    //debug_out("Actor %u position: %u.%05u, %u.%05u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
   }
 
   vm_update_actors();
@@ -319,6 +318,7 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
       uint8_t cmd_offset = *anim_ptr++;
       //debug_out("  cel level: %d", level);
       //debug_out("    cmd offset: %02x", cmd_offset);
+      //debug_out("    prev anim: %02x", *cel_anim);
       if (cmd_offset == 0xff) {
         *cel_level_cur_cmd  = 0xff;
         *cel_level_cmd_ptr  = 0;
@@ -789,15 +789,14 @@ static void reset_animation(uint8_t local_id)
 {
   __auto_type cel_anim          = local_actors.cel_anim[local_id];
   __auto_type cel_level_cur_cmd = local_actors.cel_level_cur_cmd[local_id];
-  uint8_t dir = 2;
-  actors.dir[local_actors.global_id[local_id]] = dir;
+  uint8_t dir = actors.dir[local_actors.global_id[local_id]];
 
   for (uint8_t i = 0; i < 16; ++i) {
     cel_anim[i]          = 0xff;
     cel_level_cur_cmd[i] = 0xff;
   }
-  actor_start_animation(local_id, ANIM_STANDING + dir);
-  actor_start_animation(local_id, ANIM_HEAD + dir);
+  actor_start_animation(local_id, ANIM_STANDING   + dir);
+  actor_start_animation(local_id, ANIM_HEAD       + dir);
   actor_start_animation(local_id, ANIM_MOUTH_SHUT + dir);
 }
 

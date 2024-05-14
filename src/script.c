@@ -831,6 +831,9 @@ static void do_animation(void)
   debug_scr("do-animation (actor=)%d (anim=)%d", actor_id, animation_id);
   uint8_t local_id = actors.local_id[actor_id];
   if (local_id != 0xff) {
+    if (animation_id < 0xf8) {
+      animation_id += actors.dir[actor_id];
+    }
     actor_start_animation(local_id, animation_id);
   }
 }
@@ -1190,11 +1193,7 @@ static void camera_at(void)
 {
   uint16_t new_camera_x = resolve_next_param8();
   debug_scr("camera-at %d", new_camera_x);
-  if (new_camera_x != camera_x) {
-    camera_x = new_camera_x;
-    vm_update_bg();
-    vm_update_actors();
-  }
+  vm_set_camera_to(new_camera_x);
 }
 
 static void proximity(void)

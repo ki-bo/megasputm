@@ -156,9 +156,11 @@ void res_deactivate_and_unlock_all(void)
     }
   }
   while (++i != 0);
+#ifdef HEAP_DEBUG_OUT
   uint16_t save_cs = map_cs_main_priv();
   print_heap();
   map_set_cs(save_cs);
+#endif
 }
 
 /**
