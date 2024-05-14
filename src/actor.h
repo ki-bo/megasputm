@@ -52,7 +52,9 @@ typedef struct {
 enum {
   WALKING_STATE_STOPPED,
   WALKING_STATE_STARTING,
-  WALKING_STATE_CONTINUE 
+  WALKING_STATE_CONTINUE,
+  WALKING_STATE_STOPPING,
+  WALKING_STATE_FINISHED
 };
 
 //-----------------------------------------------------------------------------------------------

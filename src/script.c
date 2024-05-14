@@ -836,6 +836,11 @@ static void do_animation(void)
     }
     actor_start_animation(local_id, animation_id);
   }
+  else {
+    if ((animation_id & 0xfc) == 0xf8) {
+      actors.dir[actor_id] = animation_id & 0x03;
+    }
+  }
 }
 
 static void camera_pan_to(void)
@@ -1374,7 +1379,8 @@ static void wait_for_actor(void)
     return;
   }
 
-  if (local_actors.walking[local_id]) {
+  uint8_t walk_state = local_actors.walking[local_id];
+  if (walk_state != WALKING_STATE_FINISHED && walk_state != WALKING_STATE_STOPPED) {
     // if actor is still moving, we break the script for one cycle
     // but need to make sure we execute this opcode again
     // so we set the pc back to the opcode
