@@ -456,10 +456,9 @@ void diskio_load_game_objects(void)
   acquire_drive();
 
   uint8_t first = 1;
-  uint16_t bytes_read = 0;
   uint8_t *address = (uint8_t *)&vm_state.global_game_objects;
 
-  while (next_track != 0 && num_bytes_left > 0) {
+  do {
     load_block(next_track, next_block);
     next_track = FDC.data;
     next_block = FDC.data;
@@ -483,20 +482,16 @@ void diskio_load_game_objects(void)
 
       num_bytes_left <<= 1;
       bytes_left_in_block -= 4;
-      
-      debug_out("num_bytes_left %d", num_bytes_left);
     }
 
-    while (bytes_left_in_block-- != 0 && num_bytes_left-- != 0) {
-      *address = FDC.data ^ 0xff;
-      ++address;
-      ++bytes_read;
+    uint8_t bytes_to_read = min(bytes_left_in_block, num_bytes_left);
+    num_bytes_left -= bytes_to_read;
+    while (bytes_to_read != 0) {
+      *address++ = FDC.data ^ 0xff;
+      --bytes_to_read;
     }
-
-    debug_out("  num_bytes_left: %d", num_bytes_left);
   }
-
-  debug_out("read %d bytes of global game objects", bytes_read);
+  while (next_track != 0 && num_bytes_left > 0);
 
   release_drive();
 }

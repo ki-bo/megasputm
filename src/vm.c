@@ -1614,9 +1614,7 @@ static void override_cutscene(void)
 static void update_sentence_line(void)
 {
   if (!(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
-    map_cs_gfx();
     gfx_clear_sentence();
-    unmap_cs();
     return;
   }
 
@@ -1666,9 +1664,7 @@ static void update_sentence_line(void)
   }  
   sentence_text[40] = '\0';
 
-  map_cs_gfx();
   gfx_print_interface_text(0, 18, sentence_text, TEXT_STYLE_SENTENCE);
-  unmap_cs();
 
   prev_sentence_highlighted = 0;
 
@@ -1792,7 +1788,6 @@ static const char *get_preposition_name(uint8_t preposition)
 static void update_inventory_interface()
 {
   unmap_ds();
-  map_cs_gfx();
   gfx_clear_inventory();
   if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
     uint8_t end_id = min(vm_state.inv_num_objects, inventory_pos + 4);
@@ -1817,7 +1812,6 @@ static void update_inventory_interface()
 
     update_inventory_scroll_buttons();
   }
-  unmap_cs();
 }
 
 static void update_inventory_highlighting(void)
