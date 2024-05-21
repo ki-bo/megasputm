@@ -323,8 +323,8 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
     if (cel_level_mask & 0x8000) {
       uint8_t cmd_offset = *anim_ptr++;
       //debug_out("  cel level: %d", level);
-      //debug_out("    cmd offset: %02x", cmd_offset);
-      //debug_out("    prev anim: %02x", *cel_anim);
+      //debug_out("    cmd offset: %x", cmd_offset);
+      //debug_out("    prev anim: %x", *cel_anim);
       if (cmd_offset == 0xff) {
         *cel_level_cur_cmd  = 0xff;
         *cel_level_cmd_ptr  = 0;
@@ -336,7 +336,7 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
         *cel_level_last_cmd = *anim_ptr++;
       }
       *cel_anim = animation;
-      //debug_out("    cur %d last %d cmd_ptr %04x", *cel_level_cur_cmd, *cel_level_last_cmd, (uint16_t)*cel_level_cmd_ptr);
+      //debug_out("    cur %d last %d cmd_ptr %x", *cel_level_cur_cmd, *cel_level_last_cmd, (uint16_t)*cel_level_cmd_ptr);
     }  
     cel_level_mask <<= 1;
     ++cel_anim;

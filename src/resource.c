@@ -610,7 +610,7 @@ uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
       best_fit_size = cur_size;
     }
 
-    //debug_out("  block %d, type %02x, index %d, free %d", block_idx, page_res_type[block_idx], page_res_index[block_idx], cur_size);
+    //debug_out("  block %d, type %x, index %d, free %d", block_idx, page_res_type[block_idx], page_res_index[block_idx], cur_size);
   }
   while (++block_idx != 0); // block_idx will wrap around to 0
 

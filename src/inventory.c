@@ -103,7 +103,7 @@ uint8_t inv_object_available(uint16_t id)
 const char *inv_get_object_name(uint8_t position)
 {
   unmap_ds();
-  debug_out("inv_objects %p name_offset %02x", vm_state.inv_objects[position], vm_state.inv_objects[position]->name_offset);
+  debug_out("inv_objects %p name_offset %x", vm_state.inv_objects[position], vm_state.inv_objects[position]->name_offset);
   const char *name_ptr = (const char *)vm_state.inv_objects[position] + vm_state.inv_objects[position]->name_offset;
   return name_ptr;
 }

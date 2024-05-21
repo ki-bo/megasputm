@@ -269,7 +269,7 @@ void script_run_active_slot(void)
     opcode = read_byte();
     param_mask = 0x80;
 #ifdef DEBUG_SCRIPTS
-    debug_out2("[%02d](%03x) %02x ", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
+    debug_out2("[%02d](%x) %x ", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
 #endif
     exec_opcode(opcode);
   }
@@ -783,7 +783,7 @@ static void resource_cmd(void)
       res_lock(RES_TYPE_SOUND, resource_id, 0);
       break;
     default:
-      //debug_out("unknown sub-opcode %02x", sub_opcode);
+      //debug_out("unknown sub-opcode %x", sub_opcode);
       fatal_error(ERR_UNKNOWN_RESOURCE_OPERATION);
   }
 }
@@ -957,7 +957,7 @@ static void jump_or_restart(void)
 {
   if (!(opcode & 0x80)) {
     pc += read_word(); // will effectively jump backwards if the offset is negative
-    debug_scr("jump %03x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
+    debug_scr("jump %x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
   }
   else {
     debug_scr("restart");
@@ -990,11 +990,11 @@ static void assign_bit_variable(void)
   uint8_t bit_var_lo = bit_var_hi & 0x0f;
   bit_var_hi >>= 4;
   if (resolve_next_param8()) {
-    //debug_scr("set bit variable %04x.%1x", bit_var_hi, bit_var_lo);
+    //debug_scr("set bit variable %x.%1x", bit_var_hi, bit_var_lo);
     vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) | (1 << bit_var_lo));
   }
   else {
-    //debug_scr("clear bit variable %04x.%1x", bit_var_hi, bit_var_lo);
+    //debug_scr("clear bit variable %x.%1x", bit_var_hi, bit_var_lo);
     vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) & ~(1 << bit_var_lo));
   }
 }
@@ -1190,7 +1190,7 @@ static void assign_from_bit_variable(void)
   uint16_t bit_var_hi = read_word() + resolve_next_param8();
   uint8_t bit_var_lo = bit_var_hi & 0x0f;
   bit_var_hi >>= 4;
-  debug_scr("VAR[%d] = bit-variable %04x.%1x", var_idx, bit_var_hi, bit_var_lo);
+  debug_scr("VAR[%d] = bit-variable %x.%1x", var_idx, bit_var_hi, bit_var_lo);
   vm_write_var(var_idx, (vm_read_var(bit_var_hi) >> bit_var_lo) & 1);
 }
 
@@ -1711,7 +1711,7 @@ static void cursor(void)
   uint16_t param = resolve_next_param16();
   vm_write_var(VAR_CURSOR_STATE, param & 0xff);
   vm_change_ui_flags(param >> 8);
-  //debug_scr("cursor cursor-state %02x ui-flags %02x", param & 0xff, param >> 8);
+  //debug_scr("cursor cursor-state %x ui-flags %x", param & 0xff, param >> 8);
 }
 
 static void stop_script(void)
@@ -1880,6 +1880,6 @@ static void jump_if_not_pickupable(void)
  */
 static void unimplemented_opcode(void)
 {
-  debug_out("Unimplemented opcode: %02x at %04x", opcode, (uint16_t)(pc - 1));
+  debug_out("Unimplemented opcode: %x at %x", opcode, (uint16_t)(pc - 1));
   fatal_error(ERR_UNKNOWN_OPCODE);
 }

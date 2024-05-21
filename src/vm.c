@@ -625,7 +625,7 @@ uint8_t vm_start_script(uint8_t script_id)
 
 uint8_t vm_start_room_script(uint16_t room_script_offset)
 {
-  //debug_out("Starting room script at offset %04x", room_script_offset);
+  //debug_out("Starting room script at offset %x", room_script_offset);
 
   uint8_t res_slot = room_res_slot + MSB(room_script_offset);
   uint16_t offset = LSB(room_script_offset);
@@ -647,7 +647,7 @@ void vm_start_object_script(uint8_t verb, uint16_t global_object_id)
   uint8_t res_slot = obj_page[id];
   script_offset += obj_offset[id];
 
-  //debug_out("Starting object script %d for verb %d at slot %02x offset %04x", global_object_id, verb, res_slot, script_offset);
+  //debug_out("Starting object script %d for verb %d at slot %x offset %x", global_object_id, verb, res_slot, script_offset);
 
   uint8_t child_script_slot = start_child_script_at_address(res_slot, script_offset);
   execute_script_slot(child_script_slot);
@@ -819,7 +819,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
     map_ds_resource(obj_page[i]);
     __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
     //debug_out("Checking object %d at %d, %d state %d - parent_state %d", obj_hdr->id, obj_hdr->pos_x, obj_hdr->pos_y_and_parent_state & 0x7f, global_game_objects[obj_hdr->id] & OBJ_STATE, obj_hdr->pos_y_and_parent_state & 0x80);
-    //debug_out("  obj_state %02x", global_game_objects[obj_hdr->id]);
+    //debug_out("  obj_state %x", global_game_objects[obj_hdr->id]);
     if (vm_state.global_game_objects[obj_hdr->id] & OBJ_CLASS_UNTOUCHABLE) {
       continue;
     }
@@ -1562,10 +1562,10 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
   uint8_t *ptr = NEAR_U8_PTR(RES_MAPPED + cur_offset);
   uint8_t script_offset = 0;
 
-  //debug_out("Searching for verb %02x in object %d", verb, local_object_id);
+  //debug_out("Searching for verb %x in object %d", verb, local_object_id);
 
   while (*ptr != 0) {
-    //debug_out("Verb %02x, offset %02x", *ptr, *(ptr + 1));
+    //debug_out("Verb %x, offset %x", *ptr, *(ptr + 1));
     if (*ptr == verb || *ptr == 0xff) {
       script_offset = *(ptr + 1);
       break;
@@ -1924,8 +1924,8 @@ static void read_walk_boxes(void)
     // debug_out("  urx: %d", box->topright_x);
     // debug_out("  llx: %d", box->bottomleft_x);
     // debug_out("  lrx: %d", box->bottomright_x);
-    // debug_out("  mask: %02x", box->mask);
-    // debug_out("  flags: %02x", box->flags);
+    // debug_out("  mask: %x", box->mask);
+    // debug_out("  flags: %x", box->flags);
   }
   walk_box_matrix = box_ptr;
   /*

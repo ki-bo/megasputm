@@ -1210,7 +1210,7 @@ static void load_block(uint8_t track, uint8_t block)
 
       //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
       if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-        //debug_out("FDC status: %04x", FDC.status)
+        //debug_out("FDC status: %x", FDC.status)
         read_error(ERR_SECTOR_DATA_CORRUPT);
       }
 
