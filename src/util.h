@@ -89,6 +89,8 @@ void debug_msg2(char* msg);
 // Memory functions (overloaded using DMA functionality)
 void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n);
 void __far *memcpy_bank(void __far *dest, const void __far *src, size_t n);
-void __far *memset_bank(void __far *s, int c, size_t n);
+void __far *memcpy_io_to_bank(void __far *dest, const void __far *src, size_t n);
+void __far *memset20(void __far *s, int c, size_t n);
+void __far *memset32(void __far *s, uint32_t c, size_t n);
 
 #endif // __UTIL_H

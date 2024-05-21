@@ -35,7 +35,9 @@ union map_t {
 };
 
 
-union map_t __attribute__((zpage)) map_regs; // need to init with non-zero to force it into data section
+union map_t __attribute__((zpage)) map_regs;
+
+#pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
  * @brief Initializes the memory mapping system
@@ -49,6 +51,8 @@ void map_init(void)
 {
   map_regs.quad = 0;
 }
+
+#pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
 
 /**
  * @brief Get the current map register (32 bit)

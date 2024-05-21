@@ -4,6 +4,7 @@
 #include "io.h"
 #include "map.h"
 #include "resource.h"
+#include "util.h"
 #include "vm.h"
 #include <string.h>
 #include <stdint.h>
@@ -12,6 +13,7 @@
 
 #define FDC_BUF FAR_U8_PTR(0xffd6c00)
 #define DISK_CACHE 0x8000000UL
+#define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x10000UL))
 
 //-----------------------------------------------------------------------------------------------
 
@@ -46,6 +48,23 @@ static struct {
   uint16_t sound_offset[120];
 } lfl_index_file_contents;
 
+  struct directory_entry {
+    uint8_t  next_track;
+    uint8_t  next_block;
+    uint8_t  file_type;
+    uint8_t  first_track;
+    uint8_t  first_block;
+    char     filename[16];
+    uint16_t sss_block;
+    uint8_t  record_length;
+    uint8_t  unused[6];
+    uint16_t file_size_blocks;
+  };
+
+  struct directory_block {
+    struct directory_entry entries[8];
+  };
+
 //-----------------------------------------------------------------------------------------------
 
 #pragma clang section data="data_diskio" bss="bss_diskio"
@@ -72,6 +91,23 @@ static struct {
   uint16_t sound_offset[120];
 } lfl_index;
 
+struct bam_entry {
+  uint8_t num_free_blocks;
+  uint8_t block_usage[5];
+};
+
+struct bam_block {
+  uint8_t next_track;
+  uint8_t next_sector;
+  uint8_t version;
+  uint8_t version_1complement;
+  uint16_t disk_id;
+  uint8_t io_byte;
+  uint8_t auto_boot_loader;
+  uint8_t reserved[8];
+  struct bam_entry bam_entries[40];
+};
+
 static uint8_t room_track_list[54];
 static uint8_t room_block_list[54];
 static uint8_t current_track;
@@ -86,6 +122,13 @@ static uint16_t cur_chunk_size;
 static uint8_t drive_ready;
 static uint8_t jiffies_elapsed_since_last_drive_access;
 static uint8_t drive_in_use;
+static uint8_t writebuf_res_slot;
+static uint8_t num_write_blocks;
+static uint8_t write_file_first_track;
+static uint8_t write_file_first_block;
+static uint8_t write_file_current_track;
+static uint8_t write_file_current_block;
+static uint8_t *write_file_data_ptr;
 
 // Private init functions
 static uint8_t read_next_directory_block(void);
@@ -104,6 +147,11 @@ static void acquire_drive(void);
 static void release_drive(void);
 static void read_error(error_code_t error_code);
 static void led_and_motor_off(void);
+static uint16_t allocate_sector(uint8_t start_track);
+static uint8_t find_free_block_on_track(uint8_t track);
+static uint8_t find_free_sector(struct bam_entry *entry);
+static void load_sector_to_bank(uint8_t track, uint8_t block, uint8_t __far *target);
+static void write_sector(uint8_t track, uint8_t sector, uint8_t __far *sector_buf_far);
 
 /**
  * @defgroup diskio_init Disk I/O Init Functions
@@ -642,6 +690,217 @@ void diskio_continue_resource_loading(uint8_t __huge *target_ptr)
   release_drive();
 }
 
+void diskio_open_for_writing(void)
+{
+  // allocating 4 blocks (2 for bam and 2 as sector write buffers)
+  writebuf_res_slot = res_reserve_heap(4);
+
+  acquire_drive();
+
+  // load BAM
+  load_block(40, 1);
+  memcpy_bank((void __far *)0xffd6d00, (void __far *)res_get_huge_ptr(writebuf_res_slot)    , 0x100);
+  load_block(40, 2);
+  memcpy_bank((void __far *)0xffd6c00, (void __far *)res_get_huge_ptr(writebuf_res_slot + 1), 0x100);
+
+  num_write_blocks         = 0;
+  write_file_first_track   = 0;
+  write_file_current_track = 39; // start searching for free blocks on track 39
+  write_file_data_ptr      = NEAR_U8_PTR(0x8400); // end of buffer to indicate new sector needs to get allocated
+}
+
+void diskio_write(const uint8_t *data, uint16_t size)
+{
+  if (!size) {
+    return;
+  }
+
+  uint16_t save_ds = map_get_ds();
+
+  uint8_t *ts_field;
+  uint8_t *sector_buf_ptr = write_file_data_ptr;
+
+  map_ds_resource(writebuf_res_slot);
+  uint8_t __far *sector_buf_far = (void __far *)res_get_huge_ptr(writebuf_res_slot + 2);
+
+  while (size != 0) {
+    if (sector_buf_ptr == NEAR_U8_PTR(0x8300)) {
+      // switch to next block in the sector
+      ts_field        = NEAR_U8_PTR(0x8200);
+      ts_field[0]     = write_file_current_track;
+      ts_field[1]     = write_file_current_block + 1;
+      sector_buf_ptr += 2; // skip over the track and block fields
+    }
+    else if (sector_buf_ptr == NEAR_U8_PTR(0x8400)) {
+      // write pointer is at the end of the buffer,
+      // allocate next sector (=2 blocks) for the file
+      uint16_t track_sector = allocate_sector(write_file_current_track);
+      if (track_sector == 0) {
+        led_and_motor_off();
+        fatal_error(ERR_DISK_FULL);
+      }
+      uint8_t write_file_next_track = MSB(track_sector);
+      uint8_t write_file_next_block = LSB(track_sector) * 2;
+      debug_out("Allocated block %d:%d\n", write_file_next_track, write_file_next_block);
+
+      if (write_file_first_track == 0) {
+        write_file_first_track = write_file_next_track;
+        write_file_first_block = write_file_next_block;
+      }
+      else {
+        ts_field    = NEAR_U8_PTR(0x8300); // start of second block in sector
+        ts_field[0] = write_file_next_track;
+        ts_field[1] = write_file_next_block;
+        // write current (full) sector to disk
+        write_sector(write_file_current_track, write_file_current_block, sector_buf_far);
+      }
+
+      write_file_current_track = write_file_next_track;
+      write_file_current_block = write_file_next_block;
+      sector_buf_ptr           = NEAR_U8_PTR(0x8200); // start of first block in sector
+      
+      memset(sector_buf_ptr, 0, 0x200);
+      sector_buf_ptr += 2; // skip over the track and block fields
+      ++num_write_blocks;
+    }
+
+    *sector_buf_ptr++ = *data++;
+    --size;
+  }
+
+  write_file_data_ptr = sector_buf_ptr;
+
+  map_set_ds(save_ds);
+}
+
+void diskio_close_writing(const char *filename)
+{
+  if (write_file_first_track == 0) {
+    // no data written, nothing to do
+    res_free_heap(writebuf_res_slot);
+    release_drive();
+    return;
+  }
+
+  uint8_t filename_len   = strlen(filename);
+  uint8_t filename_match = 0;
+  uint8_t dir_track      = 40;
+  uint8_t dir_block      = 3;
+  uint16_t save_ds       = map_get_ds();
+
+  // make bam and additional block buffers available at 0x8000
+  map_ds_resource(writebuf_res_slot);
+  // block_buf is the unbanked pointer to the mapped memory at 0x8200 (needed for DMA)
+  uint8_t __far *block_buf = (void __far *)res_get_huge_ptr(writebuf_res_slot + 2);
+
+  // finalize and write last sector to disk
+  uint8_t *ts_field;
+  if (write_file_data_ptr <= NEAR_U8_PTR(0x8300)) {
+    ts_field = NEAR_U8_PTR(0x8200);
+    // todo: de-allocate last block in sector as it was not used in this case
+  }
+  else {
+    ts_field = NEAR_U8_PTR(0x8300);
+  }
+  ts_field[0] = 0;
+  ts_field[1] = LSB(write_file_data_ptr) - 1;
+  write_sector(write_file_current_track, write_file_current_block, (uint8_t __far *)NEAR_U8_PTR(0x8200));
+  
+  // search for filename in directory
+  load_sector_to_bank(dir_track, dir_block, block_buf);
+
+  __auto_type dir_block_data = (struct directory_block *)(0x8300);
+
+  do {
+    for (uint8_t i = 0; i < 8; ++i) {
+      __auto_type cur_entry = &dir_block_data->entries[i];
+      if (cur_entry->file_type == 0x81) {
+        filename_match = 1;
+        __auto_type dir_filename = cur_entry->filename;
+        for (uint8_t j = 0; j < 16; ++j) {
+          if (j < filename_len) {
+            if (filename[j] != dir_filename[j]) {
+              filename_match = 0;
+              break;
+            }
+          }
+          else {
+            if (dir_filename[j] != '\xa0') {
+              filename_match = 0;
+              break;
+            }
+          }
+        }
+        if (filename_match) {
+          // found existing file entry, overwrite it
+          cur_entry->first_track      = write_file_first_track;
+          cur_entry->first_block      = write_file_first_block;
+          cur_entry->file_size_blocks = num_write_blocks;
+          break;
+        }
+      }
+    }
+
+    if (!filename_match) {
+      // filename not found in current directory block, read next one
+      __auto_type first_entry = &dir_block_data->entries[0];
+      dir_track = first_entry->next_track;
+      if (dir_track != 0) {
+        dir_block = first_entry->next_block;
+        load_sector_to_bank(dir_track, dir_block, block_buf);
+        dir_block_data = (struct directory_block *)(dir_block % 2 ? 0x8300 : 0x8200);
+      }
+      else {
+        // no more directory blocks, create new one
+        dir_block = find_free_block_on_track(40);
+        if (dir_block == 0xff) {
+          filename_match = 0;
+          break;
+        }
+
+        // load block first to get the other block in that sector into the FDC buffer
+        load_sector_to_bank(40, dir_block, block_buf);
+        dir_block_data = (struct directory_block *)(dir_block % 2 ? 0x8300 : 0x8200);
+
+        // erase newly allocated block
+        memset32((void __far *)dir_block_data, 0, 0x100);
+
+        first_entry                   = &dir_block_data->entries[0];
+        first_entry->next_track       = 0;
+        first_entry->next_block       = 0xff;
+        first_entry->file_type        = 0x81;
+        first_entry->first_track      = write_file_first_track;
+        first_entry->first_block      = write_file_first_block;
+        first_entry->file_size_blocks = num_write_blocks;
+
+        __auto_type dir_filename = first_entry->filename;
+        for (uint8_t i = 0; i < 16; ++i) {
+          if (i < filename_len) {
+            dir_filename[i] = filename[i];
+          }
+          else {
+            dir_filename[i] = '\xa0';
+          }
+        }
+
+        filename_match = 1;
+      }
+    }
+  }
+  while (!filename_match);
+
+  if (!filename_match) {
+    led_and_motor_off();
+    fatal_error(ERR_DISK_FULL);
+  }
+
+  res_free_heap(writebuf_res_slot);
+
+  release_drive();
+
+  map_set_ds(save_ds);
+}
+
 /** @} */ // end of diskio_public
 
 //-----------------------------------------------------------------------------------------------
@@ -1062,6 +1321,118 @@ static void led_and_motor_off(void)
 {
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
   drive_ready = 0;
+}
+
+static uint16_t allocate_sector(uint8_t start_track)
+{
+  uint8_t track     = start_track;
+  int8_t  direction = track > 40 ? 1 : -1;
+  struct bam_block *bam;
+  struct bam_entry *bam_entry;
+
+  if (track == 40) {
+    // don't allocate file sectors on track 40
+    --track;
+  }
+
+  do {
+    uint8_t bam_entry_idx;
+    if (track > 40) {
+      bam           = (struct bam_block *)0x8000;
+      bam_entry_idx = track - 41;
+    }
+    else {
+      bam           = (struct bam_block *)0x8100;
+      bam_entry_idx = track - 1;
+    }
+    bam_entry  = bam->bam_entries;
+    bam_entry += bam_entry_idx;
+
+    uint8_t sector = find_free_sector(bam_entry);
+    if (sector != 0xff) {
+      return track << 8 | sector;
+    }
+
+    track += direction;
+    if (track == 0) {
+      track     = 41;
+      direction = 1;
+    }
+    else if (track == 81) {
+      track     = 39;
+      direction = -1;
+    }
+  }
+  while (track != start_track);
+
+  // no free sector found
+  return 0xff;
+}
+
+static uint8_t find_free_block_on_track(uint8_t track)
+{
+  uint8_t res_slot = writebuf_res_slot;
+  if (track > 40) {
+    ++res_slot;
+    track -= 40;
+  }
+  struct bam_block __huge *bam = (struct bam_block __huge *)res_get_huge_ptr(res_slot);
+  __auto_type bam_entry = &(bam->bam_entries[track - 1]);
+  if (bam_entry->num_free_blocks == 0) {
+    // no free blocks on this track
+    return 0xff;
+  }
+
+  uint8_t block = 0;
+  uint8_t mask;
+  for (uint8_t i = 0; i < 5; ++i) {
+    mask = 1;
+    for (uint8_t j = 0; j < 8; ++j) {
+      if (bam_entry->block_usage[i] & mask) {
+        bam_entry->block_usage[i] &= ~mask;
+        bam_entry->num_free_blocks--;
+        return block;
+      }
+      mask <<= 1;
+      ++block;
+    }
+  }
+
+  fatal_error(ERR_INCONSISTENT_BAM);
+  return 0xff;
+}
+
+static uint8_t find_free_sector(struct bam_entry *entry)
+{
+  if (entry->num_free_blocks > 2) {
+    uint8_t sector = 0;
+    uint8_t mask;
+    for (uint8_t i = 0; i < 5; ++i) {
+      mask = 3;
+      for (uint8_t j = 0; j < 4; ++j) {
+        if (entry->block_usage[i] & mask) {
+          entry->block_usage[i] &= ~mask;
+          entry->num_free_blocks -= 2;
+          return sector;
+        }
+        mask <<= 2;
+        ++sector;
+      }
+    }
+  }
+
+  return 0xff;
+}
+
+static void load_sector_to_bank(uint8_t track, uint8_t block, uint8_t __far *target)
+{
+  load_block(track, block);
+  memcpy_io_to_bank(target, FDC_BUF, 0x200);
+}
+
+static void write_sector(uint8_t track, uint8_t sector, uint8_t __far *sector_buf_far)
+{
+  debug_out("writing track %d, sector %d from buffer %07lx", track, sector, (uint32_t)sector_buf_far);
 }
 
 /** @} */ // end of diskio_private

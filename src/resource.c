@@ -322,8 +322,20 @@ void res_deactivate_slot(uint8_t slot)
 
 uint8_t res_reserve_heap(uint8_t size_blocks)
 {
+  uint8_t free_heap_index = 0;
+  uint8_t slot = 0;
+  do {
+    if ((page_res_type[slot] & RES_TYPE_MASK) == RES_TYPE_HEAP) {
+      if (page_res_index[slot] >= free_heap_index) {
+        free_heap_index = page_res_index[slot] + 1;
+      }
+    }
+  }
+  while (++slot != 0);
+  debug_out("using heap index %d", free_heap_index);
+
   uint16_t save_cs = map_cs_main_priv();
-  uint8_t slot = allocate(RES_TYPE_HEAP, 0, size_blocks);
+  slot = allocate(RES_TYPE_HEAP, free_heap_index, size_blocks);
   set_flags(slot, RES_ACTIVE_MASK);
   map_set_cs(save_cs);
   return slot;

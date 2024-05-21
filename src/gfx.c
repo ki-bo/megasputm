@@ -198,8 +198,8 @@ void gfx_init()
   VICIV.tbdrpos       = 0x68;
   VICIV.textypos_lsb  = 0x67; 
 
-  memset_bank(FAR_U8_PTR(BG_BITMAP), 0, 0 /* 0 means 64kb */);
-  memset_bank(FAR_U8_PTR(COLRAM), 0, 2000);
+  memset20(FAR_U8_PTR(BG_BITMAP), 0, 0 /* 0 means 64kb */);
+  memset20(FAR_U8_PTR(COLRAM), 0, 2000);
 
   dmalist_rle_strip_copy.src_addr = LSB16(UNBANKED_PTR(color_strip));
   dmalist_rle_strip_copy.src_bank = BANK(UNBANKED_PTR(color_strip));
@@ -290,7 +290,7 @@ void setup_irq(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup gfx_runtime GFX Functions in code segment
+ * @defgroup gfx_runtime GFX Functions in code_main segment
  * @{
  */
 #pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
@@ -424,7 +424,7 @@ void gfx_clear_bg_image(void)
   uint16_t num_bytes = 16U * 40U * 64U;
 
   // clear one screen worth of char data
-  memset_bank(FAR_U8_PTR(BG_BITMAP), 0, num_bytes);
+  memset20(FAR_U8_PTR(BG_BITMAP), 0, num_bytes);
 
   // reset next_char_data pointer
   next_char_data = HUGE_U8_PTR(BG_BITMAP) + num_bytes;
@@ -652,7 +652,7 @@ void gfx_draw_bg(void)
     screen_ptr -= CHRCOUNT * 16 - 1;
   }
 
-  memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
+  memset20(UNBANKED_PTR(num_chars_at_row), 40, 16);
   reset_objects();
 
   map_set_ds(ds_save);
@@ -927,7 +927,7 @@ void gfx_finalize_actor_drawing(void)
  */
 void gfx_reset_actor_drawing(void)
 {
-  memset_bank(UNBANKED_PTR(num_chars_at_row), 40, 16);
+  memset20(UNBANKED_PTR(num_chars_at_row), 40, 16);
 
   // Next, zeroise all colram bytes beyond the 40 background picture chars each row.
   // This is to prevent the RRB to accidently do any gotox back into the visual area.
@@ -1279,7 +1279,7 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
 static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_lines)
 {
   if (col < 0 || col > num_masking_cache_cols || y_start <= -num_lines) {
-    memset_bank(UNBANKED_PTR(masking_column), 0, num_lines);
+    memset20(UNBANKED_PTR(masking_column), 0, num_lines);
     return;
   }
 
@@ -1294,7 +1294,7 @@ static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_l
   uint8_t idx_dst;
 
   if (y_start < 0) {
-    memset_bank(UNBANKED_PTR(masking_column), 0, -y_start);
+    memset20(UNBANKED_PTR(masking_column), 0, -y_start);
     idx_dst_start = -y_start;
     y_start = 0;
   }

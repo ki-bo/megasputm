@@ -26,6 +26,8 @@ typedef enum {
     ERR_COST_BUFSIZE_EXCEEDED = 22,
     ERR_CHRCOUNT_EXCEEDED = 23,
     ERR_UNKNOWN_CURSOR_IMAGE = 24,
+    ERR_INCONSISTENT_BAM = 25,
+    ERR_DISK_FULL = 26,
 } error_code_t;
 
 #endif // __ERROR_H__

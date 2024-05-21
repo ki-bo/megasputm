@@ -14,5 +14,8 @@ void diskio_load_game_objects(void);
 void diskio_load_room(uint8_t room, __far uint8_t *address);
 uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id);
 void diskio_continue_resource_loading(uint8_t __huge *target_ptr);
+void diskio_open_for_writing(void);
+void diskio_write(const uint8_t *data, uint16_t size);
+void diskio_close_for_writing(const char *filename);
 
 #endif // __DISKIO_H
