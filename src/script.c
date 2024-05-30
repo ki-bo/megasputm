@@ -49,13 +49,14 @@ static void camera_pan_to(void);
 static void actor_ops(void);
 static void say_line(void);
 static void random_number(void);
+static void set_or_clear_untouchable(void);
 static void jump_or_restart(void);
 static void do_sentence(void);
-static void jump_if_not_pickupable(void);
 static void assign_variable(void);
 static void assign_bit_variable(void);
 static void start_sound(void);
 static void walk_to(void);
+static void savegame_operation(void);
 static void actor_y(void);
 static void come_out_door(void);
 static void jump_if_or_if_not_equal_zero(void);
@@ -160,6 +161,7 @@ void script_init(void)
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &say_line;
   opcode_jump_table[0x16] = &random_number;
+  opcode_jump_table[0x17] = &set_or_clear_untouchable;
   opcode_jump_table[0x18] = &jump_or_restart;
   opcode_jump_table[0x19] = &do_sentence;
   opcode_jump_table[0x1a] = &assign_variable;
@@ -168,6 +170,7 @@ void script_init(void)
   opcode_jump_table[0x1e] = &walk_to;
   opcode_jump_table[0x20] = &stop_or_break;
   opcode_jump_table[0x21] = &put_actor;
+  opcode_jump_table[0x22] = &savegame_operation;
   opcode_jump_table[0x23] = &actor_y;
   opcode_jump_table[0x24] = &come_out_door;
   opcode_jump_table[0x25] = &draw_object;
@@ -207,6 +210,7 @@ void script_init(void)
   opcode_jump_table[0x51] = &do_animation;
   opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
+  opcode_jump_table[0x57] = &set_or_clear_untouchable;
   opcode_jump_table[0x58] = &begin_override_or_say_line_selected_actor;
   opcode_jump_table[0x59] = &do_sentence;
   opcode_jump_table[0x5a] = &add;
@@ -231,7 +235,7 @@ void script_init(void)
   opcode_jump_table[0x79] = &do_sentence;
   opcode_jump_table[0x7a] = &verb;
   opcode_jump_table[0x7e] = &walk_to;
-  opcode_jump_table[0x7f] = &jump_if_not_pickupable;
+  opcode_jump_table[0x7f] = &jump_if_or_if_not_pickupable;
 }
 
 /// @} // script_init
@@ -261,6 +265,11 @@ void script_run_active_slot(void)
 
   break_script = 0;
 
+#ifdef DEBUG_SCRIPTS
+  char *script_type  = vm_state.proc_type[active_script_slot] & PROC_TYPE_GLOBAL ? "S" : "R";
+  uint16_t script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
+#endif
+
   map_ds_resource(proc_res_slot[active_script_slot]);
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
   // check for PROC_STATE_RUNNING only will also mean we won't continue executing if
@@ -269,7 +278,12 @@ void script_run_active_slot(void)
     opcode = read_byte();
     param_mask = 0x80;
 #ifdef DEBUG_SCRIPTS
-    debug_out2("[%02d](%x) %x ", active_script_slot, (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), opcode);
+    debug_out("[%d]%s %d (%x) %x", 
+      active_script_slot, 
+      script_type,
+      script_id,
+      (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), 
+      opcode);
 #endif
     exec_opcode(opcode);
   }
@@ -940,6 +954,19 @@ static void random_number(void)
   vm_write_var(var_idx, rnd_number);
 }
 
+static void set_or_clear_untouchable(void)
+{
+  uint16_t obj_id = resolve_next_param16();
+  if (opcode & 0x40) {
+    //debug_scr("class-of %d is UNTOUCHABLE", obj_id);
+    vm_state.global_game_objects[obj_id] |= OBJ_CLASS_UNTOUCHABLE;
+  }
+  else {
+    //debug_scr("class-of %d is TOUCHABLE", obj_id);
+    vm_state.global_game_objects[obj_id] &= ~OBJ_CLASS_UNTOUCHABLE;
+  }
+}
+
 /**
  * @brief Opcode 0x18: Jump or restart
  * 
@@ -990,11 +1017,11 @@ static void assign_bit_variable(void)
   uint8_t bit_var_lo = bit_var_hi & 0x0f;
   bit_var_hi >>= 4;
   if (resolve_next_param8()) {
-    //debug_scr("set bit variable %x.%1x", bit_var_hi, bit_var_lo);
+    //debug_scr("set bit variable %x.%x", bit_var_hi, bit_var_lo);
     vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) | (1 << bit_var_lo));
   }
   else {
-    //debug_scr("clear bit variable %x.%1x", bit_var_hi, bit_var_lo);
+    //debug_scr("clear bit variable %x.%x", bit_var_hi, bit_var_lo);
     vm_write_var(bit_var_hi, vm_read_var(bit_var_hi) & ~(1 << bit_var_lo));
   }
 }
@@ -1011,6 +1038,47 @@ static void walk_to(void)
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
   actor_walk_to(actor_id, x, y);
+}
+
+static void savegame_operation(void)
+{
+  char savegame_filename[10];
+
+  uint8_t var_idx    = read_byte();
+  uint8_t sub_opcode = resolve_next_param8();
+  uint8_t save_slot  = sub_opcode & 0x1f;
+  
+  sub_opcode &= 0xe0;
+
+  switch (sub_opcode) {
+
+    case 0x00:
+      vm_write_var(var_idx, 32);
+      return;
+
+    case 0x20:
+      //  1 = put save disk in drive A
+      //  2 = put save disk in drive B
+      // >2 = not asking for a disk
+      vm_write_var(var_idx, 1);
+      return;
+
+    case 0x80:
+      // save
+      vm_save_game(save_slot);
+    
+    case 0xc0:
+      if (vm_savegame_exists(save_slot)) {
+        vm_write_var(var_idx, 6);
+      }
+      else {
+        vm_write_var(var_idx, 0);
+      }
+      return;
+    
+    default:
+      debug_out("unknown savegame operation %x", sub_opcode);
+  }
 }
 
 static void actor_y(void)
@@ -1190,7 +1258,7 @@ static void assign_from_bit_variable(void)
   uint16_t bit_var_hi = read_word() + resolve_next_param8();
   uint8_t bit_var_lo = bit_var_hi & 0x0f;
   bit_var_hi >>= 4;
-  debug_scr("VAR[%d] = bit-variable %x.%1x", var_idx, bit_var_hi, bit_var_lo);
+  debug_scr("VAR[%d] = bit-variable %x.%x", var_idx, bit_var_hi, bit_var_lo);
   vm_write_var(var_idx, (vm_read_var(bit_var_hi) >> bit_var_lo) & 1);
 }
 
@@ -1253,8 +1321,8 @@ static void do_sentence(void)
     vm_stop_script(SCRIPT_ID_SENTENCE);
     return;
   }
-  else if (sentence_verb == 0xfd) {
-    //debug_scr("  unimplemented sentence verb 0xfd, needed for load/save");
+  else if (sentence_verb == 0xfa) {
+    //debug_scr("  unimplemented sentence verb 0xfa, needed only in Zak?");
     fatal_error(ERR_UNKNOWN_VERB);
   }
 
@@ -1277,13 +1345,24 @@ static void do_sentence(void)
     return;
 
   case 1:
+  {
     // execute a sentence directly
-    debug_msg("  execute a sentence directly");
-    vm_write_var(VAR_CURRENT_VERB, sentence_verb);
-    vm_write_var(VAR_CURRENT_NOUN1, sentence_noun1);
-    vm_write_var(VAR_CURRENT_NOUN2, sentence_noun2);
-    vm_start_object_script(sentence_verb, sentence_noun1);
+    //debug_msg("  execute a sentence directly");
+
+    uint8_t background;
+    if (sentence_verb == 0xfd) {
+      background = 1;
+    }
+    else {
+      background = 0;
+      vm_write_var(VAR_CURRENT_VERB, sentence_verb);
+      vm_write_var(VAR_CURRENT_NOUN1, sentence_noun1);
+      vm_write_var(VAR_CURRENT_NOUN2, sentence_noun2);
+    }
+  
+    vm_start_object_script(sentence_verb, sentence_noun1, background);
     break;
+  }
 
   case 2:
     debug_msg("  print sentence on screen");
@@ -1298,11 +1377,11 @@ static void do_sentence(void)
 
 static void get_object_at_position(void)
 {
-  //debug_msg("Get object at position");
   uint8_t var_idx = read_byte();
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
   uint16_t obj_id = vm_get_object_at(x, y);
+  //debug_scr("object-at %d, %d is %d", x, y, obj_id);
   vm_write_var(var_idx, obj_id);
 }
 
@@ -1711,7 +1790,7 @@ static void cursor(void)
   uint16_t param = resolve_next_param16();
   vm_write_var(VAR_CURSOR_STATE, param & 0xff);
   vm_change_ui_flags(param >> 8);
-  //debug_scr("cursor cursor-state %x ui-flags %x", param & 0xff, param >> 8);
+  debug_scr("cursor cursor-state %x ui-flags %x", param & 0xff, param >> 8);
 }
 
 static void stop_script(void)
@@ -1848,29 +1927,6 @@ static void verb(void)
   char name[80];
   read_null_terminated_string(name);
   vm_verb_new(slot, verb_id, x, y, name);
-}
-
-/**
- * @brief Opcode 0x7f: Jump if not pickupable
- *
- * Reads an object id and a signed offset. If the object can not be picked up,
- * the script will jump to the new pc. The offset is signed two-complement and
- * is a byte position relative to the opcode of the script command following.
- * An offset of 0 would therefore disable the condition completely, as practically
- * no jump will occur.
- *
- * Variant opcodes: 0xFF
- *
- * Code section: code_script
- */
-static void jump_if_not_pickupable(void)
-{
-  //debug_msg("Jump if can not pick up object");
-  uint16_t obj_id = resolve_next_param16();
-  int16_t offset = read_word();
-  if ((vm_state.global_game_objects[obj_id] & OBJ_CLASS_PICKUPABLE) == 0) {
-    pc += offset;
-  }
 }
 
 /**

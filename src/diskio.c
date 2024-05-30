@@ -434,6 +434,14 @@ void diskio_check_motor_off(uint8_t elapsed_jiffies)
   jiffies_elapsed_since_last_drive_access = 0;
 }
 
+uint8_t diskio_file_exists(const char *filename)
+{
+  acquire_drive();
+  search_file(filename);
+  release_drive();
+  return next_track != 0;
+}
+
 /**
  * @brief Loads a file from disk into memory.
  * 
@@ -773,7 +781,7 @@ void diskio_write(const uint8_t *data, uint16_t size)
   map_set_ds(save_ds);
 }
 
-void diskio_close_writing(const char *filename)
+void diskio_close_for_writing(const char *filename)
 {
   if (write_file_first_track == 0) {
     // no data written, nothing to do
@@ -790,8 +798,8 @@ void diskio_close_writing(const char *filename)
 
   // make bam and additional block buffers available at 0x8000
   map_ds_resource(writebuf_res_slot);
-  // block_buf is the unbanked pointer to the mapped memory at 0x8200 (needed for DMA)
-  uint8_t __far *block_buf = (void __far *)res_get_huge_ptr(writebuf_res_slot + 2);
+  // sector_buf_far is the unbanked pointer to the mapped memory at 0x8200 (needed for DMA)
+  uint8_t __far *sector_buf_far = (void __far *)res_get_huge_ptr(writebuf_res_slot + 2);
 
   // finalize and write last sector to disk
   uint8_t *ts_field;
@@ -804,10 +812,10 @@ void diskio_close_writing(const char *filename)
   }
   ts_field[0] = 0;
   ts_field[1] = LSB(write_file_data_ptr) - 1;
-  write_sector(write_file_current_track, write_file_current_block, (uint8_t __far *)NEAR_U8_PTR(0x8200));
+  write_sector(write_file_current_track, write_file_current_block, sector_buf_far);
   
   // search for filename in directory
-  load_sector_to_bank(dir_track, dir_block, block_buf);
+  load_sector_to_bank(dir_track, dir_block, sector_buf_far);
 
   __auto_type dir_block_data = (struct directory_block *)(0x8300);
 
@@ -847,7 +855,7 @@ void diskio_close_writing(const char *filename)
       dir_track = first_entry->next_track;
       if (dir_track != 0) {
         dir_block = first_entry->next_block;
-        load_sector_to_bank(dir_track, dir_block, block_buf);
+        load_sector_to_bank(dir_track, dir_block, sector_buf_far);
         dir_block_data = (struct directory_block *)(dir_block % 2 ? 0x8300 : 0x8200);
       }
       else {
@@ -859,7 +867,7 @@ void diskio_close_writing(const char *filename)
         }
 
         // load block first to get the other block in that sector into the FDC buffer
-        load_sector_to_bank(40, dir_block, block_buf);
+        load_sector_to_bank(40, dir_block, sector_buf_far);
         dir_block_data = (struct directory_block *)(dir_block % 2 ? 0x8300 : 0x8200);
 
         // erase newly allocated block
@@ -893,6 +901,12 @@ void diskio_close_writing(const char *filename)
     led_and_motor_off();
     fatal_error(ERR_DISK_FULL);
   }
+
+  // write back BAM to disk
+  write_sector(40, 1, sector_buf_far - 0x200);
+
+  // write back directory block to disk
+  write_sector(40, dir_block, sector_buf_far);
 
   res_free_heap(writebuf_res_slot);
 
@@ -1424,6 +1438,18 @@ static uint8_t find_free_sector(struct bam_entry *entry)
   return 0xff;
 }
 
+/**
+ * @brief Loads a sector from disk into a far memory location
+ *
+ * The function will load a sector from disk into a far memory location. The
+ * sector is specified by its track and block number. The sector will be loaded
+ * into the FDC buffer and then copied into the far memory location.
+ * Note that there are always 2 blocks in a sector, so the sector containing the
+ * specified block will be loaded, along with the other block in the sector.
+ *
+ * @param track Logical track number (1-80)
+ * @param block Logical block number (0-39)
+ */
 static void load_sector_to_bank(uint8_t track, uint8_t block, uint8_t __far *target)
 {
   load_block(track, block);
@@ -1432,7 +1458,7 @@ static void load_sector_to_bank(uint8_t track, uint8_t block, uint8_t __far *tar
 
 static void write_sector(uint8_t track, uint8_t sector, uint8_t __far *sector_buf_far)
 {
-  debug_out("writing track %d, sector %d from buffer %07lx", track, sector, (uint32_t)sector_buf_far);
+  debug_out("writing track %d, sector %d from buffer %lx", track, sector, (uint32_t)sector_buf_far);
 }
 
 /** @} */ // end of diskio_private

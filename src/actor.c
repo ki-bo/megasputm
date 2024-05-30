@@ -218,11 +218,11 @@ void actor_next_step(uint8_t local_id)
   uint8_t actor_id = local_actors.global_id[local_id];
   uint8_t walk_dir = local_actors.walk_dir[local_id];
   if (walk_dir < 2 && actors.x[actor_id] == local_actors.next_x[local_id]) {
-    //debug_out("Reached x, correct y %u.%05u to %u", actors.y[actor_id], local_actors.y_fraction[local_id], local_actors.next_y[local_id]);
+    //debug_out("Reached x, correct y %u.%u to %u", actors.y[actor_id], local_actors.y_fraction[local_id], local_actors.next_y[local_id]);
     actors.y[actor_id] = local_actors.next_y[local_id];
   }
   else if (walk_dir >= 2 && actors.y[actor_id] == local_actors.next_y[local_id]) {
-    //debug_out("Reached y, correct x %u.%05u to %u", actors.x[actor_id], local_actors.x_fraction[local_id], local_actors.next_x[local_id]);
+    //debug_out("Reached y, correct x %u.%u to %u", actors.x[actor_id], local_actors.x_fraction[local_id], local_actors.next_x[local_id]);
     actors.x[actor_id] = local_actors.next_x[local_id];
   }
 
@@ -280,7 +280,7 @@ void actor_next_step(uint8_t local_id)
         local_actors.masking[local_id] = walkbox_get_box_masking(cur_box);
       }
       
-      //debug_out("Actor %u position: %u.%05u, %u.%05u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
+      //debug_out("Actor %u position: %u.%u, %u.%u", actor_id, actors.x[actor_id], local_actors.x_fraction[local_id], actors.y[actor_id], local_actors.y_fraction[local_id]);
     }
   }
 

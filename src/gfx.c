@@ -293,7 +293,7 @@ void setup_irq(void)
  * @defgroup gfx_runtime GFX Functions in code_main segment
  * @{
  */
-#pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
+#pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
 /// Counter increased every frame by a raster interrupt
 volatile uint8_t raster_irq_counter = 0;
@@ -1130,7 +1130,7 @@ void reset_objects(void)
  */
 void update_cursor(uint8_t snail_override)
 {
-  if (!(ui_state & UI_FLAGS_ENABLE_CURSOR) || vm_read_var8(VAR_CURSOR_STATE) == 0) {
+  if (!(ui_state & UI_FLAGS_ENABLE_CURSOR)) {
     VICII.spr_ena = 0x00;
     return;
   }

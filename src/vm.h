@@ -12,16 +12,18 @@
 
 enum {
   // bits 0-2 reserved for process state
-  PROC_STATE_FREE = 0,
-  PROC_STATE_RUNNING = 1,
+  PROC_STATE_FREE              = 0,
+  PROC_STATE_RUNNING           = 1,
   PROC_STATE_WAITING_FOR_TIMER = 2,
   PROC_STATE_WAITING_FOR_CHILD = 3,
   // flags (bits 3-7)
-  PROC_FLAGS_FROZEN = 0x80
+  PROC_FLAGS_FROZEN            = 0x80
 };
 
 enum {
-  PROC_TYPE_GLOBAL = 1
+  PROC_TYPE_GLOBAL       = 0x01,
+  PROC_TYPE_BACKGROUND   = 0x02,
+  PROC_TYPE_REGULAR_VERB = 0x04
 };
 
 enum {
@@ -139,7 +141,8 @@ struct vm
 
   uint8_t message_speed;
 
-  uint8_t  proc_script_id[NUM_SCRIPT_SLOTS];
+  uint8_t  proc_script_or_object_id[NUM_SCRIPT_SLOTS];
+  uint8_t  proc_object_id_msb[NUM_SCRIPT_SLOTS];
   uint8_t  proc_state[NUM_SCRIPT_SLOTS];
   uint8_t  proc_parent[NUM_SCRIPT_SLOTS];
   uint8_t  proc_child[NUM_SCRIPT_SLOTS];
@@ -191,7 +194,7 @@ void vm_say_line(uint8_t actor_id);
 uint8_t vm_start_script(uint8_t script_id);
 uint8_t vm_start_room_script(uint16_t room_script_offset);
 uint8_t vm_start_child_script(uint8_t script_id);
-void vm_start_object_script(uint8_t verb, uint16_t object);
+void vm_start_object_script(uint8_t verb, uint16_t object, uint8_t background);
 void vm_chain_script(uint8_t script_id);
 void vm_stop_active_script(void);
 void vm_stop_script(uint8_t script_id);
@@ -213,6 +216,9 @@ void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char
 void vm_verb_delete(uint8_t slot);
 void vm_verb_set_state(uint8_t slot, uint8_t state);
 char *vm_verb_get_name(uint8_t slot);
+uint8_t vm_savegame_exists(uint8_t slot);
+uint8_t vm_save_game(uint8_t slot);
+uint8_t vm_load_game(uint8_t slot);
 
 static inline uint16_t vm_read_var(uint8_t var)
 {

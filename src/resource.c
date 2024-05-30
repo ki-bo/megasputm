@@ -670,6 +670,7 @@ static void free_resource(uint8_t slot)
 #endif
 }
 
+#ifdef HEAP_DEBUG_OUT
 /**
  * @brief Prints out a summary of the current heap state
  *
@@ -695,10 +696,10 @@ static void print_heap(void)
         uint8_t active = prev_type & RES_ACTIVE_MASK;
         uint8_t locked = prev_type & RES_LOCKED_MASK;
         if (type == RES_TYPE_NONE) {
-          debug_out(" [%03u] Free: %d", idx - num_pages, num_pages);
+          debug_out(" [%u] Free: %d", idx - num_pages, num_pages);
         }
         else {
-          debug_out(" [%03u] Type: %d, ID: %03d, Pages: %02d, Active: %d, Locked: %d", idx - num_pages, type, prev_id, num_pages, active != 0, locked != 0);
+          debug_out(" [%u] Type: %d, ID: %d, Pages: %d, Active: %d, Locked: %d", idx - num_pages, type, prev_id, num_pages, active != 0, locked != 0);
         }
       }
       prev_type = page_res_type[idx];
@@ -710,9 +711,10 @@ static void print_heap(void)
     }
   }
   while (++idx != 0);
-  debug_out(" [%03u] Free: %d", 256 - num_pages, num_pages);
+  debug_out(" [%u] Free: %d", 256 - num_pages, num_pages);
   debug_out("-------");
 }
+#endif
 
 /** @} */ // res_private
 
