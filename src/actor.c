@@ -189,6 +189,9 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
 {
   uint16_t save_ds = map_get_ds();
 
+  if (!actor_is_in_current_room(actor_id)) {
+    return;
+  }
   __auto_type object_hdr = vm_get_room_object_hdr(object_id);
   if (!object_hdr) {
     return;
@@ -733,7 +736,7 @@ static void calculate_step(uint8_t local_id)
   int32_t x_step = 0;
   int32_t y_step = 0;
 
-  debug_out("From %d, %d (b%d) to %d, %d (b%d) x_diff %d y_diff %d", x, y, local_actors.cur_box[local_id], next_x, next_y, local_actors.next_box[local_id], x_diff, y_diff);
+  // debug_out("From %d, %d (b%d) to %d, %d (b%d) x_diff %d y_diff %d", x, y, local_actors.cur_box[local_id], next_x, next_y, local_actors.next_box[local_id], x_diff, y_diff);
 
   if (x_diff == 0 && y_diff == 0) {
     local_actors.walk_step_x[local_id] = 0;
@@ -788,7 +791,6 @@ static void add_local_actor(uint8_t actor_id)
   actors.local_id[actor_id] = local_id;
   local_actors.global_id[local_id] = actor_id;
   activate_costume(actor_id);
-  //debug_out("Actor %d is now in current room with local id %d", actor_id, local_id);
   uint8_t dir = actors.dir[actor_id];
   reset_animation(local_id);
 
