@@ -59,15 +59,15 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
 
   struct walk_box *walk_box = walk_boxes;
 
-  debug_out("Correct pos %d, %d", *x, *y);
+  //debug_out("Correct pos %d, %d", *x, *y);
   for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx) {
     uint8_t walk_box_x = *x;
     uint8_t walk_box_y = *y;
-    debug_out("Checking box %d", box_idx);
+    //debug_out("Checking box %d", box_idx);
     uint16_t distance = walkbox_get_corrected_box_position(walk_box, &walk_box_x, &walk_box_y);
-    debug_out("  w_x,y: %d, %d d %d", walk_box_x, walk_box_y, distance);
+    //debug_out("  w_x,y: %d, %d d %d", walk_box_x, walk_box_y, distance);
     if (walk_box_x == *x && walk_box_y == *y) {
-      debug_out("  inside box");
+      //debug_out("  inside box");
       map_set_ds(save_ds);
       return box_idx;
     }
@@ -80,7 +80,7 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
     ++walk_box;
   }
 
-  debug_out("Final %d, %d wb %d", corr_pos_x, corr_pos_y, dest_walk_box);
+  //debug_out("Final %d, %d wb %d", corr_pos_x, corr_pos_y, dest_walk_box);
 
   *x = corr_pos_x;
   *y = corr_pos_y;
@@ -101,26 +101,26 @@ uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, ui
   uint8_t y_bottom = box->bottom_y;
 
   if (yc >= y_bottom) {
-    debug_out("  below box");
+    // debug_out("  below box");
     yc = y_bottom;
     x_left = box->bottomleft_x;
     x_right = box->bottomright_x;
   }
   else if (yc < y_top) {
-    debug_out("  above box");
+    // debug_out("  above box");
     yc = y_top;
     x_left = box->topleft_x;
     x_right = box->topright_x;
   }
   else if (xc < box->topleft_x || xc < box->bottomleft_x) {
-    debug_out("  left of box");
+    // debug_out("  left of box");
     uint16_t save_cs = map_cs_main_priv();
     x_left = binary_search_xy(box->topleft_x, box->bottomleft_x, box->top_y, box->bottom_y, yc);
     map_set_cs(save_cs);
     x_right = x_left;
   }
   else if (xc > box->topright_x || xc > box->bottomright_x) {
-    debug_out("  right of box");
+    // debug_out("  right of box");
     uint16_t save_cs = map_cs_main_priv();
     x_left = binary_search_xy(box->topright_x, box->bottomright_x, box->top_y, box->bottom_y, yc);
     map_set_cs(save_cs);
@@ -128,7 +128,7 @@ uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, ui
   }
   else {
     // in this case the point is inside the rectangle that is defined by the inner points of the box
-    debug_out("  inside box");
+    // debug_out("  inside box");
     x_left  = max(box->topleft_x, box->bottomleft_x);
     x_right = min(box->topright_x, box->bottomright_x);
   }
@@ -178,28 +178,28 @@ void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
 
   struct walk_box *box = &walk_boxes[box_id];
 
-  debug_out("Finding closest point on box %d to %d, %d", box_id, *px, *py);
+  // debug_out("Finding closest point on box %d to %d, %d", box_id, *px, *py);
   if (*py <= box->top_y) {
     // above box
-    debug_out("  above box");
+    // debug_out("  above box");
     find_closest_point_on_line(box->topleft_x, box->top_y, box->topright_x, box->top_y, px, py);
   }
   else if (*py >= box->bottom_y) {
     // below box
-    debug_out("  below box");
+    // debug_out("  below box");
     find_closest_point_on_line(box->bottomleft_x, box->bottom_y, box->bottomright_x, box->bottom_y, px, py);
   }
   else {
     // left of box
     if (*px < box->topright_x && *px < box->bottomright_x) {
-      debug_out("  left of box");
+      // debug_out("  left of box");
       uint8_t x1 = min(box->topleft_x, box->bottomleft_x);
       uint8_t x2 = max(box->topleft_x, box->bottomleft_x);
       find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);
     }
     // right of box
     else {
-      debug_out("  right of box");
+      // debug_out("  right of box");
       uint8_t x1 = min(box->topright_x, box->bottomright_x);
       uint8_t x2 = max(box->topright_x, box->bottomright_x);
       find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);

@@ -1023,12 +1023,16 @@ uint8_t vm_savegame_exists(uint8_t slot)
 uint8_t vm_save_game(uint8_t slot)
 {
   char filename[11];
+
+  uint32_t save_map = map_get();
+
   sprintf(filename, "mm.sav.%u", slot);
   map_cs_diskio();
   diskio_open_for_writing();
   diskio_write((const uint8_t *)&vm_state, sizeof(vm_state));
   diskio_close_for_writing(filename);
-  unmap_cs();
+
+  map_set(save_map);
   return 0;
 }
 
@@ -1414,13 +1418,13 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
 
   map_set_ds(ds_save);
 
-  debug_out("  check parent %d state %d - expected_state %d", obj_hdr->id, cur_state, expected_state);
+  //debug_out("  check parent %d state %d - expected_state %d", obj_hdr->id, cur_state, expected_state);
 
   if (cur_state != expected_state) {
     return 0;
   }
   if (new_parent == 0) {
-    debug_out("  no further parent, match");
+    //debug_out("  no further parent, match");
     return 1;
   }
 

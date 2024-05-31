@@ -1066,6 +1066,7 @@ static void savegame_operation(void)
     case 0x80:
       // save
       vm_save_game(save_slot);
+      return;
     
     case 0xc0:
       if (vm_savegame_exists(save_slot)) {
@@ -1341,7 +1342,7 @@ static void do_sentence(void)
     sentence_stack.noun1[sentence_stack.num_entries] = sentence_noun1;
     sentence_stack.noun2[sentence_stack.num_entries] = sentence_noun2;
     ++sentence_stack.num_entries;
-    debug_out("  verb %d, noun1 %d, noun2 %d, stacksize %d", sentence_verb, sentence_noun1, sentence_noun2, sentence_stack.num_entries);
+    //debug_out("  verb %d, noun1 %d, noun2 %d, stacksize %d", sentence_verb, sentence_noun1, sentence_noun2, sentence_stack.num_entries);
     return;
 
   case 1:

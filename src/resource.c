@@ -332,7 +332,6 @@ uint8_t res_reserve_heap(uint8_t size_blocks)
     }
   }
   while (++slot != 0);
-  debug_out("using heap index %d", free_heap_index);
 
   uint16_t save_cs = map_cs_main_priv();
   slot = allocate(RES_TYPE_HEAP, free_heap_index, size_blocks);

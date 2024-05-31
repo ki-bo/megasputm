@@ -75,7 +75,6 @@ struct object_code *inv_get_object_by_id(uint8_t global_object_id)
   unmap_ds();
 
   for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
-    debug_out("compare %d %d", vm_state.inv_objects[i]->id, global_object_id);
     if (vm_state.inv_objects[i]->id == global_object_id) {
       return vm_state.inv_objects[i];
     }
@@ -103,7 +102,6 @@ uint8_t inv_object_available(uint16_t id)
 const char *inv_get_object_name(uint8_t position)
 {
   unmap_ds();
-  debug_out("inv_objects %p name_offset %x", vm_state.inv_objects[position], vm_state.inv_objects[position]->name_offset);
   const char *name_ptr = (const char *)vm_state.inv_objects[position] + vm_state.inv_objects[position]->name_offset;
   return name_ptr;
 }
