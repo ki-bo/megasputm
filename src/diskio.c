@@ -871,7 +871,7 @@ void diskio_close_for_writing(const char *filename)
         dir_block_data = (struct directory_block *)(dir_block % 2 ? 0x8300 : 0x8200);
 
         // erase newly allocated block
-        memset32((void __far *)dir_block_data, 0, 0x100);
+        memset20((void __far *)dir_block_data, 0, 0x100);
 
         first_entry                   = &dir_block_data->entries[0];
         first_entry->next_track       = 0;
