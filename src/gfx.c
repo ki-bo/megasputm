@@ -652,7 +652,7 @@ void gfx_draw_bg(void)
     screen_ptr -= CHRCOUNT * 16 - 1;
   }
 
-  memset20(UNBANKED_PTR(num_chars_at_row), 40, 16);
+  memset(num_chars_at_row, 40, 16);
   reset_objects();
 
   map_set_ds(ds_save);

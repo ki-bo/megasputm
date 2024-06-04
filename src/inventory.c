@@ -47,23 +47,7 @@ void inv_add_object(uint8_t local_object_id)
     fatal_error(ERR_TOO_MANY_INVENTORY_OBJECTS);
   }
 
-  static dmalist_t dmalist_inv_add_object = {
-    .end_of_options = 0,
-    .command        = 0,
-    .count          = 0,
-    .src_addr       = 0,
-    .src_bank       = 0,
-    .dst_addr       = 0,
-    .dst_bank       = 0
-  };
-
-  global_dma_list.command = 0;
-  global_dma_list.count = size;
-  global_dma_list.src_addr = LSB16(obj_hdr);
-  global_dma_list.src_bank = BANK(obj_hdr);
-  global_dma_list.dst_addr = (uint16_t)vm_state.inv_next_free;
-  global_dma_list.dst_bank = 0;
-  dma_trigger(&global_dma_list);
+  memcpy_bank((void __far *)vm_state.inv_next_free, (void __far *)obj_hdr, size);
 
   vm_state.inv_objects[vm_state.inv_num_objects] = (struct object_code *)vm_state.inv_next_free;
   ++vm_state.inv_num_objects;

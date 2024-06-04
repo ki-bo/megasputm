@@ -49,6 +49,8 @@ enum fdc_status_mask_t
   FDC_DRQ_MASK = 0x0040,
   /** F011 FDC busy flag (command is being executed) (read only) */
   FDC_BUSY_MASK = 0x0080,
+  /** F011 Write Request flag, i.e., the requested sector was found during a write operation (read only) */
+  FDC_WTREQ_MASK = 0x4000,
   /** F011 Read Request flag, i.e., the requested sector was found during a read operation (read only) */
   FDC_RDREQ_MASK = 0x8000
 };
@@ -59,7 +61,8 @@ enum fdc_command_t
   FDC_CMD_STEP_OUT = 0x10,
   FDC_CMD_STEP_IN = 0x18,
   FDC_CMD_SPINUP = 0x20,
-  FDC_CMD_READ_SECTOR = 0x40
+  FDC_CMD_READ_SECTOR = 0x40,
+  FDC_CMD_WRITE_SECTOR = 0x84
 };
 
 struct __dma {

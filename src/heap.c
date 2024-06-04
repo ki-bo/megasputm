@@ -6,16 +6,10 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-//------------------------------------------------------------------------------
-
-extern struct __heap_s __default_heap;
-
-//------------------------------------------------------------------------------
 
 // defined in compiler's runtime lib
+extern struct __heap_s __default_heap;
 void __heap_initialize(struct __heap_s *heap, void *heapstart, size_t heapsize);
-
-//------------------------------------------------------------------------------
 
 /**
  * @defgroup heap_init Heap Init Functions

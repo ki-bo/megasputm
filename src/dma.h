@@ -121,9 +121,15 @@ typedef struct
     uint16_t modulo;
 } dmalist_three_options_no_3rd_arg_t;
 
-extern dmalist_t               global_dma_list;
-extern dmalist_single_option_t global_dma_list_opt1;
-extern dmalist_two_options_t   global_dma_list_opt2;
+typedef struct {
+  union {
+    dmalist_t               no_opt;
+    dmalist_single_option_t single_opt;
+    dmalist_two_options_t   dual_opt;
+  };
+} global_dma_t;
+
+extern global_dma_t __attribute__((zpage)) global_dma;
 
 enum {
   DMA_CMD_COPY  = 0x00,
@@ -143,6 +149,12 @@ static inline void dma_trigger(const void *dma_list)
 
   DMA.addrmsb      = MSB(dma_list);
   DMA.etrig_mapped = LSB(dma_list);
+}
+
+static inline void dma_trigger_global(void)
+{
+  DMA.addrmsb      = MSB(&global_dma);
+  DMA.etrig_mapped = LSB(&global_dma);
 }
 
 #endif // __DMA_H

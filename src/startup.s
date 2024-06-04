@@ -8,6 +8,8 @@
 		.section cstack
 		.section heap
 		.section init_copy
+		.section code_init
+		.section code
 
 		.extern _Zp, _Vsp
 
@@ -197,19 +199,19 @@ frameloop3$:	cmp 0xd7fa
 relocate_runtime:
 		; move runtime to 0x0200
 		lda #1
-		trb 0xd703		; disable F018B mode
+		trb 0xd703			; disable F018B mode
 		sta 0xd707
-		.byte 0			; end of job options
-		.byte 0			; copy command
+		.byte 0				; end of job options
+		.byte 0				; copy command
 reloc_size_runtime:
-		.word 0			; count
+		.word 0				; count
 reloc_source_runtime:
-		.word 0x8000		; source
-		.byte 0			; source bank
-		.word 0x200		; destination
-		.byte 0			; destination bank
-		.byte 0			; cmd high
-		.byte 0			; modulo / ignored
+		.word 0x8000			; source
+		.byte 0				; source bank
+		.word (.sectionStart code)	; destination
+		.byte 0				; destination bank
+		.byte 0				; cmd high
+		.byte 0				; modulo / ignored
 
 relocate_init:
 		sta 0xd707
@@ -218,7 +220,7 @@ relocate_init:
 		.word (.sectionSize init_copy)	; count
 		.word (.sectionStart init_copy)	; source
 		.byte 0				; source bank
-		.word 0x4000			; destination
+		.word (.sectionStart code_init)	; destination
 		.byte 0				; destination bank
 		.byte 0				; cmd high
 		.byte 0				; modulo / ignored
