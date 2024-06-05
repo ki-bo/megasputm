@@ -150,6 +150,8 @@ static void led_and_motor_off(void);
 static uint16_t allocate_sector(uint8_t start_track);
 static uint8_t find_free_block_on_track(uint8_t track);
 static uint8_t find_free_sector(struct bam_entry *entry);
+static void free_blocks(uint8_t track, uint8_t block);
+static void free_block(uint8_t track, uint8_t block);
 static void load_sector_to_bank(uint8_t track, uint8_t block, uint8_t __far *target);
 static void write_block(uint8_t track, uint8_t block, uint8_t __far *block_data_far);
 static void write_sector(uint8_t track, uint8_t sector, uint8_t __far *sector_buf_far);
@@ -803,6 +805,8 @@ void diskio_close_for_writing(const char *filename)
   uint8_t filename_match     = 0;
   uint8_t dir_track          = 40;
   uint8_t dir_block          = 3;
+  uint8_t old_file_track     = 0;
+  uint8_t old_file_block;
   uint16_t save_ds           = map_get_ds();
 
   disable_cache = 1;
@@ -831,7 +835,6 @@ void diskio_close_for_writing(const char *filename)
   __auto_type dir_block_data = (struct directory_block *)(0x8300);
 
   do {
-    debug_out("testing %d:%d", dir_track, dir_block);
     struct directory_entry *free_dir_entry = NULL;
     for (uint8_t i = 0; i < 8; ++i) {
       __auto_type cur_entry = &dir_block_data->entries[i];
@@ -857,8 +860,9 @@ void diskio_close_for_writing(const char *filename)
           }
         }
         if (filename_match) {
-          debug_out(" match found");
           // found existing file entry, overwrite it
+          old_file_track              = cur_entry->first_track;
+          old_file_block              = cur_entry->first_block;
           cur_entry->first_track      = write_file_first_track;
           cur_entry->first_block      = write_file_first_block;
           cur_entry->file_size_blocks = num_write_blocks;
@@ -933,8 +937,6 @@ void diskio_close_for_writing(const char *filename)
           }
         }
 
-        debug_out(" written new filename");
-
         filename_match = 1;
       }
     }
@@ -944,6 +946,11 @@ void diskio_close_for_writing(const char *filename)
   if (!filename_match) {
     led_and_motor_off();
     fatal_error(ERR_DISK_FULL);
+  }
+
+  // free blocks of old file in case it was overwritten with new sectors
+  if (old_file_track != 0) {
+    free_blocks(old_file_track, old_file_block);
   }
 
   // write back BAM to disk
@@ -1025,7 +1032,6 @@ static void step_to_track(uint8_t track)
  */
 static void search_file(const char *filename, uint8_t file_type)
 {
-  debug_out("searching for %s type %x", filename, file_type);
   uint8_t file_track;
   uint8_t file_block;
   next_track = 40;
@@ -1436,7 +1442,6 @@ static uint16_t allocate_sector(uint8_t start_track)
 
 static uint8_t find_free_block_on_track(uint8_t track)
 {
-  uint8_t res_slot = writebuf_res_slot;
   __auto_type bam = (struct bam_block *)0x8000;
   if (track > 40) {
     ++bam;
@@ -1487,6 +1492,40 @@ static uint8_t find_free_sector(struct bam_entry *entry)
   }
 
   return 0xff;
+}
+
+static void free_blocks(uint8_t track, uint8_t block)
+{
+  while (track) {
+    free_block(track, block);
+    load_block(track, block);
+    track = FDC.data;
+    block = FDC.data;
+  }
+}
+
+/**
+ * @brief Frees a block on a track
+ *
+ * The function will free a block on a track by setting the corresponding bit in
+ * the BAM to 1.
+ *
+ * @param track Logical track number (1-80)
+ * @param block Logical block number (0-39)
+ */
+static void free_block(uint8_t track, uint8_t block)
+{
+  debug_out("freeing block %d:%d", track, block);
+  __auto_type bam = (struct bam_block *)0x8000;
+  if (track > 40) {
+    ++bam;
+    track -= 40;
+  }
+  __auto_type bam_entry = &(bam->bam_entries[track - 1]);
+
+  uint8_t block_idx = block / 8;
+  uint8_t mask = 1 << (block % 8);
+  bam_entry->block_usage[block_idx] |= mask;
 }
 
 /**
@@ -1580,16 +1619,13 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
 
   FDC.command = FDC_CMD_WRITE_SECTOR;
 
-  debug_out(" wait busy");
   wait_for_busy_clear(); // sector writing from buffer completed when BUSY is cleared
 
   //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
   if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-    debug_out("FDC status: %x", FDC.status)
     read_error(ERR_SECTOR_DATA_CORRUPT);
   }
 
-  debug_out(" done");
  
   last_physical_track = track;
   last_physical_sector = sector;
