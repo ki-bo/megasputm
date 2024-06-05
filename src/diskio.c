@@ -820,7 +820,7 @@ void diskio_close_for_writing(const char *filename)
   uint8_t *ts_field;
   if (write_file_data_ptr <= NEAR_U8_PTR(0x8300)) {
     ts_field = NEAR_U8_PTR(0x8200);
-    // todo: de-allocate last block in sector as it was not used in this case
+    free_block(write_file_current_track, write_file_current_block + 1);
   }
   else {
     ts_field = NEAR_U8_PTR(0x8300);

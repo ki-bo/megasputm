@@ -161,15 +161,15 @@ struct vm
 extern struct vm vm_state;
 extern char message_buffer[256];
 extern volatile uint8_t script_watchdog;
-extern uint8_t ui_state;
+extern uint8_t  ui_state;
 extern uint16_t camera_x;
-extern uint8_t active_script_slot;
-extern uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
-extern uint8_t room_res_slot;
+extern uint8_t  active_script_slot;
+extern uint8_t  proc_res_slot[NUM_SCRIPT_SLOTS];
+extern uint8_t  room_res_slot;
 extern uint8_t  obj_page[MAX_OBJECTS];
 extern uint8_t  obj_offset[MAX_OBJECTS];
 extern uint16_t obj_id[MAX_OBJECTS];
-extern uint8_t inventory_pos;
+extern uint8_t  inventory_pos;
 
 struct sentence_stack_t {
   uint8_t  num_entries;
