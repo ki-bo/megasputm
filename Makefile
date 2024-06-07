@@ -18,7 +18,7 @@ XMEGA65   = /Applications/Xemu/xmega65.app/Contents/MacOS/xmega65
 
 C_SRCS    = $(wildcard src/*.c)
 ASM_SRCS  = $(wildcard src/*.s)
-OBJS      = $(ASM_SRCS:src/%.s=obj/%.o) $(C_SRCS:src/%.c=obj/%.o)
+OBJS      = $(ASM_SRCS:src/%.s=obj/%_s.o) $(C_SRCS:src/%.c=obj/%.o)
 DEPS      = $(OBJS:%.o=%.d)
 
 ifeq ($(CONFIG),debug)
@@ -47,7 +47,7 @@ debug_xemu: mm.d81
 	@echo "--------------------------------------------------"
 	tmux send-keys -t mmxemu "$(XMEGA65) -uartmon :4510 -8 mm.d81 -besure -curskeyjoy" C-m
 
-obj/%.o: %.s
+obj/%_s.o: %.s
 	@mkdir -p obj
 	$(AS) $(ASM_FLAGS) -o $@ $<
 

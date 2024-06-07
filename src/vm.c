@@ -286,9 +286,9 @@ __task void vm_mainloop(void)
     process_dialog(elapsed_jiffies);
     update_actors();
     animate_actors();
-    map_cs_main_priv();
+    MAP_CS_MAIN_PRIV
     update_camera();
-    unmap_cs();
+    UNMAP_CS
 
     if (screen_update_needed) {
       //VICIV.bordercol = 0x01;
@@ -355,14 +355,15 @@ uint8_t vm_get_active_proc_state_and_flags(void)
 void vm_change_ui_flags(uint8_t flags)
 {
   if (flags & UI_FLAGS_APPLY_FREEZE) {
-    uint16_t save_cs = map_cs_main_priv();
+    SAVE_CS
+    MAP_CS_MAIN_PRIV
     if (flags & UI_FLAGS_ENABLE_FREEZE) {
       freeze_non_active_scripts();
     }
     else {
       unfreeze_scripts();
     }
-    map_set_cs(save_cs);
+    RESTORE_CS
   }
 
   if (flags & UI_FLAGS_APPLY_CURSOR) {
@@ -429,7 +430,7 @@ void vm_set_current_room(uint8_t room_no)
     res_deactivate_slot(room_res_slot);
   }
 
-  map_cs_gfx();
+  MAP_CS_GFX
   gfx_clear_dialog();
   gfx_fade_out();
 
@@ -449,16 +450,16 @@ void vm_set_current_room(uint8_t room_no)
     uint16_t bg_data_offset = room_hdr->bg_data_offset;
     uint16_t bg_masking_offset = room_hdr->bg_attr_offset;
 
-    map_cs_gfx();
+    MAP_CS_GFX
     gfx_decode_bg_image(map_ds_room_offset(bg_data_offset), room_width);
     gfx_decode_masking_buffer(bg_masking_offset, room_width);
 
     map_ds_resource(room_res_slot);
 
     read_objects();
-    map_cs_main_priv();
+    MAP_CS_MAIN_PRIV
     read_walk_boxes();
-    map_cs_gfx();
+    MAP_CS_GFX
     actor_room_changed();
 
     // run entry script
@@ -471,7 +472,7 @@ void vm_set_current_room(uint8_t room_no)
 
   redraw_screen();
   vm_update_bg();
-  unmap_cs();
+  UNMAP_CS
 
   // restore DS
   map_set_ds(ds_save);
@@ -988,16 +989,16 @@ void vm_revert_sentence(void)
 
 void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   verb_new(slot, verb_id, x, y, name);
-  map_set_cs(save_cs);
 }
 
 void vm_verb_delete(uint8_t slot)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   verb_delete(slot);
-  map_set_cs(save_cs);
 }
 
 void vm_verb_set_state(uint8_t slot, uint8_t state)
@@ -1362,9 +1363,9 @@ static void handle_input(void)
       }
       else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
         // clicked in verb zone
-        map_cs_main_priv();
+        MAP_CS_MAIN_PRIV
         uint8_t verb_slot = get_hovered_verb_slot();
-        unmap_cs();
+        UNMAP_CS
         if (verb_slot != 0xff) {
           select_verb(vm_state.verbs.id[verb_slot]);
         }
@@ -1739,9 +1740,9 @@ static void update_sentence_highlighting(void)
 
 static void add_string_to_sentence(const char *str, uint8_t prepend_space)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   add_string_to_sentence_priv(str, prepend_space);
-  map_set_cs(save_cs);
 }
 
 static void update_verb_interface(void)
@@ -1768,12 +1769,12 @@ static void update_verb_highlighting(void)
 
   uint8_t cur_verb = 0xff;
   if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
-    map_cs_main_priv();
+    MAP_CS_MAIN_PRIV
     cur_verb = get_hovered_verb_slot();
   }
 
   if (cur_verb != prev_verb_highlighted) {
-    map_cs_gfx();
+    MAP_CS_GFX
     if (prev_verb_highlighted != 0xff) {
       gfx_change_interface_text_style(vm_state.verbs.x[prev_verb_highlighted], 
                                       vm_state.verbs.y[prev_verb_highlighted], 
@@ -1789,7 +1790,7 @@ static void update_verb_highlighting(void)
     prev_verb_highlighted = cur_verb;
   }
 
-  unmap_cs();
+  UNMAP_CS
 }
 
 static uint8_t get_verb_slot_by_id(uint8_t verb_id)

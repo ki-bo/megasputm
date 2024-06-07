@@ -24,17 +24,6 @@ static inline void apply_map(void);
  */
 #pragma clang section text="code" rodata="cdata" data="data" bss="zzpage"
 
-union map_t {
-  struct {
-    uint8_t a;
-    uint8_t x;
-    uint8_t y;
-    uint8_t z;
-  };
-  uint32_t quad;
-};
-
-
 union map_t __attribute__((zpage)) map_regs;
 
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"

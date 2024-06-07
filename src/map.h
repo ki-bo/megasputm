@@ -3,6 +3,61 @@
 
 #include <stdint.h>
 
+union map_t {
+  struct {
+    uint8_t a;
+    uint8_t x;
+    uint8_t y;
+    uint8_t z;
+  };
+  uint32_t quad;
+};
+
+extern union map_t __attribute__((zpage)) map_regs;
+
+#define MAP_CS_MAIN_PRIV \
+    __asm(" .extern map_cs_main_priv2\n" \
+          " jsr map_cs_main_priv2\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
+#define MAP_CS_GFX \
+    __asm(" .extern map_cs_gfx2\n" \
+          " jsr map_cs_gfx2\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
+#define UNMAP_CS \
+    __asm(" .extern unmap_cs2\n" \
+          " jsr unmap_cs2\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
+#define SAVE_CS \
+    __asm(" .extern map_regs\n" \
+          " phw map_regs\n" \
+          :::);
+
+#define SAVE_CS_AUTO_RESTORE \
+    __asm(" .extern map_regs\n" \
+          " .extern map_auto_restore_cs\n" \
+          " phw map_regs\n" \
+          /* 0xf4 = PHW immediate mode */ \
+          " .byte 0xf4, .byte1(map_auto_restore_cs-1), .byte0(map_auto_restore_cs-1)\n" \
+          :::);
+
+#define RESTORE_CS \
+    __asm(" .extern map_restore_cs\n" \
+          " plx\n" \
+          " pla\n" \
+          " jsr map_restore_cs\n" \
+          : \
+          : \
+          : "a", "x", "y", "z");
+
 // code functions
 void map_init(void);
 uint32_t map_get(void);

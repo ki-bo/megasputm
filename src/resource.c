@@ -117,13 +117,13 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   }
   while(i != hint);
 
-  uint16_t save_cs = map_get_cs();
+  SAVE_CS_AUTO_RESTORE
 
   map_cs_diskio();
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
   //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
  
-  map_cs_main_priv();
+  MAP_CS_MAIN_PRIV
   uint8_t page = allocate(type, id, (chunk_size + 255) / 256);
   __auto_type dest = HUGE_U8_PTR(RESOURCE_BASE + (uint16_t)page * 256);
   
@@ -131,11 +131,9 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   diskio_continue_resource_loading(dest);
 
 #ifdef HEAP_DEBUG_OUT  
-  map_cs_main_priv();
+  MAP_CS_MAIN_PRIV
   print_heap();
 #endif
-
-  map_set_cs(save_cs);
 
   return page;
 }
@@ -157,9 +155,9 @@ void res_deactivate_and_unlock_all(void)
   }
   while (++i != 0);
 #ifdef HEAP_DEBUG_OUT
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   print_heap();
-  map_set_cs(save_cs);
 #endif
 }
 
@@ -191,13 +189,13 @@ uint8_t __huge *res_get_huge_ptr(uint8_t slot)
  */
 void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   find_and_set_flags(type, id, hint, RES_LOCKED_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Locking resource type %d id %d", type, id);
   print_heap();
 #endif
-  map_set_cs(save_cs);
 }
 
 /**
@@ -214,13 +212,13 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_LOCKED_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Unlocking resource type %d id %d slot %d", type, id, slot);
   print_heap();
 #endif
-  map_set_cs(save_cs);
 }
 
 /**
@@ -238,13 +236,13 @@ void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   find_and_set_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Activating resource type %d id %d", type, id);
   print_heap();
 #endif
-  map_set_cs(save_cs);
 }
 
 /**
@@ -261,13 +259,13 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
   print_heap();
 #endif
-  map_set_cs(save_cs);
 }
 
 /**
@@ -286,13 +284,13 @@ void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
  */
 void res_activate_slot(uint8_t slot)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   set_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Activating slot %d", slot);
   print_heap();
 #endif
-  map_set_cs(save_cs);
 }
 
 /**
@@ -311,13 +309,13 @@ void res_activate_slot(uint8_t slot)
 void res_deactivate_slot(uint8_t slot)
 {
   
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   clear_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Deactivating slot %d", slot);
   print_heap();
 #endif
-  map_set_cs(save_cs);
 }
 
 uint8_t res_reserve_heap(uint8_t size_blocks)
@@ -333,18 +331,18 @@ uint8_t res_reserve_heap(uint8_t size_blocks)
   }
   while (++slot != 0);
 
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   slot = allocate(RES_TYPE_HEAP, free_heap_index, size_blocks);
   set_flags(slot, RES_ACTIVE_MASK);
-  map_set_cs(save_cs);
   return slot;
 }
 
 void res_free_heap(uint8_t slot)
 {
-  uint16_t save_cs = map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   free_resource(slot);
-  map_set_cs(save_cs);
 }
 
 /** @} */ // res_public

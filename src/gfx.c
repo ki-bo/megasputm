@@ -314,7 +314,6 @@ volatile uint8_t raster_irq_counter = 0;
 __attribute__((interrupt()))
 static void raster_irq ()
 {
-
   uint32_t map_save = map_get();
   unmap_all();
   if (!(VICIV.irr & 0x01)) {
