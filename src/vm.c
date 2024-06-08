@@ -304,7 +304,12 @@ __task void vm_mainloop(void)
       gfx_wait_vsync();
       //VICIV.bordercol = 0x03;
       if (screen_update_needed & SCREEN_UPDATE_DIALOG) {
-        gfx_print_dialog(message_color, print_message_ptr, print_message_num_chars);
+        if (print_message_ptr) {
+          gfx_print_dialog(message_color, print_message_ptr, print_message_num_chars);
+        }
+        else {
+          gfx_clear_dialog();
+        }
       }
 
       if (screen_update_needed & (SCREEN_UPDATE_BG | SCREEN_UPDATE_ACTORS)) {
@@ -906,11 +911,11 @@ uint8_t vm_get_local_object_id(uint16_t global_object_id)
 
 void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
-  map_cs_main_priv();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
   clear_all_other_object_states(local_id);
-  unmap_cs();
 
   map_ds_resource(obj_page[local_id]);
   __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_id]);
@@ -928,18 +933,14 @@ void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
   int8_t screen_x = (int8_t)x - camera_x + 20;
 
   if (screen_x >= 40 || screen_x + width <= 0 || y >= 16) {
-    map_set_ds(save_ds);
     return;
   }
 
-  map_cs_gfx();
+  MAP_CS_GFX
   unmap_ds();
   gfx_draw_object(local_id, screen_x, y);
-  unmap_cs();
 
   vm_update_actors();
-
-  map_set_ds(save_ds);
 }
 
 void vm_set_camera_follow_actor(uint8_t actor_id)
@@ -1199,20 +1200,26 @@ static void stop_current_actor_talking(void)
   if (actor_talking != 0xff) {
     actor_stop_talking(actor_talking);
   }
-  map_cs_gfx();
-  gfx_clear_dialog();
-  unmap_cs();
+  // map_cs_gfx();
+  // debug_out("stop current actor talking");
+  // gfx_clear_dialog();
+  // unmap_cs();
+  print_message_ptr = NULL;
+  vm_update_dialog();
   vm_write_var(VAR_MESSAGE_GOING, 0);
   vm_write_var(VAR_MSGLEN, 0);
 }
 
 static void stop_all_dialog(void)
 {
-  map_cs_gfx();
-  gfx_clear_dialog();
-  unmap_cs();
+  // map_cs_gfx();
+  // debug_out("stop all dialog");
+  // gfx_clear_dialog();
+  // unmap_cs();
+  print_message_ptr = NULL;
   message_ptr = NULL;
   message_timer = 0;
+  vm_update_dialog();
   // stop talking animation for all actors
   actor_stop_talking(0xff);
   vm_write_var(VAR_MESSAGE_GOING, 0);

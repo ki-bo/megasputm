@@ -16,8 +16,8 @@ union map_t {
 extern union map_t __attribute__((zpage)) map_regs;
 
 #define MAP_CS_MAIN_PRIV \
-    __asm(" .extern map_cs_main_priv2\n" \
-          " jsr map_cs_main_priv2\n" \
+    __asm(" .extern map_cs_main_priv\n" \
+          " jsr map_cs_main_priv\n" \
           : \
           : \
           : "x", "y", "z");
@@ -49,6 +49,14 @@ extern union map_t __attribute__((zpage)) map_regs;
           " .byte 0xf4, .byte1(map_auto_restore_cs-1), .byte0(map_auto_restore_cs-1)\n" \
           :::);
 
+#define SAVE_DS_AUTO_RESTORE \
+    __asm(" .extern map_regs\n" \
+          " .extern map_auto_restore_ds\n" \
+          " phw map_regs + 2\n" \
+          /* 0xf4 = PHW immediate mode */ \
+          " .byte 0xf4, .byte1(map_auto_restore_ds-1), .byte0(map_auto_restore_ds-1)\n" \
+          :::);
+
 #define RESTORE_CS \
     __asm(" .extern map_restore_cs\n" \
           " plx\n" \
@@ -71,7 +79,6 @@ void unmap_cs(void);
 void unmap_ds(void);
 void map_cs_diskio(void);
 void map_cs_gfx(void);
-uint16_t map_cs_main_priv(void);
 uint8_t *map_ds_ptr(void __huge *ptr);
 void map_ds_resource(uint8_t res_page);
 void map_ds_heap(void);

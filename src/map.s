@@ -5,28 +5,30 @@
 save_a:		.space 1
 
 		.section code
-		.public map_cs_main_priv2
-map_cs_main_priv2:
+		.public map_cs_main_priv
+map_cs_main_priv:
 		pha
 		lda #0xa0
 		ldx #0x20
-		bra apply_map2
+		bra apply_map_cs
 
 		.public map_cs_gfx2
 map_cs_gfx2:
 		pha
 		lda #0x20
 		ldx #0x21
-		bra apply_map2
+		bra apply_map_cs
 
 		.public unmap_cs2
 unmap_cs2:
 		pha
 		lda #0x00
 		ldx #0x00
-		bra apply_map2
+		bra apply_map_cs
 
-apply_map2:
+
+
+apply_map_cs:
 		sta zp:map_regs
 		stx zp:map_regs + 1
 		ldy zp:map_regs + 2
@@ -48,6 +50,20 @@ map_auto_restore_cs:
 		map
 		eom
 		lda zp:save_a
+		rts
+
+		.public map_auto_restore_ds
+map_auto_restore_ds:
+		plz
+		stz zp:map_regs + 3
+		ply
+		sty zp:map_regs + 2
+		pha
+		lda zp:map_regs
+		ldx zp:map_regs + 1
+		map
+		eom
+		pla
 		rts
 
 		.public map_restore_cs

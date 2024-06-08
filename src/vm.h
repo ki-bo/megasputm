@@ -4,8 +4,8 @@
 #include "util.h"
 #include <stdint.h>
 
-#define NUM_SCRIPT_SLOTS     32
-#define MAX_OBJECTS          57
+#define NUM_SCRIPT_SLOTS     20
+#define MAX_OBJECTS          55
 #define MAX_VERBS            22
 #define MAX_INVENTORY        80
 #define CMD_STACK_SIZE        6
@@ -141,6 +141,8 @@ struct vm
 
   uint8_t message_speed;
 
+  uint8_t  num_active_proc_slots;
+  uint8_t  proc_slot_table[NUM_SCRIPT_SLOTS];
   uint8_t  proc_script_or_object_id[NUM_SCRIPT_SLOTS];
   uint8_t  proc_object_id_msb[NUM_SCRIPT_SLOTS];
   uint8_t  proc_state[NUM_SCRIPT_SLOTS];

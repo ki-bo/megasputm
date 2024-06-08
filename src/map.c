@@ -200,15 +200,6 @@ void map_cs_gfx(void)
   apply_map();
 }
 
-uint16_t map_cs_main_priv(void)
-{
-  uint16_t orig_map = map_get_cs();
-  map_regs.a = 0xa0;
-  map_regs.x = 0x20;
-  apply_map();
-  return orig_map;
-}
-
 uint8_t *map_ds_ptr(void __huge *ptr)
 {
   map_set_ds(0x3000 - 0x80 + ((uint32_t)ptr / 256));
