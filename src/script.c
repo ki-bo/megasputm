@@ -255,7 +255,7 @@ void script_init(void)
  * 
  * Code section: code_script
  */
-void script_run_active_slot(void)
+uint8_t script_run_active_slot(void)
 {
   if (parallel_script_count == 6) {
     fatal_error(ERR_SCRIPT_RECURSION);
@@ -269,6 +269,8 @@ void script_run_active_slot(void)
   char *script_type  = vm_state.proc_type[active_script_slot] & PROC_TYPE_GLOBAL ? "S" : "R";
   uint16_t script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
 #endif
+
+  uint16_t save_ds = map_get_ds();
 
   map_ds_resource(proc_res_slot[active_script_slot]);
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
@@ -290,9 +292,13 @@ void script_run_active_slot(void)
 
   vm_state.proc_pc[active_script_slot] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
   --parallel_script_count;
+
+  map_set_ds(save_ds);
+
+  return vm_get_active_proc_state_and_flags();
 }
 
-void script_run_slot_stacked(uint8_t slot)
+uint8_t script_run_slot_stacked(uint8_t slot)
 {
   uint8_t  stack_opcode       = opcode;
   uint8_t  stack_param_mask   = param_mask;
@@ -301,13 +307,15 @@ void script_run_slot_stacked(uint8_t slot)
   uint8_t  stack_active_slot  = active_script_slot;
 
   active_script_slot = slot;
-  script_run_active_slot();
+  uint8_t state = script_run_active_slot();
 
   opcode = stack_opcode;
   param_mask = stack_param_mask;
   pc = stack_pc;
   break_script = stack_break_script;
   active_script_slot = stack_active_slot;
+
+  return state;
 }
 
 uint16_t script_get_current_pc(void)
@@ -578,7 +586,7 @@ static void stop_or_break(void)
   }
   else {
     //debug_scr("stop-script");
-    vm_stop_active_script();
+    vm_stop_script_slot(active_script_slot);
   }
 }
 
@@ -1361,7 +1369,7 @@ static void do_sentence(void)
       vm_write_var(VAR_CURRENT_NOUN2, sentence_noun2);
     }
   
-    vm_start_object_script(sentence_verb, sentence_noun1, background);
+    vm_execute_object_script(sentence_verb, sentence_noun1, background);
     break;
   }
 

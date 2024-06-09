@@ -49,9 +49,12 @@ uint16_t camera_target;
 uint8_t camera_state;
 uint8_t camera_follow_actor_id;
 
-uint8_t active_script_slot;
+int8_t   proc_slot_table_idx;
+uint8_t  proc_slot_table_exec;
+uint8_t  script_ended;
+uint8_t  active_script_slot;
 uint16_t message_timer;
-uint8_t actor_talking;
+uint8_t  actor_talking;
 
 uint8_t message_color;
 char message_buffer[256];
@@ -101,8 +104,9 @@ static void handle_input(void);
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state);
 static uint8_t find_free_script_slot(void);
 static void update_script_timers(uint8_t elapsed_jiffies);
-static void execute_script_slot(uint8_t slot);
+static uint8_t execute_script_slot(uint8_t slot);
 static const char *get_object_name(uint16_t global_object_id);
+static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_object_id, uint8_t parent, uint8_t res_slot, uint16_t offset);
 static uint8_t start_child_script_at_address(uint8_t script_slot, uint8_t res_slot, uint16_t offset);
 static void execute_sentence_stack(void);
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
@@ -125,8 +129,11 @@ static uint8_t inventory_pos_to_y(uint8_t pos);
 static void inventory_scroll_up(void);
 static void inventory_scroll_down(void);
 static void update_inventory_scroll_buttons(void);
+static void print_slot_table(void);
 
 // Private functions (code_main_private)
+static void proc_slot_table_insert(uint8_t slot);
+static void cleanup_slot_table();
 static void read_walk_boxes(void);
 static void clear_all_other_object_states(uint8_t local_object_id);
 static void update_camera(void);
@@ -265,22 +272,38 @@ __task void vm_mainloop(void)
     diskio_check_motor_off(elapsed_jiffies);
     unmap_cs();
 
+    script_ended = 0;
+    proc_slot_table_idx = -1;
     handle_input();
 
     update_script_timers(elapsed_jiffies);
 
-    for (active_script_slot = 0; 
-         active_script_slot < NUM_SCRIPT_SLOTS;
-         ++active_script_slot)
+    debug_out("New cycle, %d scripts active", vm_state.num_active_proc_slots);
+    proc_slot_table_exec = 0;
+    for (proc_slot_table_idx = 0; 
+         proc_slot_table_idx < vm_state.num_active_proc_slots;
+         ++proc_slot_table_idx)
     {
-      // non-top-level scripts will be executed as childs in other scripts, so skip them here
-      if (vm_state.proc_parent[active_script_slot] != 0xff) {
+      // skip slots that have already been executed this cycle
+      if (proc_slot_table_exec > proc_slot_table_idx) {
         continue;
       }
-      execute_script_slot(active_script_slot);
+      active_script_slot = vm_state.proc_slot_table[proc_slot_table_idx];
+      if (vm_state.proc_state[active_script_slot] == PROC_STATE_RUNNING) {
+        execute_script_slot(active_script_slot);
+      }
+      ++proc_slot_table_exec;
     }
+    if (script_ended) {
+      MAP_CS_MAIN_PRIV
+      cleanup_slot_table();
+      UNMAP_CS
+      print_slot_table();
+    }
+    active_script_slot = 0xff;
 
     // executes the sentence script if any sentences are in the queue
+    proc_slot_table_idx = -1;
     execute_sentence_stack();
 
     process_dialog(elapsed_jiffies);
@@ -305,7 +328,7 @@ __task void vm_mainloop(void)
       //VICIV.bordercol = 0x03;
       if (screen_update_needed & SCREEN_UPDATE_DIALOG) {
         if (print_message_ptr) {
-          gfx_print_dialog(message_color, print_message_ptr, print_message_num_chars);
+        gfx_print_dialog(message_color, print_message_ptr, print_message_num_chars);
         }
         else {
           gfx_clear_dialog();
@@ -412,13 +435,8 @@ void vm_set_current_room(uint8_t room_no)
 
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
 
-  // break current script (in case it is a room/object script)
-  // If it is a room script, the break will automatically stop it after the execution of the current opcode.
-  // Be aware that exiting a room could free up the resource of the current script if it was part of the room data.
-  // Thus, the script must not try to read any further script bytes after the room switch. That is the reason we
-  // break the script here (which will also stop it if it is a room script - see execute_script_slot() ).
   if (is_room_object_script(active_script_slot)) {
-    script_break();
+    vm_stop_script_slot(active_script_slot);
   }
 
   // exit and free old room
@@ -428,8 +446,7 @@ void vm_set_current_room(uint8_t room_no)
     map_ds_resource(room_res_slot);
     uint16_t exit_script_offset = room_hdr->exit_script_offset;
     if (exit_script_offset) {
-      vm_start_room_script(exit_script_offset);
-      execute_script_slot(active_script_slot);
+      vm_execute_room_script(exit_script_offset);
     }
 
     res_deactivate_slot(room_res_slot);
@@ -470,8 +487,7 @@ void vm_set_current_room(uint8_t room_no)
     // run entry script
     uint16_t entry_script_offset = room_hdr->entry_script_offset;
     if (entry_script_offset) {
-      vm_start_room_script(entry_script_offset);
-      execute_script_slot(active_script_slot);
+      vm_execute_room_script(entry_script_offset);
     }
   }
 
@@ -610,44 +626,67 @@ void vm_say_line(uint8_t actor_id)
  */
 uint8_t vm_start_script(uint8_t script_id)
 {
-  uint8_t slot = vm_get_script_slot_by_script_id(script_id);
+  uint8_t slot = vm_get_first_script_slot_by_script_id(script_id);
   if (slot != 0xff) {
-    vm_state.proc_state[slot] = PROC_STATE_RUNNING;
-    vm_state.proc_pc[slot]    = 4; // skipping script header directly to first opcode
-    return slot;
+    debug_out("Script %d already running in slot %d", script_id, slot);
+    vm_stop_script(script_id);
   }
-
-  slot = find_free_script_slot();
-  vm_state.proc_type[slot]                = PROC_TYPE_GLOBAL;
-  vm_state.proc_script_or_object_id[slot] = script_id;
-  vm_state.proc_object_id_msb[slot]       = 0;
-  vm_state.proc_state[slot]               = PROC_STATE_RUNNING;
-  vm_state.proc_parent[slot]              = 0xff;
-  vm_state.proc_child[slot]               = 0xff;
-  vm_state.proc_pc[slot]                  = 4; // skipping script header directly to first opcode
+  else {
+    slot = find_free_script_slot();
+  }
 
   uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
   res_activate_slot(new_page);
   proc_res_slot[slot] = new_page;
 
-  //debug_out("Started top-level script %d slot %d", script_id, slot);
+  uint8_t parent = is_room_object_script(active_script_slot) ? 0xff : active_script_slot;
+
+  // init script slot
+  reset_script_slot(slot, PROC_TYPE_GLOBAL, script_id, parent, new_page, 4 /* skipping script header directly to first opcode*/);
+
+  debug_out("Starting global script %d in slot %d", script_id, slot);
+
+  // execute new script immediately (like subroutine)
+  execute_script_slot(slot);
+
+  if (vm_state.proc_state[slot] != PROC_STATE_FREE) {
+    // script hit first break and is still running, put it into slot table for scheduling next cycle
+    // (it will be placed directly after the current script in the slot table)
+    SAVE_CS_AUTO_RESTORE
+    MAP_CS_MAIN_PRIV
+    proc_slot_table_insert(slot);
+    // increase exec counter so we don't execute it again in this cycle
+    ++proc_slot_table_exec;
+    print_slot_table();
+    debug_out("Put global script %d slot %d in table", script_id, slot);
+  }
+  else {
+    debug_out("Global script %d slot %d ended immediately", script_id, slot);
+  }
 
   return slot;
 }
 
-uint8_t vm_start_room_script(uint16_t room_script_offset)
+void vm_execute_room_script(uint16_t room_script_offset)
 {
-  //debug_out("Starting room script at offset %x", room_script_offset);
+  debug_out("Starting room entry/exit script at offset %x", room_script_offset);
 
-  uint8_t res_slot = room_res_slot + MSB(room_script_offset);
-  uint16_t offset  = LSB(room_script_offset);
-  return start_child_script_at_address(0xff, res_slot, offset);
+  uint8_t  res_slot = room_res_slot + MSB(room_script_offset);
+  uint16_t offset   = LSB(room_script_offset);
+
+  uint8_t script_slot = find_free_script_slot();
+
+  reset_script_slot(script_slot, 0 /*type*/, 0xffff /*script_id*/, 0xff /*parent*/, res_slot, offset);
+  if (execute_script_slot(script_slot) != PROC_STATE_FREE) {
+    // room scripts shall never run longer than one cycle
+    fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
+  }
 }
 
-void vm_start_object_script(uint8_t verb, uint16_t global_object_id, uint8_t background)
+void vm_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t background)
 {
   uint8_t type;
-  uint8_t child_script_slot;
+  uint8_t script_slot;
   uint8_t id = vm_get_local_object_id(global_object_id);
   if (id == 0xff) {
     return;
@@ -658,38 +697,37 @@ void vm_start_object_script(uint8_t verb, uint16_t global_object_id, uint8_t bac
     return;
   }
 
-  uint8_t res_slot  = obj_page[id];
-  script_offset    += obj_offset[id];
-
-  //debug_out("Starting object script %d for verb %d at slot %x offset %x", global_object_id, verb, res_slot, script_offset);
-
   type = (background ? PROC_TYPE_BACKGROUND : 0);
   if (verb < 250) {
     type |= PROC_TYPE_REGULAR_VERB;
   }
 
-  for (child_script_slot = 0; child_script_slot < NUM_SCRIPT_SLOTS; ++child_script_slot) {
-    if (vm_state.proc_type[child_script_slot] == type &&
-        vm_state.proc_script_or_object_id[child_script_slot] == LSB(global_object_id) &&
-        vm_state.proc_object_id_msb[child_script_slot] == MSB(global_object_id)) {
-      //debug_out("reusing script slot %d for object %d verb %d", child_script_slot, global_object_id, verb);
+  for (script_slot = 0; script_slot < NUM_SCRIPT_SLOTS; ++script_slot) {
+    if (vm_state.proc_state[script_slot] != PROC_STATE_FREE &&
+        vm_state.proc_type[script_slot] == type &&
+        vm_state.proc_script_or_object_id[script_slot] == LSB(global_object_id) &&
+        vm_state.proc_object_id_msb[script_slot] == MSB(global_object_id)) {
+      debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
       break;
     }
   }
   
-  if (child_script_slot == NUM_SCRIPT_SLOTS) {
-    child_script_slot = 0xff;
+  if (script_slot == NUM_SCRIPT_SLOTS) {
+    script_slot = find_free_script_slot();
   }
-  
-  child_script_slot = start_child_script_at_address(child_script_slot, res_slot, script_offset);
-  debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, child_script_slot);
-  
-  // add object id to script slot
-  vm_state.proc_script_or_object_id[child_script_slot] = LSB(global_object_id);
-  vm_state.proc_object_id_msb[child_script_slot]       = MSB(global_object_id);
-  vm_state.proc_type[child_script_slot]                = type ;
-  
-  execute_script_slot(child_script_slot);
+
+  uint8_t res_slot  = obj_page[id];
+  script_offset    += obj_offset[id];
+
+  debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
+  reset_script_slot(script_slot, type, global_object_id, 0xff /*parent*/, res_slot, script_offset);
+
+  //child_script_slot = start_child_script_at_address(script_slot, res_slot, script_offset);
+ 
+  if (execute_script_slot(script_slot) != PROC_STATE_FREE) {
+    // room scripts shall never run longer than one cycle
+    fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
+  }
 }
 
 /**
@@ -705,11 +743,13 @@ void vm_start_object_script(uint8_t verb, uint16_t global_object_id, uint8_t bac
  */
 void vm_chain_script(uint8_t script_id)
 {
-  //debug_out("Chaining script %d from script %d slot %d", script_id, vm_state.proc_script_or_object_id[active_script_slot], active_script_slot);
+  debug_out("Chaining script %d from script %d slot %d", script_id, vm_state.proc_script_or_object_id[active_script_slot], active_script_slot);
 
-  if (!is_room_object_script(active_script_slot)) {
-    res_deactivate_slot(proc_res_slot[active_script_slot]);
+  if (is_room_object_script(active_script_slot)) {
+    fatal_error(ERR_CHAINING_ROOM_SCRIPT);
   }
+
+  res_deactivate_slot(proc_res_slot[active_script_slot]);
 
   uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
   res_activate_slot(new_page);
@@ -719,64 +759,65 @@ void vm_chain_script(uint8_t script_id)
   vm_state.proc_pc[active_script_slot]                  = 4; // skipping script header directly to first opcode
   vm_state.proc_script_or_object_id[active_script_slot] = script_id;
   vm_state.proc_object_id_msb[active_script_slot]       = 0;
+
+  print_slot_table();
 }
 
 /**
- * @brief Stops the currently active script
+ * @brief Stops the script in the specified script slot
  * 
- * Deactivates the currently active script and sets the process state to PROC_STATE_FREE.
+ * Deactivates the script and sets the process state to PROC_STATE_FREE.
  * The associated script resource is deactivated and thus marked free to override if needed.
+ *
+ * @param script_id The id of the script to stop
+ * @param stop_children If non-zero, all child scripts of the specified script will be stopped, as well
  *
  * Code section: code_main
  */
-void vm_stop_active_script()
+void vm_stop_script_slot(uint8_t slot)
 {
-  if (!is_room_object_script(active_script_slot)) {
-    debug_out("Script %d ended slot %d", vm_state.proc_script_or_object_id[active_script_slot], active_script_slot);
-    res_deactivate_slot(proc_res_slot[active_script_slot]);
+  if (!is_room_object_script(slot)) {
+    debug_out("Script %d ended slot %d", vm_state.proc_script_or_object_id[slot], slot);
+    res_deactivate_slot(proc_res_slot[slot]);
+    // stop all children
+    for (uint8_t table_idx = proc_slot_table_idx + 1; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+    {
+      uint8_t next_slot = vm_state.proc_slot_table[table_idx];
+      if (vm_state.proc_parent[next_slot] == slot) {
+        vm_stop_script_slot(next_slot);
+      }
+    }
   }
   else {
     debug_out("Object script %d ended slot %d", 
-      vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot],
-      active_script_slot);
+              (vm_state.proc_script_or_object_id[slot]) | (vm_state.proc_object_id_msb[slot] << 8), 
+              slot);
   }
-  vm_state.proc_state[active_script_slot] = PROC_STATE_FREE;
-  uint8_t parent = vm_state.proc_parent[active_script_slot];
-  if (parent != 0xff)
-  {
-    vm_state.proc_state[parent] = PROC_STATE_RUNNING;
-    vm_state.proc_child[parent] = 0xff;
-  }
+  vm_state.proc_state[slot] = PROC_STATE_FREE;
+  script_ended = 1;
+
+  print_slot_table();
 }
 
 void vm_stop_script(uint8_t script_id)
 {
-  for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
+  for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
   {
+    uint8_t slot = vm_state.proc_slot_table[table_idx];
     if (vm_state.proc_state[slot] != PROC_STATE_FREE && 
         vm_state.proc_type[slot] == PROC_TYPE_GLOBAL &&
         vm_state.proc_script_or_object_id[slot] == script_id)
     {
-      debug_out("Stopping script %d in slot %d", script_id, slot);
-      res_deactivate_slot(proc_res_slot[slot]);
-      vm_state.proc_state[slot] = PROC_STATE_FREE;
-      // stop all children
-      while (vm_state.proc_child[slot] != 0xff)
-      {
-        vm_state.proc_child[slot] = 0xff;
-        slot = vm_state.proc_child[slot];
-        //debug_out("  also stop child script %d slot %d", vm_state.proc_script_or_object_id[slot], slot);
-        res_deactivate_slot(proc_res_slot[slot]);
-        vm_state.proc_state[slot] = PROC_STATE_FREE;
-      }
+      vm_stop_script_slot(slot);
     }
   }
 }
 
-uint8_t vm_get_script_slot_by_script_id(uint8_t script_id)
+uint8_t vm_get_first_script_slot_by_script_id(uint8_t script_id)
 {
-  for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
+  for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
   {
+    uint8_t slot = vm_state.proc_slot_table[table_idx];
     if (vm_state.proc_state[slot] != PROC_STATE_FREE && 
         vm_state.proc_type[slot] == PROC_TYPE_GLOBAL &&
         vm_state.proc_script_or_object_id[slot] == script_id)
@@ -790,7 +831,7 @@ uint8_t vm_get_script_slot_by_script_id(uint8_t script_id)
 
 uint8_t vm_is_script_running(uint8_t script_id)
 {
-  return vm_get_script_slot_by_script_id(script_id) != 0xff;
+  return vm_get_first_script_slot_by_script_id(script_id) != 0xff;
 }
 
 /**
@@ -1060,7 +1101,6 @@ static void reset_game_state(void)
     vm_state.proc_state[i]               = PROC_STATE_FREE;
     vm_state.proc_script_or_object_id[i] = 0xff;
     vm_state.proc_parent[i]              = 0xff;
-    vm_state.proc_child[i]               = 0xff;
     vm_state.proc_wait_timer[i]          = 0;
   }
 
@@ -1089,10 +1129,11 @@ static void reset_game_state(void)
     }
   }
 
-  vm_state.inv_num_objects = 0;
-  vm_state.inv_objects[0]  = NULL;
-  vm_state.inv_next_free   = (void *)INVENTORY_BASE;
+  vm_state.inv_num_objects       = 0;
+  vm_state.inv_objects[0]        = NULL;
+  vm_state.inv_next_free         = (void *)INVENTORY_BASE;
 
+  active_script_slot         = 0xff;
   camera_x                   = 20;
   camera_state               = 0;
   camera_follow_actor_id     = 0xff;
@@ -1107,7 +1148,15 @@ static void reset_game_state(void)
   ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
   vm_write_var(VAR_CURSOR_STATE, 3);
 
-  vm_start_script(1);
+  // put script 1 into script slot
+  uint8_t script_id = 1;
+  uint8_t script1_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+  res_activate_slot(script1_page);
+
+  // init script slot
+  reset_script_slot(0, PROC_TYPE_GLOBAL, script_id, 0xff, script1_page, 4 /* skipping script header directly to first opcode*/);
+  vm_state.proc_slot_table[0] = 0;
+  vm_state.num_active_proc_slots = 1;
 
   wait_for_jiffy(); // this resets the elapsed jiffies timer
 }
@@ -1200,10 +1249,6 @@ static void stop_current_actor_talking(void)
   if (actor_talking != 0xff) {
     actor_stop_talking(actor_talking);
   }
-  // map_cs_gfx();
-  // debug_out("stop current actor talking");
-  // gfx_clear_dialog();
-  // unmap_cs();
   print_message_ptr = NULL;
   vm_update_dialog();
   vm_write_var(VAR_MESSAGE_GOING, 0);
@@ -1362,11 +1407,13 @@ static void handle_input(void)
         // clicked in gfx scene
         vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SCENE_CLICK);
         vm_start_script(SCRIPT_ID_INPUT_EVENT);
+        return;
       }
       else if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
         // clicked on sentence line
         vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SENTENCE_CLICK);
         vm_start_script(SCRIPT_ID_INPUT_EVENT);
+        return;
       }
       else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
         // clicked in verb zone
@@ -1387,13 +1434,16 @@ static void handle_input(void)
             vm_write_var(VAR_CLICKED_NOUN, inv_get_object_id(inventory_item_id));
             vm_start_script(SCRIPT_ID_INPUT_EVENT);
             vm_update_sentence();
+            return;
           }
         }
         else if (inventory_ui_slot == 4) {
           inventory_scroll_up();
+          return;
         }
         else if (inventory_ui_slot == 5) {
           inventory_scroll_down();
+          return;
         }
       }
     }
@@ -1482,62 +1532,31 @@ static void update_script_timers(uint8_t elapsed_jiffies)
   }
 }
 
-static void execute_script_slot(uint8_t slot)
+static uint8_t execute_script_slot(uint8_t slot)
 {
-  uint32_t map_save = map_get();
-
-  // walk down to last child
-  while (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD)
-  {
-    slot = vm_state.proc_child[slot];
-  }
+  SAVE_CS_AUTO_RESTORE
+  UNMAP_CS
 
   uint8_t save_active_script_slot = active_script_slot;
+  uint8_t result;
 
-  unmap_cs();
+  active_script_slot = slot;
 
-  // checking for PROC_STATE_RUNNING also implies frozen states won't match and
-  // don't get executed
-  while (slot != 0xff && get_proc_state(slot) == PROC_STATE_RUNNING) {
-    active_script_slot = slot;
-    if (parallel_script_count == 0) {
-      // top-level scripts don't need to save state on stack
-      script_run_active_slot();
-    }
-    else {
-      // never execute the script that called us recursively
-      // (remember we can be called directly from within a script)
-      if (active_script_slot == save_active_script_slot) {
-        break;
-      }
-
-      // save state on stack for nested scripts
-      script_run_slot_stacked(active_script_slot);
-      // stacked scripts shall always terminate after one cycle
-      if (get_proc_state(active_script_slot) != PROC_STATE_FREE) {
-        vm_stop_active_script();
-      }
-    }
-    if (get_proc_state(slot) == PROC_STATE_WAITING_FOR_CHILD) {
-      // script has just started a new child script
-      //debug_out("Script in slot %d has started new child in slot %d", slot, vm.proc_child[slot]);
-      slot = vm_state.proc_child[slot];
-      continue;
-    }
-    else if (vm_state.proc_state[slot] == PROC_STATE_FREE) {
-      // script has exited, launch parent script if needed
-      //debug_out("Script in slot %d has exited, moving on to parent slot %d", slot, vm.proc_parent[slot]);
-      slot = vm_state.proc_parent[slot];
-      continue;
-    }
-    // in all other cases, the script will resume in the next cycle
-    // no further parent or child scripts will be executed
-    break;
+  if (parallel_script_count == 0) {
+    // top-level script
+    debug_out("  executing top-level script slot %d", slot);
+    result = script_run_active_slot();
+  }
+  else {
+    // script execution from within another script
+    // need to stack the current script state
+    debug_out("  executing child script slot %d", slot);
+    result = script_run_slot_stacked(active_script_slot);
   }
 
   active_script_slot = save_active_script_slot;
 
-  map_set(map_save);
+  return result;
 }
 
 static const char *get_object_name(uint16_t global_object_id)
@@ -1554,24 +1573,15 @@ static const char *get_object_name(uint16_t global_object_id)
   return ((const char *)obj_hdr) + name_offset;
 }
 
-static uint8_t start_child_script_at_address(uint8_t script_slot, uint8_t res_slot, uint16_t offset)
+static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_object_id, uint8_t parent, uint8_t res_slot, uint16_t offset)
 {
-  uint8_t slot = (script_slot == 0xff) ? find_free_script_slot() : script_slot;
-
-  vm_state.proc_script_or_object_id[slot] = 0xff; // init room script id with non-object id
-  vm_state.proc_object_id_msb[slot]       = 0xff;
+  vm_state.proc_script_or_object_id[slot] = LSB(script_or_object_id);
+  vm_state.proc_object_id_msb[slot]       = MSB(script_or_object_id);
   vm_state.proc_state[slot]               = PROC_STATE_RUNNING;
-  vm_state.proc_parent[slot]              = active_script_slot;
-  vm_state.proc_child[slot]               = 0xff;
-  vm_state.proc_type[slot]                = 0;
+  vm_state.proc_parent[slot]              = parent;
+  vm_state.proc_type[slot]                = type;
   proc_res_slot[slot]                     = res_slot;
   vm_state.proc_pc[slot]                  = offset;
-  
-  // update the calling script to wait for the child script
-  vm_state.proc_child[active_script_slot] = slot;
-  set_proc_state(active_script_slot, PROC_STATE_WAITING_FOR_CHILD);
-
-  return slot;
 }
 
 static void execute_sentence_stack(void)
@@ -1599,7 +1609,6 @@ static void execute_sentence_stack(void)
 
   uint8_t slot = vm_start_script(SCRIPT_ID_SENTENCE);
   //debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
-  execute_script_slot(slot);
 }
 
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id)
@@ -1943,9 +1952,65 @@ static void update_inventory_scroll_buttons(void)
   }
 }
 
+static void print_slot_table(void)
+{
+  debug_out2("Table (%d slots):", vm_state.num_active_proc_slots);
+  for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
+    uint8_t slot = vm_state.proc_slot_table[i];
+    uint16_t id = vm_state.proc_script_or_object_id[slot] | (vm_state.proc_object_id_msb[slot] << 8);
+    debug_out2(" %d(%d)", slot, id);
+    uint8_t state = get_proc_state(slot);
+    if (state == PROC_STATE_FREE) {
+      debug_msg2("X");
+    }
+    else if (state == PROC_STATE_WAITING_FOR_TIMER) {
+      debug_msg2("W");
+    }
+    else if (state == PROC_STATE_RUNNING) {
+      debug_msg2("R");
+    }
+    else {
+      debug_out2("?%d", state);
+    }
+    if (vm_state.proc_state[slot] & PROC_FLAGS_FROZEN) {
+      debug_msg2("F");
+    }
+  }
+  debug_out("");
+}
+
 /// @} // vm_private
 
 #pragma clang section text="code_main_private"
+static void proc_slot_table_insert(uint8_t slot)
+{
+  int8_t new_entry = proc_slot_table_idx + 1;
+
+  for (int8_t i = vm_state.num_active_proc_slots - 1; i >= new_entry; --i) {
+    vm_state.proc_slot_table[i + 1] = vm_state.proc_slot_table[i];
+  }
+
+  vm_state.proc_slot_table[new_entry] = slot;
+  ++vm_state.num_active_proc_slots;
+}
+
+static void cleanup_slot_table()
+{
+  uint8_t write_ptr = 0;
+
+  for (uint8_t read_ptr = 0; read_ptr < vm_state.num_active_proc_slots; ++read_ptr) {
+    uint8_t slot = vm_state.proc_slot_table[read_ptr];
+    if (vm_state.proc_state[slot] != PROC_STATE_FREE) {
+      if (write_ptr != read_ptr) {
+        vm_state.proc_slot_table[write_ptr] = slot;
+      }
+      ++write_ptr;
+    }
+  }
+
+  vm_state.num_active_proc_slots = write_ptr;
+}
+
 static void read_walk_boxes(void)
 {
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
