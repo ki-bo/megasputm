@@ -2,7 +2,6 @@
 
 		.section zzpage,bss
 		.extern map_regs
-save_a:		.space 1
 
 		.section code
 		.public map_cs_main_priv
@@ -10,6 +9,13 @@ map_cs_main_priv:
 		pha
 		lda #0xa0
 		ldx #0x20
+		bra apply_map_cs
+
+		.public map_cs_diskio2
+map_cs_diskio2:
+		pha
+		lda #0x00
+		ldx #0x21
 		bra apply_map_cs
 
 		.public map_cs_gfx2
@@ -42,14 +48,15 @@ apply_map_cs:
 map_auto_restore_cs:
 		plx
 		stx zp:map_regs + 1
-		sta zp:save_a
-		pla
+		ply
+		pha
+		tya
 		sta zp:map_regs
 		ldy zp:map_regs + 2
 		ldz map_regs + 3
 		map
 		eom
-		lda zp:save_a
+		pla
 		rts
 
 		.public map_auto_restore_ds
@@ -72,6 +79,16 @@ map_restore_cs:
 		stx zp:map_regs + 1
 		ldy zp:map_regs + 2
 		ldz map_regs + 3
+		map
+		eom
+		rts
+
+		.public map_restore_ds
+map_restore_ds:
+		lda zp:map_regs
+		ldx zp:map_regs + 1
+		sty zp:map_regs + 2
+		stz zp:map_regs + 3
 		map
 		eom
 		rts

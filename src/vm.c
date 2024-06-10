@@ -51,7 +51,7 @@ uint8_t camera_follow_actor_id;
 
 int8_t   proc_slot_table_idx;
 uint8_t  proc_slot_table_exec;
-uint8_t  script_ended;
+uint8_t  proc_table_cleanup_needed;
 uint8_t  active_script_slot;
 uint16_t message_timer;
 uint8_t  actor_talking;
@@ -130,6 +130,7 @@ static void inventory_scroll_up(void);
 static void inventory_scroll_down(void);
 static void update_inventory_scroll_buttons(void);
 static void print_slot_table(void);
+static void stop_script_from_table(uint8_t table_idx);
 
 // Private functions (code_main_private)
 static void proc_slot_table_insert(uint8_t slot);
@@ -193,9 +194,8 @@ void vm_init(void)
 void vm_restart_game(void)
 {
   static const char restart_str[] = "Are you sure you want to restart? (y/n)";
-  map_cs_gfx();
+  MAP_CS_GFX
   gfx_print_dialog(2, restart_str, sizeof(restart_str) - 1);
-  unmap_cs();
 
   while (1) {
     if (input_key_pressed) {
@@ -212,9 +212,8 @@ void vm_restart_game(void)
     }
   }
   
-  map_cs_gfx();
   gfx_clear_dialog();
-  unmap_cs();
+  UNMAP_CS
 }
 
 /**
@@ -238,9 +237,9 @@ __task void vm_mainloop(void)
         : /* no input operands */
         : "x" /* clobber list */);
 
-  map_cs_gfx();
+  MAP_CS_GFX
   gfx_start();
-  unmap_cs();
+  UNMAP_CS
 
   reset_game = 1;
 
@@ -248,13 +247,13 @@ __task void vm_mainloop(void)
     if (reset_game) {
       reset_game = 0;
       unmap_all();
-      map_cs_gfx();
+      MAP_CS_GFX
       gfx_fade_out();
       gfx_clear_bg_image();
       gfx_reset_actor_drawing();
-      map_cs_diskio();
+      MAP_CS_DISKIO
       reset_game_state();
-      unmap_cs();
+      UNMAP_CS
     }
   
     script_watchdog = 0;
@@ -268,17 +267,17 @@ __task void vm_mainloop(void)
 
     //VICIV.bordercol = 0x01;
 
-    map_cs_diskio();
+    MAP_CS_DISKIO
     diskio_check_motor_off(elapsed_jiffies);
-    unmap_cs();
+    UNMAP_CS
 
-    script_ended = 0;
+    proc_table_cleanup_needed = 0;
     proc_slot_table_idx = -1;
     handle_input();
 
     update_script_timers(elapsed_jiffies);
 
-    debug_out("New cycle, %d scripts active", vm_state.num_active_proc_slots);
+    //debug_out("New cycle, %d scripts active", vm_state.num_active_proc_slots);
     proc_slot_table_exec = 0;
     for (proc_slot_table_idx = 0; 
          proc_slot_table_idx < vm_state.num_active_proc_slots;
@@ -289,12 +288,12 @@ __task void vm_mainloop(void)
         continue;
       }
       active_script_slot = vm_state.proc_slot_table[proc_slot_table_idx];
-      if (vm_state.proc_state[active_script_slot] == PROC_STATE_RUNNING) {
+      if (active_script_slot != 0xff && vm_state.proc_state[active_script_slot] == PROC_STATE_RUNNING) {
         execute_script_slot(active_script_slot);
       }
       ++proc_slot_table_exec;
     }
-    if (script_ended) {
+    if (proc_table_cleanup_needed) {
       MAP_CS_MAIN_PRIV
       cleanup_slot_table();
       UNMAP_CS
@@ -323,7 +322,7 @@ __task void vm_mainloop(void)
       }
 
       //VICIV.bordercol = 0x00;
-      map_cs_gfx();
+      MAP_CS_GFX
       gfx_wait_vsync();
       //VICIV.bordercol = 0x03;
       if (screen_update_needed & SCREEN_UPDATE_DIALOG) {
@@ -351,7 +350,7 @@ __task void vm_mainloop(void)
         update_sentence_line();
       }
 
-      unmap_cs();
+      UNMAP_CS
 
       screen_update_needed = 0;
     }
@@ -658,10 +657,6 @@ uint8_t vm_start_script(uint8_t script_id)
     // increase exec counter so we don't execute it again in this cycle
     ++proc_slot_table_exec;
     print_slot_table();
-    debug_out("Put global script %d slot %d in table", script_id, slot);
-  }
-  else {
-    debug_out("Global script %d slot %d ended immediately", script_id, slot);
   }
 
   return slot;
@@ -681,6 +676,7 @@ void vm_execute_room_script(uint16_t room_script_offset)
     // room scripts shall never run longer than one cycle
     fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
   }
+  //print_slot_table();
 }
 
 void vm_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t background)
@@ -722,8 +718,6 @@ void vm_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t b
   debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
   reset_script_slot(script_slot, type, global_object_id, 0xff /*parent*/, res_slot, script_offset);
 
-  //child_script_slot = start_child_script_at_address(script_slot, res_slot, script_offset);
- 
   if (execute_script_slot(script_slot) != PROC_STATE_FREE) {
     // room scripts shall never run longer than one cycle
     fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
@@ -770,31 +764,47 @@ void vm_chain_script(uint8_t script_id)
  * The associated script resource is deactivated and thus marked free to override if needed.
  *
  * @param script_id The id of the script to stop
- * @param stop_children If non-zero, all child scripts of the specified script will be stopped, as well
  *
  * Code section: code_main
  */
 void vm_stop_script_slot(uint8_t slot)
 {
+  vm_state.proc_state[slot] = PROC_STATE_FREE;
+
   if (!is_room_object_script(slot)) {
     debug_out("Script %d ended slot %d", vm_state.proc_script_or_object_id[slot], slot);
     res_deactivate_slot(proc_res_slot[slot]);
-    // stop all children
-    for (uint8_t table_idx = proc_slot_table_idx + 1; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+
+    SAVE_CS_AUTO_RESTORE
+    MAP_CS_MAIN_PRIV
+
+    for (uint8_t table_idx = 1; table_idx < vm_state.num_active_proc_slots; ++table_idx)
     {
-      uint8_t next_slot = vm_state.proc_slot_table[table_idx];
-      if (vm_state.proc_parent[next_slot] == slot) {
-        vm_stop_script_slot(next_slot);
+      // stop children of us
+      uint8_t child_slot = vm_state.proc_slot_table[table_idx];
+      if (child_slot != 0xff && vm_state.proc_parent[child_slot] == slot) {
+        stop_script_from_table(child_slot);
       }
     }
+
+    // Mark all stopped scripts as 0xff in slot table
+    for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+    {
+      uint8_t tmp_slot = vm_state.proc_slot_table[table_idx];
+      if (tmp_slot != 0xff && vm_state.proc_state[tmp_slot] == PROC_STATE_FREE) {
+        vm_state.proc_slot_table[table_idx] = 0xff;
+      }
+    }
+
+    // Will remove all 0xff entries from the table after all scripts have been processed
+    // in the current cycle
+    proc_table_cleanup_needed = 1;
   }
   else {
     debug_out("Object script %d ended slot %d", 
               (vm_state.proc_script_or_object_id[slot]) | (vm_state.proc_object_id_msb[slot] << 8), 
               slot);
   }
-  vm_state.proc_state[slot] = PROC_STATE_FREE;
-  script_ended = 1;
 
   print_slot_table();
 }
@@ -804,7 +814,7 @@ void vm_stop_script(uint8_t script_id)
   for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
   {
     uint8_t slot = vm_state.proc_slot_table[table_idx];
-    if (vm_state.proc_state[slot] != PROC_STATE_FREE && 
+    if (slot != 0xff &&
         vm_state.proc_type[slot] == PROC_TYPE_GLOBAL &&
         vm_state.proc_script_or_object_id[slot] == script_id)
     {
@@ -818,7 +828,7 @@ uint8_t vm_get_first_script_slot_by_script_id(uint8_t script_id)
   for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
   {
     uint8_t slot = vm_state.proc_slot_table[table_idx];
-    if (vm_state.proc_state[slot] != PROC_STATE_FREE && 
+    if (slot != 0xff &&
         vm_state.proc_type[slot] == PROC_TYPE_GLOBAL &&
         vm_state.proc_script_or_object_id[slot] == script_id)
     {
@@ -1257,10 +1267,6 @@ static void stop_current_actor_talking(void)
 
 static void stop_all_dialog(void)
 {
-  // map_cs_gfx();
-  // debug_out("stop all dialog");
-  // gfx_clear_dialog();
-  // unmap_cs();
   print_message_ptr = NULL;
   message_ptr = NULL;
   message_timer = 0;
@@ -1284,10 +1290,9 @@ static void stop_all_dialog(void)
  */
 static uint8_t wait_for_jiffy(void)
 {
-  uint16_t save_cs = map_get_cs();
-  map_cs_gfx();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_GFX
   uint8_t num_jiffies_elapsed = gfx_wait_for_jiffy_timer();
-  map_set_cs(save_cs);
   return num_jiffies_elapsed;
 }
 
@@ -1613,7 +1618,7 @@ static void execute_sentence_stack(void)
 
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   map_ds_resource(obj_page[local_object_id]);
   uint16_t cur_offset = obj_offset[local_object_id];
@@ -1631,8 +1636,6 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
     }
     ptr += 2;
   }
-
-  map_set_ds(save_ds);
 
   return script_offset;
 }
@@ -1677,7 +1680,8 @@ static void update_sentence_line(void)
     return;
   }
 
-  uint16_t save_ds = map_get_ds();
+  // no auto restore as this function is inlined
+  SAVE_DS
 
   sentence_length = 0;
 
@@ -1727,7 +1731,7 @@ static void update_sentence_line(void)
 
   prev_sentence_highlighted = 0;
 
-  map_set_ds(save_ds);
+  RESTORE_DS
 }
 
 static void update_sentence_highlighting(void)
@@ -1957,6 +1961,10 @@ static void print_slot_table(void)
   debug_out2("Table (%d slots):", vm_state.num_active_proc_slots);
   for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
     uint8_t slot = vm_state.proc_slot_table[i];
+    if (slot == 0xff) {
+      debug_msg2(" X");
+      continue;
+    }
     uint16_t id = vm_state.proc_script_or_object_id[slot] | (vm_state.proc_object_id_msb[slot] << 8);
     debug_out2(" %d(%d)", slot, id);
     uint8_t state = get_proc_state(slot);
@@ -1979,6 +1987,30 @@ static void print_slot_table(void)
   debug_out("");
 }
 
+/**
+ * @brief Stops a script from the slot table and also stops all its children
+ *
+ * Function will stop the mentioned script slot from the table and all of its children. The
+ * children are stopped recusively by setting their status to PROC_STATE_FREE and deactivating
+ * their resource slot.
+ */
+static void stop_script_from_table(uint8_t table_idx)
+{
+  uint8_t slot = vm_state.proc_slot_table[table_idx];
+  vm_state.proc_state[slot] = PROC_STATE_FREE;
+
+  debug_out(" Child script %d ended slot %d", vm_state.proc_script_or_object_id[slot], slot);
+  res_deactivate_slot(proc_res_slot[slot]);
+  for (++table_idx; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+  {
+    // stop children of us
+    uint8_t child_slot = vm_state.proc_slot_table[table_idx];
+    if (child_slot != 0xff && vm_state.proc_parent[child_slot] == slot) {
+      stop_script_from_table(table_idx);
+    }
+  }
+}
+
 /// @} // vm_private
 
 #pragma clang section text="code_main_private"
@@ -1994,13 +2026,21 @@ static void proc_slot_table_insert(uint8_t slot)
   ++vm_state.num_active_proc_slots;
 }
 
+/**
+ * @brief Removes all orphan entries from slot table
+ *
+ * All slots with value 0xff are removed from the table, moving all other entries to the
+ * beginning of the table. The number of active slots is updated accordingly.
+ *
+ * Code section: code_main_private
+ */
 static void cleanup_slot_table()
 {
   uint8_t write_ptr = 0;
 
   for (uint8_t read_ptr = 0; read_ptr < vm_state.num_active_proc_slots; ++read_ptr) {
     uint8_t slot = vm_state.proc_slot_table[read_ptr];
-    if (vm_state.proc_state[slot] != PROC_STATE_FREE) {
+    if (slot != 0xff) {
       if (write_ptr != read_ptr) {
         vm_state.proc_slot_table[write_ptr] = slot;
       }
@@ -2185,7 +2225,7 @@ static uint8_t get_hovered_verb_slot(void)
 
 static void verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   map_ds_heap();
 
   vm_state.verbs.id[slot] = verb_id;
@@ -2199,13 +2239,11 @@ static void verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const 
   strcpy(vm_state.verbs.name[slot], name);
 
   vm_update_verbs();
-
-  map_set_ds(save_ds);
 }
 
 static void verb_delete(uint8_t slot)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   vm_state.verbs.id[slot] = 0xff;
   map_ds_heap();
@@ -2213,8 +2251,6 @@ static void verb_delete(uint8_t slot)
   vm_state.verbs.name[slot] = NULL;
 
   vm_update_verbs();
-
-  map_set_ds(save_ds);
 }
 
 static void freeze_non_active_scripts(void)

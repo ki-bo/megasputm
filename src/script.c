@@ -270,7 +270,7 @@ uint8_t script_run_active_slot(void)
   uint16_t script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
 #endif
 
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   map_ds_resource(proc_res_slot[active_script_slot]);
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
@@ -293,7 +293,6 @@ uint8_t script_run_active_slot(void)
   vm_state.proc_pc[active_script_slot] = (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
   --parallel_script_count;
 
-  map_set_ds(save_ds);
 
   return vm_get_active_proc_state_and_flags();
 }
@@ -1099,7 +1098,7 @@ static void actor_y(void)
 
 static void come_out_door(void)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   uint16_t arrive_at_object_id = resolve_next_param16();
   uint8_t  new_room_id         = resolve_next_param8();
@@ -1131,8 +1130,6 @@ static void come_out_door(void)
   if (walk_to_x != 0xff && walk_to_y != 0xff) {
     actor_walk_to(actor_id, walk_to_x, walk_to_y);
   }
-
-  map_set_ds(save_ds);
 }
 
 /**
@@ -1280,7 +1277,7 @@ static void camera_at(void)
 
 static void proximity(void)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   uint8_t var_idx = read_byte();
   uint16_t object1_id = resolve_next_param16();
@@ -1310,8 +1307,6 @@ static void proximity(void)
   uint16_t dx = abs((int16_t)x1 - (int16_t)x2);
   uint16_t dy = abs((int16_t)y1 - (int16_t)y2);
   vm_write_var(var_idx, max(dx, dy));
-
-  map_set_ds(save_ds);
 }
 
 static void do_sentence(void)
@@ -1840,7 +1835,7 @@ static void preposition(void)
   uint8_t var_idx = read_byte();
   uint16_t obj_id = resolve_next_param16();
 
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   uint8_t preposition = 0xff;
   struct object_code *obj_hdr = inv_get_object_by_id(obj_id);
   if (obj_hdr == NULL) {
@@ -1852,8 +1847,6 @@ static void preposition(void)
   }
 
   vm_write_var(var_idx, preposition);
-  
-  map_set_ds(save_ds);
 }
 
 static void lights(void)

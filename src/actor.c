@@ -94,7 +94,7 @@ void actor_put_in_room(uint8_t actor_id, uint8_t room_no)
 
 void actor_room_changed(void)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   uint8_t new_room = vm_read_var8(VAR_SELECTED_ROOM);
   for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
@@ -114,8 +114,6 @@ void actor_room_changed(void)
       add_local_actor(actor_id);
     }
   }
-
-  map_set_ds(save_ds);
 }
 
 void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y)
@@ -187,7 +185,7 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
 
 void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   if (!actor_is_in_current_room(actor_id)) {
     return;
@@ -208,8 +206,6 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
   if (local_actors.walking[local_id] == WALKING_STATE_STOPPED) {
     actor_change_direction(local_id, actor_dir);
   }
-
-  map_set_ds(save_ds);
 }
 
 void actor_next_step(uint8_t local_id)
@@ -310,13 +306,12 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   __auto_type cel_level_cmd_ptr  = local_actors.cel_level_cmd_ptr[local_id];
   __auto_type cel_level_last_cmd = local_actors.cel_level_last_cmd[local_id];
 
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   map_ds_resource(local_actors.res_slot[local_id]);
 
   __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
   //debug_out("Local actor %d start animation %d", local_id, animation);
   if (animation >= costume_hdr->num_animations + 1) {
-    map_set_ds(save_ds);
     return;
   }
   __auto_type anim_ptr = NEAR_U8_PTR(RES_MAPPED + costume_hdr->animation_offsets[animation]);
@@ -349,8 +344,6 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   }
 
   vm_update_actors();
-
-  map_set_ds(save_ds);
 }
 
 void actor_update_animation(uint8_t local_id)
@@ -691,7 +684,7 @@ static void stop_walking(uint8_t local_id)
 
 static void calculate_next_box_point(uint8_t local_id)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   map_ds_resource(room_res_slot);
 
   uint8_t cur_box = local_actors.cur_box[local_id];
@@ -713,8 +706,6 @@ static void calculate_next_box_point(uint8_t local_id)
   local_actors.next_y[local_id] = cur_y;
   local_actors.next_box[local_id] = next_box;
   //debug_out("Adapted next box point %d, %d", cur_x, cur_y);
-
-  map_set_ds(save_ds);
 }
 
 static void calculate_step(uint8_t local_id)

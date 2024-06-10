@@ -39,17 +39,16 @@ uint8_t walkbox_get_next_box(uint8_t cur_box, uint8_t target_box)
 
 uint8_t walkbox_get_box_masking(uint8_t box_id)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   map_ds_resource(room_res_slot);
   __auto_type box = walk_boxes[box_id];
   uint8_t masking = box.mask;
-  map_set_ds(save_ds);
   return masking;
 }
 
 uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   map_ds_resource(room_res_slot);
 
   uint16_t min_distance = 0xffff;
@@ -68,7 +67,6 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
     //debug_out("  w_x,y: %d, %d d %d", walk_box_x, walk_box_y, distance);
     if (walk_box_x == *x && walk_box_y == *y) {
       //debug_out("  inside box");
-      map_set_ds(save_ds);
       return box_idx;
     }
     if (distance <= min_distance) {
@@ -84,8 +82,6 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
 
   *x = corr_pos_x;
   *y = corr_pos_y;
-
-  map_set_ds(save_ds);
 
   return dest_walk_box;
 }

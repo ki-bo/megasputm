@@ -69,7 +69,7 @@ struct object_code *inv_get_object_by_id(uint8_t global_object_id)
 
 uint8_t inv_object_available(uint16_t id)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   uint8_t result = 0;
 
   for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
@@ -79,7 +79,6 @@ uint8_t inv_object_available(uint16_t id)
     }
   }
   
-  map_set_ds(save_ds);
   return result;
 }
 

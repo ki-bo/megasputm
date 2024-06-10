@@ -733,7 +733,7 @@ void diskio_write(const uint8_t *data, uint16_t size)
     return;
   }
 
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   uint8_t *ts_field;
   uint8_t *sector_buf_ptr = write_file_data_ptr;
@@ -787,8 +787,6 @@ void diskio_write(const uint8_t *data, uint16_t size)
   }
 
   write_file_data_ptr = sector_buf_ptr;
-
-  map_set_ds(save_ds);
 }
 
 void diskio_close_for_writing(const char *filename)
@@ -800,6 +798,8 @@ void diskio_close_for_writing(const char *filename)
     return;
   }
 
+  SAVE_DS_AUTO_RESTORE
+
   uint8_t disable_cache_save = disable_cache;
   uint8_t filename_len       = strlen(filename);
   uint8_t filename_match     = 0;
@@ -807,7 +807,6 @@ void diskio_close_for_writing(const char *filename)
   uint8_t dir_block          = 3;
   uint8_t old_file_track     = 0;
   uint8_t old_file_block;
-  uint16_t save_ds           = map_get_ds();
 
   disable_cache = 1;
 
@@ -966,8 +965,6 @@ void diskio_close_for_writing(const char *filename)
   res_free_heap(writebuf_res_slot);
 
   release_drive();
-
-  map_set_ds(save_ds);
 }
 
 /** @} */ // end of diskio_public

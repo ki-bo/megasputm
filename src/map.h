@@ -22,6 +22,13 @@ extern union map_t __attribute__((zpage)) map_regs;
           : \
           : "x", "y", "z");
 
+#define MAP_CS_DISKIO \
+    __asm(" .extern map_cs_diskio2\n" \
+          " jsr map_cs_diskio2\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
 #define MAP_CS_GFX \
     __asm(" .extern map_cs_gfx2\n" \
           " jsr map_cs_gfx2\n" \
@@ -49,6 +56,11 @@ extern union map_t __attribute__((zpage)) map_regs;
           " .byte 0xf4, .byte1(map_auto_restore_cs-1), .byte0(map_auto_restore_cs-1)\n" \
           :::);
 
+#define SAVE_DS \
+    __asm(" .extern map_regs\n" \
+          " phw map_regs + 2\n" \
+          :::);
+
 #define SAVE_DS_AUTO_RESTORE \
     __asm(" .extern map_regs\n" \
           " .extern map_auto_restore_ds\n" \
@@ -62,6 +74,15 @@ extern union map_t __attribute__((zpage)) map_regs;
           " plx\n" \
           " pla\n" \
           " jsr map_restore_cs\n" \
+          : \
+          : \
+          : "a", "x", "y", "z");
+
+#define RESTORE_DS \
+    __asm(" .extern map_restore_ds\n" \
+          " plz\n" \
+          " ply\n" \
+          " jsr map_restore_ds\n" \
           : \
           : \
           : "a", "x", "y", "z");

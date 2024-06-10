@@ -479,7 +479,7 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
  */
 void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   masking_data_room_offset = bg_masking_offset;
   uint8_t *src = map_ds_room_offset(bg_masking_offset);
@@ -534,8 +534,6 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
     }
   }
   num_masking_cache_cols = mask_col;
-
-  map_set_ds(save_ds);
 }
 
 /**
@@ -887,7 +885,7 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
  */
 void gfx_finalize_actor_drawing(void)
 {
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   unmap_ds();
   static uint8_t max_end_of_row = 0;
 
@@ -909,7 +907,6 @@ void gfx_finalize_actor_drawing(void)
   }
 
   //debug_out("max_end_of_row: %d", max_end_of_row);
-  map_set_ds(save_ds);
 }
 
 /**
@@ -1232,7 +1229,7 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   uint16_t gotox_scr = shift_y << 13;
   --char_num;
 
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   unmap_ds();
   
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN);
@@ -1271,8 +1268,6 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
     screen_start_ptr += CHRCOUNT;
     colram_start_ptr += CHRCOUNT;
   }
-
-  map_set_ds(save_ds);
 }
 
 static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_lines)
@@ -1282,7 +1277,7 @@ static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_l
     return;
   }
 
-  uint16_t save_ds = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   uint8_t *data = map_ds_room_offset(masking_data_room_offset);
   uint8_t cur_mask;
   uint8_t iterations;
@@ -1349,8 +1344,6 @@ static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_l
   for (uint8_t local_obj_id = 0; local_obj_id < num_objects_drawn; ++local_obj_id) {
     decode_object_mask_column(obj_draw_list[local_obj_id], col, y_start_save, num_lines, idx_dst_start);
   }
-
-  map_set_ds(save_ds);
 }
 
 static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_start, uint8_t num_lines, uint8_t idx_dst)

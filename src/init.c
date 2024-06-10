@@ -34,14 +34,14 @@ void global_init(void)
   charset_init();
 
   // init diskio module
-  map_cs_diskio();
+  MAP_CS_DISKIO
   diskio_init();
 
   // init gfx module  
   diskio_load_file("M12", (uint8_t __far *)(0x14000)); // load gfx code
-  map_cs_gfx();
+  MAP_CS_GFX
   gfx_init();
-  unmap_cs();
+  UNMAP_CS
 
   // init input module
   input_init();
