@@ -108,6 +108,11 @@ enum {
   VERB_STATE_DELETED = 0x80
 };
 
+enum {
+  RESET_RESTART     = 0x01,
+  RESET_LOADED_GAME = 0x02
+};
+
 struct verb {
   uint8_t  id[MAX_VERBS];
   uint8_t  state[MAX_VERBS];
@@ -150,6 +155,14 @@ struct vm
   uint8_t  proc_type[NUM_SCRIPT_SLOTS];
   uint16_t proc_pc[NUM_SCRIPT_SLOTS];
   int32_t  proc_wait_timer[NUM_SCRIPT_SLOTS];
+
+  // cutscene backup data
+  uint8_t cs_room;
+  int8_t cs_cursor_state;
+  uint8_t cs_ui_state;
+  uint8_t cs_camera_state;
+  uint8_t cs_proc_slot;
+  uint16_t cs_override_pc;
 
   // verb data
   struct verb verbs;

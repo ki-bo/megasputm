@@ -29,7 +29,22 @@ map_cs_gfx2:
 unmap_cs2:
 		pha
 		lda #0x00
-		ldx #0x00
+		tax
+		bra apply_map_cs
+
+		.public unmap_ds2
+unmap_ds2:
+		ldy #0x00
+		ldz #0x00
+		bra apply_map_ds
+
+		.public unmap_all2
+unmap_all2:
+		pha
+		lda #0x00
+		tax
+		tay
+		taz
 		bra apply_map_cs
 
 
@@ -39,6 +54,17 @@ apply_map_cs:
 		stx zp:map_regs + 1
 		ldy zp:map_regs + 2
 		ldz map_regs + 3
+		map
+		eom
+		pla
+		rts
+
+apply_map_ds:
+		pha
+		lda zp:map_regs
+		ldx zp:map_regs + 1
+		sty zp:map_regs + 2
+		stz map_regs + 3
 		map
 		eom
 		pla

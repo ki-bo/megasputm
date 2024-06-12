@@ -1051,42 +1051,57 @@ static void savegame_operation(void)
 {
   char savegame_filename[10];
 
-  uint8_t var_idx    = read_byte();
-  uint8_t sub_opcode = resolve_next_param8();
-  uint8_t save_slot  = sub_opcode & 0x1f;
+  uint8_t var_idx        = read_byte();
+  uint8_t sub_opcode     = resolve_next_param8();
+  uint8_t savegame_slot  = sub_opcode & 0x1f;
   
   sub_opcode &= 0xe0;
+
+  uint8_t result = 0;
 
   switch (sub_opcode) {
 
     case 0x00:
-      vm_write_var(var_idx, 32);
-      return;
+      result = 32;
+      break;
 
     case 0x20:
+      // print message on screen:
       //  1 = put save disk in drive A
       //  2 = put save disk in drive B
       // >2 = not asking for a disk
-      vm_write_var(var_idx, 1);
-      return;
+      result = 1;
+      break;
+
+    case 0x40:
+      if (vm_load_game(savegame_slot)) {
+        result = 5; // load error
+      }
+      else {
+        result = 3; // load ok
+      }
+      break;
 
     case 0x80:
       // save
-      vm_save_game(save_slot);
-      return;
+      if (vm_save_game(savegame_slot)) {
+        result = 2; // save error
+      }
+      // result = 0 -> save ok
+      break;
     
     case 0xc0:
-      if (vm_savegame_exists(save_slot)) {
-        vm_write_var(var_idx, 6);
+      if (vm_savegame_exists(savegame_slot)) {
+        result = 6;
       }
-      else {
-        vm_write_var(var_idx, 0);
-      }
-      return;
+      // result = 0 otherwise
+      break;
     
     default:
       debug_out("unknown savegame operation %x", sub_opcode);
   }
+
+  vm_write_var(var_idx, result);
 }
 
 static void actor_y(void)

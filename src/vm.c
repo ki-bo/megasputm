@@ -62,14 +62,6 @@ char *message_ptr;
 char *print_message_ptr;
 uint8_t print_message_num_chars;
 
-// cutscene backup data
-uint8_t cs_room;
-int8_t cs_cursor_state;
-uint8_t cs_ui_state;
-uint8_t cs_camera_state;
-uint8_t cs_proc_slot;
-uint16_t cs_override_pc;
-
 // room and object data
 uint8_t  room_res_slot;
 uint16_t room_width;
@@ -88,6 +80,8 @@ uint8_t prev_inventory_highlighted;
 uint8_t sentence_length;
 
 uint8_t inventory_pos;
+
+static const uint8_t savegame_magic[] = {'M', '6', '5', 'M', 'C', 'M', 'N'};
 
 // Private functions
 static void reset_game_state(void);
@@ -110,6 +104,7 @@ static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_obj
 static uint8_t start_child_script_at_address(uint8_t script_slot, uint8_t res_slot, uint16_t offset);
 static void execute_sentence_stack(void);
 static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
+static void load_room(uint8_t room_no);
 static void update_actors(void);
 static void animate_actors(void);
 static void override_cutscene(void);
@@ -200,7 +195,7 @@ void vm_restart_game(void)
   while (1) {
     if (input_key_pressed) {
       if (input_key_pressed == 'y') {
-        reset_game = 1;
+        reset_game = RESET_RESTART;
         break;
       }
       else if (input_key_pressed == 'n') {
@@ -241,10 +236,10 @@ __task void vm_mainloop(void)
   gfx_start();
   UNMAP_CS
 
-  reset_game = 1;
+  reset_game = RESET_RESTART;
 
   while (1) {
-    if (reset_game) {
+    if (reset_game == RESET_RESTART) {
       reset_game = 0;
       unmap_all();
       MAP_CS_GFX
@@ -252,8 +247,21 @@ __task void vm_mainloop(void)
       gfx_clear_bg_image();
       gfx_reset_actor_drawing();
       MAP_CS_DISKIO
+      diskio_load_game_objects();
       reset_game_state();
       UNMAP_CS
+
+      // put script 1 into script slot
+      uint8_t script_id = 1;
+      uint8_t script1_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+      res_activate_slot(script1_page);
+
+      // init script slot
+      reset_script_slot(0, PROC_TYPE_GLOBAL, script_id, 0xff, script1_page, 4 /* skipping script header directly to first opcode*/);
+      vm_state.proc_slot_table[0] = 0;
+      vm_state.num_active_proc_slots = 1;
+
+      wait_for_jiffy(); // this resets the elapsed jiffies timer
     }
   
     script_watchdog = 0;
@@ -291,8 +299,18 @@ __task void vm_mainloop(void)
       if (active_script_slot != 0xff && vm_state.proc_state[active_script_slot] == PROC_STATE_RUNNING) {
         execute_script_slot(active_script_slot);
       }
+      if (reset_game == RESET_LOADED_GAME) {
+        break;
+      }
       ++proc_slot_table_exec;
     }
+
+    if (reset_game == RESET_LOADED_GAME) {
+      wait_for_jiffy(); // this resets the elapsed jiffies timer
+      reset_game = 0;
+      continue; // restart game loop if new game was loaded
+    }
+
     if (proc_table_cleanup_needed) {
       MAP_CS_MAIN_PRIV
       cleanup_slot_table();
@@ -464,22 +482,7 @@ void vm_set_current_room(uint8_t room_no)
   else {
     //debug_out("Activating new room %d", room_no);
     // activate new room data
-    room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
-    res_activate_slot(room_res_slot);
-    map_ds_resource(room_res_slot);
-    room_width = room_hdr->bg_width;
-    uint16_t bg_data_offset = room_hdr->bg_data_offset;
-    uint16_t bg_masking_offset = room_hdr->bg_attr_offset;
-
-    MAP_CS_GFX
-    gfx_decode_bg_image(map_ds_room_offset(bg_data_offset), room_width);
-    gfx_decode_masking_buffer(bg_masking_offset, room_width);
-
-    map_ds_resource(room_res_slot);
-
-    read_objects();
-    MAP_CS_MAIN_PRIV
-    read_walk_boxes();
+    load_room(room_no);
     MAP_CS_GFX
     actor_room_changed();
 
@@ -531,12 +534,12 @@ void vm_set_script_wait_timer(int32_t negative_ticks)
  */
 void vm_cut_scene_begin(void)
 {
-  cs_room = vm_read_var8(VAR_SELECTED_ROOM);
-  cs_cursor_state = vm_read_var8(VAR_CURSOR_STATE);
-  cs_proc_slot = 0xff;
-  cs_override_pc = 0;
-  cs_camera_state = camera_state;
-  cs_ui_state = ui_state;
+  vm_state.cs_room = vm_read_var8(VAR_SELECTED_ROOM);
+  vm_state.cs_cursor_state = vm_read_var8(VAR_CURSOR_STATE);
+  vm_state.cs_proc_slot = 0xff;
+  vm_state.cs_override_pc = 0;
+  vm_state.cs_camera_state = camera_state;
+  vm_state.cs_ui_state = ui_state;
   vm_change_ui_flags(UI_FLAGS_APPLY_FREEZE | UI_FLAGS_ENABLE_FREEZE |
                      UI_FLAGS_APPLY_CURSOR |
                      UI_FLAGS_APPLY_INTERFACE);
@@ -545,26 +548,26 @@ void vm_cut_scene_begin(void)
 void vm_cut_scene_end(void)
 {
   //debug_out("cut-scene ended");
-  camera_state = cs_camera_state;
+  camera_state = vm_state.cs_camera_state;
   if (camera_state == CAMERA_STATE_FOLLOW_ACTOR) {
     vm_set_camera_follow_actor(vm_read_var8(VAR_SELECTED_ACTOR));
   }
-  if (vm_read_var8(VAR_SELECTED_ROOM) != cs_room) {
+  if (vm_read_var8(VAR_SELECTED_ROOM) != vm_state.cs_room) {
     //debug_out("switching to room %d", cs_room);
-    vm_set_current_room(cs_room);
+    vm_set_current_room(vm_state.cs_room);
   }
-  vm_write_var(VAR_CURSOR_STATE, cs_cursor_state);
-  vm_change_ui_flags(cs_ui_state | UI_FLAGS_APPLY_CURSOR | UI_FLAGS_APPLY_FREEZE | UI_FLAGS_APPLY_INTERFACE);
-  cs_proc_slot = 0xff;
-  cs_override_pc = 0;
+  vm_write_var(VAR_CURSOR_STATE, vm_state.cs_cursor_state);
+  vm_change_ui_flags(vm_state.cs_ui_state | UI_FLAGS_APPLY_CURSOR | UI_FLAGS_APPLY_FREEZE | UI_FLAGS_APPLY_INTERFACE);
+  vm_state.cs_proc_slot = 0xff;
+  vm_state.cs_override_pc = 0;
 
   //debug_out("  cursor state %d, ui state %d", vm_read_var8(VAR_CURSOR_STATE), ui_state);
 }
 
 void vm_begin_override(void)
 {
-  cs_proc_slot = active_script_slot;
-  cs_override_pc = script_get_current_pc();
+  vm_state.cs_proc_slot = active_script_slot;
+  vm_state.cs_override_pc = script_get_current_pc();
 }
 
 /**
@@ -1076,21 +1079,80 @@ uint8_t vm_savegame_exists(uint8_t slot)
 uint8_t vm_save_game(uint8_t slot)
 {
   char filename[11];
+  uint8_t version = 0;
 
-  uint32_t save_map = map_get();
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_DISKIO
 
   sprintf(filename, "MM.SAV.%u", slot);
-  map_cs_diskio();
   diskio_open_for_writing();
-  diskio_write((const uint8_t *)&vm_state, sizeof(vm_state));
-  diskio_close_for_writing(filename);
+  diskio_write((uint8_t __huge *)savegame_magic, sizeof(savegame_magic));
+  diskio_write((uint8_t __huge *)&version, 1);
+  diskio_write((uint8_t __huge *)&vm_state, sizeof(vm_state));
+  uint16_t inventory_num_bytes = (uint16_t)vm_state.inv_next_free - (uint16_t)INVENTORY_BASE;
+  diskio_write((uint8_t __huge *)INVENTORY_BASE, inventory_num_bytes);
+  diskio_write((uint8_t __huge *)&actors, sizeof(actors));
+  diskio_close_for_writing(filename, FILE_TYPE_SEQ);
 
-  map_set(save_map);
   return 0;
 }
 
 uint8_t vm_load_game(uint8_t slot)
 {
+  char filename[11];
+  uint8_t magic_hdr[8];
+
+  uint8_t cur_pc        = script_get_current_pc();
+  uint8_t cur_script_id = vm_state.proc_script_or_object_id[active_script_slot];
+
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_DISKIO
+
+  sprintf(filename, "MM.SAV.%u", slot);
+  diskio_open_for_reading(filename, FILE_TYPE_SEQ);
+  diskio_read(magic_hdr, sizeof(magic_hdr));
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (magic_hdr[i] != savegame_magic[i]) {
+      diskio_close_for_reading();
+      return 1;
+    }
+  }
+  // check version
+  if (magic_hdr[7] != 0) {
+    diskio_close_for_reading();
+    return 1;
+  }
+
+  reset_game_state();
+
+  diskio_read((uint8_t *)&vm_state, sizeof(vm_state));
+  SAVE_DS_AUTO_RESTORE
+  UNMAP_DS
+  uint16_t inventory_num_bytes = (uint16_t)vm_state.inv_next_free - (uint16_t)INVENTORY_BASE;
+  diskio_read((uint8_t *)INVENTORY_BASE, inventory_num_bytes);
+  diskio_read((uint8_t *)&actors, sizeof(actors));
+  diskio_close_for_reading();
+
+  for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
+    uint8_t slot = vm_state.proc_slot_table[i];
+    if (slot != 0xff) {
+      if (vm_state.proc_script_or_object_id[slot] == cur_script_id) {
+        // found the slot where the active script is running
+        active_script_slot = slot;
+      }
+      uint8_t script_id = vm_state.proc_script_or_object_id[slot];
+      uint8_t script_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+      res_activate_slot(script_page);
+      proc_res_slot[slot] = script_page;
+    }
+  }
+
+  load_room(vm_read_var8(VAR_SELECTED_ROOM));
+
+  UNMAP_CS
+
+  script_break();
+  reset_game = RESET_LOADED_GAME;
   return 0;
 }
 
@@ -1106,7 +1168,6 @@ uint8_t vm_load_game(uint8_t slot)
 #pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
 static void reset_game_state(void)
 {
-  diskio_load_game_objects();
   for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
     vm_state.proc_state[i]               = PROC_STATE_FREE;
     vm_state.proc_script_or_object_id[i] = 0xff;
@@ -1157,18 +1218,6 @@ static void reset_game_state(void)
 
   ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
   vm_write_var(VAR_CURSOR_STATE, 3);
-
-  // put script 1 into script slot
-  uint8_t script_id = 1;
-  uint8_t script1_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
-  res_activate_slot(script1_page);
-
-  // init script slot
-  reset_script_slot(0, PROC_TYPE_GLOBAL, script_id, 0xff, script1_page, 4 /* skipping script header directly to first opcode*/);
-  vm_state.proc_slot_table[0] = 0;
-  vm_state.num_active_proc_slots = 1;
-
-  wait_for_jiffy(); // this resets the elapsed jiffies timer
 }
 
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
@@ -1549,13 +1598,13 @@ static uint8_t execute_script_slot(uint8_t slot)
 
   if (parallel_script_count == 0) {
     // top-level script
-    debug_out("  executing top-level script slot %d", slot);
+    //debug_out("  executing top-level script slot %d", slot);
     result = script_run_active_slot();
   }
   else {
     // script execution from within another script
     // need to stack the current script state
-    debug_out("  executing child script slot %d", slot);
+    //debug_out("  executing child script slot %d", slot);
     result = script_run_slot_stacked(active_script_slot);
   }
 
@@ -1640,6 +1689,28 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
   return script_offset;
 }
 
+static void load_room(uint8_t room_no)
+{
+  __auto_type room_hdr = (struct room_header *)RES_MAPPED;
+
+  room_res_slot = res_provide(RES_TYPE_ROOM, room_no, 0);
+  res_activate_slot(room_res_slot);
+  map_ds_resource(room_res_slot);
+  room_width = room_hdr->bg_width;
+  uint16_t bg_data_offset = room_hdr->bg_data_offset;
+  uint16_t bg_masking_offset = room_hdr->bg_attr_offset;
+
+  MAP_CS_GFX
+  gfx_decode_bg_image(map_ds_room_offset(bg_data_offset), room_width);
+  gfx_decode_masking_buffer(bg_masking_offset, room_width);
+
+  map_ds_resource(room_res_slot);
+
+  read_objects();
+  MAP_CS_MAIN_PRIV
+  read_walk_boxes();
+}
+
 static void update_actors(void)
 {
   for (uint8_t i = 0; i < MAX_LOCAL_ACTORS; ++i)
@@ -1663,12 +1734,12 @@ static void animate_actors(void)
 
 static void override_cutscene(void)
 {
-  if (cs_override_pc) {
-    vm_state.proc_pc[cs_proc_slot] = cs_override_pc;
-    cs_override_pc = 0;
-    vm_state.proc_state[cs_proc_slot] &= ~PROC_FLAGS_FROZEN;
-    if (vm_state.proc_state[cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
-      vm_state.proc_state[cs_proc_slot] = PROC_STATE_RUNNING;
+  if (vm_state.cs_override_pc) {
+    vm_state.proc_pc[vm_state.cs_proc_slot] = vm_state.cs_override_pc;
+    vm_state.cs_override_pc = 0;
+    vm_state.proc_state[vm_state.cs_proc_slot] &= ~PROC_FLAGS_FROZEN;
+    if (vm_state.proc_state[vm_state.cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
+      vm_state.proc_state[vm_state.cs_proc_slot] = PROC_STATE_RUNNING;
     }
   }
 }

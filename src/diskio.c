@@ -145,7 +145,7 @@ static void load_block(uint8_t track, uint8_t block);
 static void prepare_drive(void);
 static void acquire_drive(void);
 static void release_drive(void);
-static void read_error(error_code_t error_code);
+static void disk_error(error_code_t error_code);
 static void led_and_motor_off(void);
 static uint16_t allocate_sector(uint8_t start_track);
 static uint8_t find_free_block_on_track(uint8_t track);
@@ -477,8 +477,7 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
   search_file(filename, 0x82);
   
   if (next_track == 0) {
-    led_and_motor_off();
-    fatal_error(ERR_FILE_NOT_FOUND);
+    disk_error(ERR_FILE_NOT_FOUND);
   }
 
   dmalist_copy.count = 254;
@@ -561,38 +560,6 @@ void diskio_load_game_objects(void)
 }
 
 /**
- * @brief Loads a room from disk into memory.
- *
- * @param room The room number to load.
- * @param address The address in memory to load the room to.
- *
- * Code section: code_diskio
- */
-void diskio_load_room(uint8_t room, __far uint8_t *address)
-{
-  acquire_drive();
-
-  next_track = room_track_list[room];
-  next_block = room_block_list[room];
-  uint8_t payload_size = 254;
-
-  while (next_track != 0) {
-    load_block(next_track, next_block);
-    next_track = FDC.data;
-    next_block = FDC.data;
-    if (next_track == 0) {
-      payload_size = next_block - 1;
-    }
-    for (uint8_t i = 0; i < payload_size ; ++i) {
-      *address = FDC.data ^ 0xff;
-      ++address;
-    }
-  }
-  
-  release_drive();
-}
-
-/**
  * @brief Starts loading a resource from disk into memory.
  *
  * The function will start loading a resource from disk into memory. The resource
@@ -639,8 +606,7 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   }
 
   if (room_id == 0) {
-    led_and_motor_off();
-    fatal_error(ERR_RESOURCE_NOT_FOUND);
+    disk_error(ERR_RESOURCE_NOT_FOUND);
   }
 
   load_block(room_track_list[room_id], room_block_list[room_id]);
@@ -706,6 +672,57 @@ void diskio_continue_resource_loading(uint8_t __huge *target_ptr)
   release_drive();
 }
 
+void diskio_open_for_reading(const char *filename, uint8_t file_type)
+{
+  acquire_drive();
+  disable_cache = 1;
+  search_file(filename, file_type);
+  
+  if (next_track == 0) {
+    disk_error(ERR_FILE_NOT_FOUND);
+  }
+
+  // load first block of file
+  load_block(next_track, next_block);
+  next_track = FDC.data;
+  next_block = FDC.data;
+  cur_block_read_ptr = 0;
+}
+
+void diskio_read(uint8_t *target_ptr, uint16_t size)
+{
+  while (size) {
+    uint8_t bytes_left_in_block = next_track == 0 ? next_block - 1 : 254;
+    bytes_left_in_block -= cur_block_read_ptr;
+    
+    uint8_t bytes_to_read = min(size, bytes_left_in_block);
+    for (uint8_t i = 0; i < bytes_to_read; ++i) {
+      *target_ptr = FDC.data;
+      //debug_out("%x=%x", ((uint16_t)target_ptr), *target_ptr);
+      ++target_ptr;
+    }
+    
+    size -= bytes_to_read;
+    cur_block_read_ptr += bytes_to_read;
+
+    if (size != 0) {
+      if (next_track == 0) {
+        disk_error(ERR_FILE_READ_BEYOND_EOF);
+      }
+      load_block(next_track, next_block);
+      next_track = FDC.data;
+      next_block = FDC.data;
+      cur_block_read_ptr = 0;
+    }
+  }
+}
+
+void diskio_close_for_reading(void)
+{
+  release_drive();
+  disable_cache = 0;
+}
+
 void diskio_open_for_writing(void)
 {
   // allocating 4 blocks (2 for bam and 2 as sector write buffers)
@@ -727,7 +744,7 @@ void diskio_open_for_writing(void)
   write_file_data_ptr      = NEAR_U8_PTR(0x8400); // end of buffer to indicate new sector needs to get allocated
 }
 
-void diskio_write(const uint8_t *data, uint16_t size)
+void diskio_write(const uint8_t __huge *data, uint16_t size)
 {
   if (!size) {
     return;
@@ -754,12 +771,11 @@ void diskio_write(const uint8_t *data, uint16_t size)
       // allocate next sector (=2 blocks) for the file
       uint16_t track_sector = allocate_sector(write_file_current_track);
       if (track_sector == 0) {
-        led_and_motor_off();
-        fatal_error(ERR_DISK_FULL);
+        disk_error(ERR_DISK_FULL);
       }
       uint8_t write_file_next_track = MSB(track_sector);
       uint8_t write_file_next_block = LSB(track_sector) * 2;
-      debug_out("Allocated block %d:%d\n", write_file_next_track, write_file_next_block);
+      //debug_out("Allocated block %d:%d\n", write_file_next_track, write_file_next_block);
 
       if (write_file_first_track == 0) {
         write_file_first_track = write_file_next_track;
@@ -779,7 +795,7 @@ void diskio_write(const uint8_t *data, uint16_t size)
       
       memset(sector_buf_ptr, 0, 0x200);
       sector_buf_ptr += 2; // skip over the track and block fields
-      ++num_write_blocks;
+      num_write_blocks += 2;
     }
 
     *sector_buf_ptr++ = *data++;
@@ -789,7 +805,7 @@ void diskio_write(const uint8_t *data, uint16_t size)
   write_file_data_ptr = sector_buf_ptr;
 }
 
-void diskio_close_for_writing(const char *filename)
+void diskio_close_for_writing(const char *filename, uint8_t file_type)
 {
   if (write_file_first_track == 0) {
     // no data written, nothing to do
@@ -820,6 +836,7 @@ void diskio_close_for_writing(const char *filename)
   if (write_file_data_ptr <= NEAR_U8_PTR(0x8300)) {
     ts_field = NEAR_U8_PTR(0x8200);
     free_block(write_file_current_track, write_file_current_block + 1);
+    --num_write_blocks;
   }
   else {
     ts_field = NEAR_U8_PTR(0x8300);
@@ -841,7 +858,7 @@ void diskio_close_for_writing(const char *filename)
       if (!free_dir_entry && cur_entry->file_type == 0) {
         free_dir_entry = cur_entry;
       }
-      else if (cur_entry->file_type == 0x81) {
+      else if (cur_entry->file_type == file_type) {
         filename_match = 1;
         __auto_type dir_filename = cur_entry->filename;
         for (uint8_t j = 0; j < 16; ++j) {
@@ -896,8 +913,7 @@ void diskio_close_for_writing(const char *filename)
             filename_match = 0;
             break;
           }
-          //debug_out(" no more block, new one %d", new_dir_block);
-          debug_out(" chaining new block %d:%d to old block %d:%d", 40, new_dir_block, 40, dir_block);
+          //debug_out(" chaining new block %d:%d to old block %d:%d", 40, new_dir_block, 40, dir_block);
           // reference new block in first entry of current block
           entry->next_track = 40;
           entry->next_block = new_dir_block;
@@ -921,7 +937,7 @@ void diskio_close_for_writing(const char *filename)
           free_dir_entry->next_block = 0xff;
         }
 
-        free_dir_entry->file_type        = 0x81;
+        free_dir_entry->file_type        = file_type;
         free_dir_entry->first_track      = write_file_first_track;
         free_dir_entry->first_block      = write_file_first_block;
         free_dir_entry->file_size_blocks = num_write_blocks;
@@ -943,8 +959,7 @@ void diskio_close_for_writing(const char *filename)
   while (!filename_match);
 
   if (!filename_match) {
-    led_and_motor_off();
-    fatal_error(ERR_DISK_FULL);
+    disk_error(ERR_DISK_FULL);
   }
 
   // free blocks of old file in case it was overwritten with new sectors
@@ -1199,8 +1214,7 @@ static void load_block(uint8_t track, uint8_t block)
   };
 
   if (track == 0 || track > 80 || block > 39) {
-    led_and_motor_off();
-    fatal_error(ERR_INVALID_DISK_LOCATION);
+    disk_error(ERR_INVALID_DISK_LOCATION);
   }
 
   uint8_t physical_sector;
@@ -1268,7 +1282,7 @@ static void load_block(uint8_t track, uint8_t block)
       while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
       if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
         //debug_out("unable to find track %d, sector %d, side %d\n", track, physical_sector, side);
-        read_error(ERR_SECTOR_NOT_FOUND);
+        disk_error(ERR_SECTOR_NOT_FOUND);
       }
 
       wait_for_busy_clear(); // sector reading to buffer completed when BUSY is cleared
@@ -1276,7 +1290,7 @@ static void load_block(uint8_t track, uint8_t block)
       //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
       if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
         //debug_out("FDC status: %x", FDC.status)
-        read_error(ERR_SECTOR_DATA_CORRUPT);
+        disk_error(ERR_SECTOR_DATA_CORRUPT);
       }
 
       // copy the sector to the cache
@@ -1371,7 +1385,7 @@ static void release_drive(void)
  * Code section: code_diskio
  * Private function
  */
-static void read_error(error_code_t error_code)
+static void disk_error(error_code_t error_code)
 {
   led_and_motor_off();
   fatal_error(error_code);
@@ -1512,7 +1526,7 @@ static void free_blocks(uint8_t track, uint8_t block)
  */
 static void free_block(uint8_t track, uint8_t block)
 {
-  debug_out("freeing block %d:%d", track, block);
+  //debug_out("freeing block %d:%d", track, block);
   __auto_type bam = (struct bam_block *)0x8000;
   if (track > 40) {
     ++bam;
@@ -1578,10 +1592,13 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
   --track; // logical (1-80) to physical (0-79) track
 
   if (track > 79 || sector > 19) {
-    led_and_motor_off();
-    fatal_error(ERR_INVALID_DISK_LOCATION);
+    disk_error(ERR_INVALID_DISK_LOCATION);
   }
-  
+
+  const uint32_t cache_offset = (uint32_t)(track * 20 + sector) * 512UL;
+  int8_t __far *cache_block = FAR_I8_PTR(DISK_CACHE + cache_offset);
+  *cache_block = -1; // invalidate block in cache
+
   uint8_t side;
   ++sector; // logical (0-19) to physical (1-20) sector
   if (sector > 10) {
@@ -1620,7 +1637,7 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
 
   //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
   if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-    read_error(ERR_SECTOR_DATA_CORRUPT);
+    disk_error(ERR_SECTOR_DATA_CORRUPT);
   }
 
  

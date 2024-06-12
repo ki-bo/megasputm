@@ -30,6 +30,7 @@ typedef enum {
     ERR_DISK_FULL = 26,
     ERR_CHAINING_ROOM_SCRIPT = 27,
     ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE = 28,
+    ERR_FILE_READ_BEYOND_EOF = 29,
 } error_code_t;
 
 #endif // __ERROR_H__

@@ -43,6 +43,26 @@ extern union map_t __attribute__((zpage)) map_regs;
           : \
           : "x", "y", "z");
 
+#define UNMAP_DS \
+    __asm(" .extern unmap_ds2\n" \
+          " jsr unmap_ds2\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
+#define UNMAP_ALL \
+    __asm(" .extern unmap_all2\n" \
+          " jsr unmap_all2\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
+#define SAVE_MAP \
+    __asm(" .extern map_regs\n" \
+          " phw map_regs\n" \
+          " phw map_regs + 2\n" \
+          :::);
+
 #define SAVE_CS \
     __asm(" .extern map_regs\n" \
           " phw map_regs\n" \
@@ -68,6 +88,18 @@ extern union map_t __attribute__((zpage)) map_regs;
           /* 0xf4 = PHW immediate mode */ \
           " .byte 0xf4, .byte1(map_auto_restore_ds-1), .byte0(map_auto_restore_ds-1)\n" \
           :::);
+
+#define RESTORE_MAP \
+    __asm(" .extern map_restore\n" \
+          " plz\n" \
+          " ply\n" \
+          " plx\n" \
+          " pla\n" \
+          " map\n" \
+          " eom\n" \
+          : \
+          : \
+          : "a", "x", "y", "z");
 
 #define RESTORE_CS \
     __asm(" .extern map_restore_cs\n" \
