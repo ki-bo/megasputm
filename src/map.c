@@ -56,30 +56,6 @@ uint32_t map_get(void)
 }
 
 /**
- * @brief Get the current Code Segment (CS) map register
- * 
- * @return uint16_t The current CS map register
- *
- * Code section: code
- */
-uint16_t map_get_cs(void)
-{
-  return (map_regs.x << 8) | map_regs.a;
-}
-
-/**
- * @brief Get the current Data Segment (DS) map register
- * 
- * @return uint16_t The current DS map register
- *
- * Code section: code
- */
-uint16_t map_get_ds(void)
-{
-  return (map_regs.z << 8) | map_regs.y;
-}
-
-/**
  * @brief Set the map register (32 bit)
  * 
  * Sets the complete mapping register to the given value. It is usually done to restore a 
@@ -92,23 +68,6 @@ uint16_t map_get_ds(void)
 void map_set(uint32_t map_reg)
 {
   map_regs.quad = map_reg;
-  apply_map();
-}
-
-/**
- * @brief Set the Code Segment (CS) map register
- * 
- * Sets the Code Segment (CS) part of the mapping register to the given value. It is usually 
- * done to restore a previously saved CS mapping (via map_get_cs()).
- * 
- * @param map_reg The new CS map register
- *
- * Code section: code
- */
-void map_set_cs(uint16_t map_reg)
-{
-  map_regs.a = LSB(map_reg);
-  map_regs.x = MSB(map_reg);
   apply_map();
 }
 
@@ -181,21 +140,6 @@ void unmap_ds(void)
 void map_cs_diskio(void)
 {
   map_regs.a = 0x00;
-  map_regs.x = 0x21;
-  apply_map();
-}
-
-/**
- * @brief Maps the graphics module to CS (0x2000-0x3fff)
- * 
- * Graphics module originally is stored at 0x14000-0x15fff. This function maps
- * it to 0x2000-0x3fff.
- *
- * Code section: code
- */
-void map_cs_gfx(void)
-{
-  map_regs.a = 0x20;
   map_regs.x = 0x21;
   apply_map();
 }

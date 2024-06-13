@@ -325,7 +325,7 @@ static void raster_irq ()
 
   input_update();
 
-  map_cs_gfx();
+  MAP_CS_GFX
   if (script_watchdog < 30) {
     ++script_watchdog;
   }
@@ -632,8 +632,8 @@ void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars)
  */
 void gfx_draw_bg(void)
 {
-  uint16_t ds_save = map_get_ds();
-  unmap_ds();
+  SAVE_DS_AUTO_RESTORE
+  UNMAP_DS
 
   uint16_t left_char_offset = camera_x - 20;
   screen_pixel_offset_x = left_char_offset * 8;
@@ -651,8 +651,6 @@ void gfx_draw_bg(void)
 
   memset(num_chars_at_row, 40, 16);
   reset_objects();
-
-  map_set_ds(ds_save);
 }
 
 /**

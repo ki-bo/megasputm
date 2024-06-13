@@ -419,7 +419,7 @@ void vm_change_ui_flags(uint8_t flags)
     ui_state = (ui_state & ~(UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS)) |
                 (flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS));
     screen_update_needed |= SCREEN_UPDATE_SENTENCE | SCREEN_UPDATE_VERBS | SCREEN_UPDATE_INVENTORY;
-    map_cs_gfx();
+    MAP_CS_GFX
     if (screen_update_needed & SCREEN_UPDATE_SENTENCE && !(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
       gfx_clear_sentence();
     }
@@ -429,7 +429,7 @@ void vm_change_ui_flags(uint8_t flags)
     if (screen_update_needed & SCREEN_UPDATE_INVENTORY && !(ui_state & UI_FLAGS_ENABLE_INVENTORY)) {
       gfx_clear_inventory();
     }
-    unmap_cs();
+    UNMAP_CS
   }
 
   //debug_out("UI state enable-cursor: %d", ui_state & UI_FLAGS_ENABLE_CURSOR);
@@ -448,7 +448,7 @@ void vm_change_ui_flags(uint8_t flags)
 void vm_set_current_room(uint8_t room_no)
 {
   // save DS
-  uint16_t ds_save = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   __auto_type room_hdr = (struct room_header *)RES_MAPPED;
 
@@ -496,9 +496,6 @@ void vm_set_current_room(uint8_t room_no)
   redraw_screen();
   vm_update_bg();
   UNMAP_CS
-
-  // restore DS
-  map_set_ds(ds_save);
 }
 
 /**
@@ -911,8 +908,7 @@ struct object_code *vm_get_room_object_hdr(uint16_t global_object_id)
  */
 uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 {
-  // save DS
-  uint16_t ds_save = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   uint16_t found_obj_id = 0;
   y >>= 2;
@@ -943,9 +939,6 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
       break;
     }
   }
-
-  // restore DS
-  map_set_ds(ds_save);
 
   return found_obj_id;
 }
@@ -1414,7 +1407,7 @@ static void read_objects(void)
 static void redraw_screen(void)
 {
   uint32_t map_save = map_get();
-  map_cs_gfx();
+  MAP_CS_GFX
 
   // draw background
   gfx_draw_bg();
@@ -1433,7 +1426,7 @@ static void redraw_screen(void)
       continue;
     }
     int8_t screen_y = obj_hdr->pos_y_and_parent_state & 0x7f;
-    unmap_ds();
+    UNMAP_DS
 
     gfx_draw_object(i, screen_x, screen_y);
   }
@@ -1520,15 +1513,13 @@ static void handle_input(void)
 
 static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
 {
-  uint16_t ds_save = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
   map_ds_resource(obj_page[parent]);
 
   __auto_type obj_hdr  = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[parent]);
   uint8_t new_parent   = obj_hdr->parent;
   uint8_t cur_state    = vm_state.global_game_objects[obj_hdr->id] & OBJ_STATE;
   uint8_t parent_state = obj_hdr->pos_y_and_parent_state & 0x80;
-
-  map_set_ds(ds_save);
 
   //debug_out("  check parent %d state %d - expected_state %d", obj_hdr->id, cur_state, expected_state);
 
@@ -1813,17 +1804,17 @@ static void update_sentence_highlighting(void)
 
   if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
     if (!prev_sentence_highlighted) {
-      map_cs_gfx();
+      MAP_CS_GFX
       gfx_change_interface_text_style(0, 18, 40, TEXT_STYLE_HIGHLIGHTED);
-      unmap_cs();
+      UNMAP_CS
       prev_sentence_highlighted = 1;
     }
   }
   else {
     if (prev_sentence_highlighted) {
-      map_cs_gfx();
+      MAP_CS_GFX
       gfx_change_interface_text_style(0, 18, 40, TEXT_STYLE_SENTENCE);
-      unmap_cs();
+      UNMAP_CS
       prev_sentence_highlighted = 0;
     }
   }
@@ -1946,7 +1937,7 @@ static void update_inventory_highlighting(void)
   uint8_t cur_inventory = get_hovered_inventory_slot();
 
   if (cur_inventory != prev_inventory_highlighted) {
-    map_cs_gfx();
+    MAP_CS_GFX
     if (prev_inventory_highlighted != 0xff) {
       uint8_t style = (prev_inventory_highlighted & 4) ? TEXT_STYLE_INVENTORY_ARROW : TEXT_STYLE_INVENTORY;
       gfx_change_interface_text_style(inventory_pos_to_x(prev_inventory_highlighted), 
@@ -1960,7 +1951,7 @@ static void update_inventory_highlighting(void)
                                       cur_inventory & 4 ? 4 : 18, 
                                       TEXT_STYLE_HIGHLIGHTED);
     }
-    unmap_cs();
+    UNMAP_CS
     prev_inventory_highlighted = cur_inventory;
   }
 }
@@ -2167,7 +2158,7 @@ static void read_walk_boxes(void)
  */
 static void clear_all_other_object_states(uint8_t local_object_id)
 {
-  uint16_t ds_save = map_get_ds();
+  SAVE_DS_AUTO_RESTORE
 
   map_ds_resource(obj_page[local_object_id]);
   __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
@@ -2197,8 +2188,6 @@ static void clear_all_other_object_states(uint8_t local_object_id)
       //debug_out("Cleared state of object %d due to identical position and size", obj_hdr->id);
     }
   }
-
-  map_set_ds(ds_save);
 }
 
 static void update_camera(void)

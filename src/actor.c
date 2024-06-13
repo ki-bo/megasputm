@@ -388,7 +388,7 @@ void actor_update_animation(uint8_t local_id)
 void actor_sort_and_draw_all(void)
 {
   uint32_t map_save = map_get();
-  map_cs_gfx();
+  MAP_CS_GFX
   gfx_reset_actor_drawing();
 
   // sorting all local actors
