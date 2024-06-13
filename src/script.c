@@ -995,7 +995,7 @@ static void jump_or_restart(void)
   }
   else {
     debug_scr("restart");
-    vm_restart_game();
+    reset_game = RESET_RESTART;
   }
 }
 

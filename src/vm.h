@@ -173,6 +173,7 @@ struct vm
 };
 
 extern struct vm vm_state;
+extern uint8_t reset_game;
 extern char message_buffer[256];
 extern volatile uint8_t script_watchdog;
 extern uint8_t  ui_state;
@@ -194,7 +195,6 @@ struct sentence_stack_t {
 extern struct sentence_stack_t sentence_stack;
 
 void vm_init(void);
-void vm_restart_game(void);
 __task void vm_mainloop(void);
 uint8_t vm_get_active_proc_state_and_flags(void);
 void vm_change_ui_flags(uint8_t flags);

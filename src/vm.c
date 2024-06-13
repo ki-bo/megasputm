@@ -186,31 +186,6 @@ void vm_init(void)
  */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
-void vm_restart_game(void)
-{
-  static const char restart_str[] = "Are you sure you want to restart? (y/n)";
-  MAP_CS_GFX
-  gfx_print_dialog(2, restart_str, sizeof(restart_str) - 1);
-
-  while (1) {
-    if (input_key_pressed) {
-      if (input_key_pressed == 'y') {
-        reset_game = RESET_RESTART;
-        break;
-      }
-      else if (input_key_pressed == 'n') {
-        break;
-      }
-      else {
-        input_key_pressed = 0;
-      }
-    }
-  }
-  
-  gfx_clear_dialog();
-  UNMAP_CS
-}
-
 /**
  * @brief Main loop of the virtual machine
  * 
@@ -1500,6 +1475,33 @@ static void handle_input(void)
   if (input_key_pressed) {
     if (input_key_pressed == vm_read_var8(VAR_CUTSCENEEXIT_KEY)) {
       override_cutscene();
+    }
+    else if (input_key_pressed == 8) {
+      // handle restart key, ask user confirmation
+      static const char restart_str[] = "Are you sure you want to restart? (y/n)";
+
+      input_key_pressed = 0; // ack the F8 restart key
+
+      MAP_CS_GFX
+      gfx_print_dialog(2, restart_str, sizeof(restart_str) - 1);
+
+      while (1) {
+        if (input_key_pressed) {
+          if (input_key_pressed == 'y') {
+            reset_game = RESET_RESTART;
+            break;
+          }
+          else if (input_key_pressed == 'n') {
+            break;
+          }
+          else {
+            input_key_pressed = 0;
+          }
+        }
+      }
+      
+      gfx_clear_dialog();
+      UNMAP_CS
     }
     else {
       vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
