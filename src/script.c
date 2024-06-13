@@ -121,6 +121,10 @@ static uint8_t backup_opcode;
 static uint8_t backup_param_mask;
 static uint8_t *backup_pc;
 static uint8_t backup_break_script;
+#ifdef DEBUG_SCRIPTS
+  uint16_t active_script_id;
+#endif
+
 
 //----------------------------------------------------------------------
 
@@ -267,7 +271,7 @@ uint8_t script_run_active_slot(void)
 
 #ifdef DEBUG_SCRIPTS
   char *script_type  = vm_state.proc_type[active_script_slot] & PROC_TYPE_GLOBAL ? "S" : "R";
-  uint16_t script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
+  active_script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
 #endif
 
   SAVE_DS_AUTO_RESTORE
@@ -283,7 +287,7 @@ uint8_t script_run_active_slot(void)
     debug_out("[%d]%s %d (%x) %x", 
       active_script_slot, 
       script_type,
-      script_id,
+      active_script_id,
       (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 5), 
       opcode);
 #endif
@@ -1094,7 +1098,9 @@ static void savegame_operation(void)
       if (vm_savegame_exists(savegame_slot)) {
         result = 6;
       }
-      // result = 0 otherwise
+      else {
+        result = 7;
+      }
       break;
     
     default:
@@ -1353,10 +1359,11 @@ static void do_sentence(void)
   case 0:
     // put sentence into cmd stack
     debug_msg("  put sentence into sentence stack");
+    debug_out("  verb %d noun1 %d noun2 %d", sentence_verb, sentence_noun1, sentence_noun2);
     if (sentence_stack.num_entries == CMD_STACK_SIZE) {
       fatal_error(ERR_CMD_STACK_OVERFLOW);
     }
-    sentence_stack.verb[sentence_stack.num_entries] = sentence_verb;
+    sentence_stack.verb[sentence_stack.num_entries]  = sentence_verb;
     sentence_stack.noun1[sentence_stack.num_entries] = sentence_noun1;
     sentence_stack.noun2[sentence_stack.num_entries] = sentence_noun2;
     ++sentence_stack.num_entries;
@@ -1654,6 +1661,9 @@ void chain_script(void)
   uint8_t script_id = resolve_next_param8();
   vm_chain_script(script_id);
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
+#ifdef DEBUG_SCRIPTS
+  active_script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
+#endif
 }
 
 /**
@@ -1816,7 +1826,12 @@ static void stop_script(void)
 {
   uint8_t script_id = resolve_next_param8();
   //debug_scr("stop-script %d", script_id);
+  if (script_id == 0) {
+    vm_stop_script_slot(active_script_slot);
+  }
+  else {
   vm_stop_script(script_id);
+  }
 }
 
 static void lock_or_unlock(void)

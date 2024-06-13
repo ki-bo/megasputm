@@ -1639,7 +1639,7 @@ static void execute_sentence_stack(void)
   }
 
   --sentence_stack.num_entries;
-  uint8_t verb = sentence_stack.verb[sentence_stack.num_entries];
+  uint8_t  verb  = sentence_stack.verb[sentence_stack.num_entries];
   uint16_t noun1 = sentence_stack.noun1[sentence_stack.num_entries];
   uint16_t noun2 = sentence_stack.noun2[sentence_stack.num_entries];
 
@@ -1647,12 +1647,16 @@ static void execute_sentence_stack(void)
   vm_write_var(VAR_CURRENT_NOUN1, noun1);
   vm_write_var(VAR_CURRENT_NOUN2, noun2);
   
-  uint8_t script_offset = 0;
+  uint8_t script_offset   = 0;
   uint8_t local_object_id = vm_get_local_object_id(noun1);
+
   if (local_object_id != 0xff) {
     script_offset = get_room_object_script_offset(verb, local_object_id);
   }
+  
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
+
+  debug_out(" verb %d, noun1 %d, noun2 %d, valid_verb %d", verb, noun1, noun2, script_offset != 0);
 
   uint8_t slot = vm_start_script(SCRIPT_ID_SENTENCE);
   //debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
