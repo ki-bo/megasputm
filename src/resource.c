@@ -45,19 +45,19 @@ static void print_heap(void);
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup res_init Resource Init Functions
- * @{
- */
+  * @defgroup res_init Resource Init Functions
+  * @{
+  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
- * @brief Initializes the resource memory
- *
- * This function initializes the resource memory by setting all pages to
- * RES_TYPE_NONE.
- *
- * Code section: code_init
- */
+  * @brief Initializes the resource memory
+  *
+  * This function initializes the resource memory by setting all pages to
+  * RES_TYPE_NONE.
+  *
+  * Code section: code_init
+  */
 void res_init(void)
 {
   memset(page_res_type, RES_TYPE_NONE, 256);
@@ -75,31 +75,31 @@ void res_init(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup res_public Resource Public Functions
- * @{
- */
+  * @defgroup res_public Resource Public Functions
+  * @{
+  */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
 /**
- * @brief Ensure a resource is available in memory
- *
- * This function ensures that a resource is available in memory. If the resource
- * is not already in memory, it will be loaded from disk. The function returns
- * the page of the resource in the resource memory. Use map_ds_resource() to
- * map the resource memory to the data segment.
- * 
- * The resource is identified by a type and an id. The type is a combination of
- * the resource type and flags. The resource type is the lower 3 bits of the type
- * (see res_type_flags_t) and the flags are the upper 5 bits (see res_type_flags_t). 
- * The id is a number that identifies the resource within its type.
- *
- * @param type_and_flags Resource type to provide
- * @param id Resource ID to provide
- * @param hint The position in the page list to start searching for the resource
- * @return uint8_t Page of the resource in the resource memory
- *
- * Code section: code_main
- */
+  * @brief Ensure a resource is available in memory
+  *
+  * This function ensures that a resource is available in memory. If the resource
+  * is not already in memory, it will be loaded from disk. The function returns
+  * the page of the resource in the resource memory. Use map_ds_resource() to
+  * map the resource memory to the data segment.
+  * 
+  * The resource is identified by a type and an id. The type is a combination of
+  * the resource type and flags. The resource type is the lower 3 bits of the type
+  * (see res_type_flags_t) and the flags are the upper 5 bits (see res_type_flags_t). 
+  * The id is a number that identifies the resource within its type.
+  *
+  * @param type_and_flags Resource type to provide
+  * @param id Resource ID to provide
+  * @param hint The position in the page list to start searching for the resource
+  * @return Page of the resource in the resource memory
+  *
+  * Code section: code_main
+  */
 uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
   // will deal with sound later, as those resources are too big to fit into the chipram heap
@@ -139,12 +139,12 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 }
 
 /**
- * @brief Deactivates all resources in memory
- *
- * This function deactivates all resources in memory, except for heap resources.
- *
- * Code section: code_main
- */
+  * @brief Deactivates all resources in memory
+  *
+  * This function deactivates all resources in memory, except for heap resources.
+  *
+  * Code section: code_main
+  */
 void res_deactivate_and_unlock_all(void)
 {
   uint8_t i = 0;
@@ -162,31 +162,31 @@ void res_deactivate_and_unlock_all(void)
 }
 
 /**
- * @brief Provides a 32 bit pointer to a resource in memory
- * 
- * @param slot The page of the resource in the resource memory
- * @return The 32 bit pointer to the resource
- */
+  * @brief Provides a 32 bit pointer to a resource in memory
+  * 
+  * @param slot The page of the resource in the resource memory
+  * @return The 32 bit pointer to the resource
+  */
 uint8_t __huge *res_get_huge_ptr(uint8_t slot)
 {
   return (uint8_t __huge *)(RESOURCE_BASE + (uint16_t)slot * 256);
 }
 
 /**
- * @brief Locks a resource in memory
- *
- * This function locks a resource in memory. The resource will not be overwritten
- * by other resources if possible. This is useful for resources that are used frequently and
- * should not be reloaded from disk. However, it is not guaranteed that the resource will
- * remain in memory. If memory allocations can't be satisfied by just freeing unlocked
- * resources, locked resources will be freed as well.
- *
- * @param type Resource type and flags
- * @param id Resource ID
- * @param hint The position in the page list to start searching for the resource
- *
- * Code section: code_main
- */
+  * @brief Locks a resource in memory
+  *
+  * This function locks a resource in memory. The resource will not be overwritten
+  * by other resources if possible. This is useful for resources that are used frequently and
+  * should not be reloaded from disk. However, it is not guaranteed that the resource will
+  * remain in memory. If memory allocations can't be satisfied by just freeing unlocked
+  * resources, locked resources will be freed as well.
+  *
+  * @param type Resource type and flags
+  * @param id Resource ID
+  * @param hint The position in the page list to start searching for the resource
+  *
+  * Code section: code_main
+  */
 void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 {
   SAVE_CS_AUTO_RESTORE
@@ -199,17 +199,17 @@ void res_lock(uint8_t type, uint8_t id, uint8_t hint)
 }
 
 /**
- * @brief Unlocks a resource in memory
- *
- * This function unlocks a resource in memory. The resource will be overwritten
- * by other resources if necessary.
- *
- * @param type Resource type and flags
- * @param id Resource ID
- * @param hint The position in the page list to start searching for the resource
- *
- * Code section: code_main
- */
+  * @brief Unlocks a resource in memory
+  *
+  * This function unlocks a resource in memory. The resource will be overwritten
+  * by other resources if necessary.
+  *
+  * @param type Resource type and flags
+  * @param id Resource ID
+  * @param hint The position in the page list to start searching for the resource
+  *
+  * Code section: code_main
+  */
 void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 {
   SAVE_CS_AUTO_RESTORE
@@ -222,18 +222,18 @@ void res_unlock(uint8_t type, uint8_t id, uint8_t hint)
 }
 
 /**
- * @brief Marks a resource as active, preventing it from being freed
- *
- * Activating a resource prevents it from being freed by the resource manager. This is useful
- * for resources that are currently in use and should not be freed. It is important to deactivate
- * the resource once it is no longer needed to allow the resource manager to free it.
- * 
- * @param type Type of the resource to activate
- * @param id ID of the resource to activate
- * @param hint The position in the page list to start searching for the resource
- *
- * Code section: code_main
- */
+  * @brief Marks a resource as active, preventing it from being freed
+  *
+  * Activating a resource prevents it from being freed by the resource manager. This is useful
+  * for resources that are currently in use and should not be freed. It is important to deactivate
+  * the resource once it is no longer needed to allow the resource manager to free it.
+  * 
+  * @param type Type of the resource to activate
+  * @param id ID of the resource to activate
+  * @param hint The position in the page list to start searching for the resource
+  *
+  * Code section: code_main
+  */
 void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 {
   SAVE_CS_AUTO_RESTORE
@@ -246,17 +246,17 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint)
 }
 
 /**
- * @brief Deactivates a resource, allowing it to be freed
- * 
- * Deactivating a resource allows the resource manager to free it if necessary. This is useful
- * for resources that are no longer in use and can be freed to make room for other resources.
- * 
- * @param type Type of the resource to deactivate
- * @param id ID of the resource to deactivate
- * @param hint The position in the page list to start searching for the resource
- *
- * Code section: code_main
- */
+  * @brief Deactivates a resource, allowing it to be freed
+  * 
+  * Deactivating a resource allows the resource manager to free it if necessary. This is useful
+  * for resources that are no longer in use and can be freed to make room for other resources.
+  * 
+  * @param type Type of the resource to deactivate
+  * @param id ID of the resource to deactivate
+  * @param hint The position in the page list to start searching for the resource
+  *
+  * Code section: code_main
+  */
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
 {
   SAVE_CS_AUTO_RESTORE
@@ -269,19 +269,19 @@ void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
 }
 
 /**
- * @brief Activates a resource slot, preventing it from being freed
- * 
- * Activating a resource slot prevents it from being freed by the resource manager. This is useful
- * for resources that are currently in use and should not be freed. It is important to deactivate
- * the resource once it is no longer needed to allow the resource manager to free it.
- * 
- * It is the whole resource starting at the provided slot that is activated. Thus, all pages
- * of the resource are getting marked as active.
- * 
- * @param slot Starting page of the resource to activate
- *
- * Code section: code_main
- */
+  * @brief Activates a resource slot, preventing it from being freed
+  * 
+  * Activating a resource slot prevents it from being freed by the resource manager. This is useful
+  * for resources that are currently in use and should not be freed. It is important to deactivate
+  * the resource once it is no longer needed to allow the resource manager to free it.
+  * 
+  * It is the whole resource starting at the provided slot that is activated. Thus, all pages
+  * of the resource are getting marked as active.
+  * 
+  * @param slot Starting page of the resource to activate
+  *
+  * Code section: code_main
+  */
 void res_activate_slot(uint8_t slot)
 {
   SAVE_CS_AUTO_RESTORE
@@ -294,18 +294,18 @@ void res_activate_slot(uint8_t slot)
 }
 
 /**
- * @brief Deactivates a resource slot, allowing it to be freed
- * 
- * Deactivating a resource slot allows the resource manager to free it if necessary. This is useful
- * for resources that are no longer in use and can be freed to make room for other resources.
- * 
- * It is the whole resource starting at the provided slot that is deactivated. Thus, all pages
- * of the resource are getting marked as inactive.
- * 
- * @param slot Starting page of the resource to deactivate
- *
- * Code section: code_main
- */
+  * @brief Deactivates a resource slot, allowing it to be freed
+  * 
+  * Deactivating a resource slot allows the resource manager to free it if necessary. This is useful
+  * for resources that are no longer in use and can be freed to make room for other resources.
+  * 
+  * It is the whole resource starting at the provided slot that is deactivated. Thus, all pages
+  * of the resource are getting marked as inactive.
+  * 
+  * @param slot Starting page of the resource to deactivate
+  *
+  * Code section: code_main
+  */
 void res_deactivate_slot(uint8_t slot)
 {
   
@@ -350,22 +350,22 @@ void res_free_heap(uint8_t slot)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup res_private Resource Private Functions
- * @{
- */
+  * @defgroup res_private Resource Private Functions
+  * @{
+  */
 
 #pragma clang section text="code_main_private" rodata="cdata_main_private" data="data_main_private"
 
 /**
- * @brief Sets flags for a resource
- *
- * This function sets the specified flags for a resource.
- *
- * @param slot Index of the first page of the resource
- * @param flags Flags to set
- *
- * Code section: code_main
- */
+  * @brief Sets flags for a resource
+  *
+  * This function sets the specified flags for a resource.
+  *
+  * @param slot Index of the first page of the resource
+  * @param flags Flags to set
+  *
+  * Code section: code_main
+  */
 void set_flags(uint8_t slot, uint8_t flags)
 {
   uint8_t current_type_and_flags = page_res_type[slot];
@@ -373,15 +373,15 @@ void set_flags(uint8_t slot, uint8_t flags)
 }
 
 /**
- * @brief Clears flags for a resource
- *
- * This function clears the specified flags for a resource.
- *
- * @param slot Index of the first page of the resource
- * @param flags Flags to clear
- *
- * Code section: code_main
- */
+  * @brief Clears flags for a resource
+  *
+  * This function clears the specified flags for a resource.
+  *
+  * @param slot Index of the first page of the resource
+  * @param flags Flags to clear
+  *
+  * Code section: code_main
+  */
 void clear_flags(uint8_t slot, uint8_t flags)
 {
   uint8_t current_type_and_flags = page_res_type[slot];
@@ -389,15 +389,15 @@ void clear_flags(uint8_t slot, uint8_t flags)
 }
 
 /**
- * @brief Resets flags for a resource
- *
- * This function resets all flags of a resource to the specified flags.
- *
- * @param slot Index of the first page of the resource
- * @param flags New flags to set
- *
- * Code section: code_main
- */
+  * @brief Resets flags for a resource
+  *
+  * This function resets all flags of a resource to the specified flags.
+  *
+  * @param slot Index of the first page of the resource
+  * @param flags New flags to set
+  *
+  * Code section: code_main
+  */
 void reset_flags(uint8_t slot, uint8_t flags)
 {
   uint8_t current_type_and_flags = page_res_type[slot];
@@ -412,20 +412,20 @@ void reset_flags(uint8_t slot, uint8_t flags)
 }
 
 /**
- * @brief Finds a resource in memory
- *
- * This function finds a resource in memory. If hint is non-zero, the function
- * will start searching at the hint position. Be careful to make sure that the
- * hint is not pointing to the middle of a resource, as the function will not
- * check for that and might return a non-starting page of the resource.
- *
- * @param type Type of the resource
- * @param id ID of the resource
- * @param hint The position in the page list to start searching for the resource
- * @return uint16_t Index of the first page of the resource, or 0xffff if not found
- *
- * Code section: code_main
- */
+  * @brief Finds a resource in memory
+  *
+  * This function finds a resource in memory. If hint is non-zero, the function
+  * will start searching at the hint position. Be careful to make sure that the
+  * hint is not pointing to the middle of a resource, as the function will not
+  * check for that and might return a non-starting page of the resource.
+  *
+  * @param type Type of the resource
+  * @param id ID of the resource
+  * @param hint The position in the page list to start searching for the resource
+  * @return Index of the first page of the resource, or 0xffff if not found
+  *
+  * Code section: code_main
+  */
 uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 {
   uint8_t i = hint;
@@ -440,21 +440,21 @@ uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 }
 
 /**
- * @brief Finds a resource and sets flags
- *
- * This function finds a resource in memory and sets the specified flags. If hint is non-zero,
- * the function will start searching at the hint position. Be careful to make sure that the
- * hint is not pointing to the middle of a resource, as the function will not check for that
- * and might return a non-starting page of the resource.
- *
- * @param type Type of the resource
- * @param id ID of the resource
- * @param hint The position in the page list to start searching for the resource
- * @param flags Flags to set
- * @return uint16_t Index of the first page of the resource, or 0xffff if not found
- *
- * Code section: code_main
- */
+  * @brief Finds a resource and sets flags
+  *
+  * This function finds a resource in memory and sets the specified flags. If hint is non-zero,
+  * the function will start searching at the hint position. Be careful to make sure that the
+  * hint is not pointing to the middle of a resource, as the function will not check for that
+  * and might return a non-starting page of the resource.
+  *
+  * @param type Type of the resource
+  * @param id ID of the resource
+  * @param hint The position in the page list to start searching for the resource
+  * @param flags Flags to set
+  * @return Index of the first page of the resource, or 0xffff if not found
+  *
+  * Code section: code_main
+  */
 uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
   uint16_t result = find_resource(type, id, hint);
@@ -467,21 +467,21 @@ uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flag
 }
 
 /**
- * @brief Finds a resource and clears flags
- *
- * This function finds a resource in memory and clears the specified flags. If hint is non-zero,
- * the function will start searching at the hint position. Be careful to make sure that the
- * hint is not pointing to the middle of a resource, as the function will not check for that
- * and might return a non-starting page of the resource.
- *
- * @param type Type of the resource
- * @param id ID of the resource
- * @param hint The position in the page list to start searching for the resource
- * @param flags Flags to clear
- * @return uint16_t Index of the first page of the resource, or 0xffff if not found
- *
- * Code section: code_main
- */
+  * @brief Finds a resource and clears flags
+  *
+  * This function finds a resource in memory and clears the specified flags. If hint is non-zero,
+  * the function will start searching at the hint position. Be careful to make sure that the
+  * hint is not pointing to the middle of a resource, as the function will not check for that
+  * and might return a non-starting page of the resource.
+  *
+  * @param type Type of the resource
+  * @param id ID of the resource
+  * @param hint The position in the page list to start searching for the resource
+  * @param flags Flags to clear
+  * @return Index of the first page of the resource, or 0xffff if not found
+  *
+  * Code section: code_main
+  */
 uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
   uint16_t result = find_resource(type, id, hint);
@@ -497,23 +497,23 @@ uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t fl
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type"
 /**
- * @brief Allocates memory for the specified resource
- * 
- * This function allocates memory for the specified resource.
- * If a free block of memory is available, the function will allocate
- * there. If not, it will try to free locked memory to make room.
- * If no unlocked memory can be freed, it will free locked memory.
- * Active resources will not be freed.
- *
- * If no memory can be freed, the function will call fatal_error().
- *
- * @param type Type and flags of the resource
- * @param id ID of the resource
- * @param num_pages Contiguous pages to allocate
- * @return uint8_t Index of the first page of the allocated memory
- *
- * Code section: code_main
- */
+  * @brief Allocates memory for the specified resource
+  * 
+  * This function allocates memory for the specified resource.
+  * If a free block of memory is available, the function will allocate
+  * there. If not, it will try to free locked memory to make room.
+  * If no unlocked memory can be freed, it will free locked memory.
+  * Active resources will not be freed.
+  *
+  * If no memory can be freed, the function will call fatal_error().
+  *
+  * @param type Type and flags of the resource
+  * @param id ID of the resource
+  * @param num_pages Contiguous pages to allocate
+  * @return Index of the first page of the allocated memory
+  *
+  * Code section: code_main
+  */
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 {
   uint16_t result;
@@ -553,22 +553,22 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 #pragma clang diagnostic pop
 
 /**
- * @brief Finds a free block range in memory
- *
- * This function finds a free block range in memory with a best-fit strategy. The function
- * will search for a block of memory that is at least num_pages long. The strategy parameter
- * determines how the function will search for free memory. If the strategy is HEAP_STRATEGY_FREE_ONLY,
- * the function will only consider free memory pages. If the strategy is HEAP_STRATEGY_ALLOW_UNLOCKED,
- * the function will consider free and unlocked memory pages. If the strategy is HEAP_STRATEGY_ALLOW_LOCKED,
- * the function will consider free, unlocked and locked memory pages. Pages marked as active will not be
- * considered in any case.
- *
- * @param num_pages Number of pages to find
- * @param strategy Strategy to use when searching for free memory
- * @return uint16_t Index of the first page of the free block range, or 0xffff if not found
- *
- * Code section: code_main
- */
+  * @brief Finds a free block range in memory
+  *
+  * This function finds a free block range in memory with a best-fit strategy. The function
+  * will search for a block of memory that is at least num_pages long. The strategy parameter
+  * determines how the function will search for free memory. If the strategy is HEAP_STRATEGY_FREE_ONLY,
+  * the function will only consider free memory pages. If the strategy is HEAP_STRATEGY_ALLOW_UNLOCKED,
+  * the function will consider free and unlocked memory pages. If the strategy is HEAP_STRATEGY_ALLOW_LOCKED,
+  * the function will consider free, unlocked and locked memory pages. Pages marked as active will not be
+  * considered in any case.
+  *
+  * @param num_pages Number of pages to find
+  * @param strategy Strategy to use when searching for free memory
+  * @return Index of the first page of the free block range, or 0xffff if not found
+  *
+  * Code section: code_main
+  */
 uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
 {
   uint8_t current_start = 0;
@@ -621,17 +621,17 @@ uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
 }
 
 /**
- * @brief Frees a resource in memory
- *
- * This function frees the resource in memory that covers the specified slot. The function
- * will free all pages of the resource, searching back for the start of the resource.
- *
- * If the page is marked as free already (RES_TYPE_NONE), the function will do nothing.
- *
- * @param slot Index of a page of the resource
- *
- * Code section: code_main
- */
+  * @brief Frees a resource in memory
+  *
+  * This function frees the resource in memory that covers the specified slot. The function
+  * will free all pages of the resource, searching back for the start of the resource.
+  *
+  * If the page is marked as free already (RES_TYPE_NONE), the function will do nothing.
+  *
+  * @param slot Index of a page of the resource
+  *
+  * Code section: code_main
+  */
 static void free_resource(uint8_t slot)
 {
   uint8_t type = page_res_type[slot] & RES_TYPE_MASK;
@@ -669,16 +669,16 @@ static void free_resource(uint8_t slot)
 
 #ifdef HEAP_DEBUG_OUT
 /**
- * @brief Prints out a summary of the current heap state
- *
- * This function prints out a summary of the current heap state. It will print out
- * the type, ID, number of pages, active flag and locked flag for each block range.
- *
- * This is a debug function and regular output of it can be activated by uncommenting
- * the HEAP_DEBUG_OUT define at the top of this file.
- *
- * Code section: code_main 
- */
+  * @brief Prints out a summary of the current heap state
+  *
+  * This function prints out a summary of the current heap state. It will print out
+  * the type, ID, number of pages, active flag and locked flag for each block range.
+  *
+  * This is a debug function and regular output of it can be activated by uncommenting
+  * the HEAP_DEBUG_OUT define at the top of this file.
+  *
+  * Code section: code_main 
+  */
 static void print_heap(void)
 {
   uint8_t num_pages = 0;

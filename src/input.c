@@ -23,16 +23,16 @@ uint8_t input_key_pressed;
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup input_init Input Init Functions
- * @{
- */
+  * @defgroup input_init Input Init Functions
+  * @{
+  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
- * @brief Initialize the input module
- *
- * Code section: code_init
- */
+  * @brief Initialize the input module
+  *
+  * Code section: code_init
+  */
 void input_init(void)
 {
   input_cursor_x = 0;
@@ -45,19 +45,19 @@ void input_init(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup input_public Input Public Functions
- * @{
- */
+  * @defgroup input_public Input Public Functions
+  * @{
+  */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
 /**
- * @brief Update the input module
- *
- * This function updates the cursor position. Should be called once per frame in the
- * interrupt routine.
- *
- * Code section: code_main
- */
+  * @brief Update the input module
+  *
+  * This function updates the cursor position. Should be called once per frame in the
+  * interrupt routine.
+  *
+  * Code section: code_main
+  */
 void input_update(void)
 {
   uint8_t joy = CIA1.pra;

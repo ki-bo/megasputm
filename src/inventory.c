@@ -11,9 +11,9 @@
 
 
 /**
- * @defgroup inv_init Inventory Init Functions
- * @{
- */
+  * @defgroup inv_init Inventory Init Functions
+  * @{
+  */
 #pragma clang section text="code_init"  rodata="cdata_init" data="data_init" bss="bss_init"
 
 void inv_init()
@@ -23,17 +23,17 @@ void inv_init()
  ///@} inv_init
 
 /**
- * @defgroup inv_public Inventory Public Functions
- * @{
- */
+  * @defgroup inv_public Inventory Public Functions
+  * @{
+  */
 #pragma clang section text="code_main"  rodata="cdata_main" data="data_main" bss="zdata"
 
 /**
- * @brief Add an object to the inventory.
- * 
- * @param object Pointer to the object chunk.
- * @param size Amount of bytes to copy.
- */
+  * @brief Add an object to the inventory.
+  * 
+  * @param object Pointer to the object chunk.
+  * @param size Amount of bytes to copy.
+  */
 void inv_add_object(uint8_t local_object_id)
 {
   __auto_type obj_hdr = (struct object_code __huge *)(res_get_huge_ptr(obj_page[local_object_id]) + obj_offset[local_object_id]);

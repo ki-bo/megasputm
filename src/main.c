@@ -7,16 +7,16 @@
 #pragma clang section text="code"
 
 /**
- * @brief Entry function called by startup code
- *
- * This is the first C code getting executed after the startup code
- * has finished. It initializes the system and then calls the main_entry
- * function in the code_main section.
- *
- * It is part of the runtime code loaded during startup to 0x0200.
- *
- * Code section: code
- */
+  * @brief Entry function called by startup code
+  *
+  * This is the first C code getting executed after the startup code
+  * has finished. It initializes the system and then calls the main_entry
+  * function in the code_main section.
+  *
+  * It is part of the runtime code loaded during startup to 0x0200.
+  *
+  * Code section: code
+  */
 __task void main(void) 
 {
   global_init();

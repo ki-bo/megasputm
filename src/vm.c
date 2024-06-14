@@ -142,18 +142,18 @@ static void add_string_to_sentence_priv(const char *str, uint8_t prepend_space);
 
 
 /**
- * @defgroup vm_init VM Init Functions
- * @{
- */
+  * @defgroup vm_init VM Init Functions
+  * @{
+  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
- * @brief Initializes the virtual machine
- * 
- * Initializes the virtual machine by setting all script slots to free.
- *
- * Code section: code_init
- */
+  * @brief Initializes the virtual machine
+  * 
+  * Initializes the virtual machine by setting all script slots to free.
+  *
+  * Code section: code_init
+  */
 void vm_init(void)
 {
   for (active_script_slot = 0; active_script_slot < NUM_SCRIPT_SLOTS; ++active_script_slot)
@@ -181,23 +181,23 @@ void vm_init(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup vm_public VM Public Functions
- * @{
- */
+  * @defgroup vm_public VM Public Functions
+  * @{
+  */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
 /**
- * @brief Main loop of the virtual machine
- * 
- * The main loop of the virtual machine. This function will never return and runs an infinite
- * loop processing all game logic. It is waiting for at least one jiffy to pass before
- * processing the next cycle of the active scripts.
- *
- * Graphics update is triggered if at least one script has requested a screen update by setting
- * the screen_update_needed flag.
- *
- * Code section: code_main
- */
+  * @brief Main loop of the virtual machine
+  * 
+  * The main loop of the virtual machine. This function will never return and runs an infinite
+  * loop processing all game logic. It is waiting for at least one jiffy to pass before
+  * processing the next cycle of the active scripts.
+  *
+  * Graphics update is triggered if at least one script has requested a screen update by setting
+  * the screen_update_needed flag.
+  *
+  * Code section: code_main
+  */
 __task void vm_mainloop(void)
 {
   // We will never return, so reset the stack pointer to the top of the stack
@@ -357,16 +357,16 @@ __task void vm_mainloop(void)
 }
 
 /**
- * @brief Returns the current state of the active process
- * 
- * The returned value is the complete state variable of the currently active process.
- * This includes the state in the lower bits and the additional state flags in the
- * upper bits.
- *
- * @return uint8_t The current state of the active process
- *
- * Code section: code_main
- */
+  * @brief Returns the current state of the active process
+  * 
+  * The returned value is the complete state variable of the currently active process.
+  * This includes the state in the lower bits and the additional state flags in the
+  * upper bits.
+  *
+  * @return The current state of the active process
+  *
+  * Code section: code_main
+  */
 uint8_t vm_get_active_proc_state_and_flags(void)
 {
   return vm_state.proc_state[active_script_slot];
@@ -412,14 +412,14 @@ void vm_change_ui_flags(uint8_t flags)
 }
 
 /**
- * @brief Switches the scene to another room
- * 
- * Switches the scene to another room by deactivating the current room and activating the new
- * room. The new room number is stored in VAR_ROOM_NO. The function will also decode the new
- * background image and redraw the screen, including drawing all objects currently visible.
- *
- * Code section: code_main
- */
+  * @brief Switches the scene to another room
+  * 
+  * Switches the scene to another room by deactivating the current room and activating the new
+  * room. The new room number is stored in VAR_ROOM_NO. The function will also decode the new
+  * background image and redraw the screen, including drawing all objects currently visible.
+  *
+  * Code section: code_main
+  */
 void vm_set_current_room(uint8_t room_no)
 {
   // save DS
@@ -474,22 +474,22 @@ void vm_set_current_room(uint8_t room_no)
 }
 
 /**
- * @brief Delays the currently active script
- *
- * Initializes the delay timer for the currently active script. Note that the timer
- * is actually counting up, so the script will provide a negative number of ticks
- * as parameter to this function.
- *
- * The scheduler will suspend execution of the currently active process until the
- * timer becomes zero or positive.
- *
- * The process state of the currently active process is set to PROC_STATE_WAITING_FOR_TIMER
- * when this function returns.
- * 
- * @param timer_value The negative amount of ticks to suspend
- *
- * Code section: code_main
- */
+  * @brief Delays the currently active script
+  *
+  * Initializes the delay timer for the currently active script. Note that the timer
+  * is actually counting up, so the script will provide a negative number of ticks
+  * as parameter to this function.
+  *
+  * The scheduler will suspend execution of the currently active process until the
+  * timer becomes zero or positive.
+  *
+  * The process state of the currently active process is set to PROC_STATE_WAITING_FOR_TIMER
+  * when this function returns.
+  * 
+  * @param timer_value The negative amount of ticks to suspend
+  *
+  * Code section: code_main
+  */
 void vm_set_script_wait_timer(int32_t negative_ticks)
 {
   vm_state.proc_state[active_script_slot] = PROC_STATE_WAITING_FOR_TIMER;
@@ -497,13 +497,13 @@ void vm_set_script_wait_timer(int32_t negative_ticks)
 }
 
 /**
- * @brief Starts a cutscene
- *
- * Starts a cutscene by saving the current game state and setting the cursor and interface
- * state to the cutscene state. The cutscene state is stored in the cutscene variables.
- *
- * Code section: code_main
- */
+  * @brief Starts a cutscene
+  *
+  * Starts a cutscene by saving the current game state and setting the cursor and interface
+  * state to the cutscene state. The cutscene state is stored in the cutscene variables.
+  *
+  * Code section: code_main
+  */
 void vm_cut_scene_begin(void)
 {
   vm_state.cs_room = vm_read_var8(VAR_SELECTED_ROOM);
@@ -543,23 +543,23 @@ void vm_begin_override(void)
 }
 
 /**
- * @brief Outputs a text message on screen for the specified actor
- * 
- * Outputs dialog on screen for the specified actor. The text message is stored in the 
- * text message buffer and the text timer is set to the number of jiffies needed to display
- * the message. The variable VAR_MESSAGE_GOING is set to 1 while the message is presented on
- * screen. It will be reset back to 0 in the main loop once the message timer expires.
- * 
- * For general text outputs, actor_id 0xff can be used. No talking animation will be triggered
- * in that case.
- *
- * The text message is directly printed on screen without waiting for a redraw event.
+  * @brief Outputs a text message on screen for the specified actor
+  * 
+  * Outputs dialog on screen for the specified actor. The text message is stored in the 
+  * text message buffer and the text timer is set to the number of jiffies needed to display
+  * the message. The variable VAR_MESSAGE_GOING is set to 1 while the message is presented on
+  * screen. It will be reset back to 0 in the main loop once the message timer expires.
+  * 
+  * For general text outputs, actor_id 0xff can be used. No talking animation will be triggered
+  * in that case.
+  *
+  * The text message is directly printed on screen without waiting for a redraw event.
 
- * @param actor_id ID of the actor talking, will be used to select the configured text color
- *                 for the text output on screen.
- *
- * Code section: code_main
- */
+  * @param actor_id ID of the actor talking, will be used to select the configured text color
+  *                 for the text output on screen.
+  *
+  * Code section: code_main
+  */
 void vm_say_line(uint8_t actor_id)
 {
   // check if there is already a message going on
@@ -589,15 +589,15 @@ void vm_say_line(uint8_t actor_id)
 }
 
 /**
- * @brief Starts a global script
- * 
- * The script with the given id is added to a free process slot and marked with state
- * PROC_STATE_RUNNING. The script will start execution at the next cycle of the main loop.
- *
- * @param script_id 
- *
- * Code section: code_main
- */
+  * @brief Starts a global script
+  * 
+  * The script with the given id is added to a free process slot and marked with state
+  * PROC_STATE_RUNNING. The script will start execution at the next cycle of the main loop.
+  *
+  * @param script_id 
+  *
+  * Code section: code_main
+  */
 uint8_t vm_start_script(uint8_t script_id)
 {
   uint8_t slot = vm_get_first_script_slot_by_script_id(script_id);
@@ -700,16 +700,16 @@ void vm_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t b
 }
 
 /**
- * @brief Chains a script to the currently active script
- *
- * Chains a script to the currently active script. The currently active script will be
- * stopped and the new script will be executed from start in the same slot. The old script 
- * resource is deactivated and marked free to override if needed.
- *
- * @param script_id The id of the script to execute instead of the currently active script
- *
- * Code section: code_main
- */
+  * @brief Chains a script to the currently active script
+  *
+  * Chains a script to the currently active script. The currently active script will be
+  * stopped and the new script will be executed from start in the same slot. The old script 
+  * resource is deactivated and marked free to override if needed.
+  *
+  * @param script_id The id of the script to execute instead of the currently active script
+  *
+  * Code section: code_main
+  */
 void vm_chain_script(uint8_t script_id)
 {
   debug_out("Chaining script %d from script %d slot %d", script_id, vm_state.proc_script_or_object_id[active_script_slot], active_script_slot);
@@ -733,15 +733,15 @@ void vm_chain_script(uint8_t script_id)
 }
 
 /**
- * @brief Stops the script in the specified script slot
- * 
- * Deactivates the script and sets the process state to PROC_STATE_FREE.
- * The associated script resource is deactivated and thus marked free to override if needed.
- *
- * @param script_id The id of the script to stop
- *
- * Code section: code_main
- */
+  * @brief Stops the script in the specified script slot
+  * 
+  * Deactivates the script and sets the process state to PROC_STATE_FREE.
+  * The associated script resource is deactivated and thus marked free to override if needed.
+  *
+  * @param script_id The id of the script to stop
+  *
+  * Code section: code_main
+  */
 void vm_stop_script_slot(uint8_t slot)
 {
   vm_state.proc_state[slot] = PROC_STATE_FREE;
@@ -820,13 +820,13 @@ uint8_t vm_is_script_running(uint8_t script_id)
 }
 
 /**
- * @brief Requests that the screen is updated
- *
- * The screen update flag is set to 1, which will trigger a screen update in the main loop.
- * The redraw will happen after all active scripts have finished their current execution cycle.
- *
- * Code section: code_main
- */
+  * @brief Requests that the screen is updated
+  *
+  * The screen update flag is set to 1, which will trigger a screen update in the main loop.
+  * The redraw will happen after all active scripts have finished their current execution cycle.
+  *
+  * Code section: code_main
+  */
 void vm_update_bg(void)
 {
   screen_update_needed |= SCREEN_UPDATE_BG;
@@ -869,18 +869,18 @@ struct object_code *vm_get_room_object_hdr(uint16_t global_object_id)
 }
 
 /**
- * @brief Returns the object id at the given position
- *
- * Returns the object id of the object at the given position. The function will iterate over
- * all objects and check if the object is currently active and if the object position matches
- * the one provided. If a match is found, the object id is returned.
- *
- * @param x The x position of the object in scene coordinates
- * @param y The y position of the object in scene coordinates
- * @return uint16_t The object id of the object at the given position
- *
- * Code section: code_main
- */
+  * @brief Returns the object id at the given position
+  *
+  * Returns the object id of the object at the given position. The function will iterate over
+  * all objects and check if the object is currently active and if the object position matches
+  * the one provided. If a match is found, the object id is returned.
+  *
+  * @param x The x position of the object in scene coordinates
+  * @param y The y position of the object in scene coordinates
+  * @return The object id of the object at the given position
+  *
+  * Code section: code_main
+  */
 uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 {
   SAVE_DS_AUTO_RESTORE
@@ -1129,9 +1129,9 @@ uint8_t vm_load_game(uint8_t slot)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup vm_private VM Private Functions
- * @{
- */
+  * @defgroup vm_private VM Private Functions
+  * @{
+  */
 
 #pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
 static void reset_game_state(void)
@@ -1206,16 +1206,16 @@ static uint8_t is_room_object_script(uint8_t slot)
 }
 
 /**
- * @brief Processes the dialog timer
- *
- * Decreases the dialog timer by the number of jiffies elapsed since the last call. Clears
- * the dialog area on screen and resets the dialog active variable when the timer reaches
- * zero. Note that the dialog timer is counting down.
- * 
- * @param jiffies_elapsed The number of jiffies elapsed since the last call
- *
- * Code section: code_main
- */
+  * @brief Processes the dialog timer
+  *
+  * Decreases the dialog timer by the number of jiffies elapsed since the last call. Clears
+  * the dialog area on screen and resets the dialog active variable when the timer reaches
+  * zero. Note that the dialog timer is counting down.
+  * 
+  * @param jiffies_elapsed The number of jiffies elapsed since the last call
+  *
+  * Code section: code_main
+  */
 static void process_dialog(uint8_t jiffies_elapsed)
 {
   if (message_ptr == NULL && message_timer == 0)
@@ -1295,16 +1295,16 @@ static void stop_all_dialog(void)
 }
 
 /**
- * @brief Waits for at least one jiffy to have passed since the last call
- *
- * Waits until at least one jiffy has passed since the last call. The function will return
- * the number of jiffies elapsed since the last call. If at least one jiffy has passed
- * already since the last call, the function will return immediately.
- * 
- * @return uint8_t The number of jiffies elapsed since the last call
- *
- * Code section: code_main
- */
+  * @brief Waits for at least one jiffy to have passed since the last call
+  *
+  * Waits until at least one jiffy has passed since the last call. The function will return
+  * the number of jiffies elapsed since the last call. If at least one jiffy has passed
+  * already since the last call, the function will return immediately.
+  * 
+  * @return The number of jiffies elapsed since the last call
+  *
+  * Code section: code_main
+  */
 static uint8_t wait_for_jiffy(void)
 {
   SAVE_CS_AUTO_RESTORE
@@ -1314,19 +1314,19 @@ static uint8_t wait_for_jiffy(void)
 }
 
 /**
- * @brief Reads object data for the current room
- *
- * Reads all offsets for object images and object data from the current room resource. The
- * function will read the number of objects from the room header and then read the object
- * offsets and image offsets from the room resource. The function will then read the object
- * metadata and image data for each object and store it in the object data arrays.
- *
- * The images are decoded and kept in gfx memory for fast drawing on screen.
- *
- * Needs cs_gfx mapped and the room resource mapped to DS.
- *
- * Code section: code_main
- */
+  * @brief Reads object data for the current room
+  *
+  * Reads all offsets for object images and object data from the current room resource. The
+  * function will read the number of objects from the room header and then read the object
+  * offsets and image offsets from the room resource. The function will then read the object
+  * metadata and image data for each object and store it in the object data arrays.
+  *
+  * The images are decoded and kept in gfx memory for fast drawing on screen.
+  *
+  * Needs cs_gfx mapped and the room resource mapped to DS.
+  *
+  * Code section: code_main
+  */
 static void read_objects(void)
 {
   struct offset {
@@ -1371,14 +1371,14 @@ static void read_objects(void)
 }
 
 /**
- * @brief Redraws the screen
- *
- * Redraws the screen by redrawing the background and all objects currently visible on screen.
- * The function will read the object data from the object data arrays and draw the objects
- * on screen at their current position.
- *
- * Code section: code_main
- */
+  * @brief Redraws the screen
+  *
+  * Redraws the screen by redrawing the background and all objects currently visible on screen.
+  * The function will read the object data from the object data arrays and draw the objects
+  * on screen at their current position.
+  *
+  * Code section: code_main
+  */
 static void redraw_screen(void)
 {
   uint32_t map_save = map_get();
@@ -1539,15 +1539,15 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type"
 /**
- * @brief Finds a free script slot
- *
- * Finds a free script slot by iterating over all script slots and returning the first free slot
- * found. If no free slot is found, the function will trigger a fatal error.
- *
- * @return uint8_t The index of the first free script slot
- *
- * Code section: code_main
- */
+  * @brief Finds a free script slot
+  *
+  * Finds a free script slot by iterating over all script slots and returning the first free slot
+  * found. If no free slot is found, the function will trigger a fatal error.
+  *
+  * @return The index of the first free script slot
+  *
+  * Code section: code_main
+  */
 static uint8_t find_free_script_slot(void)
 {
   uint8_t slot;
@@ -1767,7 +1767,7 @@ static void update_sentence_line(void)
     if (noun1_name) {
       //debug_out("  Noun1 name: %s", noun1_name);
     }
-    add_string_to_sentence(noun1_name, 1);
+      add_string_to_sentence(noun1_name, 1);
   }
   
   uint8_t preposition = vm_read_var8(VAR_SENTENCE_PREPOSITION);
@@ -1776,7 +1776,7 @@ static void update_sentence_line(void)
     if (preposition_name) {
       //debug_out("  Preposition name: %s", preposition_name);
     }
-    add_string_to_sentence(preposition_name, 1);
+      add_string_to_sentence(preposition_name, 1);
   }
 
   uint16_t noun2 = vm_read_var(VAR_SENTENCE_NOUN2);
@@ -1785,7 +1785,7 @@ static void update_sentence_line(void)
     if (noun2_name) {
       //debug_out("  Noun2 name: %s", noun2_name);
     }
-    add_string_to_sentence(noun2_name, 1);
+      add_string_to_sentence(noun2_name, 1);
   }
 
   uint8_t num_chars = sentence_length;
@@ -1962,9 +1962,26 @@ static void update_inventory_highlighting(void)
   }
 }
 
+/**
+  * @brief Returns the inventory slot currently hovered by the cursor
+  *
+  * @return The inventory slot currently hovered by the cursor
+  *
+  * The following return codes are possible:
+  * - 0xff: Cursor is not hovering over any inventory slot
+  * - 0-3: Cursor is hovering over an inventory slot
+  *   - 0: Top-left slot
+  *   - 1: Top-right slot
+  *   - 2: Bottom-left slot
+  *   - 3: Bottom-right slot 
+  * - 4: Cursor is hovering over the scroll-up button
+  * - 5: Cursor is hovering over the scroll-down button
+  *
+  * Code section: code_main
+  */
 static uint8_t get_hovered_inventory_slot(void)
 {
-   uint8_t cur_inventory = 0xff;
+  uint8_t cur_inventory = 0xff;
   
   if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
     if (input_cursor_x >= 22 * 4) {
@@ -1987,8 +2004,10 @@ static uint8_t get_hovered_inventory_slot(void)
 static uint8_t inventory_pos_to_x(uint8_t pos)
 {
   if (pos & 4) {
+    // arrow buttons
     return 18;
   }
+  // even slots are on the left, odd slots are on the right
   return (pos & 1) ? 22 : 0;
 }
 
@@ -2056,12 +2075,12 @@ static void print_slot_table(void)
 }
 
 /**
- * @brief Stops a script from the slot table and also stops all its children
- *
- * Function will stop the mentioned script slot from the table and all of its children. The
- * children are stopped recusively by setting their status to PROC_STATE_FREE and deactivating
- * their resource slot.
- */
+  * @brief Stops a script from the slot table and also stops all its children
+  *
+  * Function will stop the mentioned script slot from the table and all of its children. The
+  * children are stopped recusively by setting their status to PROC_STATE_FREE and deactivating
+  * their resource slot.
+  */
 static void stop_script_from_table(uint8_t table_idx)
 {
   uint8_t slot = vm_state.proc_slot_table[table_idx];
@@ -2095,13 +2114,13 @@ static void proc_slot_table_insert(uint8_t slot)
 }
 
 /**
- * @brief Removes all orphan entries from slot table
- *
- * All slots with value 0xff are removed from the table, moving all other entries to the
- * beginning of the table. The number of active slots is updated accordingly.
- *
- * Code section: code_main_private
- */
+  * @brief Removes all orphan entries from slot table
+  *
+  * All slots with value 0xff are removed from the table, moving all other entries to the
+  * beginning of the table. The number of active slots is updated accordingly.
+  *
+  * Code section: code_main_private
+  */
 static void cleanup_slot_table()
 {
   uint8_t write_ptr = 0;
@@ -2153,15 +2172,15 @@ static void read_walk_boxes(void)
 }
 
 /**
- * @brief Clears state of objects matching position and size
- *
- * Clears the state of all objects that match the given position and size. The function will
- * iterate over all objects and check if the object is currently active and if the object
- * position and size matches the one provided. If a match is found, the object state is
- * cleared.
- * 
- * @param local_object_id Object in current room to compare with
- */
+  * @brief Clears state of objects matching position and size
+  *
+  * Clears the state of all objects that match the given position and size. The function will
+  * iterate over all objects and check if the object is currently active and if the object
+  * position and size matches the one provided. If a match is found, the object state is
+  * cleared.
+  * 
+  * @param local_object_id Object in current room to compare with
+  */
 static void clear_all_other_object_states(uint8_t local_object_id)
 {
   SAVE_DS_AUTO_RESTORE

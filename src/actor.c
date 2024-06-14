@@ -51,9 +51,9 @@ static void turn(uint8_t local_id);
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup actor_init Actor Init Functions
- * @{
- */
+  * @defgroup actor_init Actor Init Functions
+  * @{
+  */
 #pragma clang section text="code_init" data="data_init" rodata="cdata_init" bss="bss_init"
 
 void actor_init(void)
@@ -71,9 +71,9 @@ void actor_init(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup actor_public Actor Public Functions
- * @{
- */
+  * @defgroup actor_public Actor Public Functions
+  * @{
+  */
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
 
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no)
@@ -424,20 +424,20 @@ void actor_sort_and_draw_all(void)
 }
 
 /**
- * @brief Draw the actor with the given local id.
- * 
- * This function draws the actor with the given local id to the backbuffer, allocating a canvas
- * of character data for the actor. The actor is drawn at its current position, using the current
- * cel animation for each cel level. The actor is drawn with the current direction and masking.
- *
- * Drawing the actor is done in the following steps:
- * 1. Determine the bounding box for all cels of the actor, relative to the actor's position.
- * 2. Allocate an empty canvas for the actor, if the actor is visible on screen.
- * 3. Draw all cels to the allocated canvas.
- * 4. Apply background and object maskings to the actor canvas.
- * 
- * @param local_id The local id of the actor to draw.
- */
+  * @brief Draw the actor with the given local id.
+  * 
+  * This function draws the actor with the given local id to the backbuffer, allocating a canvas
+  * of character data for the actor. The actor is drawn at its current position, using the current
+  * cel animation for each cel level. The actor is drawn with the current direction and masking.
+  *
+  * Drawing the actor is done in the following steps:
+  * 1. Determine the bounding box for all cels of the actor, relative to the actor's position.
+  * 2. Allocate an empty canvas for the actor, if the actor is visible on screen.
+  * 3. Draw all cels to the allocated canvas.
+  * 4. Apply background and object maskings to the actor canvas.
+  * 
+  * @param local_id The local id of the actor to draw.
+  */
 void actor_draw(uint8_t local_id)
 {
   uint8_t global_id = local_actors.global_id[local_id];
@@ -599,9 +599,9 @@ void actor_change_direction(uint8_t local_id, uint8_t dir)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup actor_private Actor Private Functions
- * @{
- */
+  * @defgroup actor_private Actor Private Functions
+  * @{
+  */
 
 static uint8_t get_free_local_id(void)
 {

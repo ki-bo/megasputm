@@ -173,18 +173,18 @@ static uint16_t text_style_to_color(enum text_style style);
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup gfx_init GFX Init Functions
- * @{
- */
+  * @defgroup gfx_init GFX Init Functions
+  * @{
+  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
- * @brief Initialises the gfx module.
- *
- * This function must be called before any other gfx function.
- *
- * Code section: code_init
- */
+  * @brief Initialises the gfx module.
+  *
+  * This function must be called before any other gfx function.
+  *
+  * Code section: code_init
+  */
 void gfx_init()
 {
   VICIV.sdbdrwd_msb  &= ~VIC4_HOTREG_MASK;
@@ -266,10 +266,10 @@ void gfx_init()
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @brief Setup interrupt routine for the raster interrupt.
- * 
- * Code section: code_init
- */
+  * @brief Setup interrupt routine for the raster interrupt.
+  * 
+  * Code section: code_init
+  */
 void setup_irq(void)
 {
   CPU_VECTORS.irq = &raster_irq;
@@ -290,27 +290,27 @@ void setup_irq(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup gfx_runtime GFX Functions in code_main segment
- * @{
- */
+  * @defgroup gfx_runtime GFX Functions in code_main segment
+  * @{
+  */
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 
 /// Counter increased every frame by a raster interrupt
 volatile uint8_t raster_irq_counter = 0;
 
 /**
- * @brief Raster interrupt routine.
- * 
- * This function is called every frame. It updates the cursor position and
- * appearance. A raster_irq counter is updated which will drive the timing 
- * of the non-interrupt main loop and scripts. It is also used as vsync
- * trigger to control the timing of the screen updates.
- *
- * This irq function is placed in the code section to make sure it is always
- * visible and never overlayed by other banked code or data.
- *
- * Code section: code
- */
+  * @brief Raster interrupt routine.
+  * 
+  * This function is called every frame. It updates the cursor position and
+  * appearance. A raster_irq counter is updated which will drive the timing 
+  * of the non-interrupt main loop and scripts. It is also used as vsync
+  * trigger to control the timing of the screen updates.
+  *
+  * This irq function is placed in the code section to make sure it is always
+  * visible and never overlayed by other banked code or data.
+  *
+  * Code section: code
+  */
 __attribute__((interrupt()))
 static void raster_irq ()
 {
@@ -340,17 +340,17 @@ static void raster_irq ()
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup gfx_public GFX Public Functions 
- */
+  * @defgroup gfx_public GFX Public Functions 
+  */
 #pragma clang section text="code_gfx" rodata="cdata_gfx" data="data_gfx" bss="bss_gfx"
 
 /**
- * @brief Starts the gfx module and enables video output.
- * 
- * This function must be called after gfx_init. It enabled the raster interrupt and video output.
- *
- * Code section: code_gfx
- */
+  * @brief Starts the gfx module and enables video output.
+  * 
+  * This function must be called after gfx_init. It enabled the raster interrupt and video output.
+  *
+  * Code section: code_gfx
+  */
 void gfx_start(void)
 {
   // Be careful with this register, as using rmw instructions just enabling the BLANK
@@ -364,10 +364,10 @@ void gfx_start(void)
 }
 
 /**
- * @brief Fades out the graphics area of the screen.
- *
- * Code section: code_gfx
- */
+  * @brief Fades out the graphics area of the screen.
+  *
+  * Code section: code_gfx
+  */
 void gfx_fade_out(void)
 {
   __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + CHRCOUNT * 2;
@@ -381,15 +381,15 @@ void gfx_fade_out(void)
 }
 
 /**
- * @brief Waits for the next jiffy timer increase.
- *
- * The jiffy counter is updated every raster irq. This function will block until the jiffy
- * counter is updated the next time.
- * 
- * @return The number of jiffies that have passed since the last call to this function.
- *
- * Code section: code_gfx
- */
+  * @brief Waits for the next jiffy timer increase.
+  *
+  * The jiffy counter is updated every raster irq. This function will block until the jiffy
+  * counter is updated the next time.
+  * 
+  * @return The number of jiffies that have passed since the last call to this function.
+  *
+  * Code section: code_gfx
+  */
 uint8_t gfx_wait_for_jiffy_timer(void)
 {
   static uint8_t last_raster_irq_counter = 0;
@@ -400,10 +400,10 @@ uint8_t gfx_wait_for_jiffy_timer(void)
 }
 
 /**
- * @brief Waits for the next frame.
- *
- * Code section: code_gfx
- */
+  * @brief Waits for the next frame.
+  *
+  * Code section: code_gfx
+  */
 void gfx_wait_vsync(void)
 {
   uint8_t counter = raster_irq_counter;
@@ -411,13 +411,13 @@ void gfx_wait_vsync(void)
 }
 
 /**
- * @brief Clears the background image.
- *
- * The pixel data memory is cleared so the background image is blank. This routine
- * is used when selecting room 0 (also called "the-void" in SCUMM).
- *
- * Code section: code_gfx
- */
+  * @brief Clears the background image.
+  *
+  * The pixel data memory is cleared so the background image is blank. This routine
+  * is used when selecting room 0 (also called "the-void" in SCUMM).
+  *
+  * Code section: code_gfx
+  */
 void gfx_clear_bg_image(void)
 {
   uint16_t num_bytes = 16U * 40U * 64U;
@@ -433,18 +433,18 @@ void gfx_clear_bg_image(void)
 }
 
 /**
- * @brief Decodes a room background image and stores it in the background bitmap.
- * 
- * The background bitmap is located at BG_BITMAP. The static pointer next_char_data
- * will point to the next byte following the last byte written to the background bitmap.
- * Object images will be stored as char data following the room background image
- * (starting at next_char_data).
- * 
- * @param src The encoded bitmap data in the room resource.
- * @param width The width of the bitmap in characters.
- *
- * Code section: code_gfx
- */
+  * @brief Decodes a room background image and stores it in the background bitmap.
+  * 
+  * The background bitmap is located at BG_BITMAP. The static pointer next_char_data
+  * will point to the next byte following the last byte written to the background bitmap.
+  * Object images will be stored as char data following the room background image
+  * (starting at next_char_data).
+  * 
+  * @param src The encoded bitmap data in the room resource.
+  * @param width The width of the bitmap in characters.
+  *
+  * Code section: code_gfx
+  */
 void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 {
   //debug_out("Decoding bg image, width: %d\n", width)
@@ -460,23 +460,23 @@ void gfx_decode_bg_image(uint8_t *src, uint16_t width)
 }
 
 /**
- * @brief Decodes the binary masking data after the background image.
- *
- * The masking data is stored in the room resource following the background image.
- * It is used to mask out actor pixels that should not be drawn over the background.
- * That way, actors can be placed behind background image objects by not drawing
- * their pixels where the masking buffer is set.
- *
- * The result is not cached in memory, but the masking_cache_iterations and
- * masking_cache_data_offset arrays are filled with the data for each column.
- * Those arrays allow starting the actual decoding of the masking data at
- * arbitrary columns.
- * 
- * @param bg_masking_offset Room offset to background masking data.
- * @param width Width of the masking data in characters.
- *
- * Code section: code_gfx
- */
+  * @brief Decodes the binary masking data after the background image.
+  *
+  * The masking data is stored in the room resource following the background image.
+  * It is used to mask out actor pixels that should not be drawn over the background.
+  * That way, actors can be placed behind background image objects by not drawing
+  * their pixels where the masking buffer is set.
+  *
+  * The result is not cached in memory, but the masking_cache_iterations and
+  * masking_cache_data_offset arrays are filled with the data for each column.
+  * Those arrays allow starting the actual decoding of the masking data at
+  * arbitrary columns.
+  * 
+  * @param bg_masking_offset Room offset to background masking data.
+  * @param width Width of the masking data in characters.
+  *
+  * Code section: code_gfx
+  */
 void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 {
   SAVE_DS_AUTO_RESTORE
@@ -537,24 +537,24 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 }
 
 /**
- * @brief Decodes an object image and stores it in the char data memory.
- *
- * The static pointer next_char_data will point to the next byte following the last byte
- * written to the char data memory. That way, object char data will be stored sequentially
- * in memory. We will keep track of object IDs and their corresponding char numbers in
- * the obj_first_char array.
- *
- * This function will map DS but won't restore it. It is assumed that the caller will
- * restore the DS register after calling this function.
- * 
- * @param src Pointer to the encoded object image data.
- * @param x X scene position of the object image in pixels.
- * @param y Y scene position of the object image in characters.
- * @param width Width of the object image in characters.
- * @param height Height of the object image in characters.
- *
- * Code section: code_gfx
- */
+  * @brief Decodes an object image and stores it in the char data memory.
+  *
+  * The static pointer next_char_data will point to the next byte following the last byte
+  * written to the char data memory. That way, object char data will be stored sequentially
+  * in memory. We will keep track of object IDs and their corresponding char numbers in
+  * the obj_first_char array.
+  *
+  * This function will map DS but won't restore it. It is assumed that the caller will
+  * restore the DS register after calling this function.
+  * 
+  * @param src Pointer to the encoded object image data.
+  * @param x X scene position of the object image in pixels.
+  * @param y Y scene position of the object image in characters.
+  * @param width Width of the object image in characters.
+  * @param height Height of the object image in characters.
+  *
+  * Code section: code_gfx
+  */
 void gfx_set_object_image(uint8_t __huge *src, uint8_t x, uint8_t y, uint8_t width, uint8_t height)
 {
   obj_first_char[next_obj_slot] = (uint32_t)next_char_data / 64;
@@ -572,10 +572,10 @@ void gfx_set_object_image(uint8_t __huge *src, uint8_t x, uint8_t y, uint8_t wid
 }
 
 /**
- * @brief Clears the dialog area of the screen.
- *
- * Code section: code_gfx
- */
+  * @brief Clears the dialog area of the screen.
+  *
+  * Code section: code_gfx
+  */
 void gfx_clear_dialog(void)
 {
   static const dmalist_t dmalist_clear_dialog_screen = {
@@ -592,20 +592,20 @@ void gfx_clear_dialog(void)
 }
 
 /**
- * @brief Prints a dialog to the screen.
- *
- * The text is printed to the dialog area of the screen. The dialog area is located
- * at the top of the screen and is 2 lines high. The text is printed in the given color.
- *
- * If character code 0x01 is encountered in the text, the text will continue on the next
- * line.
- * 
- * @param color The color palette index of the dialog text.
- * @param text The dialog text as ASCII string.
- * @param num_chars The number of characters to print.
- *
- * Code section: code_gfx
- */
+  * @brief Prints a dialog to the screen.
+  *
+  * The text is printed to the dialog area of the screen. The dialog area is located
+  * at the top of the screen and is 2 lines high. The text is printed in the given color.
+  *
+  * If character code 0x01 is encountered in the text, the text will continue on the next
+  * line.
+  * 
+  * @param color The color palette index of the dialog text.
+  * @param text The dialog text as ASCII string.
+  * @param num_chars The number of characters to print.
+  *
+  * Code section: code_gfx
+  */
 void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars)
 {
   gfx_clear_dialog();
@@ -623,13 +623,13 @@ void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars)
 }
 
 /**
- * @brief Draws the current room's background image
- *
- * The background image is drawn to the backbuffer screen memory. The horizontal
- * camera position is taken into account.
- * 
- * Code section: code_gfx
- */
+  * @brief Draws the current room's background image
+  *
+  * The background image is drawn to the backbuffer screen memory. The horizontal
+  * camera position is taken into account.
+  * 
+  * Code section: code_gfx
+  */
 void gfx_draw_bg(void)
 {
   SAVE_DS_AUTO_RESTORE
@@ -654,20 +654,20 @@ void gfx_draw_bg(void)
 }
 
 /**
- * @brief Draws an object to the backbuffer.
- *
- * The object is drawn to the backbuffer screen memory. The coordinates x and y are
- * the position relative to the visible screen area (top/left being 0,0). The object
- * is drawn with the given width and height in characters.
- * 
- * @param local_id The local object ID (0-based position in the room's objects list)
- * @param x The x position of the object in characters.
- * @param y The y position of the object in characters.
- * @param width The width of the object in characters.
- * @param height The height of the object in characters.
- *
- * Code section: code_gfx
- */
+  * @brief Draws an object to the backbuffer.
+  *
+  * The object is drawn to the backbuffer screen memory. The coordinates x and y are
+  * the position relative to the visible screen area (top/left being 0,0). The object
+  * is drawn with the given width and height in characters.
+  * 
+  * @param local_id The local object ID (0-based position in the room's objects list)
+  * @param x The x position of the object in characters.
+  * @param y The y position of the object in characters.
+  * @param width The width of the object in characters.
+  * @param height The height of the object in characters.
+  *
+  * Code section: code_gfx
+  */
 void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y)
 {
   //debug_out("Obj %d at %d, %d", local_id, x, y);
@@ -873,14 +873,14 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
 }
 
 /**
- * @brief Finalizes drawing of all actors of the current screen.
- *
- * Needs to be called after all actors were drawn to the backbuffer. It will reposition
- * the RRB position (GOTOX) to the right edge of the screen and place an end-of-line
- * character code to indicate the RRB rendering should stop for this character row.
- *
- * Code section: code_gfx
- */
+  * @brief Finalizes drawing of all actors of the current screen.
+  *
+  * Needs to be called after all actors were drawn to the backbuffer. It will reposition
+  * the RRB position (GOTOX) to the right edge of the screen and place an end-of-line
+  * character code to indicate the RRB rendering should stop for this character row.
+  *
+  * Code section: code_gfx
+  */
 void gfx_finalize_actor_drawing(void)
 {
   SAVE_DS_AUTO_RESTORE
@@ -908,17 +908,17 @@ void gfx_finalize_actor_drawing(void)
 }
 
 /**
- * @brief Resets RRB write pointers to the end of the background image.
- *
- * This function needs to be called before the actor cels are drawn to the backbuffer.
- * It will reset the position of the RRB write positions for each character row to the
- * end of the background image.
- * Any new cels drawn will therefore overwrite any previously placed RRB objects.
- * We also zeroize the colram bytes beyond the 40 background picture chars each row.
- * This is to prevent accidental gotox back into the visual area.
- *
- * Code section: code_gfx
- */
+  * @brief Resets RRB write pointers to the end of the background image.
+  *
+  * This function needs to be called before the actor cels are drawn to the backbuffer.
+  * It will reset the position of the RRB write positions for each character row to the
+  * end of the background image.
+  * Any new cels drawn will therefore overwrite any previously placed RRB objects.
+  * We also zeroize the colram bytes beyond the 40 background picture chars each row.
+  * This is to prevent accidental gotox back into the visual area.
+  *
+  * Code section: code_gfx
+  */
 void gfx_reset_actor_drawing(void)
 {
   memset20(UNBANKED_PTR(num_chars_at_row), 40, 16);
@@ -949,13 +949,13 @@ void gfx_reset_actor_drawing(void)
 }
 
 /**
- * @brief Copies the backbuffer to the screen.
- *
- * Copies the backbuffer screen and color RAM to the actual screen and color RAM.
- * Should be called after gfx_wait_vsync to avoid tearing.
- * 
- * Code section: code_gfx
- */
+  * @brief Copies the backbuffer to the screen.
+  *
+  * Copies the backbuffer screen and color RAM to the actual screen and color RAM.
+  * Should be called after gfx_wait_vsync to avoid tearing.
+  * 
+  * Code section: code_gfx
+  */
 void gfx_update_main_screen(void)
 {
   static dmalist_single_option_t dmalist_copy_gfx[2] = {
@@ -1054,9 +1054,9 @@ void gfx_clear_inventory(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup gfx_private GFX Private Functions
- * @{
- */
+  * @defgroup gfx_private GFX Private Functions
+  * @{
+  */
 
 static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
 {
@@ -1115,13 +1115,13 @@ void reset_objects(void)
 }
 
 /**
- * @brief Updates the cursor.
- *
- * This function is called every frame by the raster interrupt. It updates the cursor position and
- * appearance. It will hide and show the cursor based on ui_state flag UI_FLAGS_ENABLE_CURSOR.
- *
- * Code section: code_gfx
- */
+  * @brief Updates the cursor.
+  *
+  * This function is called every frame by the raster interrupt. It updates the cursor position and
+  * appearance. It will hide and show the cursor based on ui_state flag UI_FLAGS_ENABLE_CURSOR.
+  *
+  * Code section: code_gfx
+  */
 void update_cursor(uint8_t snail_override)
 {
   if (!(ui_state & UI_FLAGS_ENABLE_CURSOR)) {
@@ -1163,14 +1163,14 @@ void update_cursor(uint8_t snail_override)
 }
 
 /**
- * @brief Sets the color of the dialog text.
- * 
- * Fills the colram of the dialog area with the given color.
- *
- * @param color The color palette index.
- *
- * Code section: code_gfx
- */
+  * @brief Sets the color of the dialog text.
+  * 
+  * Fills the colram of the dialog area with the given color.
+  *
+  * @param color The color palette index.
+  *
+  * Code section: code_gfx
+  */
 void set_dialog_color(uint8_t color)
 {
   static const dmalist_two_options_t dmalist_clear_dialog_colram = {

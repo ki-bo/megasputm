@@ -16,13 +16,13 @@
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="zdata_init"
 
 /**
- * @brief Initialises all submodules
- *
- * This function does all initialisation of all sub-modules. It needs to be called
- * at the beginning of the autoboot prg.
- *
- * Code section: code_init
- */
+  * @brief Initialises all submodules
+  *
+  * This function does all initialisation of all sub-modules. It needs to be called
+  * at the beginning of the autoboot prg.
+  *
+  * Code section: code_init
+  */
 void global_init(void)
 {
   map_init();

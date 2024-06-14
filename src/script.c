@@ -129,19 +129,19 @@ static uint8_t backup_break_script;
 //----------------------------------------------------------------------
 
 /**
- * @defgroup script_init Script Init Functions
- * @{
- */
+  * @defgroup script_init Script Init Functions
+  * @{
+  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="zdata"
 
 /**
- * @brief Initializes the script module.
- * 
- * Initializes the opcode jump table with the corespinding function
- * pointers for each opcode.
- *
- * Code section: code_init
- */
+  * @brief Initializes the script module.
+  * 
+  * Initializes the opcode jump table with the corespinding function
+  * pointers for each opcode.
+  *
+  * Code section: code_init
+  */
 void script_init(void)
 {
   for (uint8_t i = 0; i < 128; i++) {
@@ -247,18 +247,18 @@ void script_init(void)
 //----------------------------------------------------------------------
 
 /**
- * @defgroup script_public Script Public Functions
- * @{
- */
+  * @defgroup script_public Script Public Functions
+  * @{
+  */
 #pragma clang section text="code_script" rodata="cdata_script" data="data_script" bss="zdata"
 
 /**
- * @brief Runs the next script cycle of the currently active script slot.
- *
- * The script is run from the current pc until the script's state is not PROC_STATE_RUNNING.
- * 
- * Code section: code_script
- */
+  * @brief Runs the next script cycle of the currently active script slot.
+  *
+  * The script is run from the current pc until the script's state is not PROC_STATE_RUNNING.
+  * 
+  * Code section: code_script
+  */
 uint8_t script_run_active_slot(void)
 {
   if (parallel_script_count == 6) {
@@ -334,21 +334,21 @@ void script_break(void)
 #pragma clang section text="code"
 
 /**
- * @brief Executes the function for the given opcode.
- *
- * We are not doing this code inline but as a separate function
- * because the compiler would otherwise not know about the clobbering
- * of registers (including zp registers) by the called function.
- * Placing the function in section code will make sure that it
- * is not inlined by functions in other sections, like code_script.
- * 
- * The highest bit of the opcode is ignored, so opcodes 128-255 are
- * jumping to the same function as opcodes 0-127.
- *
- * @param opcode The opcode to be called (0-127).
- *
- * Code section: code
- */
+  * @brief Executes the function for the given opcode.
+  *
+  * We are not doing this code inline but as a separate function
+  * because the compiler would otherwise not know about the clobbering
+  * of registers (including zp registers) by the called function.
+  * Placing the function in section code will make sure that it
+  * is not inlined by functions in other sections, like code_script.
+  * 
+  * The highest bit of the opcode is ignored, so opcodes 128-255 are
+  * jumping to the same function as opcodes 0-127.
+  *
+  * @param opcode The opcode to be called (0-127).
+  *
+  * Code section: code
+  */
  //__attribute__((section("code")))
 void exec_opcode(uint8_t opcode)
 {
@@ -364,14 +364,14 @@ void exec_opcode(uint8_t opcode)
 #pragma clang section text="code_script"
 
 /**
- * @brief Reads a byte from the script.
- *
- * Reads the byte at pc and increments pc by 1.
- * 
- * @return uint8_t The byte.
- *
- * Code section: code_script
- */
+  * @brief Reads a byte from the script.
+  *
+  * Reads the byte at pc and increments pc by 1.
+  * 
+  * @return The byte.
+  *
+  * Code section: code_script
+  */
 static uint8_t read_byte(void)
 {
   uint8_t value;
@@ -380,14 +380,14 @@ static uint8_t read_byte(void)
 }
 
 /**
- * @brief Reads a 16-bit word from the script.
- *
- * Reads the 16 bit word at pc and increments pc by 2.
- * 
- * @return uint16_t The 16-bit word.
- *
- * Code section: code_script
- */
+  * @brief Reads a 16-bit word from the script.
+  *
+  * Reads the 16 bit word at pc and increments pc by 2.
+  * 
+  * @return The 16-bit word.
+  *
+  * Code section: code_script
+  */
 static uint16_t read_word(void)
 {
   uint16_t value;
@@ -409,14 +409,14 @@ static uint16_t read_word(void)
 }
 
 /**
- * @brief Reads 24 bits from the script.
- *
- * The value is stored in a 32-bit signed integer.
- * 
- * @return int32_t The read value.
- *
- * Code section: code_script
- */
+  * @brief Reads 24 bits from the script.
+  *
+  * The value is stored in a 32-bit signed integer.
+  * 
+  * @return The read value.
+  *
+  * Code section: code_script
+  */
 static int32_t read_int24(void)
 {
   int32_t value;
@@ -443,16 +443,16 @@ static int32_t read_int24(void)
 }
 
 /**
- * @brief Resolves the next parameter as an 8-bit value.
- *
- * The parameter can be either a variable index or an 8-bit value.
- * If the parameter is a variable index, the value of the variable is
- * truncated to the lower 8 bits.
- * 
- * @return uint8_t The resolved parameter.
- *
- * Code section: code_script
- */
+  * @brief Resolves the next parameter as an 8-bit value.
+  *
+  * The parameter can be either a variable index or an 8-bit value.
+  * If the parameter is a variable index, the value of the variable is
+  * truncated to the lower 8 bits.
+  * 
+  * @return The resolved parameter.
+  *
+  * Code section: code_script
+  */
 static uint8_t resolve_next_param8(void)
 {
   uint8_t param;
@@ -468,14 +468,14 @@ static uint8_t resolve_next_param8(void)
 }
 
 /**
- * @brief Resolves the next parameter as a 16-bit value.
- *
- * The parameter can be either a variable index or a 16-bit value.
- * 
- * @return uint16_t The resolved parameter.
- *
- * Code section: code_script
- */
+  * @brief Resolves the next parameter as a 16-bit value.
+  *
+  * The parameter can be either a variable index or a 16-bit value.
+  * 
+  * @return The resolved parameter.
+  *
+  * Code section: code_script
+  */
 static uint16_t resolve_next_param16(void)
 {
   uint16_t param;
@@ -491,14 +491,14 @@ static uint16_t resolve_next_param16(void)
 }
 
 /**
- * @brief Reads a null-terminated string from the script.
- *
- * Reads the string at pc and increments pc until a null byte is found.
- * 
- * @param dest The destination buffer where the string will be stored.
- *
- * Code section: code_script
- */
+  * @brief Reads a null-terminated string from the script.
+  *
+  * Reads the string at pc and increments pc until a null byte is found.
+  * 
+  * @param dest The destination buffer where the string will be stored.
+  *
+  * Code section: code_script
+  */
 static void read_null_terminated_string(char *dest)
 {
   char c;
@@ -531,17 +531,17 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
 }
 
 /**
- * @brief Reads a string from the script and decodes it.
- * 
- * In this case, the string is encoding space characters as
- * MSB of the character byte directly before the space.
- *
- * The resulting string in dest is null-terminated.
- *
- * @param dest The destination buffer where the decoded string will be stored.
- *
- * Code section: code_script
- */
+  * @brief Reads a string from the script and decodes it.
+  * 
+  * In this case, the string is encoding space characters as
+  * MSB of the character byte directly before the space.
+  *
+  * The resulting string in dest is null-terminated.
+  *
+  * @param dest The destination buffer where the decoded string will be stored.
+  *
+  * Code section: code_script
+  */
 static void read_encoded_string_null_terminated(char *dest)
 {
   uint8_t num_chars = 0;
@@ -562,22 +562,22 @@ static void read_encoded_string_null_terminated(char *dest)
 }
 
 /**
- * @brief Opcode 0x00: stop-script (current one) or break-here
- *
- * Opcodes 0x00 or 0xa0 (doesn't seem to be different) are used to stop 
- * the currently running script (as if using stop-script without parameter
- * in SCUMM).
- *
- * Opcode 0x80 is used to break the script and return to the main loop
- * for one cycle (break-here command in SCUMM). This usually is used to execute a redraw of the screen
- * before continuing the script.
- *
- * Opcode 0x20 is used to stop the music playback.
- *
- * Variant opcodes: 0x20, 0x80, 0xa0
- * 
- * Code section: code_script
- */
+  * @brief Opcode 0x00: stop-script (current one) or break-here
+  *
+  * Opcodes 0x00 or 0xa0 (doesn't seem to be different) are used to stop 
+  * the currently running script (as if using stop-script without parameter
+  * in SCUMM).
+  *
+  * Opcode 0x80 is used to break the script and return to the main loop
+  * for one cycle (break-here command in SCUMM). This usually is used to execute a redraw of the screen
+  * before continuing the script.
+  *
+  * Opcode 0x20 is used to stop the music playback.
+  *
+  * Variant opcodes: 0x20, 0x80, 0xa0
+  * 
+  * Code section: code_script
+  */
 static void stop_or_break(void)
 {
   if (opcode == 0x80) {
@@ -594,15 +594,15 @@ static void stop_or_break(void)
 }
 
 /**
- * @brief Opcode 0x01: put-actor
- *
- * Reads an actor id and two 8-bit values for x and y position. The actor
- * is then positioned at the given position.
- *
- * Variant opcodes: 0x21, 0x61, 0xA1, 0xE1
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x01: put-actor
+  *
+  * Reads an actor id and two 8-bit values for x and y position. The actor
+  * is then positioned at the given position.
+  *
+  * Variant opcodes: 0x21, 0x61, 0xA1, 0xE1
+  *
+  * Code section: code_script
+  */
 static void put_actor(void)
 {
   uint8_t actor_id = resolve_next_param8();
@@ -628,20 +628,20 @@ static void actor_room(void)
 }
 
 /**
- * @brief Opcode 0x04: Jump if greater
- *
- * Reads a variable index and a 16-bit value. If the value of the variable is
- * greater than the value, the script will jump to the new pc. The offset is
- * signed two-complement and is a byte position relative to the opcode of the
- * script command following. An offset of 0 would therefore disable the condition
- * completely, as practically no jump will occur.
- * The value to compare with can either be a 16-bit constant value (if opcode
- * is 0x04) or a variable index (if opcode is 0x84).
- *
- * Variant opcodes: 0x84
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x04: Jump if greater
+  *
+  * Reads a variable index and a 16-bit value. If the value of the variable is
+  * greater than the value, the script will jump to the new pc. The offset is
+  * signed two-complement and is a byte position relative to the opcode of the
+  * script command following. An offset of 0 would therefore disable the condition
+  * completely, as practically no jump will occur.
+  * The value to compare with can either be a 16-bit constant value (if opcode
+  * is 0x04) or a variable index (if opcode is 0x84).
+  *
+  * Variant opcodes: 0x84
+  *
+  * Code section: code_script
+  */
 static void jump_if_greater(void)
 {
   uint8_t var_idx = read_byte();
@@ -687,18 +687,18 @@ static void assign_array(void)
 }
 
 /**
- * @brief Opcode 0x08: Jump if equal
- *
- * Reads a variable index and a 16-bit value. If the value of the variable is
- * equal to the value, the script will jump to the new pc. The offset is
- * signed two-complement and is a byte position relative to the opcode of the
- * script command following. An offset of 0 would therefore disable the
- * condition completely, as practically no jump will occur.
- * The value to compare with can either be a 16-bit constant value (if opcode
- * is 0x08) or a variable index (if opcode is 0x88).
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x08: Jump if equal
+  *
+  * Reads a variable index and a 16-bit value. If the value of the variable is
+  * equal to the value, the script will jump to the new pc. The offset is
+  * signed two-complement and is a byte position relative to the opcode of the
+  * script command following. An offset of 0 would therefore disable the
+  * condition completely, as practically no jump will occur.
+  * The value to compare with can either be a 16-bit constant value (if opcode
+  * is 0x08) or a variable index (if opcode is 0x88).
+  *
+  * Code section: code_script
+  */
 static void jump_if_equal(void)
 {
   uint8_t var_idx = read_byte();
@@ -711,16 +711,16 @@ static void jump_if_equal(void)
 }
 
 /**
- * @brief Opcode 0x07: state-of
- * 
- * If the opcode bit 6 is set, the object state is cleared, otherwise it is set.
- * As an object active state is relevant for screen rendering (used for showing/
- * hiding an object), a screen update is requested after the state change.
- *
- * Variant opcodes: 0x47, 0x87, 0xC7
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x07: state-of
+  * 
+  * If the opcode bit 6 is set, the object state is cleared, otherwise it is set.
+  * As an object active state is relevant for screen rendering (used for showing/
+  * hiding an object), a screen update is requested after the state change.
+  *
+  * Variant opcodes: 0x47, 0x87, 0xC7
+  *
+  * Code section: code_script
+  */
 static void state_of(void)
 {
   uint16_t obj_id = resolve_next_param16();
@@ -739,19 +739,19 @@ static void state_of(void)
 }
 
 /**
- * @brief Opcode 0x0c: Resource cmd
- *
- * A subcode is read and the resource id is resolved. Depending on the subcode,
- * the resource type is determined and the resource is either provided or locked.
- *
- * Providing a resource make sure it is available in memory. If the resource is
- * still available, an unnecessary reload is avoided. Locking a resource makes
- * sure that it is not unloaded from memory as long as it stays locked. 
- *
- * Variant opcodes: 0x8c
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x0c: Resource cmd
+  *
+  * A subcode is read and the resource id is resolved. Depending on the subcode,
+  * the resource type is determined and the resource is either provided or locked.
+  *
+  * Providing a resource make sure it is available in memory. If the resource is
+  * still available, an unnecessary reload is avoided. Locking a resource makes
+  * sure that it is not unloaded from memory as long as it stays locked. 
+  *
+  * Variant opcodes: 0x8c
+  *
+  * Code section: code_script
+  */
 static void resource_cmd(void)
 {
   uint8_t resource_id = resolve_next_param8();
@@ -876,15 +876,15 @@ static void camera_pan_to(void)
 }
 
 /**
- * @brief Opcode 0x13: Actor ops
- * 
- * Used to configure actors. The subcode is read and the actor id is resolved.
- * Depending on the subcode, different actor properties are set.
- *
- * Variant opcodes: 0x53, 0x93, 0xD3
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x13: Actor ops
+  * 
+  * Used to configure actors. The subcode is read and the actor id is resolved.
+  * Depending on the subcode, different actor properties are set.
+  *
+  * Variant opcodes: 0x53, 0x93, 0xD3
+  *
+  * Code section: code_script
+  */
 static void actor_ops(void)
 {
   //debug_msg("Actor ops");
@@ -918,20 +918,20 @@ static void actor_ops(void)
 }
 
 /**
- * @brief Opcode 0x14: say-line (or print-line)
- *
- * Outputs a text message to the screen. The actor id is resolved and the
- * dialog string is read/decoded from the script.
- *
- * If the actor id is 0xff, the text is printed as a message from the game
- * with a default color. No actor talking animation will be triggered
- * in that case.
- *
- * The text is displayed on screen immediately. No update screen request is
- * necessary.
- * 
- * Code section: code_script
- */
+  * @brief Opcode 0x14: say-line (or print-line)
+  *
+  * Outputs a text message to the screen. The actor id is resolved and the
+  * dialog string is read/decoded from the script.
+  *
+  * If the actor id is 0xff, the text is printed as a message from the game
+  * with a default color. No actor talking animation will be triggered
+  * in that case.
+  *
+  * The text is displayed on screen immediately. No update screen request is
+  * necessary.
+  * 
+  * Code section: code_script
+  */
 static void say_line(void)
 {
   uint8_t actor_id = resolve_next_param8();
@@ -946,15 +946,15 @@ static void say_line(void)
 }
 
 /**
- * @brief Opcode 0x16: random_number
- * 
- * Creates a random number in the range [0..upper_bound] (including the upper_bound).
- * The random number is stored in the variable that is specified by the first parameter.
- *
- * Variant opcodes: 0x96
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x16: random_number
+  * 
+  * Creates a random number in the range [0..upper_bound] (including the upper_bound).
+  * The random number is stored in the variable that is specified by the first parameter.
+  *
+  * Variant opcodes: 0x96
+  *
+  * Code section: code_script
+  */
 static void random_number(void)
 {
   uint8_t var_idx = read_byte();
@@ -979,18 +979,18 @@ static void set_or_clear_untouchable(void)
 }
 
 /**
- * @brief Opcode 0x18: Jump or restart
- * 
- * Opcode 0x18:
- * Reads a 16 bit offset value and jumps to the new pc. An offset of 0 means
- * that the script will continue with the next opcode. The offset is signed
- * two-complement.
- *
- * Opcide 0x98:
- * Will restart the game from the beginning.
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x18: Jump or restart
+  * 
+  * Opcode 0x18:
+  * Reads a 16 bit offset value and jumps to the new pc. An offset of 0 means
+  * that the script will continue with the next opcode. The offset is signed
+  * two-complement.
+  *
+  * Opcide 0x98:
+  * Will restart the game from the beginning.
+  *
+  * Code section: code_script
+  */
 static void jump_or_restart(void)
 {
   if (!(opcode & 0x80)) {
@@ -1004,16 +1004,16 @@ static void jump_or_restart(void)
 }
 
 /**
- * @brief Opcode 0x1A: Assign variable
- *
- * Assigns a value to a variable. The variable index is read from the script as
- * the first parameter, and the value is read as the next 16-bit value. The value
- * can either be a 16-bit constant value or a variable index (if opcode is 0x9A).
- *
- * Variant opcodes: 0x9A
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x1A: Assign variable
+  *
+  * Assigns a value to a variable. The variable index is read from the script as
+  * the first parameter, and the value is read as the next 16-bit value. The value
+  * can either be a 16-bit constant value or a variable index (if opcode is 0x9A).
+  *
+  * Variant opcodes: 0x9A
+  *
+  * Code section: code_script
+  */
 static void assign_variable(void)
 {
   //debug_scr("assign-variable");
@@ -1154,19 +1154,19 @@ static void come_out_door(void)
 }
 
 /**
- * @brief Opcode 0x28: Jump if equal or not equal zero
- *
- * Reads a variable index and compares it to zero. Depending on the opcode, the
- * script will jump to the new pc if the variable is equal to zero (opcode 0x28)
- * or not equal to zero (opcode 0xA8). The offset is signed two-complement and
- * is a byte position relative to the opcode of the script command following.
- * An offset of 0 would therefore disable the condition completely, as practically
- * no jump will occur.
- *
- * Variant opcodes: 0xA8
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x28: Jump if equal or not equal zero
+  *
+  * Reads a variable index and compares it to zero. Depending on the opcode, the
+  * script will jump to the new pc if the variable is equal to zero (opcode 0x28)
+  * or not equal to zero (opcode 0xA8). The offset is signed two-complement and
+  * is a byte position relative to the opcode of the script command following.
+  * An offset of 0 would therefore disable the condition completely, as practically
+  * no jump will occur.
+  *
+  * Variant opcodes: 0xA8
+  *
+  * Code section: code_script
+  */
 static void jump_if_or_if_not_equal_zero(void)
 {
   uint8_t var_idx = read_byte();
@@ -1186,14 +1186,14 @@ static void jump_if_or_if_not_equal_zero(void)
 }
 
 /**
- * @brief Opcode 0x2B: sleep-for using value from a variable
- * 
- * Reads a variable index and delays the script execution by the negative value
- * of the variable. The delay is calculated as -1 - variable_value. The timer
- * will count upwards and resume execution of the script once it reaaches 0.
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x2B: sleep-for using value from a variable
+  * 
+  * Reads a variable index and delays the script execution by the negative value
+  * of the variable. The delay is calculated as -1 - variable_value. The timer
+  * will count upwards and resume execution of the script once it reaaches 0.
+  *
+  * Code section: code_script
+  */
 static void sleep_for_variable(void)
 {
   //debug_msg("sleep-for with variable");
@@ -1203,15 +1203,15 @@ static void sleep_for_variable(void)
 }
 
 /**
- * @brief Opcode 0x2D: put-actor a in-room r
- *
- * Reads the actor id and the room id from the script and places the actor in
- * the room.
- *
- * Variant opcodes: 0x6D, 0xAD, 0xED
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x2D: put-actor a in-room r
+  *
+  * Reads the actor id and the room id from the script and places the actor in
+  * the room.
+  *
+  * Variant opcodes: 0x6D, 0xAD, 0xED
+  *
+  * Code section: code_script
+  */
 static void put_actor_in_room(void)
 {
   uint8_t actor_id = resolve_next_param8();
@@ -1221,20 +1221,20 @@ static void put_actor_in_room(void)
 }
 
 /**
- * @brief Opcode 0x2E/0xAE: sleep-for or wait-for-message
- * 
- * If the opcode is 0x2E, the script will pause for a certain amount of time.
- * Reads 24 bits of ticks value for the wait timer. Note that the amount
- * of ticks that the script should pause actually needs to be calculated by
- * ticks_to_wait = 0xffffff - param_value.
- *
- * If the opcode is 0xAE, the script will wait until the current message is
- * processed. If the message is still going, the script will be paused and
- * the pc will be decremented to repeat the wait-for-message command in the
- * next script cycle.
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x2E/0xAE: sleep-for or wait-for-message
+  * 
+  * If the opcode is 0x2E, the script will pause for a certain amount of time.
+  * Reads 24 bits of ticks value for the wait timer. Note that the amount
+  * of ticks that the script should pause actually needs to be calculated by
+  * ticks_to_wait = 0xffffff - param_value.
+  *
+  * If the opcode is 0xAE, the script will wait until the current message is
+  * processed. If the message is still going, the script will be paused and
+  * the pc will be decremented to repeat the wait-for-message command in the
+  * next script cycle.
+  *
+  * Code section: code_script
+  */
 static void sleep_for_or_wait_for_message(void)
 {
   if (!(opcode & 0x80)) {
@@ -1269,16 +1269,16 @@ static void jump_if_or_if_not_locked(void)
 }
 
 /**
- * @brief Opcode 0x31: assign from bit variable
- *
- * Reads a variable index and a 16-bit value. The value is used as a bit variable
- * and the bit is assigned to the variable index. The bit variable is read from
- * the script as the first parameter.
- *
- * Variant opcodes: 0xB1
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x31: assign from bit variable
+  *
+  * Reads a variable index and a 16-bit value. The value is used as a bit variable
+  * and the bit is assigned to the variable index. The bit variable is read from
+  * the script as the first parameter.
+  *
+  * Variant opcodes: 0xB1
+  *
+  * Code section: code_script
+  */
 static void assign_from_bit_variable(void)
 {
   uint8_t var_idx = read_byte();
@@ -1433,18 +1433,18 @@ static void set_or_clear_pickupable(void)
 }
 
 /**
- * @brief Opcode 0x38: Jump if smaller
- *
- * Reads a variable index and a 16-bit value. If the value of the variable is
- * smaller than the value, the script will jump to the new pc. The offset is
- * signed two-complement and is a byte position relative to the opcode of the
- * script command following. An offset of 0 would therefore disable the
- * condition completely, as practically no jump will occur.
- * The value to compare with can either be a 16-bit constant value (if opcode
- * is 0x38) or a variable index (if opcode is 0xB8).
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x38: Jump if smaller
+  *
+  * Reads a variable index and a 16-bit value. If the value of the variable is
+  * smaller than the value, the script will jump to the new pc. The offset is
+  * signed two-complement and is a byte position relative to the opcode of the
+  * script command following. An offset of 0 would therefore disable the
+  * condition completely, as practically no jump will occur.
+  * The value to compare with can either be a 16-bit constant value (if opcode
+  * is 0x38) or a variable index (if opcode is 0xB8).
+  *
+  * Code section: code_script
+  */
 static void jump_if_smaller(void)
 {
   //debug_msg("Jump if smaller");
@@ -1457,17 +1457,17 @@ static void jump_if_smaller(void)
 }
 
 /**
- * @brief Opcode 0x3A: Subtract
- *
- * Subtracts a value from a variable. The value can be either a 16-bit constant
- * or a variable index (if opcode is 0xBA). The variable to modify is read from
- * the script as the first parameter.
- *
- * Opcode 0x3A: VAR(PARAM1) -= PARAM2
- * Opcode 0xBA: VAR(PARAM1) -= VAR(PARAM2)
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x3A: Subtract
+  *
+  * Subtracts a value from a variable. The value can be either a 16-bit constant
+  * or a variable index (if opcode is 0xBA). The variable to modify is read from
+  * the script as the first parameter.
+  *
+  * Opcode 0x3A: VAR(PARAM1) -= PARAM2
+  * Opcode 0xBA: VAR(PARAM1) -= VAR(PARAM2)
+  *
+  * Code section: code_script
+  */
 static void subtract(void)
 {
   //debug_msg("Subtract");
@@ -1519,14 +1519,14 @@ static void jump_if_or_if_not_pickupable(void)
 
 
 /**
- * @brief Opcode 0x40: Cutscene
- * 
- * Starts a cutscene. Certain aspects of the game state will be saved so that
- * it can be restored once the cutscene is over (eg. remembering the current room
- * so the scene can be restored after the cutscene).
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x40: Cutscene
+  * 
+  * Starts a cutscene. Certain aspects of the game state will be saved so that
+  * it can be restored once the cutscene is over (eg. remembering the current room
+  * so the scene can be restored after the cutscene).
+  *
+  * Code section: code_script
+  */
 static void cut_scene(void)
 {
   //debug_msg("cut-scene");
@@ -1541,15 +1541,15 @@ static void cut_scene(void)
 }
 
 /**
- * @brief Opcode 0x42: Start script
- * 
- * Starts a new script. The script id is read from the script and the script
- * is started. The script will run in parallel to the current script.
- *
- * Variant opcodes: 0xC2
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x42: Start script
+  * 
+  * Starts a new script. The script id is read from the script and the script
+  * is started. The script will run in parallel to the current script.
+  *
+  * Variant opcodes: 0xC2
+  *
+  * Code section: code_script
+  */
 static void start_script(void)
 {
   //debug_msg("Start script");
@@ -1567,20 +1567,20 @@ static void actor_x(void)
 }
 
 /**
- * @brief Opcode 0x44: Jump if smaller or equal
- *
- * Reads a variable index and a 16-bit value. If the value of the variable is
- * smaller or equal to the value, the script will jump to the new pc. The offset
- * is signed two-complement and is a byte position relative to the opcode of the
- * script command following. An offset of 0 would therefore disable the condition
- * completely, as practically no jump will occur.
- * The value to compare with can either be a 16-bit constant value (if opcode
- * is 0x44) or a variable index (if opcode is 0xC4).
- *
- * Variant opcodes: 0xC4
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x44: Jump if smaller or equal
+  *
+  * Reads a variable index and a 16-bit value. If the value of the variable is
+  * smaller or equal to the value, the script will jump to the new pc. The offset
+  * is signed two-complement and is a byte position relative to the opcode of the
+  * script command following. An offset of 0 would therefore disable the condition
+  * completely, as practically no jump will occur.
+  * The value to compare with can either be a 16-bit constant value (if opcode
+  * is 0x44) or a variable index (if opcode is 0xC4).
+  *
+  * Variant opcodes: 0xC4
+  *
+  * Code section: code_script
+  */
 static void jump_if_smaller_or_equal(void)
 {
   //debug_msg("Jump if smaller or equal");
@@ -1593,16 +1593,16 @@ static void jump_if_smaller_or_equal(void)
 }
 
 /**
- * @brief Opcode 0x46: Increment or decrement
- * 
- * Reads a variable index and increments or decrements the value of the variable.
- * If the opcode bit 7 is set, the variable is decremented, otherwise it is
- * incremented.
- *
- * Variant opcodes: 0xC6
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x46: Increment or decrement
+  * 
+  * Reads a variable index and increments or decrements the value of the variable.
+  * If the opcode bit 7 is set, the variable is decremented, otherwise it is
+  * incremented.
+  *
+  * Variant opcodes: 0xC6
+  *
+  * Code section: code_script
+  */
 static void increment_or_decrement(void)
 {
   //debug_msg("Increment variable");
@@ -1617,18 +1617,18 @@ static void increment_or_decrement(void)
 }
 
 /**
- * @brief Opcode 0x48: Jump if not equal
- *
- * Reads a variable index and a 16-bit value. If the value of the variable is
- * not equal to the value, the script will jump to the new pc. The offset is
- * signed two-complement and is a byte position relative to the opcode of the 
- * script command following. An offset of 0 would therefore disable the 
- * condition completely, as practically no jump will occur.
- * The value to compare with can either be a 16-bit constant value (if opcode 
- * is 0x48) or a variable index (if opcode is 0xC8).
- * 
- * Code section: code_script
- */
+  * @brief Opcode 0x48: Jump if not equal
+  *
+  * Reads a variable index and a 16-bit value. If the value of the variable is
+  * not equal to the value, the script will jump to the new pc. The offset is
+  * signed two-complement and is a byte position relative to the opcode of the 
+  * script command following. An offset of 0 would therefore disable the 
+  * condition completely, as practically no jump will occur.
+  * The value to compare with can either be a 16-bit constant value (if opcode 
+  * is 0x48) or a variable index (if opcode is 0xC8).
+  * 
+  * Code section: code_script
+  */
 static void jump_if_not_equal(void)
 {
   //debug_msg("Jump if not equal");
@@ -1641,20 +1641,20 @@ static void jump_if_not_equal(void)
 }
 
 /**
- * @brief Opcode 0x4A: Chain script
- *
- * Reads a script id and chains the script. The current script will be stopped
- * immediately and the new script will be started. The new script will run 
- * instead of the current script in the same script slot. The new script resource
- * will be loaded and the new script will be started. The script resource will 
- * be mapped already at the end of this function and the PC will be set to the
- * beginning of the new script. Therefore, when returning from this function,
- * the new script will be executed from the beginning.
- *
- * Variant opcodes: 0xCA
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x4A: Chain script
+  *
+  * Reads a script id and chains the script. The current script will be stopped
+  * immediately and the new script will be started. The new script will run 
+  * instead of the current script in the same script slot. The new script resource
+  * will be loaded and the new script will be started. The script resource will 
+  * be mapped already at the end of this function and the PC will be set to the
+  * beginning of the new script. Therefore, when returning from this function,
+  * the new script will be executed from the beginning.
+  *
+  * Variant opcodes: 0xCA
+  *
+  * Code section: code_script
+  */
 void chain_script(void)
 {
   //debug_msg("chain-script");
@@ -1667,20 +1667,20 @@ void chain_script(void)
 }
 
 /**
- * @brief Opcode 0x4F: Jump if object not active
- *
- * Reads an object id and a signed offset. If the object is not active, the script
- * will jump to the new pc. The offset is signed two-complement and is a byte
- * position relative to the opcode of the script command following. An offset of 0
- * would therefore disable the condition completely, as practically no jump will occur.
- *
- * The object active state is relevant for screen rendering (used for showing/hiding
- * an object).
- *
- * Variant opcodes: 0xCF
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x4F: Jump if object not active
+  *
+  * Reads an object id and a signed offset. If the object is not active, the script
+  * will jump to the new pc. The offset is signed two-complement and is a byte
+  * position relative to the opcode of the script command following. An offset of 0
+  * would therefore disable the condition completely, as practically no jump will occur.
+  *
+  * The object active state is relevant for screen rendering (used for showing/hiding
+  * an object).
+  *
+  * Variant opcodes: 0xCF
+  *
+  * Code section: code_script
+  */
 static void jump_if_object_active_or_not_active(void)
 {
   //debug_msg("Jump if object not active");
@@ -1736,15 +1736,15 @@ static void camera_follows_actor(void)
 }
 
 /**
- * @brief Opcode 0x58: Begin override or print ego
- * 
- * Function is called for both opcodes 0x58 and 0xd8 (0x58 | 0x80).
- * Forward to the correct function depending on the opcode.
- *
- * Variant opcodes: 0xd8
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x58: Begin override or print ego
+  * 
+  * Function is called for both opcodes 0x58 and 0xd8 (0x58 | 0x80).
+  * Forward to the correct function depending on the opcode.
+  *
+  * Variant opcodes: 0xd8
+  *
+  * Code section: code_script
+  */
 void begin_override_or_say_line_selected_actor(void)
 {
   if (!(opcode & 0x80)) {
@@ -1756,17 +1756,17 @@ void begin_override_or_say_line_selected_actor(void)
 }
 
 /**
- * @brief Opcode 0x58: Begin override
- * 
- * Enables the user to override the currently running cutscene.
- * The goto command that will be executed is directly following, and is stored
- * in the override_pc variable. This is used to jump to the next opcode after
- * the cutscene has been overridden.
- *
- * The begin_override opcode is skipping the goto command that is following it.
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x58: Begin override
+  * 
+  * Enables the user to override the currently running cutscene.
+  * The goto command that will be executed is directly following, and is stored
+  * in the override_pc variable. This is used to jump to the next opcode after
+  * the cutscene has been overridden.
+  *
+  * The begin_override opcode is skipping the goto command that is following it.
+  *
+  * Code section: code_script
+  */
 static void begin_override(void)
 {
   //debug_msg("Begin override");
@@ -1775,10 +1775,10 @@ static void begin_override(void)
 }
 
 /**
- * @brief Opcode 0xd8 (0x58 | 0x80): Print ego
- * 
- * Code section: code_script
- */
+  * @brief Opcode 0xd8 (0x58 | 0x80): Print ego
+  * 
+  * Code section: code_script
+  */
 static void say_line_selected_actor(void)
 {
   //debug_msg("say-line selected-actor");
@@ -1788,17 +1788,17 @@ static void say_line_selected_actor(void)
 }
 
 /**
- * @brief Opcode 0x5A: Add
- * 
- * Adds a value to a variable. The value can be either a 16-bit constant
- * or a variable index (if opcode is 0xDA). The variable to modify is read from
- * the script as the first parameter.
- *
- * Opcode 0x5A: VAR(PARAM1) += PARAM2
- * Opcode 0xDA: VAR(PARAM1) += VAR(PARAM2)
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x5A: Add
+  * 
+  * Adds a value to a variable. The value can be either a 16-bit constant
+  * or a variable index (if opcode is 0xDA). The variable to modify is read from
+  * the script as the first parameter.
+  *
+  * Opcode 0x5A: VAR(PARAM1) += PARAM2
+  * Opcode 0xDA: VAR(PARAM1) += VAR(PARAM2)
+  *
+  * Code section: code_script
+  */
 static void add(void)
 {
   //debug_msg("Add");
@@ -1807,13 +1807,13 @@ static void add(void)
 }
 
 /**
- * @brief Opcode 0x60: Cursor opcode
- * 
- * Reads the cursor state and the state of the interface. The cursor state
- * is stored in VAR_CURSOR_STATE and the interface state is stored in state_iface.
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x60: Cursor opcode
+  * 
+  * Reads the cursor state and the state of the interface. The cursor state
+  * is stored in VAR_CURSOR_STATE and the interface state is stored in state_iface.
+  *
+  * Code section: code_script
+  */
 static void cursor(void)
 {
   uint16_t param = resolve_next_param16();
@@ -1895,13 +1895,13 @@ static void lights(void)
 }
 
 /**
- * @brief Opcode 0x72: current-room
- *
- * Switches the scene to a new room. The room number is read from the script.
- * The new room is activated immediately and a screen update is requested.
- * 
- * Code section: code_script
- */
+  * @brief Opcode 0x72: current-room
+  *
+  * Switches the scene to a new room. The room number is read from the script.
+  * The new room is activated immediately and a screen update is requested.
+  * 
+  * Code section: code_script
+  */
 static void current_room(void)
 {
   uint8_t room_no = read_byte();
@@ -1910,20 +1910,20 @@ static void current_room(void)
 }
 
 /** 
- * @brief Opcode 0x78: Jump if greater or equal
- *
- * Reads a variable index and a 16-bit value. If the value of the variable is
- * greater or equal to the value, the script will jump to the new pc. The offset
- * is signed two-complement and is a byte position relative to the opcode of the
- * script command following. An offset of 0 would therefore disable the condition
- * completely, as practically no jump will occur.
- * The value to compare with can either be a 16-bit constant value (if opcode
- * is 0x78) or a variable index (if opcode is 0xF8).
- *
- * Variant opcodes: 0xF8
- *
- * Code section: code_script
- */
+  * @brief Opcode 0x78: Jump if greater or equal
+  *
+  * Reads a variable index and a 16-bit value. If the value of the variable is
+  * greater or equal to the value, the script will jump to the new pc. The offset
+  * is signed two-complement and is a byte position relative to the opcode of the
+  * script command following. An offset of 0 would therefore disable the condition
+  * completely, as practically no jump will occur.
+  * The value to compare with can either be a 16-bit constant value (if opcode
+  * is 0x78) or a variable index (if opcode is 0xF8).
+  *
+  * Variant opcodes: 0xF8
+  *
+  * Code section: code_script
+  */
 static void jump_if_greater_or_equal(void)
 {
   //debug_msg("Jump if greater or equal");
@@ -1962,10 +1962,10 @@ static void verb(void)
 }
 
 /**
- * @brief Error handler for unimplemented opcodes.
- * 
- * Code section: code_script
- */
+  * @brief Error handler for unimplemented opcodes.
+  * 
+  * Code section: code_script
+  */
 static void unimplemented_opcode(void)
 {
   debug_out("Unimplemented opcode: %x at %x", opcode, (uint16_t)(pc - 1));

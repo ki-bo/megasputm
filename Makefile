@@ -31,7 +31,7 @@ endif
 
 -include $(DEPS)
 
-.PHONY: all clean run debug_xemu
+.PHONY: all clean run debug_xemu doxygen
 
 all: mm.d81
 
@@ -67,6 +67,9 @@ mm.d81: runtime.raw
 		cp gamedata/MM.D81 mm.d81; \
 	fi
 	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-1.raw m11 -write m1-2.raw m12
+
+doxygen:
+	doxygen Doxyfile
 
 clean:
 	-rm -rf obj

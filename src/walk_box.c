@@ -22,9 +22,9 @@ static void find_closest_point_on_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8
 //----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup walkbox_public Walk Box Public Functions
- * @{
- */
+  * @defgroup walkbox_public Walk Box Public Functions
+  * @{
+  */
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
 
 uint8_t walkbox_get_next_box(uint8_t cur_box, uint8_t target_box)
@@ -157,18 +157,18 @@ uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, ui
 }
 
 /**
- * @brief Find the closest point on the perimeter of a walk box to a given point.
- * 
- * This function calculates the closest point on the perimeter of a walk box to a given point. The
- * walk box is defined by its id. The given point is (px, py). The closest point on the perimeter of
- * the walk box is calculated and stored in (px, py).
- *
- * Be aware that this function won't work properly if the given point is inside the walk box.
- * 
- * @param box_id The id of the walk box.
- * @param px The x-coordinate of the given point.
- * @param py The y-coordinate of the given point.
- */
+  * @brief Find the closest point on the perimeter of a walk box to a given point.
+  * 
+  * This function calculates the closest point on the perimeter of a walk box to a given point. The
+  * walk box is defined by its id. The given point is (px, py). The closest point on the perimeter of
+  * the walk box is calculated and stored in (px, py).
+  *
+  * Be aware that this function won't work properly if the given point is inside the walk box.
+  * 
+  * @param box_id The id of the walk box.
+  * @param px The x-coordinate of the given point.
+  * @param py The y-coordinate of the given point.
+  */
 void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
 {
   SAVE_CS_AUTO_RESTORE
@@ -210,9 +210,9 @@ void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
 //----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup walkbox_private Walk Box Private Functions
- * @{
- */
+  * @defgroup walkbox_private Walk Box Private Functions
+  * @{
+  */
 #pragma clang section text="code_main_private"
 
 static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, uint8_t yc)
@@ -236,21 +236,21 @@ static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, 
 }
 
 /**
- * @brief Find the closest point on a line segment to a given point.
- * 
- * This function calculates the closest point on a line segment to a given point. The line segment is
- * defined by two points (x1, y1) and (x2, y2). The given point is (px, py). The closest point on the
- * line segment is calculated and stored in (px, py).
- *
- * If the line is horizontal you need to make sure that x1<=x2. In any case, make sure that y1<=y2.
- * 
- * @param x1 The x-coordinate of the first point on the line segment.
- * @param y1 The y-coordinate of the first point on the line segment.
- * @param x2 The x-coordinate of the second point on the line segment.
- * @param y2 The y-coordinate of the second point on the line segment.
- * @param px The x-coordinate of the given point.
- * @param py The y-coordinate of the given point.
- */
+  * @brief Find the closest point on a line segment to a given point.
+  * 
+  * This function calculates the closest point on a line segment to a given point. The line segment is
+  * defined by two points (x1, y1) and (x2, y2). The given point is (px, py). The closest point on the
+  * line segment is calculated and stored in (px, py).
+  *
+  * If the line is horizontal you need to make sure that x1<=x2. In any case, make sure that y1<=y2.
+  * 
+  * @param x1 The x-coordinate of the first point on the line segment.
+  * @param y1 The y-coordinate of the first point on the line segment.
+  * @param x2 The x-coordinate of the second point on the line segment.
+  * @param y2 The y-coordinate of the second point on the line segment.
+  * @param px The x-coordinate of the given point.
+  * @param py The y-coordinate of the given point.
+  */
 static void find_closest_point_on_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *px, uint8_t *py)
 {
   // Handle special case: vertical line

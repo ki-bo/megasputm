@@ -20,16 +20,16 @@
 #pragma clang section bss="bss_init"
 
 /**
- * @brief Temporary storage for the index file contents
- *
- * The index is in file 00.lfl and contains room numbers (=file numbers) and
- * offsets for each resource within that file.
- *
- * We put this into bss_init so it won't be taking up space after the init
- * routine is finished.
- *
- * BSS section: bss_init
- */
+  * @brief Temporary storage for the index file contents
+  *
+  * The index is in file 00.lfl and contains room numbers (=file numbers) and
+  * offsets for each resource within that file.
+  *
+  * We put this into bss_init so it won't be taking up space after the init
+  * routine is finished.
+  *
+  * BSS section: bss_init
+  */
 static struct {
   uint16_t magic_number;
   uint16_t num_global_game_objects;
@@ -70,13 +70,13 @@ static struct {
 #pragma clang section data="data_diskio" bss="bss_diskio"
 
 /*
- * The index is in file 00.lfl and contains room numbers (=file numbers) and
- * offsets for each resource within that file. We cache this in memory to
- * speed up access to resources.
- * The numbers are hard-coded for the Maniac Mansion (Scumm V2) game.
- *
- * BSS section: bss_diskio
- */
+  * The index is in file 00.lfl and contains room numbers (=file numbers) and
+  * offsets for each resource within that file. We cache this in memory to
+  * speed up access to resources.
+  * The numbers are hard-coded for the Maniac Mansion (Scumm V2) game.
+  *
+  * BSS section: bss_diskio
+  */
 static struct {
   uint8_t room_disk_num[61];
   uint16_t room_offset[61];
@@ -158,20 +158,20 @@ static void write_sector(uint8_t track, uint8_t sector, uint8_t __far *sector_bu
 static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector);
 
 /**
- * @defgroup diskio_init Disk I/O Init Functions
- * @{
- */
+  * @defgroup diskio_init Disk I/O Init Functions
+  * @{
+  */
 #pragma clang section text="code_init" rodata="cdata_init" data="data_init" bss="bss_init"
 
 /**
- * @brief Initialises the diskio module.
- *
- * This function must be called before any other diskio function.
- * It reads the start tracks and sectors of each room from the disk
- * directory and caches them in memory.
- * 
- * Code section: code_init
- */
+  * @brief Initialises the diskio module.
+  *
+  * This function must be called before any other diskio function.
+  * It reads the start tracks and sectors of each room from the disk
+  * directory and caches them in memory.
+  * 
+  * Code section: code_init
+  */
 void diskio_init(void)
 {
   memset(room_track_list, 0, sizeof(room_track_list));
@@ -203,24 +203,24 @@ void diskio_init(void)
 }
 
 /**
- * @brief Parses lfl file entries in the FDC buffer and caches them
- * 
- * The function assumes a directory block has been loaded into the FDC buffer.
- * It will call read_lfl_file_entry() for each file entry in the buffer and
- * cache the track and block numbers for each valid lfl file entry.
- * Start track and sector of the file in the static variables room_track_list and
- * room_block_list.
- * 
- * The directory block contains up to eight file entries. Each file entry is 32
- * bytes long. If there are more blocks to read in the directory, the function will
- * automatically load the next block and return 1. If there are no more
- * blocks to read, the function will return 0.
- *
- * Code section: code_init
- * Private function
- *
- * @return uint8_t 0 if there are no more blocks to read, 1 otherwise
- */
+  * @brief Parses lfl file entries in the FDC buffer and caches them
+  * 
+  * The function assumes a directory block has been loaded into the FDC buffer.
+  * It will call read_lfl_file_entry() for each file entry in the buffer and
+  * cache the track and block numbers for each valid lfl file entry.
+  * Start track and sector of the file in the static variables room_track_list and
+  * room_block_list.
+  * 
+  * The directory block contains up to eight file entries. Each file entry is 32
+  * bytes long. If there are more blocks to read in the directory, the function will
+  * automatically load the next block and return 1. If there are no more
+  * blocks to read, the function will return 0.
+  *
+  * Code section: code_init
+  * Private function
+  *
+  * @return 0 if there are no more blocks to read, 1 otherwise
+  */
 static uint8_t read_next_directory_block() 
 {
   uint8_t next_track = FDC.data;
@@ -240,21 +240,21 @@ static uint8_t read_next_directory_block()
 }
 
 /**
- * @brief Reads bytes from the sector buffer and parses them into a file entry.
- * 
- * The function reads bytes from the sector buffer and parses one file entry into
- * room_track_list and room_block_list. The function returns the number of bytes actually
- * read from the sector buffer.
- * 
- * @note The number of bytes actually read from the sector buffer can vary, 
- *       as the function will stop reading when it encounters the first invalid
- *       byte.
- *
- * Code section: code_init
- * Private function
- *
- * @return uint8_t The number of bytes actually read from the sector buffer
- */
+  * @brief Reads bytes from the sector buffer and parses them into a file entry.
+  * 
+  * The function reads bytes from the sector buffer and parses one file entry into
+  * room_track_list and room_block_list. The function returns the number of bytes actually
+  * read from the sector buffer.
+  * 
+  * @note The number of bytes actually read from the sector buffer can vary, 
+  *       as the function will stop reading when it encounters the first invalid
+  *       byte.
+  *
+  * Code section: code_init
+  * Private function
+  *
+  * @return The number of bytes actually read from the sector buffer
+  */
 static uint8_t read_lfl_file_entry()
 {
   uint8_t i = 1;
@@ -308,15 +308,15 @@ static uint8_t read_lfl_file_entry()
 }
 
 /**
- * @brief Loads the index from disk into memory.
- *
- * The index is in file 00.lfl and contains room numbers (=file numbers) and
- * offsets for each resource within that file. We cache this in memory to
- * speed up access to resources.
- *
- * Code section: code_init
- * Private function
- */
+  * @brief Loads the index from disk into memory.
+  *
+  * The index is in file 00.lfl and contains room numbers (=file numbers) and
+  * offsets for each resource within that file. We cache this in memory to
+  * speed up access to resources.
+  *
+  * Code section: code_init
+  * Private function
+  */
 static void load_index(void)
 {
   uint8_t bytes_left_in_block;
@@ -361,19 +361,19 @@ static void load_index(void)
 }
 
 /**
- * @brief Marks all blocks in disk cache as not-available
- *
- * Disk cache is in attic ram, starting at 0x8000000. Each physical sector
- * is 512 bytes long. The cache can hold 20*80=1600 sectors.
- * The first two bytes of each block are used to store the track and block
- * number of the next block. Legal values are only 0-80 for the track
- * number (0 = last block). Therefore, we use the unsused value 0xff to mark 
- * a sector as not available (such a value should never occur on the disk
- * for the 'next track' byte).
- *
- * Code section: code_init
- * Private function
- */
+  * @brief Marks all blocks in disk cache as not-available
+  *
+  * Disk cache is in attic ram, starting at 0x8000000. Each physical sector
+  * is 512 bytes long. The cache can hold 20*80=1600 sectors.
+  * The first two bytes of each block are used to store the track and block
+  * number of the next block. Legal values are only 0-80 for the track
+  * number (0 = last block). Therefore, we use the unsused value 0xff to mark 
+  * a sector as not available (such a value should never occur on the disk
+  * for the 'next track' byte).
+  *
+  * Code section: code_init
+  * Private function
+  */
 static void invalidate_disk_cache(void)
 {
   int8_t __huge *ptr = HUGE_I8_PTR(DISK_CACHE);
@@ -389,9 +389,9 @@ static void invalidate_disk_cache(void)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup diskio_public Disk I/O Public Functions
- * @{
- */
+  * @defgroup diskio_public Disk I/O Public Functions
+  * @{
+  */
 #pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
 
 void diskio_switch_to_real_drive(void)
@@ -411,20 +411,20 @@ void diskio_switch_to_real_drive(void)
 }
 
 /**
- * @brief Checks whether drive motor should be turned off
- * 
- * The function will check whether the drive has been accessed within the last 60 jiffies.
- * If not, it will turn off the drive motor and LED.
- * The function should be called regularly (several times per second) from the main loop, 
- * so the jiffy counter used for the check is correctly evaluated.
- *
- * The function will accumulate the elapsed jiffies since the last call and turn off the
- * drive motor and LED if the accumulated jiffies exceed 60.
- *
- * @param elapsed_jiffies The number of jiffies elapsed since the last call to this function
- *
- * Code section: code_diskio
- */
+  * @brief Checks whether drive motor should be turned off
+  * 
+  * The function will check whether the drive has been accessed within the last 60 jiffies.
+  * If not, it will turn off the drive motor and LED.
+  * The function should be called regularly (several times per second) from the main loop, 
+  * so the jiffy counter used for the check is correctly evaluated.
+  *
+  * The function will accumulate the elapsed jiffies since the last call and turn off the
+  * drive motor and LED if the accumulated jiffies exceed 60.
+  *
+  * @param elapsed_jiffies The number of jiffies elapsed since the last call to this function
+  *
+  * Code section: code_diskio
+  */
 void diskio_check_motor_off(uint8_t elapsed_jiffies)
 {
   if (!drive_ready || drive_in_use) {
@@ -451,13 +451,13 @@ uint8_t diskio_file_exists(const char *filename)
 }
 
 /**
- * @brief Loads a file from disk into memory.
- * 
- * @param filename Null-terminated string containing the filename to load.
- * @param address Far pointer address in memory to load the file to.
- *
- * Code section: code_diskio
- */
+  * @brief Loads a file from disk into memory.
+  * 
+  * @param filename Null-terminated string containing the filename to load.
+  * @param address Far pointer address in memory to load the file to.
+  *
+  * Code section: code_diskio
+  */
 void diskio_load_file(const char *filename, uint8_t __far *address)
 {
   static dmalist_single_option_t dmalist_copy = {
@@ -502,13 +502,13 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
 }
 
 /**
- * @brief Loads the global game objects from disk into memory.
- *
- * The global game objects are stored in the index file 00.lfl. The function
- * will load the global game objects from the index file into memory.
- *
- * Code section: code_diskio
- */
+  * @brief Loads the global game objects from disk into memory.
+  *
+  * The global game objects are stored in the index file 00.lfl. The function
+  * will load the global game objects from the index file into memory.
+  *
+  * Code section: code_diskio
+  */
 void diskio_load_game_objects(void)
 {
   uint8_t bytes_left_in_block;
@@ -560,25 +560,25 @@ void diskio_load_game_objects(void)
 }
 
 /**
- * @brief Starts loading a resource from disk into memory.
- *
- * The function will start loading a resource from disk into memory. The resource
- * type and id are passed as parameters. The function will return the size of the
- * resource in bytes. The actual loading of the resource data into memory is done
- * by diskio_continue_resource_loading().
- *
- * Use this function to seek to the start of a resource and get its size. 
- * Memory needs to be allocated for the resource and the resource memory be
- * mapped to DEFAULT_RESOURCE_ADDRESS. Then call diskio_continue_resource_loading()
- * to load the resource data into memory.
- *
- * @param type The resource type (RES_TYPE_ROOM, RES_TYPE_COSTUME, RES_TYPE_SCRIPT, RES_TYPE_SOUND)
- * @param id The resource id
- *
- * @return uint16_t The size of the resource in bytes
- *
- * Code section: code_diskio
- */
+  * @brief Starts loading a resource from disk into memory.
+  *
+  * The function will start loading a resource from disk into memory. The resource
+  * type and id are passed as parameters. The function will return the size of the
+  * resource in bytes. The actual loading of the resource data into memory is done
+  * by diskio_continue_resource_loading().
+  *
+  * Use this function to seek to the start of a resource and get its size. 
+  * Memory needs to be allocated for the resource and the resource memory be
+  * mapped to DEFAULT_RESOURCE_ADDRESS. Then call diskio_continue_resource_loading()
+  * to load the resource data into memory.
+  *
+  * @param type The resource type (RES_TYPE_ROOM, RES_TYPE_COSTUME, RES_TYPE_SCRIPT, RES_TYPE_SOUND)
+  * @param id The resource id
+  *
+  * @return The size of the resource in bytes
+  *
+  * Code section: code_diskio
+  */
 uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
 {
   acquire_drive();
@@ -630,19 +630,19 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
 }
 
 /**
- * @brief Continues loading a resource from disk into memory.
- *
- * The function will continue loading a resource from disk into memory. The resource
- * data is loaded into memory starting at DEFAULT_RESOURCE_ADDRESS. The size of the
- * resource data is passed as a parameter. The function will load the resource data
- * into memory and return when the resource data has been completely loaded.
- *
- * You need to call diskio_start_resource_loading() before calling this function.
- *
- * @param size The size of the resource in bytes
- *
- * Code section: code_diskio
- */
+  * @brief Continues loading a resource from disk into memory.
+  *
+  * The function will continue loading a resource from disk into memory. The resource
+  * data is loaded into memory starting at DEFAULT_RESOURCE_ADDRESS. The size of the
+  * resource data is passed as a parameter. The function will load the resource data
+  * into memory and return when the resource data has been completely loaded.
+  *
+  * You need to call diskio_start_resource_loading() before calling this function.
+  *
+  * @param size The size of the resource in bytes
+  *
+  * Code section: code_diskio
+  */
 void diskio_continue_resource_loading(uint8_t __huge *target_ptr)
 {
   *(uint16_t __huge *)target_ptr = cur_chunk_size;
@@ -987,29 +987,29 @@ void diskio_close_for_writing(const char *filename, uint8_t file_type)
 //-----------------------------------------------------------------------------------------------
 
 /**
- * @defgroup diskio_private Disk I/O Private Functions
- * @{
- */
+  * @defgroup diskio_private Disk I/O Private Functions
+  * @{
+  */
 
 /**
- * @brief Waits until the FDC busy flag is cleared
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Waits until the FDC busy flag is cleared
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 inline static void wait_for_busy_clear(void)
 {
   while (FDC.status & FDC_BUSY_MASK);
 }
 
 /**
- * @brief Moves the floppy drive head to the provided track
- * 
- * @param track Physical track number (0-79)
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Moves the floppy drive head to the provided track
+  * 
+  * @param track Physical track number (0-79)
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void step_to_track(uint8_t track)
 {
   while (track != current_track) {
@@ -1027,21 +1027,21 @@ static void step_to_track(uint8_t track)
 }
 
 /**
- * @brief Searches for a file in the directory.
- *
- * The function will provide start track and sector of the file in the static
- * variables next_track and next_block. If the file is not found, next_track
- * will be set to 0.
- *
- * 
- * @note The drive needs to be ready before calling this function. Use
- *       prepare_drive() to do that.
- *
- * @param filename Null-terminated string with the filename
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Searches for a file in the directory.
+  *
+  * The function will provide start track and sector of the file in the static
+  * variables next_track and next_block. If the file is not found, next_track
+  * will be set to 0.
+  *
+  * 
+  * @note The drive needs to be ready before calling this function. Use
+  *       prepare_drive() to do that.
+  *
+  * @param filename Null-terminated string with the filename
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void search_file(const char *filename, uint8_t file_type)
 {
   uint8_t file_track;
@@ -1115,28 +1115,28 @@ static void search_file(const char *filename, uint8_t file_type)
 }
 
 /**
- * @brief Seeks forward to a specific offset in the file
- *
- * The function will seek forward to the specified offset in the file, relative
- * to the current read position. The function will update the current read
- * position accordingly. The current track and block need to be loaded into the
- * FDC buffer before calling this function and next_track and next_block need to
- * be set to the next track and block after the current one.
- * cur_block_read_ptr needs to be set to the current read position in the block.
- *
- * When returning from this function, the data at the file read position will be
- * in the FDC buffer and cur_block_read_ptr will be set.
- * 
- * FDC.data can be used to continue reading bytes at the current read position.
- * 
- * @note cur_block_read_ptr is relative to the third byte of the block on disk, as
- *       the first two bytes are used to store the next track and block number.
- *
- * @param offset Offset in bytes relative to the current read position
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Seeks forward to a specific offset in the file
+  *
+  * The function will seek forward to the specified offset in the file, relative
+  * to the current read position. The function will update the current read
+  * position accordingly. The current track and block need to be loaded into the
+  * FDC buffer before calling this function and next_track and next_block need to
+  * be set to the next track and block after the current one.
+  * cur_block_read_ptr needs to be set to the current read position in the block.
+  *
+  * When returning from this function, the data at the file read position will be
+  * in the FDC buffer and cur_block_read_ptr will be set.
+  * 
+  * FDC.data can be used to continue reading bytes at the current read position.
+  * 
+  * @note cur_block_read_ptr is relative to the third byte of the block on disk, as
+  *       the first two bytes are used to store the next track and block number.
+  *
+  * @param offset Offset in bytes relative to the current read position
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void seek_to(uint16_t offset)
 {
   uint8_t bytes_left_in_block = (next_track == 0) ? next_block - 1 : 254;
@@ -1159,30 +1159,30 @@ static void seek_to(uint16_t offset)
 }
 
 /**
- * @brief Loads a sector from disk cache or floppy disk into the floppy buffer
- *
- * The function will load a block from the disk cache or floppy disk into the
- * floppy buffer. The data of the block will be available in the floppy buffer
- * after the function returns. If the block is in the disk cache, the function
- * will load the block from the cache into the FDC buffer. If the block is not
- * in the cache, the function will read the block from the floppy disk into the
- * FDC buffer and store it in the cache.
- *
- * The floppy buffer read pointer will be reset to point to the first byte of
- * the block after the function returns. Thus, reading from the floppy buffer
- * with FDC.data will return the first byte of the block.
- *
- * As sectors in 1581 format are 512 bytes, they always contain two logical
- * blocks. This function loads the sector containing the specified block into
- * the floppy buffer. Therefore, a second block is always implicitly
- * loaded into the floppy buffer as well.
- *
- * @param track Logical track number (1-80)
- * @param block Logical block number (0-39)
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Loads a sector from disk cache or floppy disk into the floppy buffer
+  *
+  * The function will load a block from the disk cache or floppy disk into the
+  * floppy buffer. The data of the block will be available in the floppy buffer
+  * after the function returns. If the block is in the disk cache, the function
+  * will load the block from the cache into the FDC buffer. If the block is not
+  * in the cache, the function will read the block from the floppy disk into the
+  * FDC buffer and store it in the cache.
+  *
+  * The floppy buffer read pointer will be reset to point to the first byte of
+  * the block after the function returns. Thus, reading from the floppy buffer
+  * with FDC.data will return the first byte of the block.
+  *
+  * As sectors in 1581 format are 512 bytes, they always contain two logical
+  * blocks. This function loads the sector containing the specified block into
+  * the floppy buffer. Therefore, a second block is always implicitly
+  * loaded into the floppy buffer as well.
+  *
+  * @param track Logical track number (1-80)
+  * @param block Logical block number (0-39)
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void load_block(uint8_t track, uint8_t block)
 {
   static dmalist_two_options_t dmalist_copy_from_cache = {
@@ -1318,20 +1318,20 @@ static void load_block(uint8_t track, uint8_t block)
 }
 
 /**
- * @brief Makes sure the motor and led of the drive are ready
- *
- * The function will make sure the motor and LED of the drive are ready. If the
- * drive is not ready, the function will enable the motor and LED and spin up
- * the drive. It will block until the drive reports the motor completed
- * spinning up.
- * 
- * If the drive is already ready, the function will return immediately.
- *
- * @note The function implicitly calls acquire_drive()
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Makes sure the motor and led of the drive are ready
+  *
+  * The function will make sure the motor and LED of the drive are ready. If the
+  * drive is not ready, the function will enable the motor and LED and spin up
+  * the drive. It will block until the drive reports the motor completed
+  * spinning up.
+  * 
+  * If the drive is already ready, the function will return immediately.
+  *
+  * @note The function implicitly calls acquire_drive()
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void prepare_drive(void)
 {
   if (drive_ready) {
@@ -1346,45 +1346,45 @@ static void prepare_drive(void)
 }
 
 /**
- * @brief Marks the drive as currently being used.
- *
- * This prevents the drive motor from being turned off by diskio_check_motor_off().
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Marks the drive as currently being used.
+  *
+  * This prevents the drive motor from being turned off by diskio_check_motor_off().
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void acquire_drive(void)
 {
   drive_in_use = 1;
 }
 
 /**
- * @brief Release the drive again after it has been used
- * 
- * The motor will not turn off immediately when calling this function, but
- * only after 60 jiffies have passed without the drive being accessed.
- * This prevents continuous spinning up and down of the drive when multiple
- * disk I/O operations are performed in quick succession.
- *
- * The main loop will regularly call diskio_check_motor_off() to turn off the
- * drive motor when it has not been accessed for 60 jiffies (eg. video frames).
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Release the drive again after it has been used
+  * 
+  * The motor will not turn off immediately when calling this function, but
+  * only after 60 jiffies have passed without the drive being accessed.
+  * This prevents continuous spinning up and down of the drive when multiple
+  * disk I/O operations are performed in quick succession.
+  *
+  * The main loop will regularly call diskio_check_motor_off() to turn off the
+  * drive motor when it has not been accessed for 60 jiffies (eg. video frames).
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void release_drive(void)
 {
   drive_in_use = 0;
 }
 
 /**
- * @brief Aborts the current disk I/O operation and reports a fatal error
- * 
- * @param error_code The error code to be reported via fatal_error()
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Aborts the current disk I/O operation and reports a fatal error
+  * 
+  * @param error_code The error code to be reported via fatal_error()
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void disk_error(error_code_t error_code)
 {
   led_and_motor_off();
@@ -1392,11 +1392,11 @@ static void disk_error(error_code_t error_code)
 }
 
 /**
- * @brief Turns off the drive motor and LED
- *
- * Code section: code_diskio
- * Private function
- */
+  * @brief Turns off the drive motor and LED
+  *
+  * Code section: code_diskio
+  * Private function
+  */
 static void led_and_motor_off(void)
 {
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
@@ -1516,14 +1516,14 @@ static void free_blocks(uint8_t track, uint8_t block)
 }
 
 /**
- * @brief Frees a block on a track
- *
- * The function will free a block on a track by setting the corresponding bit in
- * the BAM to 1.
- *
- * @param track Logical track number (1-80)
- * @param block Logical block number (0-39)
- */
+  * @brief Frees a block on a track
+  *
+  * The function will free a block on a track by setting the corresponding bit in
+  * the BAM to 1.
+  *
+  * @param track Logical track number (1-80)
+  * @param block Logical block number (0-39)
+  */
 static void free_block(uint8_t track, uint8_t block)
 {
   //debug_out("freeing block %d:%d", track, block);
@@ -1540,17 +1540,17 @@ static void free_block(uint8_t track, uint8_t block)
 }
 
 /**
- * @brief Loads a sector from disk into a far memory location
- *
- * The function will load a sector from disk into a far memory location. The
- * sector is specified by its track and block number. The sector will be loaded
- * into the FDC buffer and then copied into the far memory location.
- * Note that there are always 2 blocks in a sector, so the sector containing the
- * specified block will be loaded, along with the other block in the sector.
- *
- * @param track Logical track number (1-80)
- * @param block Logical block number (0-39)
- */
+  * @brief Loads a sector from disk into a far memory location
+  *
+  * The function will load a sector from disk into a far memory location. The
+  * sector is specified by its track and block number. The sector will be loaded
+  * into the FDC buffer and then copied into the far memory location.
+  * Note that there are always 2 blocks in a sector, so the sector containing the
+  * specified block will be loaded, along with the other block in the sector.
+  *
+  * @param track Logical track number (1-80)
+  * @param block Logical block number (0-39)
+  */
 static void load_sector_to_bank(uint8_t track, uint8_t block, uint8_t __far *target)
 {
   load_block(track, block);
