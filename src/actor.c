@@ -385,9 +385,13 @@ void actor_update_animation(uint8_t local_id)
   }
 }
 
+/**
+  * @brief Sorts all local actors by their y position and draws them to the backbuffer.
+  *
+  * @note The function will change CS and DS and not restore them.
+  */
 void actor_sort_and_draw_all(void)
 {
-  uint32_t map_save = map_get();
   MAP_CS_GFX
   gfx_reset_actor_drawing();
 
@@ -420,7 +424,6 @@ void actor_sort_and_draw_all(void)
   }
 
   gfx_finalize_actor_drawing();
-  map_set(map_save);
 }
 
 /**

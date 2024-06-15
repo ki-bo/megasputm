@@ -24,12 +24,14 @@ void __heap_initialize(struct __heap_s *heap, void *heapstart, size_t heapsize);
   * will reserve the memory for the heap during its init routine.
   *
   * The heap is always assumed to be in the first pages of the resource memory.
+  *
+  * Code section: code_init
   */
 void heap_init(void)
 {
   map_ds_heap();
   __heap_initialize(&__default_heap, (void *)RES_MAPPED, HEAP_SIZE);
-  unmap_ds();
+  UNMAP_DS
 }
 
 /** @} */ // heap_init

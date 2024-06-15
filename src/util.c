@@ -11,7 +11,7 @@ void fatal_error(error_code_t error)
 {
   debug_out("Fatal error: %d", error);
   //POKE(0xd020, 5);
-  map_cs_diskio();
+  MAP_CS_DISKIO
   while (1) {
     diskio_check_motor_off(1);
   }

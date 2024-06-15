@@ -119,7 +119,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 
   SAVE_CS_AUTO_RESTORE
 
-  map_cs_diskio();
+  MAP_CS_DISKIO
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
   //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
  
@@ -127,7 +127,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   uint8_t page = allocate(type, id, (chunk_size + 255) / 256);
   __auto_type dest = HUGE_U8_PTR(RESOURCE_BASE + (uint16_t)page * 256);
   
-  map_cs_diskio();
+  MAP_CS_DISKIO
   diskio_continue_resource_loading(dest);
 
 #ifdef HEAP_DEBUG_OUT  

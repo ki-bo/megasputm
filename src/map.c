@@ -9,7 +9,7 @@
 // private code functions
 static inline void apply_map(void);
 
-//-----------------------------------------------------------------------------------------------
+#define MAP_OFFSET_HEAP 0x1000 + (RESOURCE_BASE / 256) - 0x80
 
 /**
   * @defgroup map_public Map Public Functions
@@ -71,82 +71,10 @@ void map_set(uint32_t map_reg)
   apply_map();
 }
 
-/**
-  * @brief Set the Data Segment (DS) map register
-  *
-  * Sets the Data Segment (DS) part of the mapping register to the given value. It is usually
-  * done to restore a previously saved DS mapping (via map_get_ds()).
-  * 
-  * @param map_reg The new DS map register
-  *
-  * Code section: code
-  */
-void map_set_ds(uint16_t map_reg)
-{
-  map_regs.y = LSB(map_reg);
-  map_regs.z = MSB(map_reg);
-  apply_map();
-}
-
-/**
-  * @brief Unmap all segments
-  * 
-  * Disables all memory mappings (CS and DS).
-  *
-  * Code section: code
-  */
-void unmap_all(void)
-{
-  map_regs.quad = 0;
-  apply_map();
-}
-
-/**
-  * @brief Unmap the Code Segment (CS)
-  * 
-  * Disables the Code Segment (CS) memory mapping.
-  *
-  * Code section: code
-  */
-void unmap_cs(void)
-{
-  map_regs.a = 0;
-  map_regs.x = 0;
-  apply_map();
-}
-
-/**
-  * @brief Unmap the Data Segment (DS)
-  * 
-  * Disables the Data Segment (DS) memory mapping.
-  *
-  * Code section: code
-  */
-void unmap_ds(void)
-{
-  map_regs.y = 0;
-  map_regs.z = 0;
-  apply_map();
-}
-
-/**
-  * @brief Maps the disk I/O module to CS (0x2000-0x3fff)
-  * 
-  * Disk I/O module originally is stored at 0x12000-0x13fff. This function maps
-  * it to 0x2000-0x3fff.
-  *
-  * Code section: code
-  */
-void map_cs_diskio(void)
-{
-  map_regs.a = 0x00;
-  map_regs.x = 0x21;
-  apply_map();
-}
-
 uint8_t *map_ds_ptr(void __huge *ptr)
 {
-  map_set_ds(0x3000 - 0x80 + ((uint32_t)ptr / 256));
+  map_regs.ds = 0x3000 - 0x80 + (uint16_t)((uint32_t)ptr / 256);
+  apply_map();
   return (uint8_t *)RES_MAPPED + (uint8_t)ptr;
 }
 
@@ -164,37 +92,24 @@ uint8_t *map_ds_ptr(void __huge *ptr)
 void map_ds_resource(uint8_t res_page)
 {
   // map offset: RESOURCE_MEMORY + page*256 - 0x8000
-  map_set_ds(0x3000 + (RESOURCE_BASE / 256) + res_page - 0x80);
+  map_regs.ds = 0x3000 + (RESOURCE_BASE / 256) + res_page - 0x80;
+  apply_map();
 }
-
-void map_ds_heap(void)
-{
-  // assuming heap will always be at the beginning of the resource memory
-  // and is maximum 8kb in size
-  map_set_ds(0x1000 + (RESOURCE_BASE / 256) - 0x80);
-}
-
-/** @} */ // map_public
-
-//-----------------------------------------------------------------------------------------------
 
 /**
-  * @defgroup map_private Map Private Functions
-  * @{
-  */
-
- /**
-  * @brief Applies the current map register
+  * @brief Maps the DS to the heap memory
+  * 
+  * Maps the DS to the default heap memory. The heap memory is located at the beginning of
+  * the resource memory (0x18000-0x187ff). The heap is always 1 page (256 bytes) in size.
   *
   * Code section: code
   */
-static inline void apply_map(void)
+void map_ds_heap(void)
 {
-  __asm (" map\n"
-         " eom"
-         :                     /* no output operands */
-         : "Kq"(map_regs.quad) /* input operands */
-         :                     /* clobber list */);
+  // assuming heap will always be at the beginning of the resource memory
+  // and the map window is a single 8kb block.
+  map_regs.ds = 0x1000 + (RESOURCE_BASE / 256) - 0x80;
+  apply_map();
 }
 
 /**
@@ -208,6 +123,8 @@ static inline void apply_map(void)
   * 
   * @param room_offset The room offset to map
   * @return* The pointer to the mapped room offset (is between 0x8000 and 0x80ff)
+  *
+  * Code section: code
   */
 uint8_t *map_ds_room_offset(uint16_t room_offset)
 {
@@ -215,6 +132,29 @@ uint8_t *map_ds_room_offset(uint16_t room_offset)
   uint8_t new_offset = LSB(room_offset);
   map_ds_resource(res_slot);
   return NEAR_U8_PTR(RES_MAPPED + new_offset);
+}
+
+/** @} */ // map_public
+
+//-----------------------------------------------------------------------------------------------
+
+/**
+  * @defgroup map_private Map Private Functions
+  * @{
+  */
+
+/**
+  * @brief Applies the current map register
+  * 
+  * Code section: code
+  */
+static inline void apply_map(void)
+{
+  __asm (" map\n"
+         " eom"
+         :                     /* no output operands */
+         : "Kq"(map_regs.quad) /* input operands */
+         :                     /* clobber list */);
 }
 
 /** @} */ // map_private

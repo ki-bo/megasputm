@@ -216,7 +216,7 @@ __task void vm_mainloop(void)
   while (1) {
     if (reset_game == RESET_RESTART) {
       reset_game = 0;
-      unmap_all();
+      UNMAP_ALL
       MAP_CS_GFX
       gfx_fade_out();
       gfx_clear_bg_image();
@@ -959,7 +959,7 @@ void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
   }
 
   MAP_CS_GFX
-  unmap_ds();
+  UNMAP_DS
   gfx_draw_object(local_id, screen_x, y);
 
   vm_update_actors();
@@ -1038,9 +1038,9 @@ uint8_t vm_savegame_exists(uint8_t slot)
 {
   char filename[11];
   sprintf(filename, "MM.SAV.%u", slot);
-  map_cs_diskio();
+  MAP_CS_DISKIO
   uint8_t exists = diskio_file_exists(filename);
-  unmap_cs();
+  UNMAP_CS
   return exists;
 }
 
@@ -1150,7 +1150,7 @@ static void reset_game_state(void)
       free(vm_state.verbs.name[i]);
       vm_state.verbs.name[i] = NULL;
     }
-    unmap_ds();
+    UNMAP_DS
   }
   res_deactivate_and_unlock_all();
 
@@ -1766,8 +1766,8 @@ static void update_sentence_line(void)
     const char *noun1_name = get_object_name(noun1);
     if (noun1_name) {
       //debug_out("  Noun1 name: %s", noun1_name);
-    }
       add_string_to_sentence(noun1_name, 1);
+    }
   }
   
   uint8_t preposition = vm_read_var8(VAR_SENTENCE_PREPOSITION);
@@ -1775,8 +1775,8 @@ static void update_sentence_line(void)
     const char *preposition_name = get_preposition_name(preposition);
     if (preposition_name) {
       //debug_out("  Preposition name: %s", preposition_name);
-    }
       add_string_to_sentence(preposition_name, 1);
+    }
   }
 
   uint16_t noun2 = vm_read_var(VAR_SENTENCE_NOUN2);
@@ -1784,8 +1784,8 @@ static void update_sentence_line(void)
     const char *noun2_name = get_object_name(noun2);
     if (noun2_name) {
       //debug_out("  Noun2 name: %s", noun2_name);
-    }
       add_string_to_sentence(noun2_name, 1);
+    }
   }
 
   uint8_t num_chars = sentence_length;
@@ -1845,7 +1845,7 @@ static void update_verb_interface(void)
       }
     }
     prev_verb_highlighted = 0xff;
-    unmap_ds();
+    UNMAP_DS
   }
 }
 
@@ -1907,27 +1907,25 @@ static const char *get_preposition_name(uint8_t preposition)
 
 static void update_inventory_interface()
 {
-  unmap_ds();
+  UNMAP_DS
   gfx_clear_inventory();
   if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
     uint8_t end_id = min(vm_state.inv_num_objects, inventory_pos + 4);
-    uint8_t x = 0;
-    uint8_t y = 22;
     char buf[19];
     buf[18] = '\0';
-    for (uint8_t i = inventory_pos; i < end_id; ++i) {
-      const char *name = inv_get_object_name(i);
+    for (uint8_t inv_pos = 0; inv_pos < end_id; ++inv_pos) {
+      const char *name = inv_get_object_name(inv_pos);
       for (uint8_t j = 0; j < 18; ++j) {
         buf[j] = name[j];
         if (buf[j] == '\0') {
           break;
         }
       }
-      gfx_print_interface_text(x, y, buf, TEXT_STYLE_INVENTORY);
-      x = (i & 1) ? 22 : 0;
-      if (i == 2) {
-        ++y;
-      }
+      uint8_t inv_ui_pos = inv_pos - inventory_pos;
+      gfx_print_interface_text(inventory_pos_to_x(inv_ui_pos), 
+                               inventory_pos_to_y(inv_ui_pos), 
+                               buf, 
+                               TEXT_STYLE_INVENTORY);
     }
 
     update_inventory_scroll_buttons();

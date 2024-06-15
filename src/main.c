@@ -24,13 +24,13 @@ __task void main(void)
   // Use diskio module to load the main code to section code_main at 0x4000
   // Be aware that this is overwriting both init code and init bss in memory.
   // So init needs to be complete at this point and can't be called anymore.
-  map_cs_diskio();
+  MAP_CS_DISKIO
   diskio_load_file("M01", (uint8_t __far *)(0x2000));  // load script parser code
   diskio_load_file("M02", (uint8_t __far *)(0x4000));  // load main code
   diskio_load_file("M03", (uint8_t __far *)(0xd000));  // load main private code
   // switch back to real drive
   //diskio_switch_to_real_drive();
-  unmap_cs();
+  UNMAP_CS
 
   // Jump into loaded main code
   vm_mainloop();

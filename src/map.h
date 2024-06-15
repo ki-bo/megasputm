@@ -10,6 +10,10 @@ union map_t {
     uint8_t y;
     uint8_t z;
   };
+  struct {
+    uint16_t cs;
+    uint16_t ds;
+  };
   uint32_t quad;
 };
 
@@ -72,8 +76,7 @@ extern union map_t __attribute__((zpage)) map_regs;
     __asm(" .extern map_regs\n" \
           " .extern map_auto_restore_cs\n" \
           " phw map_regs\n" \
-          /* 0xf4 = PHW immediate mode */ \
-          " .byte 0xf4, .byte1(map_auto_restore_cs-1), .byte0(map_auto_restore_cs-1)\n" \
+          " phw #.swap(map_auto_restore_cs - 1)" \
           :::);
 
 #define SAVE_DS \
@@ -85,8 +88,7 @@ extern union map_t __attribute__((zpage)) map_regs;
     __asm(" .extern map_regs\n" \
           " .extern map_auto_restore_ds\n" \
           " phw map_regs + 2\n" \
-          /* 0xf4 = PHW immediate mode */ \
-          " .byte 0xf4, .byte1(map_auto_restore_ds-1), .byte0(map_auto_restore_ds-1)\n" \
+          " phw #.swap(map_auto_restore_ds - 1)" \
           :::);
 
 #define RESTORE_MAP \
@@ -123,11 +125,6 @@ extern union map_t __attribute__((zpage)) map_regs;
 void map_init(void);
 uint32_t map_get(void);
 void map_set(uint32_t map_reg);
-void map_set_ds(uint16_t map_reg);
-void unmap_all(void);
-void unmap_cs(void);
-void unmap_ds(void);
-void map_cs_diskio(void);
 uint8_t *map_ds_ptr(void __huge *ptr);
 void map_ds_resource(uint8_t res_page);
 void map_ds_heap(void);

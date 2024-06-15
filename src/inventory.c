@@ -56,7 +56,7 @@ void inv_add_object(uint8_t local_object_id)
 
 struct object_code *inv_get_object_by_id(uint8_t global_object_id)
 {
-  unmap_ds();
+  UNMAP_DS
 
   for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
     if (vm_state.inv_objects[i]->id == global_object_id) {
@@ -84,14 +84,14 @@ uint8_t inv_object_available(uint16_t id)
 
 const char *inv_get_object_name(uint8_t position)
 {
-  unmap_ds();
+  UNMAP_DS
   const char *name_ptr = (const char *)vm_state.inv_objects[position] + vm_state.inv_objects[position]->name_offset;
   return name_ptr;
 }
 
 uint8_t inv_get_object_id(uint8_t position)
 {
-  unmap_ds();
+  UNMAP_DS
   return vm_state.inv_objects[position]->id;
 }
 

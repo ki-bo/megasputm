@@ -315,7 +315,7 @@ __attribute__((interrupt()))
 static void raster_irq ()
 {
   uint32_t map_save = map_get();
-  unmap_all();
+  UNMAP_ALL
   if (!(VICIV.irr & 0x01)) {
     map_set(map_save);
     return;
@@ -659,6 +659,8 @@ void gfx_draw_bg(void)
   * The object is drawn to the backbuffer screen memory. The coordinates x and y are
   * the position relative to the visible screen area (top/left being 0,0). The object
   * is drawn with the given width and height in characters.
+  *
+  * @note This function needs DS to be unmapped!
   * 
   * @param local_id The local object ID (0-based position in the room's objects list)
   * @param x The x position of the object in characters.
@@ -884,7 +886,7 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
 void gfx_finalize_actor_drawing(void)
 {
   SAVE_DS_AUTO_RESTORE
-  unmap_ds();
+  UNMAP_DS
   static uint8_t max_end_of_row = 0;
 
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
@@ -1228,7 +1230,7 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   --char_num;
 
   SAVE_DS_AUTO_RESTORE
-  unmap_ds();
+  UNMAP_DS
   
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN);
   
