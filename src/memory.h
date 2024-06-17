@@ -1,5 +1,4 @@
-#ifndef __MEMORY_H
-#define __MEMORY_H
+#pragma once
 
 #define RES_MAPPED          0x8000
 #define INVENTORY_BASE      0x8000
@@ -13,5 +12,3 @@
 #define SOUND_DATA          0x58000
 
 #define HEAP_SIZE           0x200
-
-#endif // __MEMORY_H

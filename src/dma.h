@@ -1,5 +1,4 @@
-#ifndef __DMA_H
-#define __DMA_H
+#pragma once
 
 #include "util.h"
 #include "io.h"
@@ -156,5 +155,3 @@ static inline void dma_trigger_global(void)
   DMA.addrmsb      = MSB(&global_dma);
   DMA.etrig_mapped = LSB(&global_dma);
 }
-
-#endif // __DMA_H

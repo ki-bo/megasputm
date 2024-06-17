@@ -1,5 +1,4 @@
-#ifndef __COSTUME_H
-#define __COSTUME_H
+#pragma once
 
 #include <stdint.h>
 
@@ -34,6 +33,3 @@ struct costume_cel{
   int16_t move_x;
   int16_t move_y;
 };
-
-
-#endif // __COSTUME_H

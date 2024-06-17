@@ -1,5 +1,3 @@
-#ifndef __RESOURCE_H
-#define __RESOURCE_H
 
 #include <stdint.h>
 
@@ -41,5 +39,3 @@ void res_clear_flags(uint8_t slot, uint8_t flags);
 void res_reset_flags(uint8_t slot, uint8_t flags);
 uint8_t res_reserve_heap(uint8_t size_blocks);
 void res_free_heap(uint8_t slot);
-
-#endif // __RESOURCE_H

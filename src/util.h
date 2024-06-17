@@ -1,5 +1,4 @@
-#ifndef __UTIL_H
-#define __UTIL_H
+#pragma once
 
 #include "error.h"
 #include <calypsi/intrinsics6502.h>
@@ -92,5 +91,3 @@ void __far *memcpy_bank(void __far *dest, const void __far *src, size_t n);
 void __far *memcpy_far(void __far *dest, const void __far *src, size_t n);
 void __far *memset20(void __far *s, int c, size_t n);
 void __far *memset32(void __far *s, uint32_t c, size_t n);
-
-#endif // __UTIL_H

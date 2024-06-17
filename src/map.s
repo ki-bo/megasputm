@@ -2,6 +2,7 @@
 
 		.section zzpage,bss
 		.extern map_regs
+		.extern _Zp
 
 		.section code
 		.public map_cs_main_priv
@@ -11,35 +12,35 @@ map_cs_main_priv:
 		ldx #0x20
 		bra apply_map_cs
 
-		.public map_cs_diskio2
-map_cs_diskio2:
+		.public map_cs_diskio
+map_cs_diskio:
 		pha
 		lda #0x00
 		ldx #0x21
 		bra apply_map_cs
 
-		.public map_cs_gfx2
-map_cs_gfx2:
+		.public map_cs_gfx
+map_cs_gfx:
 		pha
 		lda #0x20
 		ldx #0x21
 		bra apply_map_cs
 
-		.public unmap_cs2
-unmap_cs2:
+		.public unmap_cs
+unmap_cs:
 		pha
 		lda #0x00
 		tax
 		bra apply_map_cs
 
-		.public unmap_ds2
-unmap_ds2:
+		.public unmap_ds
+unmap_ds:
 		ldy #0x00
 		ldz #0x00
 		bra apply_map_ds
 
-		.public unmap_all2
-unmap_all2:
+		.public unmap_all
+unmap_all:
 		pha
 		lda #0x00
 		tax
@@ -115,6 +116,31 @@ map_restore_ds:
 		ldx zp:map_regs + 1
 		sty zp:map_regs + 2
 		stz zp:map_regs + 3
+		map
+		eom
+		rts
+
+		// uint8_t *map_ds_ptr(void __huge *ptr);
+		.public map_ds_ptr
+		
+		// map_regs.ds = 0x3000 - 0x80 + (uint16_t)((uint32_t)ptr / 256);
+  		// apply_map();
+  		// return (uint8_t *)RES_MAPPED + (uint8_t)ptr;
+
+map_ds_ptr:
+		lda #0x80
+		tax
+		clc
+		adc zp:_Zp+1
+		stx zp:_Zp+1
+		tay
+		sty zp:map_regs + 2
+		lda zp:_Zp+2
+		adc #0x2f
+		taz
+		stz zp:map_regs + 3
+		lda zp:map_regs
+		ldx zp:map_regs + 1
 		map
 		eom
 		rts

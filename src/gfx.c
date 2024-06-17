@@ -314,25 +314,40 @@ volatile uint8_t raster_irq_counter = 0;
 __attribute__((interrupt()))
 static void raster_irq ()
 {
-  uint32_t map_save = map_get();
-  UNMAP_ALL
   if (!(VICIV.irr & 0x01)) {
-    map_set(map_save);
+    // not a raster interrupt, ignore
     return;
   }
+
+  // set gfx MAP
+  __asm(" lda #0x20\n"
+        " ldx #0x21\n"
+        " ldy #0\n"
+        " ldz #0\n"
+        " map\n"
+        " eom\n"
+        :
+        :
+        : "a", "x", "y", "z");
 
   ++raster_irq_counter;
 
   input_update();
 
-  MAP_CS_GFX
   if (script_watchdog < 30) {
     ++script_watchdog;
   }
   update_cursor(script_watchdog == 30);
   
   VICIV.irr = VICIV.irr; // ack interrupt
-  map_set(map_save);     // restore MAP  
+
+  // restore MAP
+  __asm(" ldq map_regs\n"
+        " map\n"
+        " eom\n"
+        :
+        :
+        : "a", "x", "y", "z");
 }
 
 /** @} */ // gfx_runtime

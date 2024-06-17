@@ -1,5 +1,4 @@
-#ifndef __INVENTORY_H
-#define __INVENTORY_H
+#pragma once
 
 #include <stdint.h>
 
@@ -12,5 +11,3 @@ struct object_code *inv_get_object_by_id(uint8_t global_object_id);
 uint8_t inv_object_available(uint16_t id);
 const char *inv_get_object_name(uint8_t position);
 uint8_t inv_get_object_id(uint8_t position);
-
-#endif // __INVENTORY_H

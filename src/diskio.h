@@ -1,5 +1,4 @@
-#ifndef __DISKIO_H
-#define __DISKIO_H
+#pragma once
 
 #include <stdint.h>
 
@@ -25,5 +24,3 @@ void diskio_close_for_reading(void);
 void diskio_open_for_writing(void);
 void diskio_write(const uint8_t __huge *data, uint16_t size);
 void diskio_close_for_writing(const char *filename, uint8_t file_type);
-
-#endif // __DISKIO_H

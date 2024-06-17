@@ -1,5 +1,4 @@
-#ifndef __WALK_BOX_H
-#define __WALK_BOX_H
+#pragma once
 
 #include <stdint.h>
 
@@ -24,5 +23,3 @@ uint8_t walkbox_get_box_masking(uint8_t box_id);
 uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y);
 uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, uint8_t *y);
 void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py);
-
-#endif // __WALK_BOX_H

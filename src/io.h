@@ -1,5 +1,4 @@
-#ifndef __IO_H
-#define __IO_H
+#pragma once
 
 #include <stdint.h>
 
@@ -82,5 +81,3 @@ struct __dma {
 #define DMA         (*(volatile struct __dma *)         0xd700)
 #define RNDGEN      (*(volatile uint8_t *)              0xd7ef)
 #define RNDRDY      (*(volatile uint8_t *)              0xd7fe)
-
-#endif // __IO_H

@@ -1,5 +1,4 @@
-#ifndef __ERROR_H__
-#define __ERROR_H__
+#pragma once
 
 typedef enum {
     ERR_FILE_NOT_FOUND = 1,
@@ -32,5 +31,3 @@ typedef enum {
     ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE = 28,
     ERR_FILE_READ_BEYOND_EOF = 29,
 } error_code_t;
-
-#endif // __ERROR_H__

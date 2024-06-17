@@ -1,5 +1,4 @@
-#ifndef __VM_H
-#define __VM_H
+#pragma once
 
 #include "util.h"
 #include <stdint.h>
@@ -258,5 +257,3 @@ static inline void vm_write_var(uint8_t var, uint16_t value)
                  : "Kx" (var), [val]"Kzp16" (value)
                  : "a");*/
 }
-
-#endif // __VM_H

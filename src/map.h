@@ -1,5 +1,4 @@
-#ifndef __MAP_H
-#define __MAP_H
+#pragma once
 
 #include <stdint.h>
 
@@ -27,36 +26,36 @@ extern union map_t __attribute__((zpage)) map_regs;
           : "x", "y", "z");
 
 #define MAP_CS_DISKIO \
-    __asm(" .extern map_cs_diskio2\n" \
-          " jsr map_cs_diskio2\n" \
+    __asm(" .extern map_cs_diskio\n" \
+          " jsr map_cs_diskio\n" \
           : \
           : \
           : "x", "y", "z");
 
 #define MAP_CS_GFX \
-    __asm(" .extern map_cs_gfx2\n" \
-          " jsr map_cs_gfx2\n" \
+    __asm(" .extern map_cs_gfx\n" \
+          " jsr map_cs_gfx\n" \
           : \
           : \
           : "x", "y", "z");
 
 #define UNMAP_CS \
-    __asm(" .extern unmap_cs2\n" \
-          " jsr unmap_cs2\n" \
+    __asm(" .extern unmap_cs\n" \
+          " jsr unmap_cs\n" \
           : \
           : \
           : "x", "y", "z");
 
 #define UNMAP_DS \
-    __asm(" .extern unmap_ds2\n" \
-          " jsr unmap_ds2\n" \
+    __asm(" .extern unmap_ds\n" \
+          " jsr unmap_ds\n" \
           : \
           : \
           : "x", "y", "z");
 
 #define UNMAP_ALL \
-    __asm(" .extern unmap_all2\n" \
-          " jsr unmap_all2\n" \
+    __asm(" .extern unmap_all\n" \
+          " jsr unmap_all\n" \
           : \
           : \
           : "x", "y", "z");
@@ -123,11 +122,19 @@ extern union map_t __attribute__((zpage)) map_regs;
 
 // code functions
 void map_init(void);
-uint32_t map_get(void);
-void map_set(uint32_t map_reg);
+/**
+  * @brief Map the DS to the specified address.
+  *
+  * Will map DS to the address of ptr in a way that the first
+  * address of the memory ptr is pointing to will land in the
+  * first 256 bytes page of the mapped DS. The mapped window will 
+  * always be at 0x8000-0xbfff.
+  *
+  * Example: If mapping 0x12345 to DS, then 0x12300 will be mapped
+  * to 0x8000 and the first byte of the mapped memory will be available
+  * at 0x8045.
+  */
 uint8_t *map_ds_ptr(void __huge *ptr);
 void map_ds_resource(uint8_t res_page);
 void map_ds_heap(void);
 uint8_t *map_ds_room_offset(uint16_t room_offset);
-
-#endif // __MAP_H

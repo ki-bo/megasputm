@@ -1,5 +1,4 @@
-#ifndef __ACTOR_H
-#define __ACTOR_H
+#pragma once
 
 #include "vm.h"
 #include <stdint.h>
@@ -89,6 +88,3 @@ static inline uint8_t actor_is_in_current_room(uint8_t actor_id)
 {
     return actors.local_id[actor_id] != 0xff;
 }
-
-
-#endif // __ACTOR_H

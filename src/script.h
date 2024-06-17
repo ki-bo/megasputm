@@ -1,5 +1,4 @@
-#ifndef __SCRIPT_H
-#define __SCRIPT_H
+#pragma once
 
 #include <stdint.h>
 
@@ -13,5 +12,3 @@ uint8_t script_run_active_slot(void);
 uint8_t script_run_slot_stacked(uint8_t slot);
 uint16_t script_get_current_pc(void);
 void script_break(void);
-
-#endif // __SCRIPT_H

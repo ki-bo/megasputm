@@ -119,8 +119,8 @@ static const char *get_preposition_name(uint8_t preposition);
 static void update_inventory_interface();
 static void update_inventory_highlighting(void);
 static uint8_t get_hovered_inventory_slot(void);
-static uint8_t inventory_pos_to_x(uint8_t pos);
-static uint8_t inventory_pos_to_y(uint8_t pos);
+static uint8_t inventory_ui_pos_to_x(uint8_t pos);
+static uint8_t inventory_ui_pos_to_y(uint8_t pos);
 static void inventory_scroll_up(void);
 static void inventory_scroll_down(void);
 static void update_inventory_scroll_buttons(void);
@@ -1377,11 +1377,12 @@ static void read_objects(void)
   * The function will read the object data from the object data arrays and draw the objects
   * on screen at their current position.
   *
+  * @note This function will change CS and DS but won't restore them.
+  *
   * Code section: code_main
   */
 static void redraw_screen(void)
 {
-  uint32_t map_save = map_get();
   MAP_CS_GFX
 
   // draw background
@@ -1405,8 +1406,6 @@ static void redraw_screen(void)
 
     gfx_draw_object(i, screen_x, screen_y);
   }
-
-  map_set(map_save);
 }
 
 static void handle_input(void)
@@ -1922,8 +1921,8 @@ static void update_inventory_interface()
         }
       }
       uint8_t inv_ui_pos = inv_pos - inventory_pos;
-      gfx_print_interface_text(inventory_pos_to_x(inv_ui_pos), 
-                               inventory_pos_to_y(inv_ui_pos), 
+      gfx_print_interface_text(inventory_ui_pos_to_x(inv_ui_pos), 
+                               inventory_ui_pos_to_y(inv_ui_pos), 
                                buf, 
                                TEXT_STYLE_INVENTORY);
     }
@@ -1944,14 +1943,14 @@ static void update_inventory_highlighting(void)
     MAP_CS_GFX
     if (prev_inventory_highlighted != 0xff) {
       uint8_t style = (prev_inventory_highlighted & 4) ? TEXT_STYLE_INVENTORY_ARROW : TEXT_STYLE_INVENTORY;
-      gfx_change_interface_text_style(inventory_pos_to_x(prev_inventory_highlighted), 
-                                      inventory_pos_to_y(prev_inventory_highlighted), 
+      gfx_change_interface_text_style(inventory_ui_pos_to_x(prev_inventory_highlighted), 
+                                      inventory_ui_pos_to_y(prev_inventory_highlighted), 
                                       prev_inventory_highlighted & 4 ? 4 : 18, 
                                       style);
     }
     if (cur_inventory != 0xff) {
-      gfx_change_interface_text_style(inventory_pos_to_x(cur_inventory), 
-                                      inventory_pos_to_y(cur_inventory), 
+      gfx_change_interface_text_style(inventory_ui_pos_to_x(cur_inventory), 
+                                      inventory_ui_pos_to_y(cur_inventory), 
                                       cur_inventory & 4 ? 4 : 18, 
                                       TEXT_STYLE_HIGHLIGHTED);
     }
@@ -1999,7 +1998,7 @@ static uint8_t get_hovered_inventory_slot(void)
   return cur_inventory;
 }
 
-static uint8_t inventory_pos_to_x(uint8_t pos)
+static uint8_t inventory_ui_pos_to_x(uint8_t pos)
 {
   if (pos & 4) {
     // arrow buttons
@@ -2009,7 +2008,7 @@ static uint8_t inventory_pos_to_x(uint8_t pos)
   return (pos & 1) ? 22 : 0;
 }
 
-static uint8_t inventory_pos_to_y(uint8_t pos)
+static uint8_t inventory_ui_pos_to_y(uint8_t pos)
 {
   return 22 + (pos >> 1);
 }

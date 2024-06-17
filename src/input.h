@@ -1,5 +1,4 @@
-#ifndef __INPUT_H
-#define __INPUT_H
+#pragma once
 
 #include <stdint.h>
 
@@ -21,5 +20,3 @@ void input_init(void);
 
 // code_main functions
 void input_update(void);
-
-#endif // __INPUT_H

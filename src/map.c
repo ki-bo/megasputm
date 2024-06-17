@@ -44,41 +44,6 @@ void map_init(void)
 #pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
 
 /**
-  * @brief Get the current map register (32 bit)
-  * 
-  * @return The current map register
-  *
-  * Code section: code
-  */
-uint32_t map_get(void)
-{
-  return map_regs.quad;    
-}
-
-/**
-  * @brief Set the map register (32 bit)
-  * 
-  * Sets the complete mapping register to the given value. It is usually done to restore a 
-  * previously saved mapping (via map_get()).
-  * 
-  * @param map_reg The new map register
-  *
-  * Code section: code
-  */
-void map_set(uint32_t map_reg)
-{
-  map_regs.quad = map_reg;
-  apply_map();
-}
-
-uint8_t *map_ds_ptr(void __huge *ptr)
-{
-  map_regs.ds = 0x3000 - 0x80 + (uint16_t)((uint32_t)ptr / 256);
-  apply_map();
-  return (uint8_t *)RES_MAPPED + (uint8_t)ptr;
-}
-
-/**
   * @brief Maps a resource slot to DS (0x8000-0xbfff)
   * 
   * Resource slots are located at RESOURCE_MEMORY (0x18000-0x27fff). 
