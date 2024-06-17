@@ -67,6 +67,13 @@ mm.d81: runtime.raw
 		cp gamedata/MM.D81 mm.d81; \
 	fi
 	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-1.raw m11 -write m1-2.raw m12
+	@echo "Copying save game files to disk image..."
+	@for file in mm.sav.*; do \
+		if [ -f "$$file" ]; then \
+			echo "Adding $$file to mm.d81..."; \
+			$(C1541) -attach mm.d81 -write $$file $$(basename $$file); \
+		fi \
+	done
 
 doxygen:
 	doxygen Doxyfile
