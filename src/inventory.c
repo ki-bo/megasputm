@@ -95,4 +95,17 @@ uint8_t inv_get_object_id(uint8_t position)
   return vm_state.inv_objects[position]->id;
 }
 
+uint8_t inv_get_position_by_id(uint8_t global_object_id)
+{
+  UNMAP_DS
+
+  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
+    if (vm_state.inv_objects[i]->id == global_object_id) {
+      return i;
+    }
+  }
+
+  return 0xff;
+}
+
 ///@} inv_public

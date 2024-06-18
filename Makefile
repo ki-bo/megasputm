@@ -6,6 +6,8 @@ LN = ln6502
 
 CONFIG ?= default
 
+SAVE_FILES = $(wildcard mm.sav.*)
+
 CC_FLAGS  = --target=mega65 --code-model=plain -O2 -Werror --no-cross-call --strong-inline --inline-on-matching-custom-text-section --no-interprocedural-cross-jump --list-file=$(@:%.o=%.lst)
 DEP_FLAGS = -MMD -MP
 ASM_FLAGS = --target=mega65 --list-file=$(@:%.o=%.lst)
@@ -58,7 +60,7 @@ obj/%.o: %.c
 runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
-mm.d81: runtime.raw
+mm.d81: runtime.raw $(SAVE_FILES)
 	@if [ ! -f gamedata/MM.D81 ]; then \
 		echo "MM.D81 not found, creating new .d81 disk image..."; \
 		$(C1541) -format "mm,00" d81 mm.d81; \
@@ -68,10 +70,10 @@ mm.d81: runtime.raw
 	fi
 	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-1.raw m11 -write m1-2.raw m12
 	@echo "Copying save game files to disk image..."
-	@for file in mm.sav.*; do \
+	@for file in $(SAVE_FILES); do \
 		if [ -f "$$file" ]; then \
 			echo "Adding $$file to mm.d81..."; \
-			$(C1541) -attach mm.d81 -write $$file $$(basename $$file); \
+			$(C1541) -attach mm.d81 -write $$file $$(basename $$file),s; \
 		fi \
 	done
 

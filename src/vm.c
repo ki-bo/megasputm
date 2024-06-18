@@ -103,7 +103,7 @@ static const char *get_object_name(uint16_t global_object_id);
 static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_object_id, uint8_t parent, uint8_t res_slot, uint16_t offset);
 static uint8_t start_child_script_at_address(uint8_t script_slot, uint8_t res_slot, uint16_t offset);
 static void execute_sentence_stack(void);
-static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id);
+static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id, uint8_t is_inventory);
 static void load_room(uint8_t room_no);
 static void update_actors(void);
 static void animate_actors(void);
@@ -455,7 +455,7 @@ void vm_set_current_room(uint8_t room_no)
     num_objects = 0;
   }
   else {
-    //debug_out("Activating new room %d", room_no);
+    debug_out("Activating new room %d", room_no);
     // activate new room data
     load_room(room_no);
     MAP_CS_GFX
@@ -656,26 +656,50 @@ void vm_execute_room_script(uint16_t room_script_offset)
 
 void vm_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t background)
 {
-  uint8_t type;
-  uint8_t script_slot;
-  uint8_t id = vm_get_local_object_id(global_object_id);
-  if (id == 0xff) {
-    return;
+  SAVE_DS_AUTO_RESTORE
+
+  uint8_t  is_inventory;
+  uint8_t  type;
+  uint8_t  script_slot;
+  uint16_t script_offset;
+  uint8_t  res_slot;
+  uint8_t  id = vm_get_local_object_id(global_object_id);
+  if (id != 0xff) {
+    is_inventory  = 0;
+    type          = 0;
+    res_slot      = obj_page[id];
+    script_offset = obj_offset[id];
+  }
+  else {
+    id = inv_get_position_by_id(global_object_id);
+    if (id != 0xff) {
+      is_inventory  = 1;
+      type          = PROC_TYPE_INVENTORY;
+      res_slot      = 0;
+      script_offset = (uint16_t)vm_state.inv_objects[id] - RES_MAPPED;
+    }
+    else {
+      // object not in room or inventory
+      return;
+    }
   }
 
-  uint16_t script_offset = get_room_object_script_offset(verb, id);
-  if (script_offset == 0) {
+  uint8_t verb_offset = get_room_object_script_offset(verb, id, is_inventory);
+  if (verb_offset == 0) {
     return;
   }
+  script_offset += verb_offset;
 
-  type = (background ? PROC_TYPE_BACKGROUND : 0);
+  if (background) {
+    type |= PROC_TYPE_BACKGROUND;
+  }
   if (verb < 250) {
     type |= PROC_TYPE_REGULAR_VERB;
   }
 
   for (script_slot = 0; script_slot < NUM_SCRIPT_SLOTS; ++script_slot) {
     if (vm_state.proc_state[script_slot] != PROC_STATE_FREE &&
-        vm_state.proc_type[script_slot] == type &&
+        vm_state.proc_type[script_slot] == (type & (PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB)) &&
         vm_state.proc_script_or_object_id[script_slot] == LSB(global_object_id) &&
         vm_state.proc_object_id_msb[script_slot] == MSB(global_object_id)) {
       debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
@@ -686,9 +710,6 @@ void vm_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t b
   if (script_slot == NUM_SCRIPT_SLOTS) {
     script_slot = find_free_script_slot();
   }
-
-  uint8_t res_slot  = obj_page[id];
-  script_offset    += obj_offset[id];
 
   debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
   reset_script_slot(script_slot, type, global_object_id, 0xff /*parent*/, res_slot, script_offset);
@@ -756,9 +777,10 @@ void vm_stop_script_slot(uint8_t slot)
     for (uint8_t table_idx = 1; table_idx < vm_state.num_active_proc_slots; ++table_idx)
     {
       // stop children of us
+      debug_out("Checking slot %d, has parent %d", vm_state.proc_slot_table[table_idx], vm_state.proc_parent[vm_state.proc_slot_table[table_idx]]);
       uint8_t child_slot = vm_state.proc_slot_table[table_idx];
       if (child_slot != 0xff && vm_state.proc_parent[child_slot] == slot) {
-        stop_script_from_table(child_slot);
+        stop_script_from_table(table_idx);
       }
     }
 
@@ -1599,6 +1621,10 @@ static uint8_t execute_script_slot(uint8_t slot)
     //debug_out("  executing child script slot %d", slot);
     result = script_run_slot_stacked(active_script_slot);
   }
+  if (result != PROC_STATE_FREE && vm_state.proc_parent[slot] != 0xff) {
+    debug_out("detach script slot %d", slot);
+    vm_state.proc_parent[slot] = 0xff;
+  }
 
   active_script_slot = save_active_script_slot;
 
@@ -1648,9 +1674,18 @@ static void execute_sentence_stack(void)
   
   uint8_t script_offset   = 0;
   uint8_t local_object_id = vm_get_local_object_id(noun1);
+  uint8_t is_inventory;
 
   if (local_object_id != 0xff) {
-    script_offset = get_room_object_script_offset(verb, local_object_id);
+    is_inventory = 0;
+  }
+  else {
+    is_inventory = 1;
+    local_object_id = inv_get_position_by_id(noun1);
+  }
+
+  if (local_object_id != 0xff) {
+    script_offset = get_room_object_script_offset(verb, local_object_id, is_inventory);
   }
   
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
@@ -1661,20 +1696,30 @@ static void execute_sentence_stack(void)
   //debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
 }
 
-static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id)
+static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_id, uint8_t is_inventory)
 {
   SAVE_DS_AUTO_RESTORE
 
-  map_ds_resource(obj_page[local_object_id]);
-  uint16_t cur_offset = obj_offset[local_object_id];
-  cur_offset += 15;
-  uint8_t *ptr = NEAR_U8_PTR(RES_MAPPED + cur_offset);
+  uint8_t *ptr;
+
+  if (is_inventory) {
+    UNMAP_DS
+    ptr = NEAR_U8_PTR(vm_state.inv_objects[local_object_id]);
+    debug_out("inventory object %d at %p", local_object_id, ptr);
+  }
+  else {
+    map_ds_resource(obj_page[local_object_id]);
+    ptr = NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
+  }
+  ptr += 15;
+  debug_out("searching for verb %d at %p", verb, ptr);
+  
   uint8_t script_offset = 0;
 
   //debug_out("Searching for verb %x in object %d", verb, local_object_id);
 
   while (*ptr != 0) {
-    //debug_out("Verb %x, offset %x", *ptr, *(ptr + 1));
+    debug_out("Verb %x, offset %x", *ptr, *(ptr + 1));
     if (*ptr == verb || *ptr == 0xff) {
       script_offset = *(ptr + 1);
       break;

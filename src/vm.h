@@ -22,7 +22,8 @@ enum {
 enum {
   PROC_TYPE_GLOBAL       = 0x01,
   PROC_TYPE_BACKGROUND   = 0x02,
-  PROC_TYPE_REGULAR_VERB = 0x04
+  PROC_TYPE_REGULAR_VERB = 0x04,
+  PROC_TYPE_INVENTORY    = 0x08
 };
 
 enum {
@@ -67,8 +68,8 @@ enum {
   OBJ_CLASS_UNTOUCHABLE = 0x20,
   OBJ_CLASS_LOCKED      = 0x40,
   // SCUMM defines different meanings for the state bit
-  // 0: HERE, CLOSED, R-OPEN,   OFF, R_GONE
-  // 1: GONE, OPEN,   R-CLOSED, ON,  R_HERE
+  // 0: HERE, CLOSED, R-OPEN,   OFF, R-GONE
+  // 1: GONE, OPEN,   R-CLOSED, ON,  R-HERE
   OBJ_STATE             = 0x80
 };
 

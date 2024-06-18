@@ -270,13 +270,18 @@ uint8_t script_run_active_slot(void)
   break_script = 0;
 
 #ifdef DEBUG_SCRIPTS
-  char *script_type  = vm_state.proc_type[active_script_slot] & PROC_TYPE_GLOBAL ? "S" : "R";
+  char *script_type  = vm_state.proc_type[active_script_slot] & PROC_TYPE_GLOBAL ? "S" : 
+                       vm_state.proc_type[active_script_slot] & PROC_TYPE_INVENTORY ? "I" : "R";
   active_script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
 #endif
 
   SAVE_DS_AUTO_RESTORE
-
-  map_ds_resource(proc_res_slot[active_script_slot]);
+  if (vm_state.proc_type[active_script_slot] & PROC_TYPE_INVENTORY) {
+    UNMAP_DS
+  }
+  else {
+    map_ds_resource(proc_res_slot[active_script_slot]);
+  }
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
   // check for PROC_STATE_RUNNING only will also mean we won't continue executing if
   // PROC_FLAGS_FROZEN is set.
@@ -308,6 +313,9 @@ uint8_t script_run_slot_stacked(uint8_t slot)
   uint8_t *stack_pc           = pc;
   uint8_t  stack_break_script = break_script;
   uint8_t  stack_active_slot  = active_script_slot;
+#ifdef DEBUG_SCRIPTS
+  uint16_t stack_active_script_id = active_script_id;
+#endif
 
   active_script_slot = slot;
   uint8_t state = script_run_active_slot();
@@ -317,6 +325,9 @@ uint8_t script_run_slot_stacked(uint8_t slot)
   pc = stack_pc;
   break_script = stack_break_script;
   active_script_slot = stack_active_slot;
+#ifdef DEBUG_SCRIPTS
+  active_script_id = stack_active_script_id;
+#endif
 
   return state;
 }
@@ -1661,9 +1672,6 @@ void chain_script(void)
   uint8_t script_id = resolve_next_param8();
   vm_chain_script(script_id);
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
-#ifdef DEBUG_SCRIPTS
-  active_script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
-#endif
 }
 
 /**
@@ -1710,6 +1718,7 @@ static void pick_up_object(void)
   }
 
   if (inv_object_available(obj_id)) {
+    // already in inventory
     return;
   }
 
