@@ -122,6 +122,7 @@ extern union map_t __attribute__((zpage)) map_regs;
 
 // code functions
 void map_init(void);
+
 /**
   * @brief Map the DS to the specified address.
   *
@@ -135,6 +136,42 @@ void map_init(void);
   * at 0x8045.
   */
 uint8_t *map_ds_ptr(void __huge *ptr);
+
+/**
+  * @brief Maps a resource slot to DS (0x8000-0xbfff)
+  * 
+  * Resource slots are located at RESOURCE_MEMORY (0x18000-0x27fff). 
+  * This function maps the memory starting at 0x18000 + (res_page * 256) to 0x8000.
+  * We are always mapping 16KB of memory.
+  *
+  * @param res_page The resource slot to map. The slot is 0-indexed.
+  *
+  * Code section: code
+  */
 void map_ds_resource(uint8_t res_page);
+
+/**
+  * @brief Maps the DS to the heap memory
+  * 
+  * Maps the DS to the default heap memory. The heap memory is located at the beginning of
+  * the resource memory (0x18000-0x187ff). The heap is always 1 page (256 bytes) in size.
+  *
+  * Code section: code
+  */
 void map_ds_heap(void);
+
+/**
+  * @brief Maps a room offset to DS
+  *
+  * Maps a room offset to DS. The room offset is a 16-bit value that points to a location
+  * in the room data. The room data is stored in the resource memory.
+  *
+  * The room data is mapped so that the specified offset will be between 0x8000 and 0x80ff.
+  * The mapped block is 16kb in size (mapped to 0x8000 - 0xbfff).
+  * 
+  * @param room_offset The room offset to map
+  * @return* The pointer to the mapped room offset (is between 0x8000 and 0x80ff)
+  *
+  * Code section: code
+  */
 uint8_t *map_ds_room_offset(uint16_t room_offset);
