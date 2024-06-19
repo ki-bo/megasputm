@@ -1452,6 +1452,11 @@ static void redraw_screen(void)
     if (!(vm_state.global_game_objects[obj_hdr->id] & OBJ_STATE)) {
       continue;
     }
+    if (obj_hdr->parent != 0) {
+      if (!match_parent_object_state(obj_hdr->parent - 1, obj_hdr->pos_y_and_parent_state & 0x80)) {
+        continue;
+      }
+    }
     int8_t screen_x = obj_hdr->pos_x - camera_x + 20;
     if (screen_x >= 40 || screen_x + obj_hdr->width <= 0) {
       continue;
@@ -2260,7 +2265,7 @@ static void clear_all_other_object_states(uint8_t local_object_id)
   SAVE_DS_AUTO_RESTORE
 
   map_ds_resource(obj_page[local_object_id]);
-  __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
+  __auto_type obj_hdr = (struct object_code *)(RES_MAPPED + obj_offset[local_object_id]);
   uint8_t width = obj_hdr->width;
   uint8_t height = obj_hdr->height_and_actor_dir >> 3;
   uint8_t x = obj_hdr->pos_x;
@@ -2275,7 +2280,7 @@ static void clear_all_other_object_states(uint8_t local_object_id)
     }
 
     map_ds_resource(obj_page[i]);
-    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
+    __auto_type obj_hdr = (struct object_code *)(RES_MAPPED + obj_offset[i]);
     if (obj_hdr->width == width && 
        (obj_hdr->height_and_actor_dir >> 3) == height &&
         obj_hdr->pos_x == x && 
