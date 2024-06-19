@@ -6,10 +6,6 @@
 #include "util.h"
 #include "vm.h"
 
-#pragma clang section rodata="cdata_main" data="data_main" bss="zdata"
-
-
-
 /**
   * @defgroup inv_init Inventory Init Functions
   * @{
@@ -106,6 +102,54 @@ uint8_t inv_get_position_by_id(uint8_t global_object_id)
   }
 
   return 0xff;
+}
+
+/**
+  * @brief Get the displayed inventory.
+  *
+  * This function will return the inventory entries that should be displayed on the screen.
+  * It filters the inventory starting at inventory item start_position for entries that match
+  * the provided owner_id and returns the number of entries that should be displayed (0-4).
+  *
+  * It also fills the inventory display structure with the previous and next ids that match
+  * the owner_id. If no previous or next entries are available, the corresponding id will be
+  * set to 0xff. This information can be used to hide or display the inventory scroll buttons.
+  * 
+  * @param entries Pointer to the inventory display structure.
+  * @param start_position Position to start displaying from.
+  * @param owner_id Owner of the objects to display.
+  * @return Number of entries available for displaying on scren.
+  *
+  * Code section: code_main
+  */
+uint8_t inv_get_displayed_inventory(struct inventory_display *entries, uint8_t start_position, uint8_t owner_id)
+{
+  UNMAP_DS
+
+  entries->prev_id = 0xff;
+  entries->next_id = 0xff;
+
+  uint8_t num_entries = 0;
+  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
+    __auto_type object_ptr   = vm_state.inv_objects[i];
+    uint16_t    object_id    = object_ptr->id;
+    uint8_t     object_owner = vm_state.global_game_objects[object_id] & 0x0f;
+    if (object_owner == owner_id) {
+      if (i < start_position) {
+        entries->prev_id = i;
+      }
+      else if (num_entries < 4) {
+        entries->displayed_ids[num_entries] = i;
+        ++num_entries;
+      }
+      else {
+        entries->next_id = i;
+        break;
+      }
+    }
+  }
+
+  return num_entries;
 }
 
 ///@} inv_public

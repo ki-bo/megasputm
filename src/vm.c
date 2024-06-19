@@ -123,7 +123,6 @@ static uint8_t inventory_ui_pos_to_x(uint8_t pos);
 static uint8_t inventory_ui_pos_to_y(uint8_t pos);
 static void inventory_scroll_up(void);
 static void inventory_scroll_down(void);
-static void update_inventory_scroll_buttons(void);
 static void print_slot_table(void);
 static void stop_script_from_table(uint8_t table_idx);
 
@@ -913,7 +912,7 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 
   for (uint8_t i = 0; i < num_objects; ++i) {
     map_ds_resource(obj_page[i]);
-    __auto_type obj_hdr = (struct object_code *)NEAR_U8_PTR(RES_MAPPED + obj_offset[i]);
+    __auto_type obj_hdr = (struct object_code *)(RES_MAPPED + obj_offset[i]);
     //debug_out("Checking object %d at %d, %d state %d - parent_state %d", obj_hdr->id, obj_hdr->pos_x, obj_hdr->pos_y_and_parent_state & 0x7f, vm_state.global_game_objects[obj_hdr->id] & OBJ_STATE, obj_hdr->pos_y_and_parent_state & 0x80);
     //debug_out("  obj_state %x", vm_state.global_game_objects[obj_hdr->id]);
     if (vm_state.global_game_objects[obj_hdr->id] & OBJ_CLASS_UNTOUCHABLE) {
@@ -1984,27 +1983,39 @@ static const char *get_preposition_name(uint8_t preposition)
 static void update_inventory_interface()
 {
   UNMAP_DS
+
+  struct inventory_display entries;
+  uint8_t num_entries;
+
   gfx_clear_inventory();
+
   if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
-    uint8_t end_id = min(vm_state.inv_num_objects, inventory_pos + 4);
+    num_entries = inv_get_displayed_inventory(&entries, 
+                                              inventory_pos, 
+                                              vm_read_var8(VAR_SELECTED_ACTOR));
     char buf[19];
     buf[18] = '\0';
-    for (uint8_t inv_pos = 0; inv_pos < end_id; ++inv_pos) {
-      const char *name = inv_get_object_name(inv_pos);
+    for (uint8_t ui_pos = 0; ui_pos < num_entries; ++ui_pos) {
+      const char *name = inv_get_object_name(entries.displayed_ids[ui_pos]);
       for (uint8_t j = 0; j < 18; ++j) {
         buf[j] = name[j];
         if (buf[j] == '\0') {
           break;
         }
       }
-      uint8_t inv_ui_pos = inv_pos - inventory_pos;
-      gfx_print_interface_text(inventory_ui_pos_to_x(inv_ui_pos), 
-                               inventory_ui_pos_to_y(inv_ui_pos), 
+      gfx_print_interface_text(inventory_ui_pos_to_x(ui_pos), 
+                               inventory_ui_pos_to_y(ui_pos), 
                                buf, 
                                TEXT_STYLE_INVENTORY);
     }
     
-    update_inventory_scroll_buttons();
+    if (entries.prev_id != 0xff) {
+      gfx_print_interface_text(19, 22, "\xfc\xfd", TEXT_STYLE_INVENTORY_ARROW);
+    }
+
+    if (entries.next_id != 0xff) {
+      gfx_print_interface_text(19, 23, "\xfe\xff", TEXT_STYLE_INVENTORY_ARROW);
+    }
   }
 }
 
@@ -2103,17 +2114,6 @@ static void inventory_scroll_down(void)
   if (inventory_pos + 4 < vm_state.inv_num_objects) {
     inventory_pos += 2;
     vm_update_inventory();
-  }
-}
-
-static void update_inventory_scroll_buttons(void)
-{
-  if (inventory_pos && inventory_pos + 4 < vm_state.inv_num_objects) {
-    gfx_print_interface_text(19, 22, "\xfc\xfd", TEXT_STYLE_INVENTORY_ARROW);
-  }
-
-  if (inventory_pos + 4 < vm_state.inv_num_objects) {
-    gfx_print_interface_text(19, 23, "\xfe\xff", TEXT_STYLE_INVENTORY_ARROW);
   }
 }
 
