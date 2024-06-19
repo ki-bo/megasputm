@@ -1146,7 +1146,6 @@ void update_cursor(uint8_t snail_override)
     return;
   }
 
-  uint8_t cursor_image = snail_override ? 2 : vm_read_var8(VAR_CURSOR_STATE);
   uint16_t spr_pos_x = (input_cursor_x + 12) * 2 - HOTSPOT_OFFSET_X;
   uint8_t  spr_pos_y = (input_cursor_y + 50)     - HOTSPOT_OFFSET_Y;
   // cursor_image bit 1 = snail/regular cursor

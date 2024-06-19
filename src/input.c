@@ -83,7 +83,9 @@ void input_update(void)
   else if (!(joy & 0x08) && input_cursor_x != 159) {
     input_cursor_x += 1;
   }
-  input_button_pressed = !(joy & 0x10) ? INPUT_BUTTON_LEFT : 0;
+  if (ui_state & UI_FLAGS_ENABLE_CURSOR) {
+    input_button_pressed = !(joy & 0x10) ? INPUT_BUTTON_LEFT : 0;
+  }
 
   // keyboard handling
   if (input_key_pressed == 0) { // = 0 means previous key was processed
