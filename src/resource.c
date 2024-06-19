@@ -40,6 +40,7 @@ static uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t st
 static void free_resource(uint8_t slot);
 static uint8_t defragment_memory(void);
 static void clear_inactive_blocks(void);
+static uint8_t get_free_heap_index(void);
 static void print_heap(void);
 
 //-----------------------------------------------------------------------------------------------
@@ -318,22 +319,41 @@ void res_deactivate_slot(uint8_t slot)
 #endif
 }
 
-uint8_t res_reserve_heap(uint8_t size_blocks)
+uint8_t res_get_locked_resources(uint16_t *locked_resources, uint8_t max_entries)
 {
-  uint8_t free_heap_index = 0;
-  uint8_t slot = 0;
+  uint8_t  slot            = 0;
+  uint16_t last_type_index = 0xffff;
+  uint8_t  num_entries     = 0;
+  
   do {
-    if ((page_res_type[slot] & RES_TYPE_MASK) == RES_TYPE_HEAP) {
-      if (page_res_index[slot] >= free_heap_index) {
-        free_heap_index = page_res_index[slot] + 1;
+    if (page_res_type[slot] & RES_LOCKED_MASK) {
+      uint16_t type_index = ((page_res_type[slot] & RES_TYPE_MASK) << 8) | page_res_index[slot];
+      if (type_index != last_type_index) {
+        if (num_entries == max_entries) {
+          fatal_error(ERR_TOO_MANY_LOCKED_RESOURCES);
+        }
+        *locked_resources++ = type_index;
+        last_type_index     = type_index;
+        ++num_entries;
       }
     }
   }
   while (++slot != 0);
 
+  return num_entries;
+}
+
+uint8_t res_get_flags(uint8_t slot)
+{
+  return page_res_type[slot];
+}
+
+uint8_t res_reserve_heap(uint8_t size_blocks)
+{
   SAVE_CS_AUTO_RESTORE
   MAP_CS_MAIN_PRIV
-  slot = allocate(RES_TYPE_HEAP, free_heap_index, size_blocks);
+  uint8_t free_heap_index = get_free_heap_index();
+  uint8_t slot = allocate(RES_TYPE_HEAP, free_heap_index, size_blocks);
   set_flags(slot, RES_ACTIVE_MASK);
   return slot;
 }
@@ -364,7 +384,7 @@ void res_free_heap(uint8_t slot)
   * @param slot Index of the first page of the resource
   * @param flags Flags to set
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 void set_flags(uint8_t slot, uint8_t flags)
 {
@@ -380,7 +400,7 @@ void set_flags(uint8_t slot, uint8_t flags)
   * @param slot Index of the first page of the resource
   * @param flags Flags to clear
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 void clear_flags(uint8_t slot, uint8_t flags)
 {
@@ -396,7 +416,7 @@ void clear_flags(uint8_t slot, uint8_t flags)
   * @param slot Index of the first page of the resource
   * @param flags New flags to set
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 void reset_flags(uint8_t slot, uint8_t flags)
 {
@@ -424,7 +444,7 @@ void reset_flags(uint8_t slot, uint8_t flags)
   * @param hint The position in the page list to start searching for the resource
   * @return Index of the first page of the resource, or 0xffff if not found
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
 {
@@ -453,7 +473,7 @@ uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint)
   * @param flags Flags to set
   * @return Index of the first page of the resource, or 0xffff if not found
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
@@ -480,7 +500,7 @@ uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flag
   * @param flags Flags to clear
   * @return Index of the first page of the resource, or 0xffff if not found
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags)
 {
@@ -512,7 +532,7 @@ uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t fl
   * @param num_pages Contiguous pages to allocate
   * @return Index of the first page of the allocated memory
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
 {
@@ -567,7 +587,7 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
   * @param strategy Strategy to use when searching for free memory
   * @return Index of the first page of the free block range, or 0xffff if not found
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
 {
@@ -630,7 +650,7 @@ uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
   *
   * @param slot Index of a page of the resource
   *
-  * Code section: code_main
+  * Code section: code_main_private
   */
 static void free_resource(uint8_t slot)
 {
@@ -667,6 +687,27 @@ static void free_resource(uint8_t slot)
 #endif
 }
 
+/**
+  * @brief Returns the lowest free/unused heap index
+  *
+  * @return The free heap index not yet in use
+  *
+  * Code section: code_main_private
+  */
+static uint8_t get_free_heap_index(void)
+{
+  uint8_t free_heap_index = 0;
+  for (int16_t slot = 0; slot < 256; ++slot) {
+    if ((page_res_type[slot] & RES_TYPE_MASK) == RES_TYPE_HEAP) {
+      if (page_res_index[slot] == free_heap_index) {
+        ++free_heap_index;
+        slot = -1;
+      }
+    }
+  }
+  return free_heap_index;
+}
+
 #ifdef HEAP_DEBUG_OUT
 /**
   * @brief Prints out a summary of the current heap state
@@ -677,7 +718,7 @@ static void free_resource(uint8_t slot)
   * This is a debug function and regular output of it can be activated by uncommenting
   * the HEAP_DEBUG_OUT define at the top of this file.
   *
-  * Code section: code_main 
+  * Code section: code_main_private 
   */
 static void print_heap(void)
 {

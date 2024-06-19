@@ -1068,11 +1068,21 @@ uint8_t vm_savegame_exists(uint8_t slot)
 
 uint8_t vm_save_game(uint8_t slot)
 {
-  char filename[11];
+  char    filename[11];
   uint8_t version = 0;
 
+  uint8_t   heap_slot;
+  uint16_t *locked_resources;
+  uint8_t   num_locked_resources;
+
+  SAVE_DS_AUTO_RESTORE
   SAVE_CS_AUTO_RESTORE
   MAP_CS_DISKIO
+
+  heap_slot            = res_reserve_heap(2);
+  map_ds_resource(heap_slot);
+  locked_resources     = NEAR_U16_PTR(RES_MAPPED);
+  num_locked_resources = res_get_locked_resources(locked_resources, 255);
 
   sprintf(filename, "MM.SAV.%u", slot);
   diskio_open_for_writing();
@@ -1082,18 +1092,25 @@ uint8_t vm_save_game(uint8_t slot)
   uint16_t inventory_num_bytes = (uint16_t)vm_state.inv_next_free - (uint16_t)INVENTORY_BASE;
   diskio_write((uint8_t __huge *)INVENTORY_BASE, inventory_num_bytes);
   diskio_write((uint8_t __huge *)&actors, sizeof(actors));
+  diskio_write((uint8_t __huge *)&num_locked_resources, 1);
+  diskio_write(res_get_huge_ptr(heap_slot), num_locked_resources * 2);
   diskio_close_for_writing(filename, FILE_TYPE_SEQ);
+
+  res_free_heap(heap_slot);
 
   return 0;
 }
 
 uint8_t vm_load_game(uint8_t slot)
 {
-  char filename[11];
-  uint8_t magic_hdr[8];
+  char     filename[11];
+  uint8_t  magic_hdr[8];
+  uint8_t  num_locked_resources;
 
-  uint8_t cur_pc        = script_get_current_pc();
-  uint8_t cur_script_id = vm_state.proc_script_or_object_id[active_script_slot];
+  uint8_t   cur_pc           = script_get_current_pc();
+  uint8_t   cur_script_id    = vm_state.proc_script_or_object_id[active_script_slot];
+  uint8_t   heap_slot        = res_reserve_heap(2);
+  uint16_t *locked_resources = NEAR_U16_PTR(RES_MAPPED);
 
   SAVE_CS_AUTO_RESTORE
   MAP_CS_DISKIO
@@ -1115,14 +1132,19 @@ uint8_t vm_load_game(uint8_t slot)
 
   reset_game_state();
 
+  // read data from disk
   diskio_read((uint8_t *)&vm_state, sizeof(vm_state));
   SAVE_DS_AUTO_RESTORE
   UNMAP_DS
   uint16_t inventory_num_bytes = (uint16_t)vm_state.inv_next_free - (uint16_t)INVENTORY_BASE;
   diskio_read((uint8_t *)INVENTORY_BASE, inventory_num_bytes);
   diskio_read((uint8_t *)&actors, sizeof(actors));
+  diskio_read((uint8_t *)&num_locked_resources, 1);
+  map_ds_resource(heap_slot);
+  diskio_read((uint8_t *)locked_resources, num_locked_resources * 2);
   diskio_close_for_reading();
 
+  // ensure active scripts are in memory and update their res_slot
   for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
     uint8_t slot = vm_state.proc_slot_table[i];
     if (slot != 0xff) {
@@ -1137,12 +1159,24 @@ uint8_t vm_load_game(uint8_t slot)
     }
   }
 
+  // lock resources
+  for (uint8_t i = 0; i < num_locked_resources; ++i, ++locked_resources) {
+    uint8_t  type  = MSB(*locked_resources);
+    uint8_t  index = LSB(*locked_resources);
+    debug_out("locked resource type %d index %d", type, index);
+    res_provide(type, index, 0);
+    res_lock(type, index, 0);
+  }
+  
+  res_free_heap(heap_slot);
+
   load_room(vm_read_var8(VAR_SELECTED_ROOM));
 
   UNMAP_CS
-
   script_break();
+
   reset_game = RESET_LOADED_GAME;
+
   return 0;
 }
 
@@ -1690,7 +1724,7 @@ static void execute_sentence_stack(void)
   
   vm_write_var(VAR_VALID_VERB, script_offset != 0);
 
-  debug_out(" verb %d, noun1 %d, noun2 %d, valid_verb %d", verb, noun1, noun2, script_offset != 0);
+  //debug_out(" verb %d, noun1 %d, noun2 %d, valid_verb %d", verb, noun1, noun2, script_offset != 0);
 
   uint8_t slot = vm_start_script(SCRIPT_ID_SENTENCE);
   //debug_out("Sentence script verb %d noun1 %d noun2 %d valid-verb %d", verb, noun1, noun2, script_offset != 0);
@@ -1705,21 +1739,19 @@ static uint8_t get_room_object_script_offset(uint8_t verb, uint8_t local_object_
   if (is_inventory) {
     UNMAP_DS
     ptr = NEAR_U8_PTR(vm_state.inv_objects[local_object_id]);
-    debug_out("inventory object %d at %p", local_object_id, ptr);
   }
   else {
     map_ds_resource(obj_page[local_object_id]);
     ptr = NEAR_U8_PTR(RES_MAPPED + obj_offset[local_object_id]);
   }
   ptr += 15;
-  debug_out("searching for verb %d at %p", verb, ptr);
   
   uint8_t script_offset = 0;
 
   //debug_out("Searching for verb %x in object %d", verb, local_object_id);
 
   while (*ptr != 0) {
-    debug_out("Verb %x, offset %x", *ptr, *(ptr + 1));
+    //debug_out("Verb %x, offset %x", *ptr, *(ptr + 1));
     if (*ptr == verb || *ptr == 0xff) {
       script_offset = *(ptr + 1);
       break;
@@ -1971,7 +2003,7 @@ static void update_inventory_interface()
                                buf, 
                                TEXT_STYLE_INVENTORY);
     }
-
+    
     update_inventory_scroll_buttons();
   }
 }

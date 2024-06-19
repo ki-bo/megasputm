@@ -1,8 +1,6 @@
 
 #include <stdint.h>
 
-#define MAX_RESOURCE_SIZE        0x4000
-
 enum res_type_t {
     RES_TYPE_NONE = 0,
     RES_TYPE_ROOM,
@@ -18,8 +16,6 @@ enum res_type_flags_t {
   RES_ACTIVE_MASK = 0x40
 };
 
-extern uint8_t res_pages_invalidated;
-
 // code_init functions
 void res_init(void);
 
@@ -34,8 +30,9 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint);
 void res_deactivate(uint8_t type, uint8_t id, uint8_t hint);
 void res_activate_slot(uint8_t slot);
 void res_deactivate_slot(uint8_t slot);
-void res_set_flags(uint8_t slot, uint8_t flags);
-void res_clear_flags(uint8_t slot, uint8_t flags);
-void res_reset_flags(uint8_t slot, uint8_t flags);
+uint8_t res_get_locked_resources(uint16_t *locked_resources, uint8_t max_entries);
+uint8_t res_get_flags(uint8_t slot);
+uint8_t res_get_num_locked(void);
+uint16_t res_get_type_and_index(uint8_t slot);
 uint8_t res_reserve_heap(uint8_t size_blocks);
 void res_free_heap(uint8_t slot);
