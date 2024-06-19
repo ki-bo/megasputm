@@ -457,7 +457,7 @@ void vm_set_current_room(uint8_t room_no)
     debug_out("Activating new room %d", room_no);
     // activate new room data
     load_room(room_no);
-    MAP_CS_GFX
+    camera_x = 20;
     actor_room_changed();
 
     // run entry script
