@@ -16,5 +16,5 @@ union map_t __attribute__((zpage)) map_regs;
   */
 void map_init(void)
 {
-  map_regs.quad = 0;
+  //map_regs.quad = 0;
 }

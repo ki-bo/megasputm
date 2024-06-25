@@ -442,7 +442,7 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
   *
   * @param script_id The id of the script to stop
   *
-  * Code section: code_main
+  * Code section: code_script
   */
 void script_stop_slot(uint8_t slot)
 {
@@ -655,7 +655,7 @@ static uint8_t run_slot_stacked(uint8_t slot)
   *
   * @return The index of the first free script slot
   *
-  * Code section: code_main
+  * Code section: code_script
   */
 static uint8_t find_free_script_slot(void)
 {
@@ -2345,4 +2345,3 @@ static void unimplemented_opcode(void)
   debug_out("Unimplemented opcode: %x at %x", opcode, (uint16_t)(pc - 1));
   fatal_error(ERR_UNKNOWN_OPCODE);
 }
-
