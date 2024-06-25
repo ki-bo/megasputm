@@ -230,7 +230,12 @@ static uint8_t binary_search_xy(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2, 
       y1 = yn;
       x1 = xn;
     }
-    yn = (uint8_t)(y1 + y2) >> 1;
+    // The next calculation originally was a one liner like this:
+    // yn = (uint8_t)(y1 + y2) >> 1;
+    // But this triggered a bug in the compiler using asr instead of lsr for the shift.
+    // Splitting it up like this fixed the issue until the compiler bug is fixed.
+    yn = y1 + y2;
+    yn >>= 1;
   }
   return xn;
 }
