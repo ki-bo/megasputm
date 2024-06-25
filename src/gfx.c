@@ -893,8 +893,7 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
   * @brief Finalizes drawing of all actors of the current screen.
   *
   * Needs to be called after all actors were drawn to the backbuffer. It will reposition
-  * the RRB position (GOTOX) to the right edge of the screen and place an end-of-line
-  * character code to indicate the RRB rendering should stop for this character row.
+  * the RRB position (GOTOX) to the right edge of the screen.
   *
   * Code section: code_gfx
   */
