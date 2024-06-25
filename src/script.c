@@ -8,7 +8,6 @@
 #include "memory.h"
 #include "resource.h"
 #include "util.h"
-#include "vm.h"
 #include "walk_box.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -22,6 +21,12 @@
 #endif
 
 // private functions
+static uint8_t run_active_slot(void);
+static uint8_t run_slot_stacked(uint8_t slot);
+static uint8_t find_free_script_slot(void);
+static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_object_id, uint8_t parent, uint8_t res_slot, uint16_t offset);
+static void stop_script_from_table(uint8_t table_idx);
+static void proc_slot_table_insert(uint8_t slot);
 static void debug_header();
 static void exec_opcode(uint8_t opcode);
 static uint8_t read_byte(void);
@@ -234,7 +239,7 @@ void script_init(void)
   opcode_jump_table[0x74] = &proximity;
   opcode_jump_table[0x75] = &get_object_at_position;
   opcode_jump_table[0x76] = &walk_to_object;
-  opcode_jump_table[0x37] = &set_or_clear_pickupable;
+  opcode_jump_table[0x77] = &set_or_clear_pickupable;
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &do_sentence;
   opcode_jump_table[0x7a] = &verb;
@@ -252,6 +257,314 @@ void script_init(void)
   */
 #pragma clang section text="code_script" rodata="cdata_script" data="data_script" bss="zdata"
 
+void script_schedule_init_script(void)
+{
+  uint8_t script_id = 1;
+  uint8_t script1_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+  res_activate_slot(script1_page);
+  reset_script_slot(0, PROC_TYPE_GLOBAL, script_id, 0xff, script1_page, 4 /* skipping script header directly to first opcode*/);
+  vm_state.proc_slot_table[0] = 0;
+  vm_state.num_active_proc_slots = 1;
+}
+
+uint8_t script_execute_slot(uint8_t slot)
+{
+  uint8_t save_active_script_slot = active_script_slot;
+  uint8_t result;
+
+  active_script_slot = slot;
+
+  if (parallel_script_count == 0) {
+    // top-level script
+    //debug_out("  executing top-level script slot %d", slot);
+    result = run_active_slot();
+  }
+  else {
+    // script execution from within another script
+    // need to stack the current script state
+    //debug_out("  executing child script slot %d", slot);
+    result = run_slot_stacked(active_script_slot);
+  }
+  if (result != PROC_STATE_FREE && vm_state.proc_parent[slot] != 0xff) {
+    vm_state.proc_parent[slot] = 0xff;
+  }
+
+  active_script_slot = save_active_script_slot;
+
+  return result;
+}
+
+uint16_t script_get_current_pc(void)
+{
+  return (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
+}
+
+void script_break(void)
+{
+  break_script = 1;
+}
+
+/**
+  * @brief Starts a global script
+  * 
+  * The script with the given id is added to a free process slot and marked with state
+  * PROC_STATE_RUNNING. The script will start execution at the next cycle of the main loop.
+  *
+  * @param script_id 
+  *
+  * Code section: code_script
+  */
+uint8_t script_start(uint8_t script_id)
+{
+  uint8_t slot = vm_get_first_script_slot_by_script_id(script_id);
+  if (slot != 0xff) {
+    //debug_out("Script %d already running in slot %d", script_id, slot);
+    script_stop(script_id);
+  }
+  else {
+    slot = find_free_script_slot();
+  }
+
+  uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+  res_activate_slot(new_page);
+  proc_res_slot[slot] = new_page;
+
+  uint8_t parent = script_is_room_object_script(active_script_slot) ? 0xff : active_script_slot;
+
+  // init script slot
+  reset_script_slot(slot, PROC_TYPE_GLOBAL, script_id, parent, new_page, 4 /* skipping script header directly to first opcode*/);
+
+  debug_out("Starting global script %d in slot %d", script_id, slot);
+
+  // execute new script immediately (like subroutine)
+  script_execute_slot(slot);
+
+  if (vm_state.proc_state[slot] != PROC_STATE_FREE) {
+    // script hit first break and is still running, put it into slot table for scheduling next cycle
+    // (it will be placed directly after the current script in the slot table)
+    proc_slot_table_insert(slot);
+    // increase exec counter so we don't execute it again in this cycle
+    ++proc_slot_table_exec;
+    script_print_slot_table();
+  }
+
+  return slot;
+}
+
+void script_execute_room_script(uint16_t room_script_offset)
+{
+  debug_out("Starting room entry/exit script at offset %x", room_script_offset);
+
+  uint8_t  res_slot = room_res_slot + MSB(room_script_offset);
+  uint16_t offset   = LSB(room_script_offset);
+
+  uint8_t script_slot = find_free_script_slot();
+
+  reset_script_slot(script_slot, 0 /*type*/, 0xffff /*script_id*/, 0xff /*parent*/, res_slot, offset);
+  if (script_execute_slot(script_slot) != PROC_STATE_FREE) {
+    // room scripts shall never run longer than one cycle
+    fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
+  }
+  //print_slot_table();
+}
+
+void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t background)
+{
+  SAVE_DS_AUTO_RESTORE
+
+  uint8_t  is_inventory;
+  uint8_t  type;
+  uint8_t  script_slot;
+  uint16_t script_offset;
+  uint8_t  res_slot;
+  uint8_t  id = vm_get_local_object_id(global_object_id);
+  if (id != 0xff) {
+    is_inventory  = 0;
+    type          = 0;
+    res_slot      = obj_page[id];
+    script_offset = obj_offset[id];
+  }
+  else {
+    id = inv_get_position_by_id(global_object_id);
+    if (id != 0xff) {
+      is_inventory  = 1;
+      type          = PROC_TYPE_INVENTORY;
+      res_slot      = 0;
+      script_offset = (uint16_t)vm_state.inv_objects[id] - RES_MAPPED;
+    }
+    else {
+      // object not in room or inventory
+      return;
+    }
+  }
+
+  uint8_t verb_offset = vm_get_room_object_script_offset(verb, id, is_inventory);
+  if (verb_offset == 0) {
+    return;
+  }
+  script_offset += verb_offset;
+
+  if (background) {
+    type |= PROC_TYPE_BACKGROUND;
+  }
+  if (verb < 250) {
+    type |= PROC_TYPE_REGULAR_VERB;
+  }
+
+  for (script_slot = 0; script_slot < NUM_SCRIPT_SLOTS; ++script_slot) {
+    if (vm_state.proc_state[script_slot] != PROC_STATE_FREE &&
+        vm_state.proc_type[script_slot] == (type & (PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB)) &&
+        vm_state.proc_script_or_object_id[script_slot] == LSB(global_object_id) &&
+        vm_state.proc_object_id_msb[script_slot] == MSB(global_object_id)) {
+      debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
+      break;
+    }
+  }
+  
+  if (script_slot == NUM_SCRIPT_SLOTS) {
+    script_slot = find_free_script_slot();
+  }
+
+  debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
+  reset_script_slot(script_slot, type, global_object_id, 0xff /*parent*/, res_slot, script_offset);
+
+  if (script_execute_slot(script_slot) != PROC_STATE_FREE) {
+    // room scripts shall never run longer than one cycle
+    fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
+  }
+}
+
+/**
+  * @brief Stops the script in the specified script slot
+  * 
+  * Deactivates the script and sets the process state to PROC_STATE_FREE.
+  * The associated script resource is deactivated and thus marked free to override if needed.
+  *
+  * @param script_id The id of the script to stop
+  *
+  * Code section: code_main
+  */
+void script_stop_slot(uint8_t slot)
+{
+  vm_state.proc_state[slot] = PROC_STATE_FREE;
+
+  if (!script_is_room_object_script(slot)) {
+    //debug_out("Script %d ended slot %d", vm_state.proc_script_or_object_id[slot], slot);
+    res_deactivate_slot(proc_res_slot[slot]);
+
+    for (uint8_t table_idx = 1; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+    {
+      // stop children of us
+      uint8_t child_slot = vm_state.proc_slot_table[table_idx];
+      if (child_slot != 0xff && vm_state.proc_parent[child_slot] == slot) {
+        stop_script_from_table(table_idx);
+      }
+    }
+
+    // Mark all stopped scripts as 0xff in slot table
+    for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+    {
+      uint8_t tmp_slot = vm_state.proc_slot_table[table_idx];
+      if (tmp_slot != 0xff && vm_state.proc_state[tmp_slot] == PROC_STATE_FREE) {
+        vm_state.proc_slot_table[table_idx] = 0xff;
+      }
+    }
+
+    // Will remove all 0xff entries from the table after all scripts have been processed
+    // in the current cycle
+    proc_table_cleanup_needed = 1;
+  }
+  else {
+    // debug_out("Object script %d ended slot %d", 
+    //           (vm_state.proc_script_or_object_id[slot]) | (vm_state.proc_object_id_msb[slot] << 8), 
+    //           slot);
+  }
+
+  script_print_slot_table();
+}
+
+void script_stop(uint8_t script_id)
+{
+  for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+  {
+    uint8_t slot = vm_state.proc_slot_table[table_idx];
+    if (slot != 0xff &&
+        vm_state.proc_type[slot] == PROC_TYPE_GLOBAL &&
+        vm_state.proc_script_or_object_id[slot] == script_id)
+    {
+      script_stop_slot(slot);
+    }
+  }
+}
+
+void script_print_slot_table(void)
+{
+  debug_out2("Table (%d slots):", vm_state.num_active_proc_slots);
+  for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
+    uint8_t slot = vm_state.proc_slot_table[i];
+    if (slot == 0xff) {
+      debug_msg2(" X");
+      continue;
+    }
+    uint16_t id = vm_state.proc_script_or_object_id[slot] | (vm_state.proc_object_id_msb[slot] << 8);
+    debug_out2(" %d(%d)", slot, id);
+    uint8_t state = vm_get_proc_state(slot);
+    if (state == PROC_STATE_FREE) {
+      debug_msg2("X");
+    }
+    else if (state == PROC_STATE_WAITING_FOR_TIMER) {
+      debug_msg2("W");
+    }
+    else if (state == PROC_STATE_RUNNING) {
+      debug_msg2("R");
+    }
+    else {
+      debug_out2("?%d", state);
+    }
+    if (vm_state.proc_state[slot] & PROC_FLAGS_FROZEN) {
+      debug_msg2("F");
+    }
+  }
+  debug_out("");
+}
+
+uint8_t script_is_room_object_script(uint8_t slot)
+{
+  return (vm_state.proc_type[slot] & PROC_TYPE_GLOBAL) == 0;
+}
+
+#pragma clang section text="code"
+
+/**
+  * @brief Executes the function for the given opcode.
+  *
+  * We are not doing this code inline but as a separate function
+  * because the compiler would otherwise not know about the clobbering
+  * of registers (including zp registers) by the called function.
+  * Placing the function in section code will make sure that it
+  * is not inlined by functions in other sections, like code_script.
+  * 
+  * The highest bit of the opcode is ignored, so opcodes 128-255 are
+  * jumping to the same function as opcodes 0-127.
+  *
+  * @param opcode The opcode to be called (0-127).
+  *
+  * Code section: code
+  */
+ //__attribute__((section("code")))
+void exec_opcode(uint8_t opcode)
+{
+  //opcode_jump_table[opcode]();
+  __asm (" asl a\n"
+         " tax\n"
+         " jsr (opcode_jump_table, x)"
+         : /* no output operands */
+         : "Ka" (opcode)
+         : "x");
+}
+
+#pragma clang section text="code_script"
+
 /**
   * @brief Runs the next script cycle of the currently active script slot.
   *
@@ -259,7 +572,7 @@ void script_init(void)
   * 
   * Code section: code_script
   */
-uint8_t script_run_active_slot(void)
+static uint8_t run_active_slot(void)
 {
   if (parallel_script_count == 6) {
     fatal_error(ERR_SCRIPT_RECURSION);
@@ -306,7 +619,7 @@ uint8_t script_run_active_slot(void)
   return vm_get_active_proc_state_and_flags();
 }
 
-uint8_t script_run_slot_stacked(uint8_t slot)
+static uint8_t run_slot_stacked(uint8_t slot)
 {
   uint8_t  stack_opcode       = opcode;
   uint8_t  stack_param_mask   = param_mask;
@@ -318,7 +631,7 @@ uint8_t script_run_slot_stacked(uint8_t slot)
 #endif
 
   active_script_slot = slot;
-  uint8_t state = script_run_active_slot();
+  uint8_t state = run_active_slot();
 
   opcode = stack_opcode;
   param_mask = stack_param_mask;
@@ -332,47 +645,79 @@ uint8_t script_run_slot_stacked(uint8_t slot)
   return state;
 }
 
-uint16_t script_get_current_pc(void)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type"
+/**
+  * @brief Finds a free script slot
+  *
+  * Finds a free script slot by iterating over all script slots and returning the first free slot
+  * found. If no free slot is found, the function will trigger a fatal error.
+  *
+  * @return The index of the first free script slot
+  *
+  * Code section: code_main
+  */
+static uint8_t find_free_script_slot(void)
 {
-  return (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED));
-}
+  uint8_t slot;
+  for (slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
+  {
+    if (vm_state.proc_state[slot] == PROC_STATE_FREE)
+    {
+      return slot;
+    }
+  }
 
-void script_break(void)
+  fatal_error(ERR_OUT_OF_SCRIPT_SLOTS);
+}
+#pragma clang diagnostic pop
+
+static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_object_id, uint8_t parent, uint8_t res_slot, uint16_t offset)
 {
-  break_script = 1;
+  vm_state.proc_script_or_object_id[slot] = LSB(script_or_object_id);
+  vm_state.proc_object_id_msb[slot]       = MSB(script_or_object_id);
+  vm_state.proc_state[slot]               = PROC_STATE_RUNNING;
+  vm_state.proc_parent[slot]              = parent;
+  vm_state.proc_type[slot]                = type;
+  proc_res_slot[slot]                     = res_slot;
+  vm_state.proc_pc[slot]                  = offset;
 }
-
-#pragma clang section text="code"
 
 /**
-  * @brief Executes the function for the given opcode.
+  * @brief Stops a script from the slot table and also stops all its children
   *
-  * We are not doing this code inline but as a separate function
-  * because the compiler would otherwise not know about the clobbering
-  * of registers (including zp registers) by the called function.
-  * Placing the function in section code will make sure that it
-  * is not inlined by functions in other sections, like code_script.
-  * 
-  * The highest bit of the opcode is ignored, so opcodes 128-255 are
-  * jumping to the same function as opcodes 0-127.
-  *
-  * @param opcode The opcode to be called (0-127).
-  *
-  * Code section: code
+  * Function will stop the mentioned script slot from the table and all of its children. The
+  * children are stopped recusively by setting their status to PROC_STATE_FREE and deactivating
+  * their resource slot.
   */
- //__attribute__((section("code")))
-void exec_opcode(uint8_t opcode)
+static void stop_script_from_table(uint8_t table_idx)
 {
-  //opcode_jump_table[opcode]();
-  __asm (" asl a\n"
-         " tax\n"
-         " jsr (opcode_jump_table, x)"
-         : /* no output operands */
-         : "Ka" (opcode)
-         : "x");
+  uint8_t slot = vm_state.proc_slot_table[table_idx];
+  vm_state.proc_state[slot] = PROC_STATE_FREE;
+
+  //debug_out(" Child script %d ended slot %d", vm_state.proc_script_or_object_id[slot], slot);
+  res_deactivate_slot(proc_res_slot[slot]);
+  for (++table_idx; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+  {
+    // stop children of us
+    uint8_t child_slot = vm_state.proc_slot_table[table_idx];
+    if (child_slot != 0xff && vm_state.proc_parent[child_slot] == slot) {
+      stop_script_from_table(table_idx);
+    }
+  }
 }
 
-#pragma clang section text="code_script"
+static void proc_slot_table_insert(uint8_t slot)
+{
+  int8_t new_entry = proc_slot_table_idx + 1;
+
+  for (int8_t i = vm_state.num_active_proc_slots - 1; i >= new_entry; --i) {
+    vm_state.proc_slot_table[i + 1] = vm_state.proc_slot_table[i];
+  }
+
+  vm_state.proc_slot_table[new_entry] = slot;
+  ++vm_state.num_active_proc_slots;
+}
 
 /**
   * @brief Reads a byte from the script.
@@ -600,7 +945,7 @@ static void stop_or_break(void)
   }
   else {
     //debug_scr("stop-script");
-    vm_stop_script_slot(active_script_slot);
+    script_stop_slot(active_script_slot);
   }
 }
 
@@ -856,7 +1201,7 @@ static void owner_of(void)
 {
   uint8_t var_idx = read_byte();
   uint16_t obj_id = resolve_next_param16();
-  debug_scr("owner-of %d is %d", obj_id, vm_state.global_game_objects[obj_id] & 0x0f);
+  //debug_scr("owner-of %d is %d", obj_id, vm_state.global_game_objects[obj_id] & 0x0f);
   vm_write_var(var_idx, vm_state.global_game_objects[obj_id] & 0x0f);
 }
 
@@ -864,7 +1209,7 @@ static void do_animation(void)
 {
   uint8_t actor_id = resolve_next_param8();
   uint8_t animation_id = resolve_next_param8();
-  debug_scr("do-animation (actor=)%d (anim=)%d", actor_id, animation_id);
+  //debug_scr("do-animation (actor=)%d (anim=)%d", actor_id, animation_id);
   uint8_t local_id = actors.local_id[actor_id];
   if (local_id != 0xff) {
     if (animation_id < 0xf8) {
@@ -882,7 +1227,7 @@ static void do_animation(void)
 static void camera_pan_to(void)
 {
   uint8_t x = resolve_next_param8();
-  debug_scr("camera-pan-to %d", x);
+  //debug_scr("camera-pan-to %d", x);
   vm_camera_pan_to(x);
 }
 
@@ -905,24 +1250,24 @@ static void actor_ops(void)
 
   switch (sub_opcode) {
     case 0x01:
-      debug_scr("actor %d sound %d", actor_id, param);
+      //debug_scr("actor %d sound %d", actor_id, param);
       actors.sound[actor_id] = param;
       break;
     case 0x02:
       actors.palette_color[actor_id] = param;
       actors.palette_idx[actor_id] = read_byte();
-      debug_scr("actor %d color %d is %d", actor_id, param, actors.palette_idx[actor_id]);
+      //debug_scr("actor %d color %d is %d", actor_id, param, actors.palette_idx[actor_id]);
       break;
     case 0x03:
       read_null_terminated_string(actors.name[actor_id]);
-      debug_scr("actor %d name \"%s\"", actor_id, actors.name[actor_id]);
+      //debug_scr("actor %d name \"%s\"", actor_id, actors.name[actor_id]);
       break;
     case 0x04:
-      debug_scr("actor %d costume %d", actor_id, param);
+      //debug_scr("actor %d costume %d", actor_id, param);
       actors.costume[actor_id] = param;
       break;
     case 0x05:
-      debug_scr("actor %d talk-color %d", actor_id, param);
+      //debug_scr("actor %d talk-color %d", actor_id, param);
       actors.talk_color[actor_id] = param;
       break;
   }
@@ -948,10 +1293,10 @@ static void say_line(void)
   uint8_t actor_id = resolve_next_param8();
   read_encoded_string_null_terminated(message_buffer);
   if (actor_id == 0xff) {
-    debug_scr("print-line");
+    //debug_scr("print-line");
   }
   else {
-    debug_scr("say-line");
+    //debug_scr("say-line");
   }
   vm_say_line(actor_id);
 }
@@ -970,7 +1315,7 @@ static void random_number(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t upper_bound = resolve_next_param8();
-  debug_scr("VAR[%d] = random %d", var_idx, upper_bound);
+  //debug_scr("VAR[%d] = random %d", var_idx, upper_bound);
   while (RNDRDY & 0x80); // wait for random number generator to be ready
   uint8_t rnd_number = RNDGEN * (upper_bound + 1) / 255;
   vm_write_var(var_idx, rnd_number);
@@ -1006,10 +1351,10 @@ static void jump_or_restart(void)
 {
   if (!(opcode & 0x80)) {
     pc += read_word(); // will effectively jump backwards if the offset is negative
-    debug_scr("jump %x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
+    //debug_scr("jump %x", (uint16_t)(pc - NEAR_U8_PTR(RES_MAPPED) - 4));
   }
   else {
-    debug_scr("restart");
+    //debug_scr("restart");
     reset_game = RESET_RESTART;
   }
 }
@@ -1228,7 +1573,7 @@ static void put_actor_in_room(void)
   uint8_t actor_id = resolve_next_param8();
   uint8_t room_id = resolve_next_param8();
   actor_put_in_room(actor_id, room_id);
-  debug_scr("put-actor %d in-room %d", actor_id, room_id);
+  //debug_scr("put-actor %d in-room %d", actor_id, room_id);
 }
 
 /**
@@ -1249,12 +1594,12 @@ static void put_actor_in_room(void)
 static void sleep_for_or_wait_for_message(void)
 {
   if (!(opcode & 0x80)) {
-    debug_scr("sleep-for");
+    //debug_scr("sleep-for");
     int32_t negative_ticks = read_int24();
     vm_set_script_wait_timer(negative_ticks);
   }
   else {
-    debug_scr("wait-for-message");
+    //debug_scr("wait-for-message");
     if (vm_read_var8(VAR_MESSAGE_GOING)) {
       --pc;
       break_script = 1;
@@ -1296,14 +1641,14 @@ static void assign_from_bit_variable(void)
   uint16_t bit_var_hi = read_word() + resolve_next_param8();
   uint8_t bit_var_lo = bit_var_hi & 0x0f;
   bit_var_hi >>= 4;
-  debug_scr("VAR[%d] = bit-variable %x.%x", var_idx, bit_var_hi, bit_var_lo);
+  //debug_scr("VAR[%d] = bit-variable %x.%x", var_idx, bit_var_hi, bit_var_lo);
   vm_write_var(var_idx, (vm_read_var(bit_var_hi) >> bit_var_lo) & 1);
 }
 
 static void camera_at(void)
 {
   uint16_t new_camera_x = resolve_next_param8();
-  debug_scr("camera-at %d", new_camera_x);
+  //debug_scr("camera-at %d", new_camera_x);
   vm_set_camera_to(new_camera_x);
 }
 
@@ -1347,14 +1692,14 @@ static void do_sentence(void)
   uint8_t sentence_verb = resolve_next_param8();
 
   if (sentence_verb == 0xfb) {
-    debug_scr("  sentence_verb: %d = RESET", sentence_verb);
+    //debug_scr("  sentence_verb: %d = RESET", sentence_verb);
     vm_revert_sentence();
     return;
   }
   else if (sentence_verb == 0xfc) {
-    debug_scr("  sentence_verb: %d = STOP", sentence_verb);
+    //debug_scr("  sentence_verb: %d = STOP", sentence_verb);
     sentence_stack.num_entries = 0;
-    vm_stop_script(SCRIPT_ID_SENTENCE);
+    script_stop(SCRIPT_ID_SENTENCE);
     return;
   }
   else if (sentence_verb == 0xfa) {
@@ -1397,7 +1742,7 @@ static void do_sentence(void)
       vm_write_var(VAR_CURRENT_NOUN2, sentence_noun2);
     }
   
-    vm_execute_object_script(sentence_verb, sentence_noun1, background);
+    script_execute_object_script(sentence_verb, sentence_noun1, background);
     break;
   }
 
@@ -1434,11 +1779,11 @@ static void set_or_clear_pickupable(void)
 {
   uint16_t obj_id = resolve_next_param16();
   if (opcode & 0x40) {
-    debug_scr("clear-pickupable %d", obj_id);
+    //debug_scr("clear-pickupable %d", obj_id);
     vm_state.global_game_objects[obj_id] &= ~OBJ_CLASS_PICKUPABLE;
   }
   else {
-    debug_scr("set-pickupable %d", obj_id);
+    //debug_scr("set-pickupable %d", obj_id);
     vm_state.global_game_objects[obj_id] |= OBJ_CLASS_PICKUPABLE;
   }
 }
@@ -1565,8 +1910,8 @@ static void start_script(void)
 {
   //debug_msg("Start script");
   uint8_t script_id = resolve_next_param8();
-  debug_scr("start-script %d", script_id);
-  vm_start_script(script_id);
+  //debug_scr("start-script %d", script_id);
+  script_start(script_id);
 }
 
 static void actor_x(void)
@@ -1660,7 +2005,8 @@ static void jump_if_not_equal(void)
   * will be loaded and the new script will be started. The script resource will 
   * be mapped already at the end of this function and the PC will be set to the
   * beginning of the new script. Therefore, when returning from this function,
-  * the new script will be executed from the beginning.
+  * the new script will be executed from the beginning. The old script resource 
+  * is deactivated and marked free to override if needed.
   *
   * Variant opcodes: 0xCA
   *
@@ -1670,7 +2016,26 @@ void chain_script(void)
 {
   //debug_msg("chain-script");
   uint8_t script_id = resolve_next_param8();
-  vm_chain_script(script_id);
+  
+  //debug_out("Chaining script %d from script %d slot %d", script_id, vm_state.proc_script_or_object_id[active_script_slot], active_script_slot);
+
+  if (script_is_room_object_script(active_script_slot)) {
+    fatal_error(ERR_CHAINING_ROOM_SCRIPT);
+  }
+
+  res_deactivate_slot(proc_res_slot[active_script_slot]);
+
+  uint8_t new_page = res_provide(RES_TYPE_SCRIPT, script_id, 0);
+  res_activate_slot(new_page);
+  map_ds_resource(new_page);
+
+  proc_res_slot[active_script_slot]                     = new_page;
+  vm_state.proc_pc[active_script_slot]                  = 4; // skipping script header directly to first opcode
+  vm_state.proc_script_or_object_id[active_script_slot] = script_id;
+  vm_state.proc_object_id_msb[active_script_slot]       = 0;
+
+  script_print_slot_table();
+
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
 }
 
@@ -1828,7 +2193,7 @@ static void cursor(void)
   uint16_t param = resolve_next_param16();
   vm_write_var(VAR_CURSOR_STATE, param & 0xff);
   vm_change_ui_flags(param >> 8);
-  debug_scr("cursor cursor-state %x ui-flags %x", param & 0xff, param >> 8);
+  //debug_scr("cursor cursor-state %x ui-flags %x", param & 0xff, param >> 8);
 }
 
 static void stop_script(void)
@@ -1836,10 +2201,10 @@ static void stop_script(void)
   uint8_t script_id = resolve_next_param8();
   //debug_scr("stop-script %d", script_id);
   if (script_id == 0) {
-    vm_stop_script_slot(active_script_slot);
+    script_stop_slot(active_script_slot);
   }
   else {
-  vm_stop_script(script_id);
+  script_stop(script_id);
   }
 }
 
@@ -1860,7 +2225,7 @@ static void script_running(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t script_id = resolve_next_param8();
-  debug_scr("VAR[%d] = script-running %d", var_idx, script_id);
+  //debug_scr("VAR[%d] = script-running %d", var_idx, script_id);
   if (vm_is_script_running(script_id)) {
     vm_write_var(var_idx, 1);
   }
@@ -1895,7 +2260,7 @@ static void lights(void)
   uint8_t z = read_byte();
 
   if (!z) {
-    debug_scr("lights are %d", x);
+    //debug_scr("lights are %d", x);
     vm_write_var(VAR_CURRENT_LIGHTS, x);
   }
   else if (z == 1) {
@@ -1980,3 +2345,4 @@ static void unimplemented_opcode(void)
   debug_out("Unimplemented opcode: %x at %x", opcode, (uint16_t)(pc - 1));
   fatal_error(ERR_UNKNOWN_OPCODE);
 }
+
