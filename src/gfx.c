@@ -1232,7 +1232,6 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   screen_pos_x &= 0x3ff;
   int8_t last_but_one_row = height_chars - 2;
   uint8_t shift_y = (uint8_t)screen_pos_y & 0x07;
-  debug_out("screen_pos_y %d shift_y %d", screen_pos_y, shift_y);
   if (shift_y) {
     shift_y = 8 - shift_y;
   }
