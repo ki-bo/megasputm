@@ -1024,7 +1024,7 @@ void gfx_clear_sentence(void)
 {
   static const dmalist_t dmalist_clear_sentence = {
     .command  = 0,
-    .count    = 40 - 2,
+    .count    = 80 - 2,
     .src_addr = LSB16(SCREEN_RAM_SENTENCE),
     .src_bank = BANK(SCREEN_RAM_SENTENCE),
     .dst_addr = LSB16(SCREEN_RAM_SENTENCE + 2),
