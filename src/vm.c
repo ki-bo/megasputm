@@ -431,6 +431,7 @@ void vm_set_current_room(uint8_t room_no)
     res_deactivate_slot(room_res_slot);
   }
 
+  vm_revert_sentence();
   MAP_CS_GFX
   gfx_clear_dialog();
   gfx_fade_out();
@@ -1785,6 +1786,11 @@ static uint8_t inventory_ui_pos_to_x(uint8_t pos)
 
 static uint8_t inventory_ui_pos_to_y(uint8_t pos)
 {
+  if (pos & 4) {
+    // arrow buttons
+    return 22 + (pos & 1);
+  }
+  // top slots are at 22, bottom slots are at 23
   return 22 + (pos >> 1);
 }
 
