@@ -459,9 +459,9 @@ void actor_draw(uint8_t local_id)
 
   uint8_t masking = local_actors.masking[local_id];
   int16_t min_x   = 0x7fff;
-  uint8_t min_y   = 0xff;
+  int16_t min_y   = 0xff;
   int16_t max_x   = 0;
-  uint8_t max_y   = 0;
+  int16_t max_y   = 0;
 
   map_ds_resource(local_actors.res_slot[local_id]);
   __auto_type hdr = (struct costume_header *)RES_MAPPED;
@@ -491,8 +491,8 @@ void actor_draw(uint8_t local_id)
         cel_data[level] = cur_cel_data;
 
         // calculate scene x position in pixels for this actor cel image
-        uint16_t cel_x    = pos_x;
-        int16_t  dx_level = dx + cur_cel_data->offset_x;
+        int16_t cel_x    = pos_x;
+        int16_t dx_level = dx + cur_cel_data->offset_x;
         if (mirror) {
           cel_x -= dx_level + cur_cel_data->width - 16;
         }
@@ -502,13 +502,14 @@ void actor_draw(uint8_t local_id)
 
         // calculate scene y position in pixels for this actor cel image
         int16_t dy_level = dy + cur_cel_data->offset_y;
-        uint8_t cel_y    = pos_y + dy_level;
+        int16_t cel_y    = pos_y + dy_level;
         
         // adjust bounding box for all cels
+        //debug_out("min_y %d, cel_y %d, max_y %d", min_y, cel_y, max_y);
         min_x = min(min_x, cel_x);
         min_y = min(min_y, cel_y);
-        max_x = max(max_x, cel_x + cur_cel_data->width);
-        max_y = max(max_y, cel_y + cur_cel_data->height);
+        max_x = max(max_x, cel_x + (int16_t)cur_cel_data->width);
+        max_y = max(max_y, cel_y + (int16_t)cur_cel_data->height);
 
         // remember position for this cel level
         level_pos_x[level] = cel_x;
@@ -529,6 +530,7 @@ void actor_draw(uint8_t local_id)
   uint8_t height = max_y - min_y;
 
   // step 2: allocate an empty canvas for the actor 
+  //debug_out("prepare min_x %d, min_y %d, width %d, height %d", min_x, min_y, width, height);
   if (!gfx_prepare_actor_drawing(min_x, min_y, width, height)) {
     // actor is outside of screen
     return;

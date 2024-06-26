@@ -753,10 +753,10 @@ uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, ui
   actor_height = actor_height_chars * 8;
 
   uint16_t num_bytes = check_next_char_data_wrap_around(actor_width, actor_height);
-  actor_char_data = (uint32_t)next_char_data;
-  next_char_data += num_bytes;
+  actor_char_data  = (uint32_t)next_char_data;
+  next_char_data  += num_bytes;
 
-  dmalist_clear_actor_chars.count = num_bytes;
+  dmalist_clear_actor_chars.count    = num_bytes;
   dmalist_clear_actor_chars.dst_addr = LSB16(actor_char_data);
   dmalist_clear_actor_chars.dst_bank = BANK(actor_char_data);
   dma_trigger(&dmalist_clear_actor_chars);
@@ -1209,8 +1209,10 @@ void set_dialog_color(uint8_t color)
 
 static uint16_t check_next_char_data_wrap_around(uint8_t width, uint8_t height)
 {
-  uint16_t num_bytes = width * height;
-  if ((uint32_t)next_char_data + num_bytes > SOUND_DATA) {
+  uint16_t num_bytes          = width * height;
+  uint32_t next_char_data_end = num_bytes + (uint32_t)next_char_data;
+
+  if (next_char_data_end > SOUND_DATA) {
     next_char_data = char_data_start_actors;
   }
   return num_bytes;
@@ -1224,20 +1226,26 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
 
   // place cel using rrb features
   int8_t char_row = screen_pos_y / 8;
+  if (screen_pos_y < 0) {
+    --char_row;
+  }
   screen_pos_x &= 0x3ff;
   int8_t last_but_one_row = height_chars - 2;
   uint8_t shift_y = (uint8_t)screen_pos_y & 0x07;
+  debug_out("screen_pos_y %d shift_y %d", screen_pos_y, shift_y);
   if (shift_y) {
     shift_y = 8 - shift_y;
   }
   else {
-    --char_row;
+    if (screen_pos_y >= 0) { 
+      --char_row;
+    }
   }
   if (char_row > 15) {
     return;
   }
 
-  uint8_t rowmask = ~row_masks[shift_y];
+  uint8_t  rowmask   = ~row_masks[shift_y];
   uint16_t gotox_col = (uint8_t)0x98 | (rowmask << 8);
   uint16_t gotox_scr = shift_y << 13;
   --char_num;
@@ -1247,10 +1255,10 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN);
   
-  if (char_row >= 0) {
-    uint16_t offset = times_chrcount[char_row + 2];
-    screen_start_ptr += times_chrcount[char_row + 2];
-  }
+  uint8_t  start_row = max(char_row, 0);
+  uint16_t offset    = times_chrcount[start_row + 2];
+  screen_start_ptr += offset;
+
   __auto_type colram_start_ptr = screen_start_ptr + (BACKBUFFER_COLRAM - BACKBUFFER_SCREEN) / 2;
   for (int8_t y = -1; y < height_chars; ++y) {
     if (char_row >= 0 && char_row < 16) {
@@ -1268,8 +1276,10 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
         cur_char += height_chars;
       }
       num_chars_at_row[char_row] += width_chars + 1;
+      screen_start_ptr += CHRCOUNT;
+      colram_start_ptr += CHRCOUNT;
     }
-   if (y == last_but_one_row) {
+    if (y == last_but_one_row) {
       rowmask = row_masks[shift_y];
       gotox_col = (uint8_t)0x98 | (rowmask << 8);
     }
@@ -1278,8 +1288,6 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
     }
     ++char_num;
     ++char_row;
-    screen_start_ptr += CHRCOUNT;
-    colram_start_ptr += CHRCOUNT;
   }
 }
 
