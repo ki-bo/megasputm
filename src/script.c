@@ -45,6 +45,7 @@ static void jump_if_greater(void);
 static void draw_object(void);
 static void assign_array(void);
 static void jump_if_equal(void);
+static void assign_variable_indirect(void);
 static void state_of(void);
 static void resource_cmd(void);
 static void walk_to_actor(void);
@@ -161,6 +162,7 @@ void script_init(void)
   opcode_jump_table[0x05] = &draw_object;
   opcode_jump_table[0x07] = &state_of;
   opcode_jump_table[0x08] = &jump_if_equal;
+  opcode_jump_table[0x0a] = &assign_variable_indirect;
   opcode_jump_table[0x0c] = &resource_cmd;
   opcode_jump_table[0x0d] = &walk_to_actor;
   opcode_jump_table[0x0f] = &jump_if_object_active_or_not_active;
@@ -1064,6 +1066,14 @@ static void jump_if_equal(void)
   if (vm_read_var(var_idx) == value) {
     pc += offset;
   }
+}
+
+static void assign_variable_indirect(void)
+{
+  uint8_t var_idx = read_byte();
+  var_idx = vm_read_var8(var_idx); // resulting variable is indirect
+  uint16_t value = resolve_next_param16();
+  vm_write_var(var_idx, value);
 }
 
 /**
