@@ -536,6 +536,10 @@ void vm_cut_scene_begin(void)
   vm_change_ui_flags(UI_FLAGS_APPLY_FREEZE | UI_FLAGS_ENABLE_FREEZE |
                      UI_FLAGS_APPLY_CURSOR |
                      UI_FLAGS_APPLY_INTERFACE);
+  // make sure current activity is stopped when entering cutscene
+  vm_revert_sentence();
+  sentence_stack.num_entries = 0;
+  script_stop(SCRIPT_ID_SENTENCE);
 }
 
 void vm_cut_scene_end(void)
