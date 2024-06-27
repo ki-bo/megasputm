@@ -47,7 +47,7 @@ debug_xemu: mm.d81
 	@echo "Make sure a tmux session named 'mmxemu' is running"
 	@echo "Use 'xemu_tmux_session.sh' to create one"
 	@echo "--------------------------------------------------"
-	tmux send-keys -t mmxemu "$(XMEGA65) -uartmon :4510 -8 mm.d81 -besure -curskeyjoy" C-m
+	tmux send-keys -t mmxemu "$(XMEGA65) -uartmon :4510 -8 mm.d81 -besure -curskeyjoy -videostd 0" C-m
 
 obj/%_s.o: %.s
 	@mkdir -p obj
