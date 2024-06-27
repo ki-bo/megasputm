@@ -166,6 +166,7 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
   if (cur_box == walk_to_box) {
     local_actors.next_x[local_id] = x;
     local_actors.next_y[local_id] = y;
+    local_actors.next_box[local_id] = walk_to_box;
   }
   else {
     calculate_next_box_point(local_id);
