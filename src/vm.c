@@ -459,6 +459,7 @@ void vm_set_current_room(uint8_t room_no)
 
   redraw_screen();
   vm_update_bg();
+  vm_update_sentence();
   UNMAP_CS
 }
 
