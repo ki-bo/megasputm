@@ -913,8 +913,18 @@ static void read_encoded_string_null_terminated(char *dest)
       ++dest;
     }
     else {
-      *dest = c;
-      ++dest;
+      if (c == 0x04) {
+        // special case char for printing integer variable
+        int16_t value = vm_read_var(read_byte());
+        dest += sprintf(dest, "%d", value);
+      }
+      else {
+        if (c == 0x07) {
+          // special case char for printing ASCII character from variable
+          c = vm_read_var8(read_byte());
+        }
+        *dest++ = c;
+      }
     }
   }
   *dest = 0;
