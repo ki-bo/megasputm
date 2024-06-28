@@ -11,6 +11,7 @@
 #include "walk_box.h"
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 //----------------------------------------------------------------------
 
@@ -1301,7 +1302,16 @@ static void actor_ops(void)
 static void say_line(void)
 {
   uint8_t actor_id = resolve_next_param8();
-  read_encoded_string_null_terminated(message_buffer);
+  // check if old message buffer ended with 0x02 (continuation of message)
+  uint8_t len = strlen(message_buffer);
+  char *msg_ptr;
+  if (len > 0 && message_buffer[len - 1] == 0x02) {
+    msg_ptr = message_buffer + len - 1;
+  }
+  else {
+    msg_ptr = message_buffer;
+  }
+  read_encoded_string_null_terminated(msg_ptr);
   if (actor_id == 0xff) {
     //debug_scr("print-line");
   }

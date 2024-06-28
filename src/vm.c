@@ -301,7 +301,7 @@ __task void vm_mainloop(void)
       //VICIV.bordercol = 0x03;
       if (screen_update_needed & SCREEN_UPDATE_DIALOG) {
         if (print_message_ptr) {
-        gfx_print_dialog(message_color, print_message_ptr, print_message_num_chars);
+          gfx_print_dialog(message_color, print_message_ptr, print_message_num_chars);
         }
         else {
           gfx_clear_dialog();
@@ -1054,6 +1054,12 @@ static uint8_t is_room_object_script(uint8_t slot)
   * Decreases the dialog timer by the number of jiffies elapsed since the last call. Clears
   * the dialog area on screen and resets the dialog active variable when the timer reaches
   * zero. Note that the dialog timer is counting down.
+  *
+  * Parsing handles special control characters:
+  * - 0x01: Next line
+  * - 0x02: Keep dialog - no dialog timer will elapse, new messages will be appended
+  * - 0x03: Break dialog - break dialog into multiple parts, each part to be displayed
+  *                        one after another and with its own dialog timer
   * 
   * @param jiffies_elapsed The number of jiffies elapsed since the last call
   *
@@ -1075,7 +1081,7 @@ static void process_dialog(uint8_t jiffies_elapsed)
       if (c == '\0') {
         break;
       }
-      if (c == 0x03) {
+      if (c == 0x02 || c == 0x03) {
         break;
       }
       ++print_message_num_chars;
@@ -1100,13 +1106,15 @@ static void process_dialog(uint8_t jiffies_elapsed)
     return;
   }
 
-  if (message_timer >= jiffies_elapsed)
-  {
-    message_timer -= jiffies_elapsed;
-  }
-  else
-  {
-    message_timer = 0;
+  if (!message_ptr || *message_ptr != 0x02) {
+    if (message_timer >= jiffies_elapsed)
+    {
+      message_timer -= jiffies_elapsed;
+    }
+    else
+    {
+      message_timer = 0;
+    }
   }
 
   if (!message_timer && !message_ptr) {
