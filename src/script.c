@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "resource.h"
 #include "util.h"
+#include "vm.h"
 #include "walk_box.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -47,6 +48,7 @@ static void jump_if_greater(void);
 static void draw_object(void);
 static void assign_array(void);
 static void jump_if_equal(void);
+static void face_towards(void);
 static void assign_variable_indirect(void);
 static void state_of(void);
 static void resource_cmd(void);
@@ -56,6 +58,7 @@ static void do_animation(void);
 static void camera_pan_to(void);
 static void actor_ops(void);
 static void say_line(void);
+static void find_actor(void);
 static void random_number(void);
 static void set_or_clear_untouchable(void);
 static void jump_or_restart(void);
@@ -68,6 +71,7 @@ static void savegame_operation(void);
 static void actor_y(void);
 static void come_out_door(void);
 static void jump_if_or_if_not_equal_zero(void);
+static void set_owner_of(void);
 static void sleep_for_variable(void);
 static void put_actor_in_room(void);
 static void subtract(void);
@@ -164,6 +168,7 @@ void script_init(void)
   opcode_jump_table[0x05] = &draw_object;
   opcode_jump_table[0x07] = &state_of;
   opcode_jump_table[0x08] = &jump_if_equal;
+  opcode_jump_table[0x09] = &face_towards;
   opcode_jump_table[0x0a] = &assign_variable_indirect;
   opcode_jump_table[0x0c] = &resource_cmd;
   opcode_jump_table[0x0d] = &walk_to_actor;
@@ -173,6 +178,7 @@ void script_init(void)
   opcode_jump_table[0x12] = &camera_pan_to;
   opcode_jump_table[0x13] = &actor_ops;
   opcode_jump_table[0x14] = &say_line;
+  opcode_jump_table[0x15] = &find_actor;
   opcode_jump_table[0x16] = &random_number;
   opcode_jump_table[0x17] = &set_or_clear_untouchable;
   opcode_jump_table[0x18] = &jump_or_restart;
@@ -190,6 +196,7 @@ void script_init(void)
   opcode_jump_table[0x26] = &assign_array;
   opcode_jump_table[0x27] = &lock_or_unlock;
   opcode_jump_table[0x28] = &jump_if_or_if_not_equal_zero;
+  opcode_jump_table[0x29] = &set_owner_of;
   opcode_jump_table[0x2b] = &sleep_for_variable;
   opcode_jump_table[0x2d] = &put_actor_in_room;
   opcode_jump_table[0x2e] = &sleep_for_or_wait_for_message;
@@ -216,6 +223,7 @@ void script_init(void)
   opcode_jump_table[0x46] = &increment_or_decrement;
   opcode_jump_table[0x47] = &state_of;
   opcode_jump_table[0x48] = &jump_if_not_equal;
+  opcode_jump_table[0x49] = &face_towards;
   opcode_jump_table[0x4a] = &chain_script;
   opcode_jump_table[0x4d] = &walk_to_actor;
   opcode_jump_table[0x4f] = &jump_if_object_active_or_not_active;
@@ -223,6 +231,7 @@ void script_init(void)
   opcode_jump_table[0x51] = &do_animation;
   opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
+  opcode_jump_table[0x55] = &find_actor;
   opcode_jump_table[0x57] = &set_or_clear_untouchable;
   opcode_jump_table[0x58] = &begin_override_or_say_line_selected_actor;
   opcode_jump_table[0x59] = &do_sentence;
@@ -235,6 +244,7 @@ void script_init(void)
   opcode_jump_table[0x64] = &come_out_door;
   opcode_jump_table[0x65] = &draw_object;
   opcode_jump_table[0x67] = &lock_or_unlock;
+  opcode_jump_table[0x69] = &set_owner_of;
   opcode_jump_table[0x68] = &script_running;
   opcode_jump_table[0x6c] = &preposition;
   opcode_jump_table[0x6d] = &put_actor_in_room;
@@ -1082,6 +1092,45 @@ static void jump_if_equal(void)
   }
 }
 
+static void face_towards(void)
+{
+  uint8_t actor_id = resolve_next_param8();
+  uint16_t object_or_actor_id = resolve_next_param16();
+  
+  uint8_t local_id = actors.local_id[actor_id];
+  if (local_id == 0xff) {
+    return;
+  }
+
+  uint8_t x1 = actors.x[actor_id];
+  uint8_t y1 = actors.y[actor_id];
+
+  uint8_t x2, y2;
+  if (vm_get_object_position(object_or_actor_id, &x2, &y2)) {
+    uint8_t diff_x = abs(x2 - x1);
+    uint8_t diff_y = abs(y2 - y1);
+    uint8_t new_dir;
+    if (diff_x > diff_y) {
+      if (x2 > x1) {
+        new_dir = FACING_RIGHT;
+      }
+      else {
+        new_dir = FACING_LEFT;
+      }
+    }
+    else {
+      if (y2 > y1) {
+        new_dir = FACING_FRONT;
+      }
+      else {
+        new_dir = FACING_BACK;
+      }
+    }
+    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
+    actor_walk_to(actor_id, x1, y1, new_dir);
+  }
+}
+
 static void assign_variable_indirect(void)
 {
   uint8_t var_idx = read_byte();
@@ -1218,7 +1267,7 @@ static void walk_to_actor(void)
     x += target_distance;
   }
 
-  actor_walk_to(actor_id1, x, y);
+  actor_walk_to(actor_id1, x, y, 0xff);
 }
 
 static void owner_of(void)
@@ -1334,6 +1383,15 @@ static void say_line(void)
   vm_say_line(actor_id);
 }
 
+static void find_actor(void)
+{
+  uint8_t var_idx = read_byte();
+  uint8_t x = resolve_next_param8();
+  uint8_t y = resolve_next_param8();
+  //debug_scr("find-actor %d at %d, %d", actor_id, x, y);
+  vm_write_var(var_idx, actor_find(x, y));
+}
+
 /**
   * @brief Opcode 0x16: random_number
   * 
@@ -1437,7 +1495,7 @@ static void walk_to(void)
   uint8_t actor_id = resolve_next_param8();
   uint8_t x = resolve_next_param8();
   uint8_t y = resolve_next_param8();
-  actor_walk_to(actor_id, x, y);
+  actor_walk_to(actor_id, x, y, 0xff);
 }
 
 static void savegame_operation(void)
@@ -1492,8 +1550,6 @@ static void savegame_operation(void)
       }
       break;
     
-    default:
-      debug_out("unknown savegame operation %x", sub_opcode);
   }
 
   vm_write_var(var_idx, result);
@@ -1538,7 +1594,7 @@ static void come_out_door(void)
   vm_revert_sentence();
 
   if (walk_to_x != 0xff && walk_to_y != 0xff) {
-    actor_walk_to(actor_id, walk_to_x, walk_to_y);
+    actor_walk_to(actor_id, walk_to_x, walk_to_y, 0xff);
   }
 }
 
@@ -1572,6 +1628,15 @@ static void jump_if_or_if_not_equal_zero(void)
       pc += offset;
     }
   }
+}
+
+static void set_owner_of(void)
+{
+  uint16_t obj_id = resolve_next_param16();
+  uint8_t owner_id = resolve_next_param8();
+  //debug_scr("owner-of %d is %d", obj_id, owner_id);
+  vm_state.global_game_objects[obj_id] = (vm_state.global_game_objects[obj_id] & 0xf0) | owner_id;
+  vm_update_inventory();
 }
 
 /**
@@ -1747,8 +1812,8 @@ static void do_sentence(void)
   switch (sub_opcode) {
   case 0:
     // put sentence into cmd stack
-    debug_msg("  put sentence into sentence stack");
-    debug_out("  verb %d noun1 %d noun2 %d", sentence_verb, sentence_noun1, sentence_noun2);
+    //debug_msg("  put sentence into sentence stack");
+    //debug_out("  verb %d noun1 %d noun2 %d", sentence_verb, sentence_noun1, sentence_noun2);
     if (sentence_stack.num_entries == CMD_STACK_SIZE) {
       fatal_error(ERR_CMD_STACK_OVERFLOW);
     }

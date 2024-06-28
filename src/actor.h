@@ -24,7 +24,12 @@ typedef struct {
 
 typedef struct {
   uint8_t       global_id[MAX_LOCAL_ACTORS];
+  uint8_t       local_id[MAX_LOCAL_ACTORS];
   uint8_t       res_slot[MAX_LOCAL_ACTORS];
+  uint8_t       bounding_box_x[MAX_LOCAL_ACTORS];
+  uint8_t       bounding_box_y[MAX_LOCAL_ACTORS];
+  uint8_t       bounding_box_width[MAX_LOCAL_ACTORS];
+  uint8_t       bounding_box_height[MAX_LOCAL_ACTORS];
   uint8_t       cel_anim[MAX_LOCAL_ACTORS][16];
   uint8_t      *cel_level_cmd_ptr[MAX_LOCAL_ACTORS][16];
   uint8_t       cel_level_cur_cmd[MAX_LOCAL_ACTORS][16];
@@ -56,6 +61,13 @@ enum {
   WALKING_STATE_FINISHED
 };
 
+enum {
+  FACING_LEFT = 0,
+  FACING_RIGHT = 1,
+  FACING_FRONT = 2,
+  FACING_BACK = 3
+};
+
 //-----------------------------------------------------------------------------------------------
 
 extern actors_t actors;
@@ -69,8 +81,9 @@ void actor_init(void);
 // main functions
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
 void actor_room_changed(void);
+uint8_t actor_find(uint8_t x, uint8_t y);
 void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y);
-void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y);
+void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y, uint8_t target_dir);
 void actor_walk_to_object(uint8_t actor_id, uint16_t object_id);
 void actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);

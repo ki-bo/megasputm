@@ -188,6 +188,7 @@ extern uint8_t          obj_page[MAX_OBJECTS];
 extern uint8_t          obj_offset[MAX_OBJECTS];
 extern uint16_t         obj_id[MAX_OBJECTS];
 extern uint8_t          inventory_pos;
+extern uint8_t          selected_actor;
 
 struct sentence_stack_t {
   uint8_t  num_entries;
@@ -218,6 +219,7 @@ void vm_update_sentence(void);
 void vm_update_inventory(void);
 struct object_code *vm_get_room_object_hdr(uint16_t global_object_id);
 uint16_t vm_get_object_at(uint8_t x, uint8_t y);
+uint8_t vm_get_object_position(uint16_t global_object_id, uint8_t *x, uint8_t *y);
 uint8_t vm_get_local_object_id(uint16_t global_object_id);
 void vm_draw_object(uint8_t local_object_id, uint8_t x, uint8_t y);
 void vm_set_camera_follow_actor(uint8_t actor_id);

@@ -80,6 +80,7 @@ uint8_t prev_inventory_highlighted;
 uint8_t sentence_length;
 
 uint8_t inventory_pos;
+uint8_t selected_actor;
 
 static const uint8_t savegame_magic[] = {'M', '6', '5', 'M', 'C', 'M', 'N'};
 
@@ -234,6 +235,14 @@ __task void vm_mainloop(void)
     MAP_CS_DISKIO
     diskio_check_motor_off(elapsed_jiffies);
     UNMAP_CS
+
+    if (selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
+      if (selected_actor != 0xff) {
+        // makes sure inventory pos is kept when loading a savegame
+        inventory_pos = 0;
+      }
+      selected_actor = vm_read_var8(VAR_SELECTED_ACTOR);
+    }
 
     proc_table_cleanup_needed = 0;
     proc_slot_table_idx = -1;
@@ -734,6 +743,29 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
   return found_obj_id;
 }
 
+uint8_t vm_get_object_position(uint16_t global_object_id, uint8_t *x, uint8_t *y)
+{
+  // check if object is an actor
+  if (global_object_id <= NUM_ACTORS) {
+    // in current room?
+    if (actors.local_id[global_object_id] == 0xff) {
+      return 0;
+    }
+    *x = actors.x[global_object_id];
+    *y = actors.y[global_object_id];
+    return 1;
+  }
+
+  // check if object is in current room
+  __auto_type obj_hdr = vm_get_room_object_hdr(global_object_id);
+  if (!obj_hdr) {
+    return 0;
+  }
+  *x = obj_hdr->pos_x;
+  *y = obj_hdr->pos_y_and_parent_state & 0x7f;
+  return 2;
+}
+
 uint8_t vm_get_local_object_id(uint16_t global_object_id)
 {
   for (uint8_t i = 0; i < num_objects; ++i)
@@ -1026,6 +1058,7 @@ static void reset_game_state(void)
   camera_state               = 0;
   camera_follow_actor_id     = 0xff;
   actor_talking              = 0xff;
+  selected_actor             = 0xff;
   vm_state.message_speed     = 6;
   message_timer              = 0;
   message_ptr                = NULL;
@@ -1410,6 +1443,10 @@ static void update_script_timers(uint8_t elapsed_jiffies)
 
 static const char *get_object_name(uint16_t global_object_id)
 {
+  if (global_object_id <= NUM_ACTORS) {
+    return actors.name[global_object_id];
+  }
+
   struct object_code *obj_hdr = inv_get_object_by_id(global_object_id);
   if (!obj_hdr) {
     obj_hdr = vm_get_room_object_hdr(global_object_id);
@@ -1694,6 +1731,14 @@ static void update_inventory_interface()
     num_entries = inv_get_displayed_inventory(&entries, 
                                               inventory_pos, 
                                               vm_read_var8(VAR_SELECTED_ACTOR));
+    if (num_entries == 0 && inventory_pos != 0) {
+      // no items to display, reset position
+      inventory_pos = 0;
+      num_entries = inv_get_displayed_inventory(&entries, 
+                                                inventory_pos, 
+                                                vm_read_var8(VAR_SELECTED_ACTOR));
+    }
+
     char buf[19];
     buf[18] = '\0';
     for (uint8_t ui_pos = 0; ui_pos < num_entries; ++ui_pos) {

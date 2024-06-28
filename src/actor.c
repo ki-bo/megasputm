@@ -11,8 +11,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-//-----------------------------------------------------------------------------------------------
-
 #pragma clang section data="data_main" rodata="cdata_main" bss="zdata"
 
 actors_t actors;
@@ -21,17 +19,6 @@ local_actors_t local_actors;
 static uint16_t            level_pos_x[16];
 static uint8_t             level_pos_y[16];
 static struct costume_cel *cel_data[16];
-
-//-----------------------------------------------------------------------------------------------
-
-enum {
-  WALK_DIR_LEFT,
-  WALK_DIR_RIGHT,
-  WALK_DIR_DOWN,
-  WALK_DIR_UP
-};
-
-//-----------------------------------------------------------------------------------------------
 
 // private functions
 static uint8_t get_free_local_id(void);
@@ -116,6 +103,42 @@ void actor_room_changed(void)
   }
 }
 
+/**
+  * @brief Find the actor at the given position.
+  *
+  * This function is used to find the actor at the given position. The actor is found by checking
+  * the current position and bounding box of all local actors. If the actor is found, the actor's
+  * id is returned. If no actor is found at the given position, the function returns 0.
+  *
+  * @param x The x position to check for an actor.
+  * @param y The y position to check for an actor.
+  * @return The id of the actor at the given position, or 0 if no actor is found.
+  */
+uint8_t actor_find(uint8_t x, uint8_t y)
+{
+  for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
+    uint8_t actor_id = local_actors.global_id[local_id];
+    if (actor_id == 0xff || actor_id == selected_actor) {
+      continue;
+    }
+
+    uint8_t actor_x = actors.x[actor_id];
+    uint8_t actor_y = actors.y[actor_id];
+    actor_x >>= 3;
+    actor_y >>= 2;
+    uint8_t width = local_actors.bounding_box_width[local_id];
+    uint8_t height = local_actors.bounding_box_height[local_id];
+    uint8_t x1 = local_actors.bounding_box_x[local_id];
+    uint8_t y1 = local_actors.bounding_box_y[local_id];
+    uint8_t x2 = x1 + width;
+    uint8_t y2 = y1 + height;
+    if (x >= x1 && x < x2 && y >= y1 && y < y2) {
+      return actor_id;
+    }
+  }
+  return 0;
+}
+
 void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y)
 {
   uint8_t local_id = actors.local_id[actor_id];
@@ -144,7 +167,7 @@ void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y)
   }
 }
 
-void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
+void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y, uint8_t target_dir)
 {
   if (!actor_is_in_current_room(actor_id)) {
     actors.x[actor_id] = x;
@@ -171,14 +194,15 @@ void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y)
   else {
     calculate_next_box_point(local_id);
   }
-  local_actors.target_dir[local_id] = 0xff;
+  local_actors.target_dir[local_id] = target_dir;
   if (is_walk_to_done(local_id)) {
     stop_walking(local_id);
-    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
+    if (target_dir == 0xff) {
+      local_actors.walking[local_id] = WALKING_STATE_STOPPED;
+    }
     return;
   }
-
-  if (local_actors.walking[local_id] != WALKING_STATE_CONTINUE) {
+  else if (local_actors.walking[local_id] != WALKING_STATE_CONTINUE) {
     local_actors.walking[local_id] = WALKING_STATE_STARTING;
   }
   calculate_step(local_id);
@@ -196,17 +220,11 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
     return;
   }
 
-  uint8_t x = object_hdr->walk_to_x;
-  uint8_t y = (object_hdr->walk_to_y_and_preposition & 0x1f) << 2;
+  uint8_t x             = object_hdr->walk_to_x;
+  uint8_t y             = (object_hdr->walk_to_y_and_preposition & 0x1f) << 2;
+  uint8_t obj_actor_dir = object_hdr->height_and_actor_dir & 0x03;
 
-  actor_walk_to(actor_id, x, y);
-
-  uint8_t local_id = actors.local_id[actor_id];
-  uint8_t actor_dir = object_hdr->height_and_actor_dir & 0x03;
-  local_actors.target_dir[local_id] = actor_dir;
-  if (local_actors.walking[local_id] == WALKING_STATE_STOPPED) {
-    actor_change_direction(local_id, actor_dir);
-  }
+  actor_walk_to(actor_id, x, y, obj_actor_dir);
 }
 
 void actor_next_step(uint8_t local_id)
@@ -530,6 +548,11 @@ void actor_draw(uint8_t local_id)
   uint8_t width  = max_x - min_x;
   uint8_t height = max_y - min_y;
 
+  local_actors.bounding_box_x[local_id]      = min_x >> 3;
+  local_actors.bounding_box_y[local_id]      = min_y >> 1;
+  local_actors.bounding_box_width[local_id]  = (width + 7) >> 3;
+  local_actors.bounding_box_height[local_id] = (max_y - min_y) >> 1;
+
   // step 2: allocate an empty canvas for the actor 
   //debug_out("prepare min_x %d, min_y %d, width %d, height %d", min_x, min_y, width, height);
   if (!gfx_prepare_actor_drawing(min_x, min_y, width, height)) {
@@ -579,7 +602,7 @@ void actor_stop_talking(uint8_t actor_id)
 
 uint8_t actor_invert_direction(uint8_t dir)
 {
-  static const uint8_t dir_invert[4] = {1, 0, 3, 2};
+  static const uint8_t dir_invert[4] = {FACING_RIGHT, FACING_LEFT, FACING_BACK, FACING_FRONT};
   return dir_invert[dir];
 }
 
@@ -673,6 +696,7 @@ static void stop_walking(uint8_t local_id)
       local_actors.walk_dir[local_id] = target_dir;
     }
     //debug_out(" turning to %d", target_dir);
+    local_actors.walking[local_id] = WALKING_STATE_STOPPING;
     turn_to_walk_to_direction(local_id);
   }
   if (local_actors.walking[local_id] == WALKING_STATE_STOPPING && 
@@ -746,18 +770,18 @@ static void calculate_step(uint8_t local_id)
 
   if (abs_x_diff < abs_y_diff) {
     if (y_diff < 0) {
-      local_actors.walk_dir[local_id] = 3;
+      local_actors.walk_dir[local_id] = FACING_BACK;
     }
     else {
-      local_actors.walk_dir[local_id] = 2;
+      local_actors.walk_dir[local_id] = FACING_FRONT;
     }
   }
   else {
     if (x_diff < 0) {
-      local_actors.walk_dir[local_id] = 0;
+      local_actors.walk_dir[local_id] = FACING_LEFT;
     }
     else {
-      local_actors.walk_dir[local_id] = 1;
+      local_actors.walk_dir[local_id] = FACING_RIGHT;
     }
   }
 
@@ -835,7 +859,7 @@ static void turn_to_walk_to_direction(uint8_t local_id)
 
 static void turn(uint8_t local_id)
 {
-  static const uint8_t turn_dir[4] = {2, 2, 1, 0};
+  static const uint8_t turn_dir[4] = {FACING_FRONT, FACING_FRONT, FACING_RIGHT, FACING_LEFT};
   uint8_t actor_id = local_actors.global_id[local_id];
   uint8_t current_dir = actors.dir[actor_id];
   actor_change_direction(local_id, turn_dir[current_dir]);
