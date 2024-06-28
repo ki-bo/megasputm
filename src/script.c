@@ -24,6 +24,7 @@
 // private functions
 static uint8_t run_active_slot(void);
 static uint8_t run_slot_stacked(uint8_t slot);
+static void run_script_first_time(uint8_t slot);
 static uint8_t find_free_script_slot(void);
 static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_object_id, uint8_t parent, uint8_t res_slot, uint16_t offset);
 static void stop_script_from_table(uint8_t table_idx);
@@ -339,17 +340,7 @@ uint8_t script_start(uint8_t script_id)
 
   debug_out("Starting global script %d in slot %d", script_id, slot);
 
-  // execute new script immediately (like subroutine)
-  script_execute_slot(slot);
-
-  if (vm_state.proc_state[slot] != PROC_STATE_FREE) {
-    // script hit first break and is still running, put it into slot table for scheduling next cycle
-    // (it will be placed directly after the current script in the slot table)
-    proc_slot_table_insert(slot);
-    // increase exec counter so we don't execute it again in this cycle
-    ++proc_slot_table_exec;
-    script_print_slot_table();
-  }
+  run_script_first_time(slot);
 
   return slot;
 }
@@ -364,11 +355,7 @@ void script_execute_room_script(uint16_t room_script_offset)
   uint8_t script_slot = find_free_script_slot();
 
   reset_script_slot(script_slot, 0 /*type*/, 0xffff /*script_id*/, 0xff /*parent*/, res_slot, offset);
-  if (script_execute_slot(script_slot) != PROC_STATE_FREE) {
-    // room scripts shall never run longer than one cycle
-    fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
-  }
-  //print_slot_table();
+  run_script_first_time(script_slot);
 }
 
 void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8_t background)
@@ -431,10 +418,7 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
   debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
   reset_script_slot(script_slot, type, global_object_id, 0xff /*parent*/, res_slot, script_offset);
 
-  if (script_execute_slot(script_slot) != PROC_STATE_FREE) {
-    // room scripts shall never run longer than one cycle
-    fatal_error(ERR_OBJECT_SCRIPT_STILL_RUNNING_AFTER_FIRST_CYCLE);
-  }
+  run_script_first_time(script_slot);
 }
 
 /**
@@ -464,24 +448,25 @@ void script_stop_slot(uint8_t slot)
       }
     }
 
-    // Mark all stopped scripts as 0xff in slot table
-    for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
-    {
-      uint8_t tmp_slot = vm_state.proc_slot_table[table_idx];
-      if (tmp_slot != 0xff && vm_state.proc_state[tmp_slot] == PROC_STATE_FREE) {
-        vm_state.proc_slot_table[table_idx] = 0xff;
-      }
-    }
-
-    // Will remove all 0xff entries from the table after all scripts have been processed
-    // in the current cycle
-    proc_table_cleanup_needed = 1;
   }
   else {
     // debug_out("Object script %d ended slot %d", 
     //           (vm_state.proc_script_or_object_id[slot]) | (vm_state.proc_object_id_msb[slot] << 8), 
     //           slot);
   }
+
+  // Mark all stopped scripts as 0xff in slot table
+  for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
+  {
+    uint8_t tmp_slot = vm_state.proc_slot_table[table_idx];
+    if (tmp_slot != 0xff && vm_state.proc_state[tmp_slot] == PROC_STATE_FREE) {
+      vm_state.proc_slot_table[table_idx] = 0xff;
+    }
+  }
+
+  // Will remove all 0xff entries from the table after all scripts have been processed
+  // in the current cycle
+  proc_table_cleanup_needed = 1;
 
   script_print_slot_table();
 }
@@ -512,6 +497,9 @@ void script_print_slot_table(void)
     uint16_t id = vm_state.proc_script_or_object_id[slot] | (vm_state.proc_object_id_msb[slot] << 8);
     debug_out2(" %d(%d)", slot, id);
     uint8_t state = vm_get_proc_state(slot);
+    if (!(vm_state.proc_type[slot] & PROC_TYPE_GLOBAL)) {
+      debug_msg2("o");
+    }
     if (state == PROC_STATE_FREE) {
       debug_msg2("X");
     }
@@ -646,6 +634,21 @@ static uint8_t run_slot_stacked(uint8_t slot)
 #endif
 
   return state;
+}
+
+static void run_script_first_time(uint8_t slot)
+{
+  // execute new script immediately (like subroutine)
+  script_execute_slot(slot);
+
+  if (vm_state.proc_state[slot] != PROC_STATE_FREE) {
+    // script hit first break and is still running, put it into slot table for scheduling next cycle
+    // (it will be placed directly after the current script in the slot table)
+    proc_slot_table_insert(slot);
+    // increase exec counter so we don't execute it again in this cycle
+    ++proc_slot_table_exec;
+    script_print_slot_table();
+  }
 }
 
 #pragma clang diagnostic push
