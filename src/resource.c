@@ -35,8 +35,9 @@ static void reset_flags(uint8_t slot, uint8_t flags);
 static uint16_t find_resource(uint8_t type, uint8_t id, uint8_t hint);
 static uint16_t find_and_set_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
 static uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t flags);
-static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages);
-static uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy);
+static uint8_t allocate_optimized(uint8_t type, uint8_t id, uint8_t num_pages);
+static uint16_t allocate(uint8_t type, uint8_t id, uint8_t num_pages, uint8_t start_page, uint8_t end_page);
+static uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy, uint8_t start_page, uint8_t end_page);
 static void free_resource(uint8_t slot);
 static uint8_t defragment_memory(void);
 static void clear_inactive_blocks(void);
@@ -125,8 +126,9 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
  
   MAP_CS_MAIN_PRIV
-  uint8_t page = allocate(type, id, (chunk_size + 255) / 256);
-  __auto_type dest = HUGE_U8_PTR(RESOURCE_BASE + (uint16_t)page * 256);
+  uint8_t num_pages = (chunk_size + 255) / 256;
+  uint8_t allocated_page = allocate_optimized(type, id, num_pages);
+  __auto_type dest = HUGE_U8_PTR(RESOURCE_BASE + (uint16_t)allocated_page * 256);
   
   MAP_CS_DISKIO
   diskio_continue_resource_loading(dest);
@@ -136,7 +138,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   print_heap();
 #endif
 
-  return page;
+  return allocated_page;
 }
 
 /**
@@ -242,7 +244,7 @@ void res_activate(uint8_t type, uint8_t id, uint8_t hint)
   find_and_set_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Activating resource type %d id %d", type, id);
-  print_heap();
+  //print_heap();
 #endif
 }
 
@@ -265,7 +267,7 @@ void res_deactivate(uint8_t type, uint8_t id, uint8_t hint)
   uint16_t slot = find_and_clear_flags(type, id, hint, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Deactivating resource type %d id %d slot %d", type, id, slot);
-  print_heap();
+  //print_heap();
 #endif
 }
 
@@ -290,7 +292,7 @@ void res_activate_slot(uint8_t slot)
   set_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Activating slot %d", slot);
-  print_heap();
+  //print_heap();
 #endif
 }
 
@@ -315,7 +317,7 @@ void res_deactivate_slot(uint8_t slot)
   clear_flags(slot, RES_ACTIVE_MASK);
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Deactivating slot %d", slot);
-  print_heap();
+  //print_heap();
 #endif
 }
 
@@ -353,7 +355,7 @@ uint8_t res_reserve_heap(uint8_t size_blocks)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_MAIN_PRIV
   uint8_t free_heap_index = get_free_heap_index();
-  uint8_t slot = allocate(RES_TYPE_HEAP, free_heap_index, size_blocks);
+  uint8_t slot = allocate(RES_TYPE_HEAP, free_heap_index, size_blocks, 0, 0);
   set_flags(slot, RES_ACTIVE_MASK);
   return slot;
 }
@@ -513,9 +515,52 @@ uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t fl
   return slot;
 }
 
+/**
+  * @brief Allocates memory for the specified resource using an optimized strategy
+  *
+  * This function allocates memory for the specified resource trying to avoid fragmentation.
+  * Small resources (less than 6 pages) are allocated in the first 32 pages while larger resources
+  * are allocated past the first 32 pages. If no memory can be allocated in the respective range, the
+  * function will try to allocate in the complete memory.
+  *
+  * If no memory can be allocated, the function will call fatal_error().
+  *
+  * @param type Type and flags of the resource
+  * @param id ID of the resource
+  * @param num_pages Contiguous pages to allocate
+  * @return Index of the first page of the allocated memory or 0xffff if no memory could be allocated
+  *
+  * Code section: code_main_private
+  */
+static uint8_t allocate_optimized(uint8_t type, uint8_t id, uint8_t num_pages)
+{
+  uint16_t allocated_page;
+  uint8_t  start_page, end_page;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type"
+  if (num_pages < 6) {
+    // try to allocate small resources in the first 32 pages
+    // to avoid fragmentation
+    start_page = 0;
+    end_page = 32;
+  }
+  else {
+    // larger resources should first try to be allocated past the first
+    // 32 pages to avoid fragmentation
+    start_page = 32;
+    end_page = 0; // =256
+  }
+  allocated_page = allocate(type, id, num_pages, start_page, end_page);
+  if (allocated_page == 0xffff) {
+    // if allocation failed, try again with complete memory
+    allocated_page = allocate(type, id, num_pages, 0, 0);
+    if (allocated_page == 0xffff) {
+      fatal_error(ERR_OUT_OF_RESOURCE_MEMORY);
+    }
+  }
+
+  return allocated_page;
+}
+
 /**
   * @brief Allocates memory for the specified resource
   * 
@@ -525,20 +570,26 @@ uint16_t find_and_clear_flags(uint8_t type, uint8_t id, uint8_t hint, uint8_t fl
   * If no unlocked memory can be freed, it will free locked memory.
   * Active resources will not be freed.
   *
+  * The range of blocks to search for free memory can be limited by providing
+  * a start and end page. If start_page is 0 and end_page is 0, the function
+  * will search the complete memory.
+  *
   * If no memory can be freed, the function will call fatal_error().
   *
   * @param type Type and flags of the resource
   * @param id ID of the resource
   * @param num_pages Contiguous pages to allocate
-  * @return Index of the first page of the allocated memory
+  * @param start_page First page of the range to search for free memory
+  * @param end_page Last page of the range to search for free memory (0 = end of memory)
+  * @return Index of the first page of the allocated memory or 0xffff if no memory could be allocated
   *
   * Code section: code_main_private
   */
-static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
+static uint16_t allocate(uint8_t type, uint8_t id, uint8_t num_pages, uint8_t start_page, uint8_t end_page)
 {
   uint16_t result;
 
-  result = find_free_block_range(num_pages, HEAP_STRATEGY_FREE_ONLY);
+  result = find_free_block_range(num_pages, HEAP_STRATEGY_FREE_ONLY, start_page, end_page);
   if (result != 0xffff) {
     uint8_t slot = (uint8_t)result;
     for (uint8_t i = 0; i < num_pages; ++i) {
@@ -549,10 +600,10 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
   }
 
   // At this point, there is no contiguos free block available to allocate
-  // Check whether there is enough free memory to if freeing locked memory 
+  // Check whether there is enough free memory if freeing locked memory 
   for (enum heap_strategy_t strategy = HEAP_STRATEGY_ALLOW_UNLOCKED; strategy <= HEAP_STRATEGY_ALLOW_LOCKED; ++strategy) {
     //debug_out("Trying heap allocation strategy %d", strategy);
-    result = find_free_block_range(num_pages, strategy);
+    result = find_free_block_range(num_pages, strategy, start_page, end_page);
     if (result != 0xffff) {
       uint8_t slot = (uint8_t)result;
       for (uint8_t i = 0; i < num_pages; ++i) {
@@ -568,9 +619,8 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
     }
   }
 
-  fatal_error(ERR_OUT_OF_RESOURCE_MEMORY);
+  return 0xffff;
 }
-#pragma clang diagnostic pop
 
 /**
   * @brief Finds a free block range in memory
@@ -583,21 +633,27 @@ static uint8_t allocate(uint8_t type, uint8_t id, uint8_t num_pages)
   * the function will consider free, unlocked and locked memory pages. Pages marked as active will not be
   * considered in any case.
   *
+  * The function will search for free memory in the range from start_page to end_page. If start_page is 0
+  * and end_page is 0, the function will search the complete memory.
+  *
   * @param num_pages Number of pages to find
   * @param strategy Strategy to use when searching for free memory
+  * @param start_page First page of the range to search for free memory
+  * @param end_page Last page of the range to search for free memory (0 = end of memory)
   * @return Index of the first page of the free block range, or 0xffff if not found
   *
   * Code section: code_main_private
   */
-uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
+uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy, uint8_t start_page, uint8_t end_page)
 {
   uint8_t current_start = 0;
   uint8_t best_fit_start = 0;
   uint16_t best_fit_size = 0x7fff;
   uint8_t cur_size = 0;
-  uint8_t block_idx = 0;
+  uint8_t block_idx = start_page;
+  uint8_t end_page_m1 = end_page - 1;
 
-  //debug_out("Searching for %d pages of free memory", num_pages);
+  //debug_out("Searching for %d pages of free memory start_page %d end_page %d", num_pages, start_page, end_page);
   
   do {
     uint8_t cur_type = page_res_type[block_idx];
@@ -622,14 +678,14 @@ uint16_t find_free_block_range(uint8_t num_pages, enum heap_strategy_t strategy)
       return current_start;
     }
 
-    if (block_idx == 255 && cur_size >= num_pages && cur_size < best_fit_size) {
+    if (block_idx == end_page_m1 && cur_size >= num_pages && cur_size < best_fit_size) {
       best_fit_start = current_start;
       best_fit_size = cur_size;
     }
 
     //debug_out("  block %d, type %x, index %d, free %d", block_idx, page_res_type[block_idx], page_res_index[block_idx], cur_size);
   }
-  while (++block_idx != 0); // block_idx will wrap around to 0
+  while (++block_idx != end_page); // block_idx will wrap around to 0
 
   //debug_out("  result: %u, size %u", (uint16_t)best_fit_start, best_fit_size);
 
