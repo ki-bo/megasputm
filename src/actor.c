@@ -765,8 +765,8 @@ static void calculate_step(uint8_t local_id)
     return;
   }
 
-  int8_t abs_x_diff = abs(x_diff);
-  int8_t abs_y_diff = abs(y_diff);
+  int8_t abs_x_diff = abs8(x_diff);
+  int8_t abs_y_diff = abs8(y_diff);
 
   if (abs_x_diff < abs_y_diff) {
     if (y_diff < 0) {

@@ -130,6 +130,7 @@ static void verb_delete(uint8_t slot);
 static void freeze_non_active_scripts(void);
 static void unfreeze_scripts(void);
 static void add_string_to_sentence_priv(const char *str, uint8_t prepend_space);
+static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y);
 
 
 /**
@@ -251,6 +252,7 @@ __task void vm_mainloop(void)
     update_script_timers(elapsed_jiffies);
 
     //debug_out("New cycle, %d scripts active", vm_state.num_active_proc_slots);
+    debug_out("camx: %d", vm_read_var(VAR_CAMERA_X));
     proc_slot_table_exec = 0;
     for (proc_slot_table_idx = 0; 
          proc_slot_table_idx < vm_state.num_active_proc_slots;
@@ -777,6 +779,39 @@ uint8_t vm_get_local_object_id(uint16_t global_object_id)
   }
 
   return 0xff;
+}
+
+uint8_t vm_calc_proximity(uint16_t actor_or_object_id1, uint16_t actor_or_object_id2)
+{
+  SAVE_DS_AUTO_RESTORE
+
+  uint8_t x1, y1, x2, y2;
+  uint8_t is_actor1 = 0;
+  uint8_t is_actor2 = 0;
+
+  // resolve the positions of the objects (or actors if id < number of actors)
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
+  is_actor1 = resolve_position(actor_or_object_id1, &x1, &y1);
+  is_actor2 = resolve_position(actor_or_object_id2, &x2, &y2);
+
+  // if one of the objects is not found, we set the distance to 0xff (maximum)
+  if (x1 == 0xff || x2 == 0xff) {
+    return 0xff;
+  }
+
+  if (is_actor1 && !is_actor2) {
+    // if object1 is an actor and object2 is an object, we need to correct the walk-to position
+    // of the object to be in the closest box (seems walk-to positions are often outside of
+    // walk boxes, eg. the doorbell in maniac mansion)
+    walkbox_correct_position_to_closest_box(&x2, &y2);
+  }
+
+  // calculate the distance between the two objects
+  uint8_t dx = abs8((int8_t)x1 - (int8_t)x2);
+  uint8_t dy = abs8((int8_t)y1 - (int8_t)y2);
+
+  return max(dx, dy);
 }
 
 void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
@@ -2127,6 +2162,33 @@ static void add_string_to_sentence_priv(const char *str, uint8_t prepend_space)
       continue;
     }
     sentence_text[sentence_length++] = *str++;
+  }
+}
+
+static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y)
+{
+  if (object_or_actor_id < vm_read_var(VAR_NUMBER_OF_ACTORS)) {
+    // is an actor
+    if (actors.room[object_or_actor_id] == vm_read_var(VAR_SELECTED_ROOM)) {
+      *x = actors.x[object_or_actor_id];
+      *y = actors.y[object_or_actor_id];
+    }
+    else {
+      *x = 0xff;
+    }
+    return 1;
+  }
+  else {
+    // is an object
+    __auto_type obj_hdr = vm_get_room_object_hdr(object_or_actor_id);
+    if (!obj_hdr) {
+      *x = 0xff;
+    } 
+    else {
+      *x = obj_hdr->walk_to_x;
+      *y = (obj_hdr->walk_to_y_and_preposition & 0x1f) << 2;
+    }
+    return 0;
   }
 }
 

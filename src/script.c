@@ -38,7 +38,6 @@ static uint32_t read_24bits(void);
 static uint8_t resolve_next_param8(void);
 static uint16_t resolve_next_param16(void);
 static void read_null_terminated_string(char *dest);
-static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y);
 
 static void stop_or_break(void);
 static void put_actor(void);
@@ -102,6 +101,7 @@ static void begin_override_or_say_line_selected_actor(void);
 static void begin_override(void);
 static void cursor(void);
 static void stop_script(void);
+static void closest_actor(void);
 static void lock_or_unlock(void);
 static void script_running(void);
 static void preposition(void);
@@ -243,6 +243,7 @@ void script_init(void)
   opcode_jump_table[0x62] = &stop_script;
   opcode_jump_table[0x64] = &come_out_door;
   opcode_jump_table[0x65] = &draw_object;
+  opcode_jump_table[0x66] = &closest_actor;
   opcode_jump_table[0x67] = &lock_or_unlock;
   opcode_jump_table[0x69] = &set_owner_of;
   opcode_jump_table[0x68] = &script_running;
@@ -880,28 +881,6 @@ static void read_null_terminated_string(char *dest)
   *dest = 0;
 }
 
-static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y)
-{
-  if (object_or_actor_id < vm_read_var(VAR_NUMBER_OF_ACTORS)) {
-    // is an actor
-    *x = actors.x[object_or_actor_id];
-    *y = actors.y[object_or_actor_id];
-    return 1;
-  }
-  else {
-    // is an object
-    __auto_type obj_hdr = vm_get_room_object_hdr(object_or_actor_id);
-    if (!obj_hdr) {
-      *x = 0xff;
-    } 
-    else {
-      *x = obj_hdr->walk_to_x;
-      *y = (obj_hdr->walk_to_y_and_preposition & 0x1f) << 2;
-    }
-    return 0;
-  }
-}
-
 /**
   * @brief Reads a string from the script and decodes it.
   * 
@@ -1107,8 +1086,8 @@ static void face_towards(void)
 
   uint8_t x2, y2;
   if (vm_get_object_position(object_or_actor_id, &x2, &y2)) {
-    uint8_t diff_x = abs(x2 - x1);
-    uint8_t diff_y = abs(y2 - y1);
+    uint8_t diff_x = abs8((int8_t)x2 - (int8_t)x1);
+    uint8_t diff_y = abs8((int8_t)y2 - (int8_t)y1);
     uint8_t new_dir;
     if (diff_x > diff_y) {
       if (x2 > x1) {
@@ -1752,36 +1731,11 @@ static void camera_at(void)
 
 static void proximity(void)
 {
-  SAVE_DS_AUTO_RESTORE
-
   uint8_t var_idx = read_byte();
   uint16_t object1_id = resolve_next_param16();
   uint16_t object2_id = resolve_next_param16();
-  uint8_t x1, y1, x2, y2;
-  uint8_t is_actor1 = 0;
-  uint8_t is_actor2 = 0;
 
-  // resolve the positions of the objects (or actors if id < number of actors)
-  is_actor1 = resolve_position(object1_id, &x1, &y1);
-  is_actor2 = resolve_position(object2_id, &x2, &y2);
-
-  // if one of the objects is not found, we set the distance to 0xff (maximum)
-  if (x1 == 0xff || x2 == 0xff) {
-    vm_write_var(var_idx, 0xff);
-    return;
-  }
-
-  if (is_actor1 && !is_actor2) {
-    // if object1 is an actor and object2 is an object, we need to correct the walk-to position
-    // of the object to be in the closest box (seems walk-to positions are often outside of
-    // walk boxes, eg. the doorbell in maniac mansion)
-    walkbox_correct_position_to_closest_box(&x2, &y2);
-  }
-
-  // calculate the distance between the two objects
-  uint16_t dx = abs((int16_t)x1 - (int16_t)x2);
-  uint16_t dy = abs((int16_t)y1 - (int16_t)y2);
-  vm_write_var(var_idx, max(dx, dy));
+  vm_write_var(var_idx, vm_calc_proximity(object1_id, object2_id));
 }
 
 static void do_sentence(void)
@@ -2304,6 +2258,29 @@ static void stop_script(void)
   else {
   script_stop(script_id);
   }
+}
+
+static void closest_actor(void)
+{
+  uint8_t var_idx = read_byte();
+  uint8_t actor_or_object_id = resolve_next_param16();
+
+  uint8_t cur_actor        = NUM_ACTORS - 1;
+  uint8_t closest_actor    = 0xff;
+  uint8_t closest_distance = 0xff;
+  do {
+    if (actors.local_id[cur_actor] != 0xff && cur_actor != actor_or_object_id) {
+      uint8_t distance = vm_calc_proximity(actor_or_object_id, cur_actor);
+      debug_out("dist a%d a%d = %d", actor_or_object_id, cur_actor, distance);
+      if (distance < closest_distance) {
+        closest_distance = distance;
+        closest_actor    = cur_actor;
+      }
+    }
+  }
+  while (--cur_actor);
+
+  vm_write_var(var_idx, closest_actor);
 }
 
 static void lock_or_unlock(void)

@@ -140,8 +140,8 @@ uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, ui
 
   //debug_out("  corrected position %d, %d", xc, yc);
 
-  uint8_t diff_x = abs(xc - *x);
-  uint8_t diff_y = abs(yc - *y) >> 2;
+  uint8_t diff_x = abs8((int8_t)xc - (int8_t)*x);
+  uint8_t diff_y = abs8((int8_t)yc - (int8_t)*y) >> 2;
   //debug_out("  diff %d, %d", diff_x, diff_y);
   if (diff_x < diff_y) {
     diff_x >>= 1;

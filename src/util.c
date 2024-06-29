@@ -54,6 +54,18 @@ void debug_msg2(char* msg)
 #endif
 }
 
+uint8_t abs8(int8_t x)
+{
+  __asm(" tax\n"
+        " bpl done\n"
+        " neg a\n"
+        "done:"
+        : "=Ka"(x)
+        : "Ka"(x)
+        : "a", "x");
+  return x;
+}
+
 void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n)
 {
   global_dma.no_opt.end_of_options = 0;
