@@ -252,7 +252,6 @@ __task void vm_mainloop(void)
     update_script_timers(elapsed_jiffies);
 
     //debug_out("New cycle, %d scripts active", vm_state.num_active_proc_slots);
-    debug_out("camx: %d", vm_read_var(VAR_CAMERA_X));
     proc_slot_table_exec = 0;
     for (proc_slot_table_idx = 0; 
          proc_slot_table_idx < vm_state.num_active_proc_slots;
@@ -2063,13 +2062,13 @@ static void update_camera(void)
     }
   }
   else {
-    if (camera_target <= camera_x - 10 && camera_x > 20)
+    if (camera_target < camera_x - 10 && camera_x > 20)
     {
       //debug_msg("Camera start moving left");
       --camera_x;
       camera_state |= CAMERA_STATE_MOVING;
     }
-    else if (camera_target >= camera_x + 10 && camera_x < max_camera_x)
+    else if (camera_target > camera_x + 10 && camera_x < max_camera_x)
     {
       //debug_msg("Camera start moving right");
       ++camera_x;
