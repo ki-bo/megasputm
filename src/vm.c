@@ -557,11 +557,10 @@ void vm_cut_scene_end(void)
 {
   //debug_out("cut-scene ended");
   camera_state = vm_state.cs_camera_state;
-  if (camera_state == CAMERA_STATE_FOLLOW_ACTOR) {
+  if (camera_state & CAMERA_STATE_FOLLOW_ACTOR) {
     vm_set_camera_follow_actor(vm_read_var8(VAR_SELECTED_ACTOR));
   }
-  if (vm_read_var8(VAR_SELECTED_ROOM) != vm_state.cs_room) {
-    //debug_out("switching to room %d", cs_room);
+  else if (vm_read_var8(VAR_SELECTED_ROOM) != vm_state.cs_room) {
     vm_set_current_room(vm_state.cs_room);
   }
   vm_write_var(VAR_CURSOR_STATE, vm_state.cs_cursor_state);
@@ -1545,7 +1544,8 @@ static void load_room(uint8_t room_no)
   uint16_t bg_masking_offset = room_hdr->bg_attr_offset;
 
   MAP_CS_GFX
-  gfx_decode_bg_image(map_ds_room_offset(bg_data_offset), room_width);
+  uint8_t __huge* bg_data = res_get_huge_ptr(room_res_slot) + bg_data_offset;
+  gfx_decode_bg_image(bg_data, room_width);
   gfx_decode_masking_buffer(bg_masking_offset, room_width);
 
   map_ds_resource(room_res_slot);

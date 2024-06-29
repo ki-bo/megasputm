@@ -20,7 +20,7 @@ void gfx_fade_out(void);
 uint8_t gfx_wait_for_jiffy_timer(void);
 void gfx_wait_vsync(void);
 void gfx_clear_bg_image(void);
-void gfx_decode_bg_image(uint8_t *src, uint16_t width);
+void gfx_decode_bg_image(uint8_t __huge *src, uint16_t width);
 void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width);
 void gfx_set_object_image(uint8_t __huge *src, uint8_t x, uint8_t y, uint8_t width, uint8_t height);
 void gfx_clear_dialog(void);

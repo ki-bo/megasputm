@@ -159,7 +159,7 @@ static void setup_irq(void);
 // Private interrupt function
 static void raster_irq(void);
 // Private gfx functions
-static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height);
+static uint8_t __huge *decode_rle_bitmap(uint8_t __huge *src, uint16_t width, uint8_t height);
 static void reset_objects(void);
 static void update_cursor(uint8_t snail_override);
 static void set_dialog_color(uint8_t color);
@@ -460,7 +460,7 @@ void gfx_clear_bg_image(void)
   *
   * Code section: code_gfx
   */
-void gfx_decode_bg_image(uint8_t *src, uint16_t width)
+void gfx_decode_bg_image(uint8_t __huge *src, uint16_t width)
 {
   //debug_out("Decoding bg image, width: %d\n", width)
   // when decoding a room background image, we always start over at the
@@ -578,9 +578,7 @@ void gfx_set_object_image(uint8_t __huge *src, uint8_t x, uint8_t y, uint8_t wid
   obj_width[next_obj_slot]      = width;
   obj_height[next_obj_slot]     = height;
 
-  uint8_t *mapped_src = map_ds_ptr(src);
-  uint8_t *mapped_mask_data = decode_rle_bitmap(mapped_src, width * 8, height * 8);
-  obj_mask_data[next_obj_slot] = src + (uint16_t)(mapped_mask_data - mapped_src);
+  obj_mask_data[next_obj_slot] = decode_rle_bitmap(src, width * 8, height * 8);
 
   ++next_obj_slot;
   char_data_start_actors = next_char_data;
@@ -1074,7 +1072,7 @@ void gfx_clear_inventory(void)
   * @{
   */
 
-static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
+static uint8_t __huge *decode_rle_bitmap(uint8_t __huge *src, uint16_t width, uint8_t height)
 {
   uint8_t rle_counter = 1;
   uint8_t keep_color = 0;
@@ -1085,6 +1083,8 @@ static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
 
   dmalist_rle_strip_copy.count = height;
   dmalist_rle_strip_copy.opt_token3 = 0x06; // disable transparent color handling
+
+  uint8_t *data = map_ds_ptr(src);
 
   do {
     --rle_counter;
@@ -1116,6 +1116,11 @@ static uint8_t *decode_rle_bitmap(uint8_t *src, uint16_t width, uint8_t height)
       ++next_char_data;
       if (!(LSB(x) & 0x07)) {
         next_char_data += col_addr_inc;
+      }
+
+      if (data >= (uint8_t *)0x9e00) {
+        uint16_t data_offset = (uint16_t)data - RES_MAPPED;
+        data = map_ds_ptr(src + data_offset);
       }
     }
   } 
