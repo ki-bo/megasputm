@@ -146,6 +146,7 @@ void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y)
     uint8_t cur_box = walkbox_correct_position_to_closest_box(&x, &y);
     local_actors.walk_to_box[local_id] = cur_box;
     local_actors.cur_box[local_id]     = cur_box;
+    local_actors.next_box[local_id]    = cur_box;
     local_actors.walk_to_x[local_id]   = x;
     local_actors.walk_to_y[local_id]   = y;
     local_actors.next_x[local_id]      = x;

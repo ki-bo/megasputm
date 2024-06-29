@@ -52,6 +52,7 @@ static void assign_variable_indirect(void);
 static void state_of(void);
 static void resource_cmd(void);
 static void walk_to_actor(void);
+static void put_actor_at_object(void);
 static void owner_of(void);
 static void do_animation(void);
 static void camera_pan_to(void);
@@ -172,6 +173,7 @@ void script_init(void)
   opcode_jump_table[0x0a] = &assign_variable_indirect;
   opcode_jump_table[0x0c] = &resource_cmd;
   opcode_jump_table[0x0d] = &walk_to_actor;
+  opcode_jump_table[0x0e] = &put_actor_at_object;
   opcode_jump_table[0x0f] = &jump_if_object_active_or_not_active;
   opcode_jump_table[0x10] = &owner_of;
   opcode_jump_table[0x11] = &do_animation;
@@ -226,6 +228,7 @@ void script_init(void)
   opcode_jump_table[0x49] = &face_towards;
   opcode_jump_table[0x4a] = &chain_script;
   opcode_jump_table[0x4d] = &walk_to_actor;
+  opcode_jump_table[0x4e] = &put_actor_at_object;
   opcode_jump_table[0x4f] = &jump_if_object_active_or_not_active;
   opcode_jump_table[0x50] = &pick_up_object;
   opcode_jump_table[0x51] = &do_animation;
@@ -1247,6 +1250,24 @@ static void walk_to_actor(void)
   }
 
   actor_walk_to(actor_id1, x, y, 0xff);
+}
+
+static void put_actor_at_object(void)
+{
+  uint8_t  actor_id  = resolve_next_param8();
+  uint16_t object_id = resolve_next_param16();
+
+  uint8_t x, y;
+
+  if (vm_get_object_position(object_id, &x, &y) == 0) {
+    x = 30;
+    y = 60;
+  }
+  else {
+    walkbox_correct_position_to_closest_box(&x, &y);
+  }
+
+  actor_place_at(actor_id, x, y);
 }
 
 static void owner_of(void)
