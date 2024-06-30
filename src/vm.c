@@ -213,6 +213,7 @@ __task void vm_mainloop(void)
       gfx_fade_out();
       gfx_clear_bg_image();
       gfx_reset_actor_drawing();
+      gfx_reset_palettes();
       MAP_CS_DISKIO
       diskio_load_game_objects();
       reset_game_state();
@@ -938,10 +939,13 @@ uint8_t vm_save_game(uint8_t slot)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_DISKIO
 
-  heap_slot            = res_reserve_heap(2);
+  heap_slot            = res_reserve_heap(5);
   map_ds_resource(heap_slot);
   locked_resources     = NEAR_U16_PTR(RES_MAPPED);
   num_locked_resources = res_get_locked_resources(locked_resources, 255);
+
+  uint8_t *pal_ptr = NEAR_U8_PTR(RES_MAPPED + 0x200);
+  memcpy(pal_ptr, (const void *)0xd100, 0x300);
 
   sprintf(filename, "MM.SAV.%u", slot);
   diskio_open_for_writing();
@@ -952,7 +956,8 @@ uint8_t vm_save_game(uint8_t slot)
   diskio_write((uint8_t __huge *)INVENTORY_BASE, inventory_num_bytes);
   diskio_write((uint8_t __huge *)&actors, sizeof(actors));
   diskio_write((uint8_t __huge *)&num_locked_resources, 1);
-  diskio_write(res_get_huge_ptr(heap_slot), num_locked_resources * 2);
+  diskio_write(res_get_huge_ptr(heap_slot),     num_locked_resources * 2);
+  diskio_write(res_get_huge_ptr(heap_slot + 2), 0x300);
   diskio_close_for_writing(filename, FILE_TYPE_SEQ);
 
   res_free_heap(heap_slot);
@@ -968,8 +973,9 @@ uint8_t vm_load_game(uint8_t slot)
 
   uint8_t   cur_pc           = script_get_current_pc();
   uint8_t   cur_script_id    = vm_state.proc_script_or_object_id[active_script_slot];
-  uint8_t   heap_slot        = res_reserve_heap(2);
+  uint8_t   heap_slot        = res_reserve_heap(5);
   uint16_t *locked_resources = NEAR_U16_PTR(RES_MAPPED);
+  uint8_t  *pal_ptr          = NEAR_U8_PTR(RES_MAPPED + 0x200);
 
   SAVE_CS_AUTO_RESTORE
   MAP_CS_DISKIO
@@ -1001,7 +1007,11 @@ uint8_t vm_load_game(uint8_t slot)
   diskio_read((uint8_t *)&num_locked_resources, 1);
   map_ds_resource(heap_slot);
   diskio_read((uint8_t *)locked_resources, num_locked_resources * 2);
+  diskio_read(pal_ptr, 0x300);
   diskio_close_for_reading();
+
+  // restore palettes
+  memcpy((void *)0xd100, pal_ptr, 0x300);
 
   // ensure active scripts are in memory and update their res_slot
   for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
@@ -1074,9 +1084,11 @@ static void reset_game_state(void)
   }
   while (++var_idx != 0);
 
+  vm_state.num_actor_palettes = 1;
   for (uint8_t i = 0; i < NUM_ACTORS; ++i) {
     actors.local_id[i] = 0xff;
     actors.room[i] = 0;
+    actors.palette_idx[i] = 1; // default actor palette is index 1
     if (i < MAX_LOCAL_ACTORS) {
       local_actors.global_id[i] = 0xff;
     }

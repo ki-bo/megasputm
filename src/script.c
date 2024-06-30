@@ -1327,9 +1327,7 @@ static void actor_ops(void)
       actors.sound[actor_id] = param;
       break;
     case 0x02:
-      actors.palette_color[actor_id] = param;
-      actors.palette_idx[actor_id] = read_byte();
-      //debug_scr("actor %d color %d is %d", actor_id, param, actors.palette_idx[actor_id]);
+      actor_map_palette(actor_id, read_byte(), param);
       break;
     case 0x03:
       read_null_terminated_string(actors.name[actor_id]);

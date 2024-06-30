@@ -146,6 +146,8 @@ struct vm
 
   uint8_t message_speed;
 
+  uint8_t num_actor_palettes;
+
   uint8_t  num_active_proc_slots;
   uint8_t  proc_slot_table[NUM_SCRIPT_SLOTS];
   uint8_t  proc_script_or_object_id[NUM_SCRIPT_SLOTS];

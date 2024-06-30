@@ -63,6 +63,25 @@ void actor_init(void)
   */
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
 
+void actor_map_palette(uint8_t actor_id, uint8_t dest_idx, uint8_t src_idx)
+{
+  uint8_t actor_palette = actors.palette_idx[actor_id];
+  if (actor_palette == 1) {
+    // actor not yet using custom palette
+    if (vm_state.num_actor_palettes == 15) {
+      fatal_error(ERR_TOO_MANY_ACTOR_PALETTES);
+    }
+    actor_palette = ++vm_state.num_actor_palettes;
+    actors.palette_idx[actor_id] = actor_palette;
+  }
+
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_GFX
+  uint8_t r, g, b;
+  gfx_get_palette(0, src_idx, &r, &g, &b);
+  gfx_set_palette(actor_palette, dest_idx, r, g, b);
+}
+
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no)
 {
   if (actors.room[actor_id] == room_no) {
@@ -556,7 +575,7 @@ void actor_draw(uint8_t local_id)
 
   // step 2: allocate an empty canvas for the actor 
   //debug_out("prepare min_x %d, min_y %d, width %d, height %d", min_x, min_y, width, height);
-  if (!gfx_prepare_actor_drawing(min_x, min_y, width, height)) {
+  if (!gfx_prepare_actor_drawing(min_x, min_y, width, height, actors.palette_idx[global_id])) {
     // actor is outside of screen
     return;
   }

@@ -10,7 +10,6 @@
 typedef struct {
   uint8_t       sound[NUM_ACTORS];
   uint8_t       palette_idx[NUM_ACTORS];
-  uint8_t       palette_color[NUM_ACTORS];
   char          name[NUM_ACTORS][ACTOR_NAME_LEN];
   uint8_t       costume[NUM_ACTORS];
   uint8_t       talk_color[NUM_ACTORS];
@@ -79,6 +78,7 @@ extern local_actors_t local_actors;
 void actor_init(void);
 
 // main functions
+void actor_map_palette(uint8_t actor_id, uint8_t dest_idx, uint8_t src_idx);
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
 void actor_room_changed(void);
 uint8_t actor_find(uint8_t x, uint8_t y);

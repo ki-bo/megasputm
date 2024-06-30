@@ -26,17 +26,14 @@
 //-----------------------------------------------------------------------------------------------
 
 #pragma clang section rodata="cdata_init"
-const char palette_red[32] = {
-  0x0, 0x0, 0x0, 0x0,  0xb, 0xb, 0xb, 0xb,  0x7, 0x7, 0x0, 0x0,  0xf, 0xf, 0xf, 0xf,
+const char palette_red[16] = {
   0x0, 0x0, 0x0, 0x0,  0xb, 0xb, 0xb, 0xb,  0x7, 0x7, 0x0, 0x0,  0xf, 0xf, 0xf, 0xf
 };
-const char palette_green[32] = {
-  0x0, 0x0, 0xb, 0xb,  0x0, 0x0, 0x7, 0xb,  0x7, 0x7, 0xf, 0xf,  0x8, 0x0, 0xf, 0xf,
-  0x0, 0x0, 0xb, 0x0,  0x0, 0x0, 0x7, 0xb,  0x7, 0x7, 0xf, 0xf,  0x8, 0x0, 0xf, 0xf
+const char palette_green[16] = {
+  0x0, 0x0, 0xb, 0xb,  0x0, 0x0, 0x7, 0xb,  0x7, 0x7, 0xf, 0xf,  0x8, 0x0, 0xf, 0xf
 };
-const char palette_blue[32] = {
-  0x0, 0xb, 0x0, 0xb,  0x0, 0xb, 0x0, 0xb,  0x7, 0xf, 0x0, 0xf,  0x8, 0xf, 0x0, 0xf,
-  0x0, 0x0, 0xb, 0xb,  0x0, 0xb, 0x0, 0xb,  0x7, 0xf, 0x0, 0xf,  0x8, 0xf, 0x0, 0xf
+const char palette_blue[16] = {
+  0x0, 0xb, 0x0, 0xb,  0x0, 0xb, 0x0, 0xb,  0x7, 0xf, 0x0, 0xf,  0x8, 0xf, 0x0, 0xf
 };
 
 //-----------------------------------------------------------------------------------------------
@@ -107,6 +104,7 @@ static int16_t actor_x;
 static int8_t actor_y;
 static uint8_t actor_width;
 static uint8_t actor_height;
+static uint8_t actor_palette;
 static uint32_t actor_char_data;
 
 static dmalist_three_options_no_3rd_arg_t dmalist_rle_strip_copy = {
@@ -309,7 +307,7 @@ volatile uint8_t raster_irq_counter = 0;
   * This irq function is placed in the code section to make sure it is always
   * visible and never overlayed by other banked code or data.
   *
-  * Code section: code
+  * Code section: code_main
   */
 __attribute__((interrupt()))
 static void raster_irq ()
@@ -423,6 +421,56 @@ void gfx_wait_vsync(void)
 {
   uint8_t counter = raster_irq_counter;
   while (counter == raster_irq_counter);
+}
+
+/**
+  * @brief Resets the actor palettes to the default EGA colors.
+  *
+  * The first palette is the default palette, the remaining palettes are used for actors
+  * that need color remapping.
+  *
+  * The first color in each actor palette is reserved for transparency. Color index 1 is
+  * always black for actors.
+  *
+  * Code section: code_gfx
+  */
+void gfx_reset_palettes(void)
+{
+  uint8_t c = 16;
+  for (uint8_t p = 1; p < 16; ++p) {
+    for (uint8_t i = 0; i < 16; ++i) {
+      if (i == 1) {
+        // actor palettes always have black as color 1
+        PALETTE.red[c]   = 0;
+        PALETTE.green[c] = 0;
+        PALETTE.blue[c]  = 0;
+      }
+      else {
+        PALETTE.red[c]   = PALETTE.red[i];
+        PALETTE.green[c] = PALETTE.green[i];
+        PALETTE.blue[c]  = PALETTE.blue[i];
+      }
+      ++c;
+    }
+  }
+}
+
+void gfx_get_palette(uint8_t palette, uint8_t col_idx, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+  palette <<= 4;
+  col_idx |= palette;
+  *r = PALETTE.red[col_idx];
+  *g = PALETTE.green[col_idx];
+  *b = PALETTE.blue[col_idx];
+}
+
+void gfx_set_palette(uint8_t palette, uint8_t col_idx, uint8_t r, uint8_t g, uint8_t b)
+{
+  palette <<= 4;
+  col_idx |= palette;
+  PALETTE.red[col_idx]   = r;
+  PALETTE.green[col_idx] = g;
+  PALETTE.blue[col_idx]  = b;
 }
 
 /**
@@ -726,7 +774,7 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y)
   while (--height);
 }
 
-uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, uint8_t height)
+uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, uint8_t height, uint8_t palette)
 {
   static dmalist_t dmalist_clear_actor_chars = {
     .command  = DMA_CMD_FILL,
@@ -745,10 +793,11 @@ uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, ui
   uint8_t actor_width_chars  = (width  + 7) >> 3;
   uint8_t actor_height_chars = (height + 7) >> 3;
 
-  actor_x      = pos_x;
-  actor_y      = pos_y;
-  actor_width  = actor_width_chars  * 8;
-  actor_height = actor_height_chars * 8;
+  actor_x       = pos_x;
+  actor_y       = pos_y;
+  actor_width   = actor_width_chars  * 8;
+  actor_height  = actor_height_chars * 8;
+  actor_palette = palette << 4;
 
   uint16_t num_bytes = check_next_char_data_wrap_around(actor_width, actor_height);
   actor_char_data  = (uint32_t)next_char_data;
@@ -799,7 +848,7 @@ void gfx_draw_actor_cel(uint8_t xpos, uint8_t ypos, struct costume_cel *cel_data
       run_length_counter = data_byte & 0x0f;
       current_color = data_byte >> 4;
       if (current_color) {
-        current_color |= 0x10;
+        current_color |= actor_palette;
       }
       if (run_length_counter == 0)
       {
