@@ -458,6 +458,7 @@ void vm_set_current_room(uint8_t room_no)
     // activate new room data
     load_room(room_no);
     camera_x = 20;
+    vm_write_var(VAR_CAMERA_X, camera_x);
     actor_room_changed();
 
     // run entry script
