@@ -50,7 +50,7 @@ void inv_add_object(uint8_t local_object_id)
   vm_state.inv_next_free += size;
 }
 
-struct object_code *inv_get_object_by_id(uint8_t global_object_id)
+struct object_code *inv_get_object_by_id(uint16_t global_object_id)
 {
   UNMAP_DS
 
@@ -63,13 +63,13 @@ struct object_code *inv_get_object_by_id(uint8_t global_object_id)
   return NULL;
 }
 
-uint8_t inv_object_available(uint16_t id)
+uint8_t inv_object_available(uint16_t global_object_id)
 {
   SAVE_DS_AUTO_RESTORE
   uint8_t result = 0;
 
   for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
-    if (vm_state.inv_objects[i]->id == id) {
+    if (vm_state.inv_objects[i]->id == global_object_id) {
       result = 1;
       break;
     }
@@ -85,13 +85,13 @@ const char *inv_get_object_name(uint8_t position)
   return name_ptr;
 }
 
-uint8_t inv_get_object_id(uint8_t position)
+uint16_t inv_get_global_object_id(uint8_t position)
 {
   UNMAP_DS
   return vm_state.inv_objects[position]->id;
 }
 
-uint8_t inv_get_position_by_id(uint8_t global_object_id)
+uint8_t inv_get_position_by_id(uint16_t global_object_id)
 {
   UNMAP_DS
 

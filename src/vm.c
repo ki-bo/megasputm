@@ -1388,7 +1388,7 @@ static void handle_input(void)
           uint8_t inventory_item_id = inventory_pos + inventory_ui_slot;
           if (inventory_item_id < vm_state.inv_num_objects) {
             vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
-            vm_write_var(VAR_CLICKED_NOUN, inv_get_object_id(inventory_item_id));
+            vm_write_var(VAR_CLICKED_NOUN, inv_get_global_object_id(inventory_item_id));
             script_start(SCRIPT_ID_INPUT_EVENT);
             vm_update_sentence();
             return;
@@ -1904,6 +1904,7 @@ static void inventory_scroll_up(void)
   if (inventory_pos) {
     inventory_pos -= 2;
     vm_update_inventory();
+    prev_inventory_highlighted = 0xff;
   }
 }
 
@@ -1912,6 +1913,7 @@ static void inventory_scroll_down(void)
   if (inventory_pos + 4 < vm_state.inv_num_objects) {
     inventory_pos += 2;
     vm_update_inventory();
+    prev_inventory_highlighted = 0xff;
   }
 }
 
