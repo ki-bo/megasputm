@@ -2199,6 +2199,21 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
   }
   else {
     // is an object
+    
+    if (inv_object_available(object_or_actor_id)) {
+      // is inventory, return position of owner actor if in current room
+      uint8_t owner_actor_id = vm_state.global_game_objects[object_or_actor_id] & 0x0f;
+      if (actor_is_in_current_room(owner_actor_id)) {
+        *x = actors.x[owner_actor_id];
+        *y = actors.y[owner_actor_id];
+      }
+      else {
+        *x = 0xff;
+      }
+      return 0;
+    }
+
+    // is room object
     __auto_type obj_hdr = vm_get_room_object_hdr(object_or_actor_id);
     if (!obj_hdr) {
       *x = 0xff;
