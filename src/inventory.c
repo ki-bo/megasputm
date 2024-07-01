@@ -6,6 +6,10 @@
 #include "util.h"
 #include "vm.h"
 
+#pragma clang section bss="zdata"
+
+struct inventory_display inv_ui_entries;
+
 /**
   * @defgroup inv_init Inventory Init Functions
   * @{
@@ -105,51 +109,62 @@ uint8_t inv_get_position_by_id(uint16_t global_object_id)
 }
 
 /**
-  * @brief Get the displayed inventory.
+  * @brief Updates the inventory items to be displayed on screen.
   *
-  * This function will return the inventory entries that should be displayed on the screen.
-  * It filters the inventory starting at inventory item start_position for entries that match
-  * the provided owner_id and returns the number of entries that should be displayed (0-4).
+  * This function will update inv_ui_entries with items that should be displayed
+  * on the screen. It filters the inventory starting at inventory item inventory_pos for entries
+  * that match the actor in VAR_SELECTED_ACTOR.
   *
-  * It also fills the inventory display structure with the previous and next ids that match
-  * the owner_id. If no previous or next entries are available, the corresponding id will be
+  * It also fills the inv_ui_entries structure with the previous and next ids that match
+  * VAR_SELECTED_ACTOR. If no previous or next entries are available, the corresponding id will be
   * set to 0xff. This information can be used to hide or display the inventory scroll buttons.
-  * 
-  * @param entries Pointer to the inventory display structure.
-  * @param start_position Position to start displaying from.
-  * @param owner_id Owner of the objects to display.
-  * @return Number of entries available for displaying on scren.
   *
   * Code section: code_main
   */
-uint8_t inv_get_displayed_inventory(struct inventory_display *entries, uint8_t start_position, uint8_t owner_id)
+void inv_update_displayed_inventory(void)
 {
   UNMAP_DS
 
-  entries->prev_id = 0xff;
-  entries->next_id = 0xff;
+  uint8_t actor_id            = vm_read_var8(VAR_SELECTED_ACTOR);
+  uint8_t owner_inventory_pos = 0;
+  
+  inv_ui_entries.num_entries = 0;
+  inv_ui_entries.prev_id     = 0xff;
+  inv_ui_entries.next_id     = 0xff;
 
-  uint8_t num_entries = 0;
-  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
-    __auto_type object_ptr   = vm_state.inv_objects[i];
-    uint16_t    object_id    = object_ptr->id;
-    uint8_t     object_owner = vm_state.global_game_objects[object_id] & 0x0f;
-    if (object_owner == owner_id) {
-      if (i < start_position) {
-        entries->prev_id = i;
-      }
-      else if (num_entries < 4) {
-        entries->displayed_ids[num_entries] = i;
-        ++num_entries;
-      }
-      else {
-        entries->next_id = i;
-        break;
+  do {
+    for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
+      __auto_type object_ptr   = vm_state.inv_objects[i];
+      uint16_t    object_id    = object_ptr->id;
+      uint8_t     object_owner = vm_state.global_game_objects[object_id] & 0x0f;
+      
+      if (object_owner == actor_id) {
+        if (owner_inventory_pos < inventory_pos) {
+          inv_ui_entries.prev_id = i;
+        }
+        else if (inv_ui_entries.num_entries < 4) {
+          inv_ui_entries.displayed_ids[inv_ui_entries.num_entries] = i;
+          ++inv_ui_entries.num_entries;
+        }
+        else {
+          inv_ui_entries.next_id = i;
+          break;
+        }
+        ++owner_inventory_pos;
       }
     }
-  }
 
-  return num_entries;
+    if (inv_ui_entries.num_entries == 0) {
+      if (inventory_pos == 0) {
+        debug_out("inv p %d n %d, num %d, entries %d %d %d %d", inv_ui_entries.prev_id, inv_ui_entries.next_id, inv_ui_entries.num_entries, inv_ui_entries.displayed_ids[0], inv_ui_entries.displayed_ids[1], inv_ui_entries.displayed_ids[2], inv_ui_entries.displayed_ids[3]);
+        return;
+      }
+      inv_ui_entries.prev_id = 0xff;
+      inventory_pos = 0;
+      owner_inventory_pos = 0;
+    }
+  }
+  while (inv_ui_entries.num_entries == 0);
 }
 
 ///@} inv_public

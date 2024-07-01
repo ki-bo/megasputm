@@ -137,7 +137,7 @@ uint8_t actor_find(uint8_t x, uint8_t y)
 {
   for (uint8_t local_id = 0; local_id < MAX_LOCAL_ACTORS; ++local_id) {
     uint8_t actor_id = local_actors.global_id[local_id];
-    if (actor_id == 0xff || actor_id == selected_actor) {
+    if (actor_id == 0xff || actor_id == last_selected_actor) {
       continue;
     }
 
@@ -707,8 +707,12 @@ static void stop_walking(uint8_t local_id)
     local_actors.walking[local_id] = WALKING_STATE_STOPPING;
     //debug_out(" stopping");
     actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
-    local_actors.x_fraction[local_id] = 0;
-    local_actors.y_fraction[local_id] = 0;
+    local_actors.x_fraction[local_id]  = 0;
+    local_actors.y_fraction[local_id]  = 0;
+    local_actors.walk_to_x[local_id]   = actors.x[actor_id];
+    local_actors.walk_to_y[local_id]   = actors.y[actor_id];
+    local_actors.walk_to_box[local_id] = local_actors.cur_box[local_id];
+    local_actors.next_box[local_id]    = local_actors.cur_box[local_id];
     return;
   }
   if (target_dir != 0xff && target_dir != actors.dir[actor_id]) {

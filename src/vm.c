@@ -80,7 +80,7 @@ uint8_t prev_inventory_highlighted;
 uint8_t sentence_length;
 
 uint8_t inventory_pos;
-uint8_t selected_actor;
+uint8_t last_selected_actor;
 
 static const uint8_t savegame_magic[] = {'M', '6', '5', 'M', 'C', 'M', 'N'};
 
@@ -238,12 +238,12 @@ __task void vm_mainloop(void)
     diskio_check_motor_off(elapsed_jiffies);
     UNMAP_CS
 
-    if (selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
-      if (selected_actor != 0xff) {
+    if (last_selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
+      if (last_selected_actor != 0xff) {
         // makes sure inventory pos is kept when loading a savegame
         inventory_pos = 0;
       }
-      selected_actor = vm_read_var8(VAR_SELECTED_ACTOR);
+      last_selected_actor = vm_read_var8(VAR_SELECTED_ACTOR);
     }
 
     proc_table_cleanup_needed = 0;
@@ -747,6 +747,8 @@ uint16_t vm_get_object_at(uint8_t x, uint8_t y)
 
 uint8_t vm_get_object_position(uint16_t global_object_id, uint8_t *x, uint8_t *y)
 {
+  SAVE_DS_AUTO_RESTORE
+
   // check if object is an actor
   if (global_object_id <= NUM_ACTORS) {
     // in current room?
@@ -850,6 +852,7 @@ void vm_draw_object(uint8_t local_id, uint8_t x, uint8_t y)
 
 void vm_set_camera_follow_actor(uint8_t actor_id)
 {
+  //debug_out("set-camera-follow-actor %d", actor_id);
   uint8_t room_of_actor = actors.room[actor_id];
   if (room_of_actor != vm_read_var8(VAR_SELECTED_ROOM)) {
     vm_set_current_room(room_of_actor);
@@ -870,7 +873,9 @@ void vm_set_camera_to(uint8_t x)
   }
 
   if (camera_x != x) {
+    //debug_out("set camera to %d", x);
     camera_x = x;
+    vm_write_var(VAR_CAMERA_X, x);
     vm_update_bg();
     vm_update_actors();
   }
@@ -1087,8 +1092,8 @@ static void reset_game_state(void)
 
   vm_state.num_actor_palettes = 1;
   for (uint8_t i = 0; i < NUM_ACTORS; ++i) {
-    actors.local_id[i] = 0xff;
-    actors.room[i] = 0;
+    actors.local_id[i]    = 0xff;
+    actors.room[i]        = 0;
     actors.palette_idx[i] = 1; // default actor palette is index 1
     if (i < MAX_LOCAL_ACTORS) {
       local_actors.global_id[i] = 0xff;
@@ -1104,7 +1109,9 @@ static void reset_game_state(void)
   camera_state               = 0;
   camera_follow_actor_id     = 0xff;
   actor_talking              = 0xff;
-  selected_actor             = 0xff;
+  // this ensures that inventory_pos won't get reset to 0
+  // (which should not happen when loading a savegame)
+  last_selected_actor        = 0xff;
   vm_state.message_speed     = 6;
   message_timer              = 0;
   message_ptr                = NULL;
@@ -1368,39 +1375,47 @@ static void handle_input(void)
       }
       else if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
         // clicked on sentence line
-        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SENTENCE_CLICK);
-        script_start(SCRIPT_ID_INPUT_EVENT);
-        return;
+        if (ui_state & UI_FLAGS_ENABLE_SENTENCE) {
+          vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SENTENCE_CLICK);
+          script_start(SCRIPT_ID_INPUT_EVENT);
+          return;
+        }
       }
       else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
         // clicked in verb zone
-        MAP_CS_MAIN_PRIV
-        uint8_t verb_slot = get_hovered_verb_slot();
-        UNMAP_CS
-        if (verb_slot != 0xff) {
-          select_verb(vm_state.verbs.id[verb_slot]);
+        if (ui_state & UI_FLAGS_ENABLE_VERBS) {
+          MAP_CS_MAIN_PRIV
+          uint8_t verb_slot = get_hovered_verb_slot();
+          UNMAP_CS
+          if (verb_slot != 0xff) {
+            select_verb(vm_state.verbs.id[verb_slot]);
+          }
+          return;
         }
       }
       else if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
         // clicked in inventory zone
-        uint8_t inventory_ui_slot = get_hovered_inventory_slot();
-        if (inventory_ui_slot < 4) {
-          uint8_t inventory_item_id = inventory_pos + inventory_ui_slot;
-          if (inventory_item_id < vm_state.inv_num_objects) {
-            vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
-            vm_write_var(VAR_CLICKED_NOUN, inv_get_global_object_id(inventory_item_id));
-            script_start(SCRIPT_ID_INPUT_EVENT);
-            vm_update_sentence();
+        if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
+          uint8_t inventory_ui_slot = get_hovered_inventory_slot();
+          if (inventory_ui_slot < 4 && 
+              inventory_ui_slot < inv_ui_entries.num_entries) {
+            uint8_t inventory_item_id = inv_ui_entries.displayed_ids[inventory_ui_slot];
+            if (inventory_item_id < vm_state.inv_num_objects) {
+              vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
+              vm_write_var(VAR_CLICKED_NOUN, inv_get_global_object_id(inventory_item_id));
+              script_start(SCRIPT_ID_INPUT_EVENT);
+              vm_update_sentence();
+              return;
+            }
+          }
+          else if (inventory_ui_slot == 4) {
+            inventory_scroll_up();
             return;
           }
-        }
-        else if (inventory_ui_slot == 4) {
-          inventory_scroll_up();
-          return;
-        }
-        else if (inventory_ui_slot == 5) {
-          inventory_scroll_down();
-          return;
+          else if (inventory_ui_slot == 5) {
+            inventory_scroll_down();
+            return;
+          }
         }
       }
     }
@@ -1770,26 +1785,16 @@ static void update_inventory_interface()
   UNMAP_DS
 
   struct inventory_display entries;
-  uint8_t num_entries;
 
   gfx_clear_inventory();
 
   if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
-    num_entries = inv_get_displayed_inventory(&entries, 
-                                              inventory_pos, 
-                                              vm_read_var8(VAR_SELECTED_ACTOR));
-    if (num_entries == 0 && inventory_pos != 0) {
-      // no items to display, reset position
-      inventory_pos = 0;
-      num_entries = inv_get_displayed_inventory(&entries, 
-                                                inventory_pos, 
-                                                vm_read_var8(VAR_SELECTED_ACTOR));
-    }
+    inv_update_displayed_inventory();
 
     char buf[19];
     buf[18] = '\0';
-    for (uint8_t ui_pos = 0; ui_pos < num_entries; ++ui_pos) {
-      const char *name = inv_get_object_name(entries.displayed_ids[ui_pos]);
+    for (uint8_t ui_pos = 0; ui_pos < inv_ui_entries.num_entries; ++ui_pos) {
+      const char *name = inv_get_object_name(inv_ui_entries.displayed_ids[ui_pos]);
       for (uint8_t j = 0; j < 18; ++j) {
         buf[j] = name[j];
         if (buf[j] == '\0') {
@@ -1802,11 +1807,11 @@ static void update_inventory_interface()
                                TEXT_STYLE_INVENTORY);
     }
     
-    if (entries.prev_id != 0xff) {
+    if (inv_ui_entries.prev_id != 0xff) {
       gfx_print_interface_text(19, 22, "\xfc\xfd", TEXT_STYLE_INVENTORY_ARROW);
     }
 
-    if (entries.next_id != 0xff) {
+    if (inv_ui_entries.next_id != 0xff) {
       gfx_print_interface_text(19, 23, "\xfe\xff", TEXT_STYLE_INVENTORY_ARROW);
     }
   }
@@ -1901,7 +1906,7 @@ static uint8_t inventory_ui_pos_to_y(uint8_t pos)
 
 static void inventory_scroll_up(void)
 {
-  if (inventory_pos) {
+  if (inv_ui_entries.prev_id != 0xff) {
     inventory_pos -= 2;
     vm_update_inventory();
     prev_inventory_highlighted = 0xff;
@@ -1910,7 +1915,7 @@ static void inventory_scroll_up(void)
 
 static void inventory_scroll_down(void)
 {
-  if (inventory_pos + 4 < vm_state.inv_num_objects) {
+  if (inv_ui_entries.next_id != 0xff) {
     inventory_pos += 2;
     vm_update_inventory();
     prev_inventory_highlighted = 0xff;

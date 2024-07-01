@@ -2290,7 +2290,7 @@ static void closest_actor(void)
   do {
     if (actors.local_id[cur_actor] != 0xff && cur_actor != actor_or_object_id) {
       uint8_t distance = vm_calc_proximity(actor_or_object_id, cur_actor);
-      debug_out("dist a%d a%d = %d", actor_or_object_id, cur_actor, distance);
+      //debug_out("dist a%d a%d = %d", actor_or_object_id, cur_actor, distance);
       if (distance < closest_distance) {
         closest_distance = distance;
         closest_actor    = cur_actor;

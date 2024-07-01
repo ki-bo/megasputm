@@ -190,7 +190,7 @@ extern uint8_t          obj_page[MAX_OBJECTS];
 extern uint8_t          obj_offset[MAX_OBJECTS];
 extern uint16_t         obj_id[MAX_OBJECTS];
 extern uint8_t          inventory_pos;
-extern uint8_t          selected_actor;
+extern uint8_t          last_selected_actor;
 
 struct sentence_stack_t {
   uint8_t  num_entries;

@@ -97,36 +97,36 @@ uint16_t walkbox_get_corrected_box_position(struct walk_box *box, uint8_t *x, ui
   uint8_t y_bottom = box->bottom_y;
 
   if (yc >= y_bottom) {
-    // debug_out("  below box");
+    //debug_out("  below box");
     yc = y_bottom;
     x_left = box->bottomleft_x;
     x_right = box->bottomright_x;
   }
   else if (yc < y_top) {
-    // debug_out("  above box");
+    //debug_out("  above box");
     yc = y_top;
     x_left = box->topleft_x;
     x_right = box->topright_x;
   }
   else if (xc < box->topleft_x || xc < box->bottomleft_x) {
-    // debug_out("  left of box");
+    //debug_out("  left of box");
     SAVE_CS
     MAP_CS_MAIN_PRIV
     x_left = binary_search_xy(box->topleft_x, box->bottomleft_x, box->top_y, box->bottom_y, yc);
-    x_right = x_left;
+    x_right = xc;
     RESTORE_CS
   }
   else if (xc > box->topright_x || xc > box->bottomright_x) {
-    // debug_out("  right of box");
+    //debug_out("  right of box");
     SAVE_CS
     MAP_CS_MAIN_PRIV
-    x_left = binary_search_xy(box->topright_x, box->bottomright_x, box->top_y, box->bottom_y, yc);
-    x_right = x_left;
+    x_left = xc;
+    x_right = binary_search_xy(box->topright_x, box->bottomright_x, box->top_y, box->bottom_y, yc);
     RESTORE_CS
   }
   else {
     // in this case the point is inside the rectangle that is defined by the inner points of the box
-    // debug_out("  inside box");
+    //debug_out("  inside box");
     x_left  = max(box->topleft_x, box->bottomleft_x);
     x_right = min(box->topright_x, box->bottomright_x);
   }
