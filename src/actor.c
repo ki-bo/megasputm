@@ -328,11 +328,16 @@ void actor_next_step(uint8_t local_id)
 void actor_start_animation(uint8_t local_id, uint8_t animation)
 {
   switch (animation & 0xfc) {
-    case 0xf8:
+    case 0xf8: {
+      uint8_t new_dir = animation & 0x03;
       // keep animation but just change direction
-      actor_change_direction(local_id, animation & 0x03);
+      if (local_actors.walk_dir[local_id] != new_dir) {
+        stop_walking(local_id);
+      }
+      actor_change_direction(local_id, new_dir);
       local_actors.walking[local_id] = WALKING_STATE_STOPPED;
       return;
+    }
     case 0xfc:
       // stop walk-to animation
       local_actors.target_dir[local_id] = 0xff;   // keep direction as is when stopping
@@ -705,7 +710,7 @@ static void stop_walking(uint8_t local_id)
 
   if (walk_state != WALKING_STATE_STOPPING && walk_state != WALKING_STATE_FINISHED) {
     local_actors.walking[local_id] = WALKING_STATE_STOPPING;
-    //debug_out(" stopping");
+    debug_out(" stopping");
     actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
     local_actors.x_fraction[local_id]  = 0;
     local_actors.y_fraction[local_id]  = 0;
@@ -719,18 +724,18 @@ static void stop_walking(uint8_t local_id)
     if (local_actors.walk_dir[local_id] != target_dir) {
       local_actors.walk_dir[local_id] = target_dir;
     }
-    //debug_out(" turning to %d", target_dir);
+    debug_out(" turning to %d", target_dir);
     local_actors.walking[local_id] = WALKING_STATE_STOPPING;
     turn_to_walk_to_direction(local_id);
   }
   if (local_actors.walking[local_id] == WALKING_STATE_STOPPING && 
       (target_dir == 0xff || target_dir == actors.dir[actor_id])) {
-    //debug_out(" walking finished");
+    debug_out(" walking finished");
     local_actors.walking[local_id] = WALKING_STATE_FINISHED;
     return;
   }
   if (local_actors.walking[local_id] == WALKING_STATE_FINISHED) {
-    //debug_out(" stopped");
+    debug_out(" stopped");
     local_actors.walking[local_id] = WALKING_STATE_STOPPED;
     actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
   }
