@@ -61,7 +61,6 @@ __program_start:
 		taz
 		map
 		eom
-		jsr __low_level_init
 
 ;;; Initialize data sections if needed.
 		.section startup, noroot, noreorder
@@ -88,38 +87,24 @@ __call_initialize_global_streams:
 		.section startup, noroot, noreorder
 		.pubweak __call_heap_initialize
 __call_heap_initialize:
-		lda #.byte0 __default_heap
-		sta zp:_Zp+0
-		lda #.byte1 __default_heap
-		sta zp:_Zp+1
-		lda #.byte0 (.sectionStart heap)
-		sta zp:_Zp+2
-		lda #.byte1 (.sectionStart heap)
-		sta zp:_Zp+3
-		lda #.byte0 (.sectionSize heap)
-		sta zp:_Zp+4
-		lda #.byte1 (.sectionSize heap)
-		sta zp:_Zp+5
+		;lda #.byte0 __default_heap
+		;sta zp:_Zp+0
+		;lda #.byte1 __default_heap
+		;sta zp:_Zp+1
+		;lda #.byte0 (.sectionStart heap)
+		;sta zp:_Zp+2
+		;lda #.byte1 (.sectionStart heap)
+		;sta zp:_Zp+3
+		;lda #.byte0 (.sectionSize heap)
+		;sta zp:_Zp+4
+		;lda #.byte1 (.sectionSize heap)
+		;sta zp:_Zp+5
 		.extern __heap_initialize, __default_heap
 		;jsr __heap_initialize
 
 		.section startup, root, noreorder
 		.extern main
 		jmp main
-
-;;; ***************************************************************************
-;;;
-;;; __low_level_init - custom low level initialization
-;;;
-;;; This default routine just returns doing nothing. You can provide your own
-;;; routine, either in C or assembly for doing custom low leve initialization.
-;;;
-;;; ***************************************************************************
-
-		.section startup, root, noreorder
-		.pubweak __low_level_init
-__low_level_init:
-		rts
 
 ;;; ***************************************************************************
 ;;;
@@ -245,14 +230,9 @@ load_file:
 		ldx #8
 		ldy #0
 		jsr 0xffba		; SETLFS
-		;; need to comment out as MEGA65 ROM is broken and doesn't support SETBNK
-		;lda file_load_address+2
-		;ldx #0
-		;jsr 0xff6b		; SETBNK
-		;; set BANK and MSB of load address via ZP instead ...
-		sta 0xb0
 		lda file_load_address+2
-		sta 0xaf
+		ldx #0
+		jsr 0xff6b		; SETBNK
 		ldy file_load_address+1
 		ldx file_load_address
 		lda #0b01000000		; bit6 = raw read (don't skip first 2 bytes)
