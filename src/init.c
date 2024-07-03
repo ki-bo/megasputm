@@ -34,23 +34,20 @@ void global_init(void)
   charset_init();
 
   // init diskio module
-  MAP_CS_DISKIO
   diskio_init();
 
-  // init gfx module  
+  // load and init gfx module (CS_DISKIO is still mapped from diskio_init)
   diskio_load_file("M12", (uint8_t __far *)(0x14000)); // load gfx code
-  MAP_CS_GFX
   gfx_init();
-  UNMAP_CS
 
   // init input module
   input_init();
 
   // init main engine code
-  res_init();
-  heap_init();
-  inv_init();
-  script_init();
-  actor_init();
-  vm_init();
+  res_init();    // resource module
+  heap_init();   // heap
+  inv_init();    // inventory
+  script_init(); // script parser
+  actor_init();  // actor module
+  vm_init();     // virtual machine and main game logic
 }

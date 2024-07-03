@@ -13,6 +13,17 @@ static void copy_chars(uint8_t char_idx_src, uint8_t char_idx_dst, uint16_t num_
 
 static const uint8_t char_definitions[][9] = {
   {
+    0x00,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000
+  },
+  {
     0x40,
     0b00000000,
     0b00000000,

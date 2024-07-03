@@ -77,6 +77,8 @@ __attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
   0b00000000,0b00000000,0b00000000,
 }; 
 
+__attribute__((aligned(64))) static const uint8_t blank_sprite[53];
+
 //-----------------------------------------------------------------------------------------------
 
 __attribute__((aligned(16))) static uint8_t *sprite_pointers[8];
@@ -107,53 +109,25 @@ static uint8_t actor_height;
 static uint8_t actor_palette;
 static uint32_t actor_char_data;
 
-static dmalist_three_options_no_3rd_arg_t dmalist_rle_strip_copy = {
-  .opt_token1     = 0x85,                   // destination skip rate
-  .opt_arg1       = 0x08,                   // = 8 bytes
-  .opt_token2     = 0x86,                   // transparent color handling
-  .opt_arg2       = 0x00,                   // transparent color
-  .opt_token3     = 0x06,                   // enable (7) or disable (6) transparent color handling
-  .end_of_options = 0x00,
-  .command        = 0,                      // DMA copy command
-  .count          = 0,
-  .src_addr       = 0,
-  .src_bank       = 0,
-  .dst_addr       = 0,
-  .dst_bank       = 0x07
-};
+static dmalist_single_option_t dmalist_copy_gfx[2];
+static dmalist_single_option_t dmalist_copy_gfx_dark[3];
+static dmalist_t dmalist_clear_dialog_screen;
+static dmalist_t dmalist_clear_actor_chars;
+static dmalist_three_options_no_3rd_arg_t dmalist_rle_strip_copy;
+static dmalist_two_options_no_2nd_arg_t dmalist_apply_masking;
+static dmalist_t dmalist_reset_rrb;
+static dmalist_t dmalist_clear_sentence;
+static dmalist_t dmalist_clear_verbs;
+static dmalist_t dmalist_clear_inventory;
+static dmalist_two_options_t dmalist_clear_dialog_colram;
 
-static const uint16_t times_chrcount[] = {
-  CHRCOUNT * 0,
-  CHRCOUNT * 1,
-  CHRCOUNT * 2,
-  CHRCOUNT * 3,
-  CHRCOUNT * 4,
-  CHRCOUNT * 5,
-  CHRCOUNT * 6,
-  CHRCOUNT * 7,
-  CHRCOUNT * 8,
-  CHRCOUNT * 9,
-  CHRCOUNT * 10,
-  CHRCOUNT * 11,
-  CHRCOUNT * 12,
-  CHRCOUNT * 13,
-  CHRCOUNT * 14,
-  CHRCOUNT * 15,
-  CHRCOUNT * 16,
-  CHRCOUNT * 17,
-  CHRCOUNT * 18,
-  CHRCOUNT * 19,
-  CHRCOUNT * 20,
-  CHRCOUNT * 21,
-  CHRCOUNT * 22,
-  CHRCOUNT * 23,
-  CHRCOUNT * 24
-};
+static uint16_t times_chrcount[25];
 
 //-----------------------------------------------------------------------------------------------
 
 // Private init functions
 static void setup_irq(void);
+static void init_dma_lists(void);
 // Private interrupt function
 static void raster_irq(void);
 // Private gfx functions
@@ -185,9 +159,13 @@ static uint16_t text_style_to_color(enum text_style style);
   */
 void gfx_init()
 {
+  MAP_CS_GFX
+
+  init_dma_lists();
+
   VICIV.sdbdrwd_msb  &= ~VIC4_HOTREG_MASK;
   VICII.ctrl1        &= ~0x10; // disable video output
-  VICIV.palsel        = 0x00; // select and map palette 0
+  VICIV.palsel        = 0x00; // select and map palette 0 (for both text and sprites)
   VICIV.ctrla        |= 0x04; // enable RAM palette
   VICIV.ctrlb         = VIC4_VFAST_MASK;
   VICIV.ctrlc        &= ~VIC4_FCLRLO_MASK;
@@ -199,23 +177,20 @@ void gfx_init()
   memset20(FAR_U8_PTR(BG_BITMAP), 0, 0 /* 0 means 64kb */);
   memset20(FAR_U8_PTR(COLRAM), 0, 2000);
 
-  dmalist_rle_strip_copy.src_addr = LSB16(UNBANKED_PTR(color_strip));
-  dmalist_rle_strip_copy.src_bank = BANK(UNBANKED_PTR(color_strip));
-
   __auto_type screen_ptr    = FAR_U16_PTR(SCREEN_RAM);
   __auto_type colram_ptr    = FAR_U16_PTR(COLRAM);
   __auto_type screen_bb_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN);
   __auto_type colram_bb_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM);
 
   for (uint16_t i = 0; i < CHRCOUNT * 25; ++i) {
-    *screen_ptr++    = 0x0020;
-    *screen_bb_ptr++ = 0x0020;
-    *colram_ptr++    = 0x0f00;
-    *colram_bb_ptr++ = 0x0f00;
+    *screen_ptr++    = 0x0000;
+    *screen_bb_ptr++ = 0x0000;
+    *colram_ptr++    = 0xff00;
+    *colram_bb_ptr++ = 0xff00;
   }
 
   for (uint8_t i = 0; i < 16; ++i) {
-    num_chars_at_row[i] = 40;
+    num_chars_at_row[i] = 41;
   }
 
   VICIV.scrnptr   = (uint32_t)SCREEN_RAM; // implicitly sets CHRCOUNT(9..8) to 0
@@ -232,12 +207,20 @@ void gfx_init()
     PALETTE.blue[i]  = palette_blue[i];
   }
 
+  // actor-in-the-dark palette
+  for (uint8_t i = 0xf0; i != 0; ++i) {
+    uint8_t src_index = (i == 0xfc) ? 0 : 8;
+    PALETTE.red[i]   = palette_red[src_index];
+    PALETTE.green[i] = palette_green[src_index];
+    PALETTE.blue[i]  = palette_blue[src_index];
+  }
+
   // setup cursors / sprites
   VICII.spr_bg_prio     = 0;                                       // sprites have priority over background
   VICII.spr_exp_x       = 0;                                       // no sprite expansion X
   VICII.spr_exp_y       = 0;                                       // no sprite expansion Y
   VICIV.ctrlc          &= ~VIC4_SPR_H640_MASK;                     // no sprite H640 mode
-  VICIV.spr_hgten       = 0x03;                                    // enable variable height for sprites 0 and 1
+  VICIV.spr_hgten       = 0xf3;                                    // enable variable height for sprites 0 and 1, 4-74
   VICIV.spr_hght        = 16;                                      // 16 pixels high
   VICIV.spr_x64en       = 0x01;                                    // enable 8 bytes per row for sprite 0
 
@@ -253,12 +236,42 @@ void gfx_init()
   VICIV.spr_yadj        = 0x00;                                    // no vertical adjustment
   VICIV.spr_enalpha     = 0x00;                                    // no alpha blending
   VICIV.spr_env400      = 0x00;                                    // no V400 mode
-  VICIV.spr0_color      = 0x01;                                    // set transparent color for sprite 0
+  VICIV.spr0_color      = 0x01;                                    // set color for sprite 0
+  VICIV.spr4_color      = 0x00;
+  VICIV.spr5_color      = 0x00;
+  VICIV.spr6_color      = 0x00;
+  VICIV.spr7_color      = 0x00;
+  VICIV.textxpos_msb   &= ~0xf0;                                   // disable tile mode for sprites 0-3
+  VICIV.textypos_msb   |= 0xf0;                                    // enable tile mode for sprites 4-7
+  VICIV.spr_exp_y      |= 0xf0;                                    // vertical expansion for sprites 4-7
+
+  memset20(UNBANKED_PTR(blank_sprite), 0xff, 68);
 
   sprite_pointers[0] = UNBANKED_SPR_PTR(cursor_snail);
   sprite_pointers[1] = UNBANKED_SPR_PTR(cursor_cross);
+  sprite_pointers[4] = UNBANKED_SPR_PTR(blank_sprite);
+  sprite_pointers[5] = UNBANKED_SPR_PTR(blank_sprite);
+  sprite_pointers[6] = UNBANKED_SPR_PTR(blank_sprite);
+  sprite_pointers[7] = UNBANKED_SPR_PTR(blank_sprite);
+
+  VICIV.spr4_x = 24;
+  VICIV.spr5_x = 24;
+  VICIV.spr6_x = 24;
+  VICIV.spr7_x = 24;
+  VICIV.spr4_y = 50 + 16 + 0 * 32;
+  VICIV.spr5_y = 50 + 16 + 1 * 32;
+  VICIV.spr6_y = 50 + 16 + 2 * 32;
+  VICIV.spr7_y = 50 + 16 + 3 * 32;
+  VICII.spr_ena = 0xf0; // enable sprites 4-7
+  VICII.spr_bg_prio = 0xf0;
+  
+  for (uint8_t i = 0; i < 25; ++i) {
+    times_chrcount[i] = CHRCOUNT * i;
+  }
 
   setup_irq();
+
+  UNMAP_CS
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -281,6 +294,156 @@ void setup_irq(void)
   CIA2.icr = 0x7f; // disable CIA2 interrupts
   CIA1.icr; // volatile reads will ack pending irqs
   CIA2.icr;
+}
+
+static void init_dma_lists(void)
+{
+  dmalist_copy_gfx[0] = (dmalist_single_option_t) {
+    .opt_token  = 0x81,
+    .opt_arg    = 0x00,
+    .command    = DMA_CMD_COPY | DMA_CMD_CHAIN,
+    .count      = CHRCOUNT * 2 * 16,
+    .src_addr   = BACKBUFFER_SCREEN + CHRCOUNT * 2 * 2,
+    .src_bank   = 0x00,
+    .dst_addr   = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
+    .dst_bank   = BANK(SCREEN_RAM)
+  };
+  dmalist_copy_gfx[1] = (dmalist_single_option_t) {
+    .opt_token  = 0x81,
+    .opt_arg    = 0xff,
+    .command    = DMA_CMD_COPY,
+    .count      = CHRCOUNT * 2 * 16,
+    .src_addr   = BACKBUFFER_COLRAM + CHRCOUNT * 2 * 2,
+    .src_bank   = 0x00,
+    .dst_addr   = LSB16(COLRAM + CHRCOUNT * 2 * 2),
+    .dst_bank   = BANK(COLRAM)
+  };
+
+  dmalist_copy_gfx_dark[0] = (dmalist_single_option_t) {
+    .opt_token  = 0x81,
+    .opt_arg    = 0x00,
+    .command    = DMA_CMD_FILL | DMA_CMD_CHAIN,
+    .count      = 80,
+    .src_addr   = 0x0000,
+    .src_bank   = 0x00,
+    .dst_addr   = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
+    .dst_bank   = BANK(SCREEN_RAM)
+  };
+  dmalist_copy_gfx_dark[1] = (dmalist_single_option_t) {
+    .opt_token  = 0x81,
+    .opt_arg    = 0x00,
+    .command    = DMA_CMD_COPY | DMA_CMD_CHAIN,
+    .count      = CHRCOUNT * 2 * 16,
+    .src_addr   = BACKBUFFER_SCREEN + CHRCOUNT * 2 * 2,
+    .src_bank   = 0x00,
+    .dst_addr   = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
+    .dst_bank   = BANK(SCREEN_RAM)
+  };
+  dmalist_copy_gfx_dark[2] = (dmalist_single_option_t) {
+    .opt_token  = 0x81,
+    .opt_arg    = 0xff,
+    .command    = DMA_CMD_COPY,
+    .count      = CHRCOUNT * 2 * 16,
+    .src_addr   = BACKBUFFER_COLRAM + CHRCOUNT * 2 * 2,
+    .src_bank   = 0x00,
+    .dst_addr   = LSB16(COLRAM + CHRCOUNT * 2 * 2),
+    .dst_bank   = BANK(COLRAM)
+  };
+
+  dmalist_clear_dialog_screen = (dmalist_t) {
+    .command  = DMA_CMD_FILL,
+    .count    = CHRCOUNT * 4,
+    .src_addr = 0x0000,
+    .src_bank = 0x00,
+    .dst_addr = LSB16(SCREEN_RAM),
+    .dst_bank = BANK(SCREEN_RAM),
+  };
+
+  dmalist_clear_actor_chars = (dmalist_t) {
+    .command  = DMA_CMD_FILL,
+    .count    = 0,
+    .src_addr = 0x0000,
+    .src_bank = 0x00,
+    .dst_addr = 0x0000,
+    .dst_bank = 0x00
+  };
+
+  dmalist_rle_strip_copy = (dmalist_three_options_no_3rd_arg_t) {
+    .opt_token1     = 0x85,                   // destination skip rate
+    .opt_arg1       = 0x08,                   // = 8 bytes
+    .opt_token2     = 0x86,                   // transparent color handling
+    .opt_arg2       = 0x00,                   // transparent color
+    .opt_token3     = 0x06,                   // enable (7) or disable (6) transparent color handling
+    .end_of_options = 0x00,
+    .command        = DMA_CMD_COPY,
+    .count          = 0,
+    .src_addr       = LSB16(UNBANKED_PTR(color_strip)),
+    .src_bank       = BANK(UNBANKED_PTR(color_strip)),
+    .dst_addr       = 0x0000,
+    .dst_bank       = 0x00
+  };
+
+  dmalist_apply_masking = (dmalist_two_options_no_2nd_arg_t) {
+    .opt_token1     = 0x86,                   // transparent color handling
+    .opt_arg1       = 0x01,                   // transparent color
+    .opt_token2     = 0x07,                   // enable (7) or disable (6) transparent color handling
+    .end_of_options = 0x00,
+    .command        = DMA_CMD_COPY,
+    .count          = 0,
+    .src_addr       = 0x0000,
+    .src_bank       = 0x00,
+    .dst_addr       = 0x0000,
+    .dst_bank       = 0x00
+  };
+
+  dmalist_reset_rrb = (dmalist_t) {
+    .command        = DMA_CMD_FILL,
+    .count          = (CHRCOUNT - 41) * 2,
+    .src_addr       = 0x0000,
+    .src_bank       = 0x00,
+    .dst_addr       = 0x0000,
+    .dst_bank       = 0x00
+  };
+
+  dmalist_clear_sentence = (dmalist_t) {
+    .command  = DMA_CMD_FILL,
+    .count    = 80,
+    .src_addr = 0x0000,
+    .src_bank = 0x00,
+    .dst_addr = LSB16(SCREEN_RAM_SENTENCE),
+    .dst_bank = BANK(SCREEN_RAM_SENTENCE),
+  };
+
+  dmalist_clear_verbs = (dmalist_t) {
+    .command  = DMA_CMD_FILL,
+    .count    = CHRCOUNT * 2 * 3,
+    .src_addr = 0x0000,
+    .src_bank = 0x00,
+    .dst_addr = LSB16(SCREEN_RAM_VERBS),
+    .dst_bank = BANK(SCREEN_RAM_VERBS),
+  };
+
+  dmalist_clear_inventory = (dmalist_t) {
+    .command  = DMA_CMD_FILL,
+    .count    = CHRCOUNT * 2 * 2,
+    .src_addr = 0x0000,
+    .src_bank = 0x00,
+    .dst_addr = LSB16(SCREEN_RAM_INVENTORY),
+    .dst_bank = BANK(SCREEN_RAM_INVENTORY),
+  };
+
+  dmalist_clear_dialog_colram = (dmalist_two_options_t) {
+    .opt_token1 = 0x80,
+    .opt_arg1   = 0xff,
+    .opt_token2 = 0x81,
+    .opt_arg2   = 0xff,
+    .command    = DMA_CMD_COPY,
+    .count      = CHRCOUNT * 2 * 2 - 2,
+    .src_addr   = LSB16(COLRAM),
+    .src_bank   = BANK(COLRAM),
+    .dst_addr   = LSB16(COLRAM + 2),
+    .dst_bank   = BANK(COLRAM + 2)
+  };
 }
 
 /** @} */ // gfx_init
@@ -383,11 +546,11 @@ void gfx_start(void)
   */
 void gfx_fade_out(void)
 {
-  __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM) + CHRCOUNT * 2;
+  __auto_type screen_ptr = FAR_U8_PTR(SCREEN_RAM) + CHRCOUNT * 2 * 2;
 
-  uint16_t num_chars = 16 * CHRCOUNT;
+  uint16_t num_chars = 16 * CHRCOUNT * 2;
   do {
-    *screen_ptr = 0x0020;
+    *screen_ptr = 0;
     ++screen_ptr;
   }
   while (--num_chars != 0);
@@ -427,7 +590,8 @@ void gfx_wait_vsync(void)
   * @brief Resets the actor palettes to the default EGA colors.
   *
   * The first palette is the default palette, the remaining palettes are used for actors
-  * that need color remapping.
+  * that need color remapping. The last palette is used for rendering actors in dark rooms
+  * and is already initialized in the init function.
   *
   * The first color in each actor palette is reserved for transparency. Color index 1 is
   * always black for actors.
@@ -437,7 +601,7 @@ void gfx_wait_vsync(void)
 void gfx_reset_palettes(void)
 {
   uint8_t c = 16;
-  for (uint8_t p = 1; p < 16; ++p) {
+  for (uint8_t p = 1; p < 15; ++p) {
     for (uint8_t i = 0; i < 16; ++i) {
       if (i == 1) {
         // actor palettes always have black as color 1
@@ -639,16 +803,6 @@ void gfx_set_object_image(uint8_t __huge *src, uint8_t x, uint8_t y, uint8_t wid
   */
 void gfx_clear_dialog(void)
 {
-  static const dmalist_t dmalist_clear_dialog_screen = {
-    .command  = 0,
-    .count    = CHRCOUNT * 4 - 2,
-    .src_addr = LSB16(SCREEN_RAM),
-    .src_bank = BANK(SCREEN_RAM),
-    .dst_addr = LSB16(SCREEN_RAM + 2),
-    .dst_bank = BANK(SCREEN_RAM + 2),
-  };
-
-  *FAR_U16_PTR(SCREEN_RAM) = 0x0020;
   dma_trigger(&dmalist_clear_dialog_screen);
 }
 
@@ -689,9 +843,11 @@ void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars)
   * The background image is drawn to the backbuffer screen memory. The horizontal
   * camera position is taken into account.
   * 
+  * @param lights If non-zero, the room is drawn with lights on.
+  *
   * Code section: code_gfx
   */
-void gfx_draw_bg(void)
+void gfx_draw_bg(uint8_t lights)
 {
   SAVE_DS_AUTO_RESTORE
   UNMAP_DS
@@ -700,17 +856,25 @@ void gfx_draw_bg(void)
   screen_pixel_offset_x = left_char_offset * 8;
 
   __auto_type screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
+  __auto_type colram_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
   uint16_t char_data = BG_BITMAP / 64 + left_char_offset * 16;
 
-  for (uint8_t x = 0; x < 40; ++x) {
+  for (uint8_t x = 0; x < 41; ++x) {
     for (uint8_t y = 0; y < 16; ++y) {
-      *screen_ptr = char_data++;
+      if (x == 0) {
+        *screen_ptr = 0x0000;
+        *colram_ptr = lights ? 0x0010 : 0x0050;
+        colram_ptr += CHRCOUNT;
+      }
+      else {
+        *screen_ptr = char_data++;
+      }
       screen_ptr += CHRCOUNT;
     }
     screen_ptr -= CHRCOUNT * 16 - 1;
   }
 
-  memset(num_chars_at_row, 40, 16);
+  memset(num_chars_at_row, 41, 16);
   reset_objects();
 }
 
@@ -749,7 +913,7 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y)
 
   do {
     if (row >= 0 && row < 16) {
-      screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + times_chrcount[row];
+      screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + times_chrcount[row] + 1;
       width = initial_width;
       col = x;
       char_num_col = char_num_row;
@@ -776,15 +940,6 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y)
 
 uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, uint8_t height, uint8_t palette)
 {
-  static dmalist_t dmalist_clear_actor_chars = {
-    .command  = DMA_CMD_FILL,
-    .count    = 0,
-    .src_addr = 0,
-    .src_bank = 0,
-    .dst_addr = 0,
-    .dst_bank = 0
-  };
-
   int16_t screen_pos_x = pos_x - screen_pixel_offset_x;
   if (screen_pos_x >= 320 || screen_pos_x + width < 0 || pos_y + height < 0) {
     return 0;
@@ -913,19 +1068,6 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
   while (cur_x != actor_width);
 
   // copy the masking data over the actor char data
-  static dmalist_two_options_no_2nd_arg_t dmalist_apply_masking = {
-    .opt_token1     = 0x86,                   // transparent color handling
-    .opt_arg1       = 0x01,                   // transparent color
-    .opt_token2     = 0x07,                   // enable (7) or disable (6) transparent color handling
-    .end_of_options = 0x00,
-    .command        = 0,                      // DMA copy command
-    .count          = 0,
-    .src_addr       = 0,
-    .src_bank       = 0,
-    .dst_addr       = 0,
-    .dst_bank       = 0
-  };
-
   dmalist_apply_masking.count    = num_bytes;
   dmalist_apply_masking.src_addr = LSB16(masking_char_data);
   dmalist_apply_masking.src_bank = BANK(masking_char_data);
@@ -948,13 +1090,13 @@ void gfx_finalize_actor_drawing(void)
 {
   SAVE_DS_AUTO_RESTORE
   UNMAP_DS
-  static uint8_t max_end_of_row = 0;
+  //static uint8_t max_end_of_row = 0;
 
   __auto_type screen_start_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2;
   __auto_type colram_start_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2;
   for (uint8_t y = 0; y < 16; ++y) {
     uint8_t end_of_row = num_chars_at_row[y];
-    max_end_of_row = max(max_end_of_row, end_of_row);
+    //max_end_of_row = max(max_end_of_row, end_of_row);
     if (end_of_row >= CHRCOUNT - 2) {
       fatal_error(ERR_CHRCOUNT_EXCEEDED);
     }
@@ -984,25 +1126,17 @@ void gfx_finalize_actor_drawing(void)
   */
 void gfx_reset_actor_drawing(void)
 {
-  memset20(UNBANKED_PTR(num_chars_at_row), 40, 16);
+  memset20(UNBANKED_PTR(num_chars_at_row), 41, 16);
 
-  // Next, zeroise all colram bytes beyond the 40 background picture chars each row.
+  // Next, zeroise all colram bytes beyond the 40 (+1 gotox) background picture chars each row.
   // This is to prevent the RRB to accidently do any gotox back into the visual area.
   // As we will be beyond the right edge of the screen, anyway, we don't need to 
   // worry about the screen ram values, as those chars won't be visible, anyway.
-  // The actor drawing will then use these zeroed area to place their actor
+  // The actor drawing will then use this zeroed area to place their actor
   // cels into, making them visible on the screen with prepended gotox.
-  static dmalist_t dmalist_reset_rrb = {
-    .command        = DMA_CMD_FILL,
-    .count          = (CHRCOUNT - 40) * 2,
-    .src_addr       = 0,
-    .src_bank       = 0,
-    .dst_addr       = 0,
-    .dst_bank       = 0
-  };
 
   // start at the end of the first row of the background image
-  uint16_t colram_addr = BACKBUFFER_COLRAM + CHRCOUNT * 4 + 40 * 2;
+  uint16_t colram_addr = BACKBUFFER_COLRAM + CHRCOUNT * 4 + 41 * 2;
   for (uint8_t y = 0; y < 16; ++y) {
     dmalist_reset_rrb.dst_addr = colram_addr;
     DMA.addrmsb = MSB(&dmalist_reset_rrb);
@@ -1021,29 +1155,6 @@ void gfx_reset_actor_drawing(void)
   */
 void gfx_update_main_screen(void)
 {
-  static dmalist_single_option_t dmalist_copy_gfx[2] = {
-    {
-      .opt_token  = 0x81,
-      .opt_arg    = 0x00,
-      .command    = 4, // copy + chain
-      .count      = CHRCOUNT * 2 * 16,
-      .src_addr   = BACKBUFFER_SCREEN + CHRCOUNT * 2 * 2,
-      .src_bank   = 0x00,
-      .dst_addr   = LSB16(SCREEN_RAM + CHRCOUNT * 2 * 2),
-      .dst_bank   = BANK(SCREEN_RAM)
-    },
-    {
-      .opt_token  = 0x81,
-      .opt_arg    = 0xff,
-      .command    = 0,
-      .count      = CHRCOUNT * 2 * 16,
-      .src_addr   = BACKBUFFER_COLRAM + CHRCOUNT * 2 * 2,
-      .src_bank   = 0x00,
-      .dst_addr   = LSB16(COLRAM + CHRCOUNT * 2 * 2),
-      .dst_bank   = BANK(COLRAM)
-    }
-  };
-
   dma_trigger(&dmalist_copy_gfx);
 }
 
@@ -1069,46 +1180,16 @@ void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, enum te
 
 void gfx_clear_sentence(void)
 {
-  static const dmalist_t dmalist_clear_sentence = {
-    .command  = 0,
-    .count    = 80 - 2,
-    .src_addr = LSB16(SCREEN_RAM_SENTENCE),
-    .src_bank = BANK(SCREEN_RAM_SENTENCE),
-    .dst_addr = LSB16(SCREEN_RAM_SENTENCE + 2),
-    .dst_bank = BANK(SCREEN_RAM_SENTENCE + 2),
-  };
-
-  *FAR_U16_PTR(SCREEN_RAM_SENTENCE) = 0x0020;
   dma_trigger(&dmalist_clear_sentence);
 }
 
 void gfx_clear_verbs(void)
 {
-  static const dmalist_t dmalist_clear_verbs = {
-    .command  = 0,
-    .count    = CHRCOUNT * 2 * 3 - 2,
-    .src_addr = LSB16(SCREEN_RAM_VERBS),
-    .src_bank = BANK(SCREEN_RAM_VERBS),
-    .dst_addr = LSB16(SCREEN_RAM_VERBS + 2),
-    .dst_bank = BANK(SCREEN_RAM_VERBS + 2),
-  };
-
-  *FAR_U16_PTR(SCREEN_RAM_VERBS) = 0x0020;
   dma_trigger(&dmalist_clear_verbs);
 }
 
 void gfx_clear_inventory(void)
 {
-  static const dmalist_t dmalist_clear_inventory = {
-    .command  = 0,
-    .count    = CHRCOUNT * 2 * 2 - 2,
-    .src_addr = LSB16(SCREEN_RAM_INVENTORY),
-    .src_bank = BANK(SCREEN_RAM_INVENTORY),
-    .dst_addr = LSB16(SCREEN_RAM_INVENTORY + 2),
-    .dst_bank = BANK(SCREEN_RAM_INVENTORY + 2),
-  };
-
-  *FAR_U16_PTR(SCREEN_RAM_INVENTORY) = 0x0020;
   dma_trigger(&dmalist_clear_inventory);
 }
 
@@ -1195,7 +1276,7 @@ void reset_objects(void)
 void update_cursor(uint8_t snail_override)
 {
   if (!(ui_state & UI_FLAGS_ENABLE_CURSOR)) {
-    VICII.spr_ena = 0x00;
+    VICII.spr_ena = 0xf0;
     return;
   }
 
@@ -1204,14 +1285,14 @@ void update_cursor(uint8_t snail_override)
   // cursor_image bit 1 = snail/regular cursor
   if (!snail_override) {
     // enable sprite 2 only = regular cursor
-    VICII.spr_ena  = 0x02;
+    VICII.spr_ena  = 0xf2;
     VICII.spr1_x   = LSB(spr_pos_x);
     VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x02;
     VICII.spr1_y   = spr_pos_y;
   }
   else {
     // enable sprite 1 only = snail cursor
-    VICII.spr_ena  = 0x01;
+    VICII.spr_ena  = 0xf1;
     VICII.spr0_x   = LSB(spr_pos_x);
     VICII.spr_hi_x = MSB(spr_pos_x) == 0 ? 0x00 : 0x01;
     VICII.spr0_y   = spr_pos_y;
@@ -1242,19 +1323,6 @@ void update_cursor(uint8_t snail_override)
   */
 void set_dialog_color(uint8_t color)
 {
-  static const dmalist_two_options_t dmalist_clear_dialog_colram = {
-    .opt_token1 = 0x80,
-    .opt_arg1   = 0xff,
-    .opt_token2 = 0x81,
-    .opt_arg2   = 0xff,
-    .command    = 0,
-    .count      = CHRCOUNT * 2 * 2 - 2,
-    .src_addr   = LSB16(COLRAM),
-    .src_bank   = BANK(COLRAM),
-    .dst_addr   = LSB16(COLRAM + 2),
-    .dst_bank   = BANK(COLRAM + 2)
-  };
-
   __auto_type ptr = FAR_U8_PTR(COLRAM);
   *ptr = 0;
   *(ptr+1) = color;
@@ -1325,7 +1393,7 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
       uint16_t cur_char = char_num;
       for (uint8_t x = 0; x < width_chars; ++x) {
         *screen_ptr++ = cur_char;
-        *colram_ptr++ = 0x0f00;
+        *colram_ptr++ = 0xff00;
         cur_char += height_chars;
       }
       num_chars_at_row[char_row] += width_chars + 1;

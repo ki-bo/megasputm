@@ -22,3 +22,4 @@ const char *inv_get_object_name(uint8_t position);
 uint16_t inv_get_global_object_id(uint8_t position);
 uint8_t inv_get_position_by_id(uint16_t global_object_id);
 void inv_update_displayed_inventory(void);
+void inv_set_name(uint16_t global_object_id, const char *name);

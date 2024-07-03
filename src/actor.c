@@ -68,7 +68,7 @@ void actor_map_palette(uint8_t actor_id, uint8_t dest_idx, uint8_t src_idx)
   uint8_t actor_palette = actors.palette_idx[actor_id];
   if (actor_palette == 1) {
     // actor not yet using custom palette
-    if (vm_state.num_actor_palettes == 15) {
+    if (vm_state.num_actor_palettes == 14) {
       fatal_error(ERR_TOO_MANY_ACTOR_PALETTES);
     }
     actor_palette = ++vm_state.num_actor_palettes;
@@ -580,7 +580,14 @@ void actor_draw(uint8_t local_id)
 
   // step 2: allocate an empty canvas for the actor 
   //debug_out("prepare min_x %d, min_y %d, width %d, height %d", min_x, min_y, width, height);
-  if (!gfx_prepare_actor_drawing(min_x, min_y, width, height, actors.palette_idx[global_id])) {
+  uint8_t palette;
+  if (vm_read_var8(VAR_CURRENT_LIGHTS) == 11) {
+    palette = actors.palette_idx[global_id];
+  }
+  else {
+    palette = 15; // palette 15 is used for actor drawing in dark rooms
+  }
+  if (!gfx_prepare_actor_drawing(min_x, min_y, width, height, palette)) {
     // actor is outside of screen
     return;
   }

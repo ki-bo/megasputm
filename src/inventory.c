@@ -86,8 +86,7 @@ uint8_t inv_object_available(uint16_t global_object_id)
 const char *inv_get_object_name(uint8_t position)
 {
   UNMAP_DS
-  const char *name_ptr = (const char *)vm_state.inv_objects[position] + vm_state.inv_objects[position]->name_offset;
-  return name_ptr;
+  return (const char *)vm_state.inv_objects[position] + vm_state.inv_objects[position]->name_offset;
 }
 
 uint16_t inv_get_global_object_id(uint8_t position)

@@ -770,6 +770,16 @@ uint8_t vm_get_object_position(uint16_t global_object_id, uint8_t *x, uint8_t *y
   return 2;
 }
 
+void vm_set_object_name(uint16_t global_object_id, const char *name)
+{
+  SAVE_DS_AUTO_RESTORE
+
+  char *name_ptr = (char *)get_object_name(global_object_id);
+  if (name_ptr) {
+    strcpy(name_ptr, name);
+  }
+}
+
 uint8_t vm_get_local_object_id(uint16_t global_object_id)
 {
   for (uint8_t i = 0; i < num_objects; ++i)
@@ -1018,6 +1028,14 @@ uint8_t vm_load_game(uint8_t slot)
 
   // restore palettes
   memcpy((void *)0xd100, pal_ptr, 0x300);
+
+  // actor-in-the-dark palette (only needed to fix older broken savegames that don't have it)
+  for (uint8_t i = 0xf0; i != 0; ++i) {
+    uint8_t src_index = (i == 0xfc) ? 0 : 8;
+    PALETTE.red[i]   = PALETTE.red[src_index];
+    PALETTE.green[i] = PALETTE.green[src_index];
+    PALETTE.blue[i]  = PALETTE.blue[src_index];
+  }
 
   // ensure active scripts are in memory and update their res_slot
   for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
@@ -1324,7 +1342,7 @@ static void redraw_screen(void)
   MAP_CS_GFX
 
   // draw background
-  gfx_draw_bg();
+  gfx_draw_bg(vm_read_var8(VAR_CURRENT_LIGHTS) == 11);
 
   // draw all visible room objects
   for (int8_t i = num_objects - 1; i >= 0; --i)
@@ -2120,6 +2138,21 @@ static uint8_t get_hovered_verb_slot(void)
   return 0xff;
 }
 
+/**
+  * @brief Creates a new verb in the verb table
+  *
+  * Creates a new verb in the verb table at the specified slot. The verb will have the given
+  * verb id, position and name. The verb will be added to the verb table and the verb interface
+  * will be updated.
+  *
+  * @param slot The slot in the verb table to create the verb in
+  * @param verb_id The verb id of the verb
+  * @param x The x position of the verb
+  * @param y The y position of the verb
+  * @param name The name of the verb
+  *
+  * Code section: code_main_private
+  */
 static void verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name)
 {
   SAVE_DS_AUTO_RESTORE
@@ -2138,6 +2171,16 @@ static void verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const 
   vm_update_verbs();
 }
 
+/**
+  * @brief Deletes a verb from the verb table
+  *
+  * Deletes the verb at the specified slot from the verb table. The verb will be removed from
+  * the verb table and the verb interface will be updated.
+  *
+  * @param slot The slot in the verb table to delete the verb from
+  *
+  * Code section: code_main_private
+  */
 static void verb_delete(uint8_t slot)
 {
   SAVE_DS_AUTO_RESTORE

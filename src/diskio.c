@@ -169,11 +169,15 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector);
   * This function must be called before any other diskio function.
   * It reads the start tracks and sectors of each room from the disk
   * directory and caches them in memory.
+  *
+  * Will map CS to the diskio module and keep it mapped when the function returns.
   * 
   * Code section: code_init
   */
 void diskio_init(void)
 {
+  MAP_CS_DISKIO
+
   memset(room_track_list, 0, sizeof(room_track_list));
   memset(room_block_list, 0, sizeof(room_block_list));
   invalidate_disk_cache();

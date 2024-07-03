@@ -81,6 +81,7 @@ static void jump_if_or_if_not_pickupable(void);
 static void add(void);
 static void sleep_for_or_wait_for_message(void);
 static void jump_if_or_if_not_locked(void);
+static void set_box(void);
 static void assign_from_bit_variable(void);
 static void camera_at(void);
 static void proximity(void);
@@ -98,6 +99,7 @@ static void chain_script(void);
 static void jump_if_object_active_or_not_active(void);
 static void pick_up_object(void);
 static void camera_follows_actor(void);
+static void new_name_of(void);
 static void begin_override_or_say_line_selected_actor(void);
 static void begin_override(void);
 static void cursor(void);
@@ -203,6 +205,7 @@ void script_init(void)
   opcode_jump_table[0x2d] = &put_actor_in_room;
   opcode_jump_table[0x2e] = &sleep_for_or_wait_for_message;
   opcode_jump_table[0x2f] = &jump_if_or_if_not_locked;
+  opcode_jump_table[0x30] = &set_box;
   opcode_jump_table[0x31] = &assign_from_bit_variable;
   opcode_jump_table[0x32] = &camera_at;
   opcode_jump_table[0x3e] = &walk_to;
@@ -234,6 +237,7 @@ void script_init(void)
   opcode_jump_table[0x51] = &do_animation;
   opcode_jump_table[0x52] = &camera_follows_actor;
   opcode_jump_table[0x53] = &actor_ops;
+  opcode_jump_table[0x54] = &new_name_of;
   opcode_jump_table[0x55] = &find_actor;
   opcode_jump_table[0x57] = &set_or_clear_untouchable;
   opcode_jump_table[0x58] = &begin_override_or_say_line_selected_actor;
@@ -248,10 +252,11 @@ void script_init(void)
   opcode_jump_table[0x65] = &draw_object;
   opcode_jump_table[0x66] = &closest_actor;
   opcode_jump_table[0x67] = &lock_or_unlock;
-  opcode_jump_table[0x69] = &set_owner_of;
   opcode_jump_table[0x68] = &script_running;
+  opcode_jump_table[0x69] = &set_owner_of;
   opcode_jump_table[0x6c] = &preposition;
   opcode_jump_table[0x6d] = &put_actor_in_room;
+  opcode_jump_table[0x6f] = &jump_if_or_if_not_locked;
   opcode_jump_table[0x70] = &lights;
   opcode_jump_table[0x72] = &current_room;
   opcode_jump_table[0x74] = &proximity;
@@ -1720,6 +1725,13 @@ static void jump_if_or_if_not_locked(void)
   }
 }
 
+static void set_box(void)
+{
+  uint8_t box_id = resolve_next_param8();
+  uint8_t value  = read_byte();
+  walk_boxes[box_id].flags = value;
+}
+
 /**
   * @brief Opcode 0x31: assign from bit variable
   *
@@ -2180,6 +2192,17 @@ static void camera_follows_actor(void)
   vm_set_camera_follow_actor(actor_id);
 }
 
+static void new_name_of(void)
+{
+  uint16_t obj_id = resolve_next_param16();
+
+  char new_name[32];
+  read_null_terminated_string(new_name);
+
+  vm_set_object_name(obj_id, new_name);
+  vm_update_inventory();
+}
+
 /**
   * @brief Opcode 0x58: Begin override or print ego
   * 
@@ -2355,10 +2378,13 @@ static void lights(void)
 
   if (!z) {
     //debug_scr("lights are %d", x);
+    debug_out("lights %d", x);
     vm_write_var(VAR_CURRENT_LIGHTS, x);
+    vm_update_bg();
+    vm_update_actors();
   }
   else if (z == 1) {
-    //debug_out("flashlight not implemented");
+    debug_out("flashlight %d %d", x, y);
   }
 }
 
