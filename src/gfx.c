@@ -1,5 +1,6 @@
 #include "gfx.h"
 #include "actor.h"
+#include "charset.h"
 #include "costume.h"
 #include "dma.h"
 #include "error.h"
@@ -20,10 +21,25 @@
 #define SCREEN_RAM_SENTENCE (SCREEN_RAM + CHRCOUNT * 2 * 18)
 #define SCREEN_RAM_VERBS (SCREEN_RAM + CHRCOUNT * 2 * 19)
 #define SCREEN_RAM_INVENTORY (SCREEN_RAM + CHRCOUNT * 2 * 22)
-#define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) + 0x12000UL))
-#define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr) + 0x12000UL) / 64))
+#define UNBANKED_PTR(ptr) ((void __far *)((uint32_t)(ptr) - 0x2000UL + GFX_SECTION))
+#define UNBANKED_SPR_PTR(ptr) ((void *)(((uint32_t)(ptr)  - 0x2000UL + GFX_SECTION) / 64))
+#define UNBANKED_SCR_PTR(ptr) ((void *)(((uint32_t)(ptr)  - 0x2000UL + SCREEN_RAM) / 64))
 
 //-----------------------------------------------------------------------------------------------
+
+#pragma clang section bss="bss_screenram"
+struct screen_rows {
+  union {
+    uint8_t  bytes[CHRCOUNT * 2];
+    uint16_t chars[CHRCOUNT];
+  };
+};
+
+union screenram {
+  uint8_t            bytes[CHRCOUNT * 2 * 25];
+  uint16_t           chars[CHRCOUNT * 25];
+  struct screen_rows rows[25];
+} screenram;
 
 #pragma clang section rodata="cdata_init"
 const char palette_red[16] = {
@@ -36,10 +52,7 @@ const char palette_blue[16] = {
   0x0, 0xb, 0x0, 0xb,  0x0, 0xb, 0x0, 0xb,  0x7, 0xf, 0x0, 0xf,  0x8, 0xf, 0x0, 0xf
 };
 
-//-----------------------------------------------------------------------------------------------
-
-#pragma clang section data="data_gfx" rodata="cdata_gfx" bss="bss_gfx"
-__attribute__((aligned(64))) static const uint8_t cursor_snail[] = {
+static const uint8_t cursor_snail_init[] = {
   0x11,0x11,0x11,0x10,0x00,0x00,0x01,0x11,
   0x11,0x11,0x11,0x06,0x66,0x66,0x60,0x11,
   0x11,0x11,0x10,0x66,0x06,0x00,0x66,0x01,
@@ -58,7 +71,7 @@ __attribute__((aligned(64))) static const uint8_t cursor_snail[] = {
   0x11,0x11,0x1f,0xff,0xff,0xff,0xff,0xff,
 };
 
-__attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
+static const uint8_t cursor_cross_init[] = {
   0b00000001,0b00000000,0b00000000,
   0b00000001,0b00000000,0b00000000,
   0b00000101,0b01000000,0b00000000,
@@ -77,7 +90,12 @@ __attribute__((aligned(64))) static const uint8_t cursor_cross[] = {
   0b00000000,0b00000000,0b00000000,
 }; 
 
-__attribute__((aligned(64))) static const uint8_t blank_sprite[53];
+//-----------------------------------------------------------------------------------------------
+
+#pragma clang section data="data_gfx" rodata="cdata_gfx" bss="bss_gfx"
+__attribute__((aligned(64))) static uint8_t cursor_snail[sizeof(cursor_snail_init)];
+__attribute__((aligned(64))) static uint8_t cursor_cross[sizeof(cursor_cross_init)];
+__attribute__((aligned(64))) static uint8_t blank_sprite[53];
 
 //-----------------------------------------------------------------------------------------------
 
@@ -94,6 +112,8 @@ static uint8_t __huge *obj_mask_data[MAX_OBJECTS];
 static uint8_t obj_draw_list[MAX_OBJECTS];
 static uint8_t num_objects_drawn;
 static uint8_t next_obj_slot = 0;
+static uint8_t flashlight_irq_update;
+static uint8_t bg_chars_per_row;
 static uint8_t num_chars_at_row[16];
 static uint8_t masking_cache_iterations[119];
 static uint16_t masking_cache_data_offset[119];
@@ -189,8 +209,9 @@ void gfx_init()
     *colram_bb_ptr++ = 0xff00;
   }
 
+  bg_chars_per_row = 41;
   for (uint8_t i = 0; i < 16; ++i) {
-    num_chars_at_row[i] = 41;
+    num_chars_at_row[i] = bg_chars_per_row;
   }
 
   VICIV.scrnptr   = (uint32_t)SCREEN_RAM; // implicitly sets CHRCOUNT(9..8) to 0
@@ -245,7 +266,9 @@ void gfx_init()
   VICIV.textypos_msb   |= 0xf0;                                    // enable tile mode for sprites 4-7
   VICIV.spr_exp_y      |= 0xf0;                                    // vertical expansion for sprites 4-7
 
-  memset20(UNBANKED_PTR(blank_sprite), 0xff, 68);
+  memcpy(cursor_snail, cursor_snail_init, sizeof(cursor_snail_init));
+  memcpy(cursor_cross, cursor_cross_init, sizeof(cursor_cross_init));
+  memset(blank_sprite, 0xff, sizeof(blank_sprite));
 
   sprite_pointers[0] = UNBANKED_SPR_PTR(cursor_snail);
   sprite_pointers[1] = UNBANKED_SPR_PTR(cursor_cross);
@@ -499,7 +522,24 @@ static void raster_irq ()
     ++script_watchdog;
   }
   update_cursor(script_watchdog == 30);
-  
+
+  /*
+  if (flashlight_irq_update) {
+    // set gfx2 MAP
+    __asm(" lda #0xe0\n"
+          " ldx #0x20\n"
+          " ldy #0x00\n"
+          " ldz #0x00\n"
+          " map\n"
+          " eom\n"
+          :
+          :
+          : "a", "x", "y", "z");
+
+    gfx_update_flashlight();
+  }
+  */
+
   VICIV.irr = VICIV.irr; // ack interrupt
 
   // restore MAP
@@ -514,6 +554,133 @@ static void raster_irq ()
 /** @} */ // gfx_runtime
 
 //-----------------------------------------------------------------------------------------------
+
+#pragma clang section text="code_gfx2" rodata="cdata_gfx2" data="data_gfx2" bss="zdata"
+
+void gfx_update_flashlight(void)
+{
+  SAVE_DS_AUTO_RESTORE
+
+  static uint8_t row_masks[8] = {0x7f, 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01, 0x00};
+
+  // screen ram is banked to 0x2000 when mapping the gfx2 memory block
+  //__auto_type bg_scr_ptr = NEAR_U16_PTR(0x2000) + CHRCOUNT * 2 + 1;
+  __auto_type bg_scr_ptr = &(screenram.rows[2].chars[1]);
+  // map color ram to 0x8000
+  __auto_type bg_col_ptr = FAR_U16_PTR(COLRAM) + CHRCOUNT * 2 + 41;
+
+  uint8_t fl_width   = vm_state.flashlight_width;
+  uint8_t pos_x_char = (input_cursor_x / 4) - (fl_width / 2);
+  if (pos_x_char & 0x80 ) {
+    // result was negative
+    pos_x_char = 0;
+  }
+  else {
+    uint8_t max_x = 40 - fl_width;
+    if (pos_x_char > max_x) {
+      pos_x_char = max_x;
+    }
+  }
+
+  uint8_t fl_rows_left = vm_state.flashlight_height;
+  uint8_t fl_height_4  = fl_rows_left * 4;
+  uint8_t pos_y_pixels = input_cursor_y;
+  uint8_t min_y        = 16 + fl_height_4;
+  if (pos_y_pixels < min_y) {
+    pos_y_pixels = 0;
+  }
+  else {
+    uint8_t max_y = 16 + 128 - fl_height_4;
+    if (pos_y_pixels > max_y) {
+      pos_y_pixels = 128 - fl_height_4 * 2;
+    }
+    else {
+      pos_y_pixels -= min_y;
+    }
+  }
+
+  uint8_t rowmask;
+  uint8_t first_row = pos_y_pixels / 8;
+  uint8_t shift_y   = pos_y_pixels & 0x07;
+  ++fl_rows_left;
+  //if (shift_y) {
+    shift_y = 7 - shift_y;
+  //}
+
+  // uint8_t char_fl_tl = CHAR_FLASHLIGHT_TL;
+  // uint8_t char_fl_tr = CHAR_FLASHLIGHT_TR;
+  // uint8_t char_fl_bl = CHAR_FLASHLIGHT_BL;
+  // uint8_t char_fl_br = CHAR_FLASHLIGHT_BR;
+  // if (shift_y) {
+  //   --char_fl_tl;
+  //   --char_fl_tr;
+  //   --char_fl_bl;
+  //   --char_fl_br;
+  // }
+  
+  uint16_t gotox_scr     = pos_x_char << 3;
+  //uint16_t fl_corner_col = 0x1100; // color 0x11 is 2nd col in 1st actor palette and is always black
+  for (uint8_t y = 0; y < 16; ++y) {
+    uint16_t col_val;
+    uint16_t scr_val;
+
+    if (y < first_row || !fl_rows_left) {
+      // row outside of flashlight area: move rrb outside of screen
+      col_val = 0x0010;
+      scr_val = 0x0140;
+    }
+    else {
+      // row inside flashlight area
+      --fl_rows_left;
+      scr_val = gotox_scr;
+
+      // copy background chars to flashlight rrb area
+
+      // the following line was
+      //   uint16_t *bg_scr = bg_scr_ptr + pos_x_char;
+      // but that triggered a compiler bug so we split it up into two lines to avoid it
+      uint16_t *bg_scr = bg_scr_ptr;
+      bg_scr += pos_x_char;
+      uint16_t *fl_scr = bg_scr_ptr + 41;
+
+      for (uint8_t x = 0; x < fl_width; ++x) {
+        *fl_scr = *bg_scr;
+        ++fl_scr;
+        ++bg_scr;
+      }
+
+      if (y == first_row) {
+        rowmask = ~row_masks[shift_y];
+        col_val = make16(0x18, rowmask);
+
+        // draw flashlight corner overlay characters
+        /*
+        uint16_t gotox_col_fl = col_val & 0x0080;
+        *bg_col_dst++ = gotox_col_fl;
+        *bg_scr_dst++ = gotox_scr;
+        *bg_col_dst++ = fl_corner_col;
+        *bg_scr_dst++ = shift_y ? CHAR_FLASHLIGHT_TL;
+        *bg_col_dst++ = gotox_col_fl;
+        *bg_scr_dst++ = gotox_scr;
+        */
+      }
+      else if (fl_rows_left == 0) {
+        col_val = make16(0x18, ~rowmask);
+      }
+      else {
+        col_val = 0x0010;
+      }
+
+    }
+
+    //debug_out("y: %d rows_left: %d fr %d sy %d col %4x scr %4x rm %x", y, fl_rows_left, first_row, shift_y, col_val, scr_val, rowmask);
+
+    *bg_col_ptr = col_val;
+    bg_col_ptr += CHRCOUNT;
+    bg_scr_ptr[40] = scr_val;
+    bg_scr_ptr += CHRCOUNT;
+  }
+}
 
 /**
   * @defgroup gfx_public GFX Public Functions 
@@ -842,6 +1009,12 @@ void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars)
   *
   * The background image is drawn to the backbuffer screen memory. The horizontal
   * camera position is taken into account.
+  *
+  * The room's background image is drawn with lights on if the lights parameter is non-zero.
+  * If lights is zero, the room is drawn with lights off. The room's background image is
+  * hidden by a layer of black sprites if lights are off. This is controlled via gotox
+  * characters in the first column of each row, determining whether the background layer
+  * or the sprite layer gets priority.
   * 
   * @param lights If non-zero, the room is drawn with lights on.
   *
@@ -862,6 +1035,7 @@ void gfx_draw_bg(uint8_t lights)
   for (uint8_t x = 0; x < 41; ++x) {
     for (uint8_t y = 0; y < 16; ++y) {
       if (x == 0) {
+        // first char of each row is gotox character setting sprite/char priority
         *screen_ptr = 0x0000;
         *colram_ptr = lights ? 0x0010 : 0x0050;
         colram_ptr += CHRCOUNT;
@@ -874,7 +1048,7 @@ void gfx_draw_bg(uint8_t lights)
     screen_ptr -= CHRCOUNT * 16 - 1;
   }
 
-  memset(num_chars_at_row, 41, 16);
+  memset(num_chars_at_row, bg_chars_per_row, 16);
   reset_objects();
 }
 
@@ -885,7 +1059,8 @@ void gfx_draw_bg(uint8_t lights)
   * the position relative to the visible screen area (top/left being 0,0). The object
   * is drawn with the given width and height in characters.
   *
-  * @note This function needs DS to be unmapped!
+  * @note This function needs DS to be unmapped before calling it so it can access
+  *       backbuffer memory!
   * 
   * @param local_id The local object ID (0-based position in the room's objects list)
   * @param x The x position of the object in characters.
@@ -936,6 +1111,61 @@ void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y)
     ++char_num_row;
   }
   while (--height);
+}
+
+/**
+  * @brief Enables the flashlight rendering mode.
+  *
+  * The flashlight mode is used to render the flashlight effect in dark rooms. The
+  * flashlight is a rectangular area of light that shows the background gfx in the otherwise
+  * black/dark room.
+  *
+  * The flashlight is rendered by an additional rrb layer that is placed directly after the 
+  * background chars (which in turn are hidden by the black sprite layer). The flashlight
+  * layer is copying characters from the background image to the flashlight rrb layer.
+  *
+  * Actor characters will be placed after the flashlight layer. In order to update and move
+  * the flashlight area quickly, we reserve width characters in each row of the image. Only
+  * characters in the rows where we show the flashlight rectangle will actually be made visible,
+  * though (which is controlled via gotox positioniong).
+  *
+  * Code section: code_gfx
+  */
+void gfx_enable_flashlight(void)
+{
+  UNMAP_DS
+  __auto_type screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + 41;
+  __auto_type colram_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2 + 41;
+
+  bg_chars_per_row  = 41 + 1 + vm_state.flashlight_width;
+
+  debug_out("flashlight on");
+  for (uint8_t i = 0; i < 16; ++i) {
+    num_chars_at_row[i] = bg_chars_per_row;
+    *screen_ptr = 0x0140;
+    *colram_ptr = 0x0010;
+    __auto_type screen_ptr2 = screen_ptr + 1;
+    __auto_type colram_ptr2 = colram_ptr + 1;
+    for (uint8_t x = 0; x < vm_state.flashlight_width; ++x) {
+      *screen_ptr2 = 0x0000;
+      *colram_ptr2 = 0xff00;
+      ++screen_ptr2;
+      ++colram_ptr2;
+    }
+    screen_ptr += CHRCOUNT;
+    colram_ptr += CHRCOUNT;
+  }
+}
+
+void gfx_disable_flashlight(void)
+{
+  bg_chars_per_row  = 41;
+  flashlight_irq_update = 0;
+}
+
+void gfx_flashlight_irq_update(uint8_t enable)
+{
+  flashlight_irq_update = enable;
 }
 
 uint8_t gfx_prepare_actor_drawing(int16_t pos_x, int8_t pos_y, uint8_t width, uint8_t height, uint8_t palette)
@@ -1126,7 +1356,7 @@ void gfx_finalize_actor_drawing(void)
   */
 void gfx_reset_actor_drawing(void)
 {
-  memset20(UNBANKED_PTR(num_chars_at_row), 41, 16);
+  memset20(UNBANKED_PTR(num_chars_at_row), bg_chars_per_row, 16);
 
   // Next, zeroise all colram bytes beyond the 40 (+1 gotox) background picture chars each row.
   // This is to prevent the RRB to accidently do any gotox back into the visual area.
@@ -1136,7 +1366,9 @@ void gfx_reset_actor_drawing(void)
   // cels into, making them visible on the screen with prepended gotox.
 
   // start at the end of the first row of the background image
-  uint16_t colram_addr = BACKBUFFER_COLRAM + CHRCOUNT * 4 + 41 * 2;
+  uint8_t num_bg_bytes = bg_chars_per_row * 2;
+  uint16_t colram_addr = BACKBUFFER_COLRAM + CHRCOUNT * 4 + num_bg_bytes;
+  dmalist_reset_rrb.count = (CHRCOUNT * 2) - num_bg_bytes;
   for (uint8_t y = 0; y < 16; ++y) {
     dmalist_reset_rrb.dst_addr = colram_addr;
     DMA.addrmsb = MSB(&dmalist_reset_rrb);

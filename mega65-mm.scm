@@ -35,7 +35,7 @@
         )
 
         ; memory for init program (will be discarded once executed)
-        (memory init (address (#x6000 . #x7fff))
+        (memory init (address (#x4000 . #x5fff))
                 (scatter-to init_copy)
                 (section 
                         code_init
@@ -45,7 +45,7 @@
         )
 
         ; temporary memory for init program (will be discarded when init is done)
-        (memory bssram-init (address (#x8000 . #x8fff))
+        (memory bssram-init (address (#x8200 . #x8fff))
                 (section 
                         bss_init
                 )
@@ -94,7 +94,23 @@
                 )
         )
 
-        (memory banked-code-0 (address (#x2000 . #x37ff)) 
+        (memory banked-bss-0 (address (#x2000 . #x37ff)) 
+                (scatter-to bank1_0000)
+                (section
+                        bss_screenram
+                )
+        )
+
+        (memory banked-code-0 (address (#x3800 . #x3fff)) 
+                (scatter-to bank1_1800)
+                (section
+                        code_gfx2
+                        cdata_gfx2
+                        data_gfx2
+                )
+        )
+
+        (memory banked-code-1 (address (#x2000 . #x37ff)) 
                 (scatter-to bank1_2000)
                 (section
                         code_diskio
@@ -103,14 +119,14 @@
                 )
         )
 
-        (memory banked-bss-0 (address (#x3800 . #x3fff)) 
+        (memory banked-bss-1 (address (#x3800 . #x3fff)) 
                 (scatter-to bank1_3800)
                 (section
                         bss_diskio
                 )
         )
  
-        (memory banked-code-1 (address (#x2000 . #x37ff)) 
+        (memory banked-code-2 (address (#x2000 . #x37ff)) 
                 (scatter-to bank1_4000)
                 (section
                         code_gfx
@@ -119,7 +135,7 @@
                 )
         )
 
-        (memory banked-bss-1 (address (#x3800 . #x3fff)) 
+        (memory banked-bss-2 (address (#x3800 . #x3fff)) 
                 (scatter-to bank1_5800)
                 (section
                         bss_gfx
@@ -132,9 +148,15 @@
                 )
         )
 
-        (memory m1-0 (address (#x10000 . #x11fff))
+        (memory m1-0-bss (address (#x10000 . #x117ff))
                 (section 
                         (bank1_0000 #x10000)
+                )
+        )
+
+        (memory m1-0 (address (#x11800 . #x11fff))
+                (section 
+                        (bank1_1800 #x11800)
                 )
         )
 

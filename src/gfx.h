@@ -14,6 +14,9 @@ enum text_style {
 // code_init functions
 void gfx_init(void);
 
+// code_gfx2 functions
+void gfx_update_flashlight(void);
+
 // code_gfx functions
 void gfx_start(void);
 void gfx_fade_out(void);
@@ -30,6 +33,9 @@ void gfx_clear_dialog(void);
 void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars);
 void gfx_draw_bg(uint8_t lights);
 void gfx_draw_object(uint8_t local_id, int8_t x, int8_t y);
+void gfx_enable_flashlight(void);
+void gfx_disable_flashlight(void);
+void gfx_flashlight_irq_update(uint8_t enable);
 uint8_t gfx_prepare_actor_drawing(int16_t screen_pos_x, int8_t screen_pos_y, uint8_t width, uint8_t height, uint8_t palette);
 void gfx_draw_actor_cel(uint8_t xpos, uint8_t ypos, struct costume_cel *cel_data, uint8_t mirror);
 void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking);

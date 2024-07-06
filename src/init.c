@@ -37,6 +37,7 @@ void global_init(void)
   diskio_init();
 
   // load and init gfx module (CS_DISKIO is still mapped from diskio_init)
+  diskio_load_file("M10", (uint8_t __far *)(0x11800)); // load gfx2 code
   diskio_load_file("M12", (uint8_t __far *)(0x14000)); // load gfx code
   gfx_init();
 

@@ -27,6 +27,13 @@ map_cs_gfx:
 		ldx #0x21
 		bra apply_map_cs
 
+		.public map_cs_gfx2
+map_cs_gfx2:
+		pha
+		lda #0xe0
+		ldx #0x20
+		bra apply_map_cs
+
 		.public unmap_cs
 unmap_cs:
 		pha

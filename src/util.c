@@ -7,6 +7,8 @@
 
 char msg[80];
 
+extern inline uint16_t make16(uint8_t low, uint8_t high);
+
 void fatal_error(error_code_t error)
 {
   debug_out("Fatal error: %d", error);

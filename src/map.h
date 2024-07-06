@@ -39,6 +39,13 @@ extern union map_t __attribute__((zpage)) map_regs;
           : \
           : "x", "y", "z");
 
+#define MAP_CS_GFX2 \
+    __asm(" .extern map_cs_gfx2\n" \
+          " jsr map_cs_gfx2\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
 #define UNMAP_CS \
     __asm(" .extern unmap_cs\n" \
           " jsr unmap_cs\n" \
@@ -128,12 +135,16 @@ void map_init(void);
   *
   * Will map DS to the address of ptr in a way that the first
   * address of the memory ptr is pointing to will land in the
-  * first 256 bytes page of the mapped DS. The mapped window will 
+  * first 256 bytes page of the mapped DS. The total mapped window will 
   * always be at 0x8000-0xbfff.
   *
   * Example: If mapping 0x12345 to DS, then 0x12300 will be mapped
   * to 0x8000 and the first byte of the mapped memory will be available
-  * at 0x8045.
+  * at 0x8045. The function will then return the pointer (uint8_t *)0x8045.
+  *
+  * @param ptr A 28 bit pointer to map to DS
+  * @return The pointer to the mapped memory (pointer will be between
+  *         0x8000 and 0x80ff)
   */
 uint8_t *map_ds_ptr(void __huge *ptr);
 

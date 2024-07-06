@@ -297,8 +297,24 @@ __task void vm_mainloop(void)
     update_camera();
     UNMAP_CS
 
+    uint8_t flashlight_on = vm_read_var8(VAR_CURRENT_LIGHTS) == 12;
+    //debug_out("Flashlight on: %d", flashlight_on);
+
     if (screen_update_needed) {
       //VICIV.bordercol = 0x01;
+      MAP_CS_GFX
+      if (screen_update_needed & SCREEN_UPDATE_FLASHLIGHT) {
+        if (flashlight_on) {
+          gfx_enable_flashlight();
+        }
+        else {
+          gfx_disable_flashlight();
+        }
+        // whenever flashlight is toggled, we need to redraw the screen
+        // as the rrb layout will change
+        vm_update_bg();
+        vm_update_actors();
+      }
       if (screen_update_needed & SCREEN_UPDATE_BG) {
         redraw_screen();
       }
@@ -307,7 +323,6 @@ __task void vm_mainloop(void)
       }
 
       //VICIV.bordercol = 0x00;
-      MAP_CS_GFX
       gfx_wait_vsync();
       //VICIV.bordercol = 0x03;
       if (screen_update_needed & SCREEN_UPDATE_DIALOG) {
@@ -338,6 +353,15 @@ __task void vm_mainloop(void)
       UNMAP_CS
 
       screen_update_needed = 0;
+    }
+
+    if (flashlight_on) {
+      //VICIV.bordercol = 0x01;
+      MAP_CS_GFX2
+      gfx_update_flashlight();
+      UNMAP_CS
+      //VICIV.bordercol = 0x00;
+      //gfx_flashlight_irq_update(1);
     }
 
     update_sentence_highlighting();
@@ -659,6 +683,11 @@ void vm_update_bg(void)
   screen_update_needed |= SCREEN_UPDATE_BG;
 }
 
+void vm_update_flashlight(void)
+{
+  screen_update_needed |= SCREEN_UPDATE_FLASHLIGHT;
+}
+
 void vm_update_dialog(void)
 {
   screen_update_needed |= SCREEN_UPDATE_DIALOG;
@@ -868,6 +897,13 @@ void vm_set_camera_follow_actor(uint8_t actor_id)
     vm_set_current_room(room_of_actor);
     vm_set_camera_to(actors.x[actor_id]);
   }
+  else {
+    uint16_t target = actors.x[actor_id];
+    if (abs((int16_t)camera_x - (int16_t)target) > 20) {
+      vm_set_camera_to(target);
+    }
+  }
+
   camera_follow_actor_id = actor_id;
   camera_state           = CAMERA_STATE_FOLLOW_ACTOR;
 }
@@ -1118,9 +1154,11 @@ static void reset_game_state(void)
     }
   }
 
-  vm_state.inv_num_objects       = 0;
-  vm_state.inv_objects[0]        = NULL;
-  vm_state.inv_next_free         = (void *)INVENTORY_BASE;
+  vm_state.inv_num_objects   = 0;
+  vm_state.inv_objects[0]    = NULL;
+  vm_state.inv_next_free     = (void *)INVENTORY_BASE;
+  vm_state.flashlight_width  = 6;
+  vm_state.flashlight_height = 4;
 
   active_script_slot         = 0xff;
   camera_x                   = 20;
@@ -1526,16 +1564,25 @@ static const char *get_object_name(uint16_t global_object_id)
     return actors.name[global_object_id];
   }
 
-  struct object_code *obj_hdr = inv_get_object_by_id(global_object_id);
-  if (!obj_hdr) {
-    obj_hdr = vm_get_room_object_hdr(global_object_id);
-    if (!obj_hdr) {
-      return NULL;
+  uint8_t owner = vm_state.global_game_objects[global_object_id] & 0x0f;
+  
+  if (owner == 0x0f) {
+    // is room object
+    struct object_code *obj_hdr = obj_hdr = vm_get_room_object_hdr(global_object_id);
+    if (obj_hdr) {
+      uint16_t name_offset = obj_hdr->name_offset;
+      return ((const char *)obj_hdr) + name_offset;
+    }
+  }
+  else if (owner == vm_read_var8(VAR_SELECTED_ACTOR)) {
+    // is inventory object
+    uint8_t inv_pos = inv_get_position_by_id(global_object_id);
+    if (inv_pos != 0xff) {
+      return inv_get_object_name(inv_pos);
     }
   }
 
-  uint16_t name_offset = obj_hdr->name_offset;
-  return ((const char *)obj_hdr) + name_offset;
+  return NULL;
 }
 
 static void execute_sentence_stack(void)
@@ -2053,6 +2100,7 @@ static void update_camera(void)
     return;
   }
 
+  uint16_t old_camera_x = camera_x;
   uint16_t max_camera_x = room_width / 8 - 20;
 
   if (camera_state & CAMERA_STATE_FOLLOW_ACTOR)
@@ -2117,11 +2165,12 @@ static void update_camera(void)
     }
   }
 
-  vm_write_var(VAR_CAMERA_X, camera_x);
-  //debug_out("camera_x: %d", camera_x);
-
-  vm_update_bg();
-  vm_update_actors();
+  if (camera_x != old_camera_x) {
+    vm_write_var(VAR_CAMERA_X, camera_x);
+    //debug_out("camera_x: %d", camera_x);
+    vm_update_bg();
+    vm_update_actors();
+  }
 }
 
 static uint8_t get_hovered_verb_slot(void)

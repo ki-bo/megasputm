@@ -2378,13 +2378,22 @@ static void lights(void)
 
   if (!z) {
     //debug_scr("lights are %d", x);
-    debug_out("lights %d", x);
-    vm_write_var(VAR_CURRENT_LIGHTS, x);
-    vm_update_bg();
-    vm_update_actors();
+    //debug_out("lights %d", x);
+    // if (x == 0) {
+    //   x = 12;
+    // }
+    if (vm_read_var8(VAR_CURRENT_LIGHTS) != x) {
+      vm_write_var(VAR_CURRENT_LIGHTS, x);
+      vm_update_bg();
+      vm_update_actors();
+      vm_update_flashlight();
+    }
   }
   else if (z == 1) {
-    debug_out("flashlight %d %d", x, y);
+    vm_state.flashlight_width  = x;
+    vm_state.flashlight_height = y;
+    vm_update_flashlight();
+    //debug_out("flashlight %d %d", x, y);
   }
 }
 
@@ -2398,7 +2407,7 @@ static void lights(void)
   */
 static void current_room(void)
 {
-  uint8_t room_no = read_byte();
+  uint8_t room_no = resolve_next_param8();
   vm_set_current_room(room_no);
   //debug_scr("current-room %d", room_no);
 }

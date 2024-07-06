@@ -31,6 +31,8 @@ ifeq ($(CONFIG),debug_scripts)
 	CC_FLAGS += -DDEBUG -DDEBUG_SCRIPTS
 endif
 
+export ETHLOAD_IP_PARAM
+
 -include $(DEPS)
 
 .PHONY: all clean run debug_xemu doxygen
@@ -38,8 +40,8 @@ endif
 all: mm.d81
 
 run: mm.d81
-	$(M65FTP) -e -c"put mm.d81"
-	$(ETHLOAD) -m mm.d81 -r autoboot.raw
+	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm.d81"
+	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm.d81 -r autoboot.raw
 
 debug_xemu: mm.d81
 	@echo "--------------------------------------------------"
@@ -68,7 +70,7 @@ mm.d81: runtime.raw $(SAVE_FILES)
 		echo "Copying MM.D81 from gamedata..."; \
 		cp gamedata/MM.D81 mm.d81; \
 	fi
-	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-1.raw m11 -write m1-2.raw m12
+	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-1.raw m11 -write m1-2.raw m12
 	@echo "Copying save game files to disk image..."
 	@for file in $(SAVE_FILES); do \
 		if [ -f "$$file" ]; then \

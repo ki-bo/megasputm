@@ -85,12 +85,13 @@ enum {
 };
 
 enum {
-  SCREEN_UPDATE_BG        = 0x01,
-  SCREEN_UPDATE_ACTORS    = 0x02,
-  SCREEN_UPDATE_DIALOG    = 0x04,
-  SCREEN_UPDATE_VERBS     = 0x08,
-  SCREEN_UPDATE_SENTENCE  = 0x10,
-  SCREEN_UPDATE_INVENTORY = 0x20
+  SCREEN_UPDATE_BG         = 0x01,
+  SCREEN_UPDATE_FLASHLIGHT = 0x02,
+  SCREEN_UPDATE_ACTORS     = 0x04,
+  SCREEN_UPDATE_DIALOG     = 0x08,
+  SCREEN_UPDATE_VERBS      = 0x10,
+  SCREEN_UPDATE_SENTENCE   = 0x20,
+  SCREEN_UPDATE_INVENTORY  = 0x40
 };
 
 enum {
@@ -172,6 +173,9 @@ struct vm
   uint8_t             inv_num_objects;
   struct object_code *inv_objects[MAX_INVENTORY];
   uint8_t            *inv_next_free;
+
+  uint8_t             flashlight_width;
+  uint8_t             flashlight_height;
 };
 
 extern struct vm        vm_state;
@@ -216,6 +220,7 @@ void vm_say_line(uint8_t actor_id);
 uint8_t vm_get_first_script_slot_by_script_id(uint8_t script_id);
 uint8_t vm_is_script_running(uint8_t script_id);
 void vm_update_bg(void);
+void vm_update_flashlight(void);
 void vm_update_actors(void);
 void vm_update_sentence(void);
 void vm_update_inventory(void);
