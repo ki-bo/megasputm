@@ -544,8 +544,9 @@ void diskio_load_game_objects(void)
       FDC.data;
 
       // number of global game objects, 2 bytes
-      num_bytes_left = FDC.data ^ 0xff;
-      num_bytes_left |= (FDC.data ^ 0xff) << 8;
+      uint8_t low  = FDC.data ^ 0xff;
+      uint8_t high = FDC.data ^ 0xff;
+      num_bytes_left = make16(low, high);
 
       num_bytes_left <<= 1;
       bytes_left_in_block -= 4;
@@ -619,7 +620,7 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   cur_block_read_ptr = 0;
 
   seek_to(offset);
-  cur_chunk_size = FDC.data ^ 0xff;
+  uint8_t chunksize_low = FDC.data ^ 0xff;
   ++cur_block_read_ptr;
   if (cur_block_read_ptr == 254) {
     load_block(next_track, next_block);
@@ -627,7 +628,8 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
     next_block = FDC.data;
     cur_block_read_ptr = 0;
   }
-  cur_chunk_size |= (FDC.data ^ 0xff) << 8;
+  uint8_t chunksize_high = FDC.data ^ 0xff;
+  cur_chunk_size = make16(chunksize_low, chunksize_high);
   ++cur_block_read_ptr;
 
   return cur_chunk_size;
@@ -1436,7 +1438,7 @@ static uint16_t allocate_sector(uint8_t start_track)
 
     uint8_t sector = find_free_sector(bam_entry);
     if (sector != 0xff) {
-      return track << 8 | sector;
+      return make16(sector, track);
     }
 
     track += direction;

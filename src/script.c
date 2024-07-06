@@ -470,7 +470,7 @@ void script_stop_slot(uint8_t slot)
   }
   else {
     // debug_out("Object script %d ended slot %d", 
-    //           (vm_state.proc_script_or_object_id[slot]) | (vm_state.proc_object_id_msb[slot] << 8), 
+    //           make16(vm_state.proc_script_or_object_id[slot]), vm_state.proc_object_id_msb[slot]), 
     //           slot);
   }
 
@@ -487,7 +487,7 @@ void script_stop_slot(uint8_t slot)
   // in the current cycle
   proc_table_cleanup_needed = 1;
 
-  script_print_slot_table();
+  //script_print_slot_table();
 }
 
 void script_stop(uint8_t script_id)
@@ -513,7 +513,7 @@ void script_print_slot_table(void)
       debug_msg2(" X");
       continue;
     }
-    uint16_t id = vm_state.proc_script_or_object_id[slot] | (vm_state.proc_object_id_msb[slot] << 8);
+    uint16_t id = make16(vm_state.proc_script_or_object_id[slot], vm_state.proc_object_id_msb[slot]);
     debug_out2(" %d(%d)", slot, id);
     uint8_t state = vm_get_proc_state(slot);
     if (!(vm_state.proc_type[slot] & PROC_TYPE_GLOBAL)) {
@@ -595,7 +595,7 @@ static uint8_t run_active_slot(void)
 #ifdef DEBUG_SCRIPTS
   char *script_type  = vm_state.proc_type[active_script_slot] & PROC_TYPE_GLOBAL ? "S" : 
                        vm_state.proc_type[active_script_slot] & PROC_TYPE_INVENTORY ? "I" : "R";
-  active_script_id = vm_state.proc_object_id_msb[active_script_slot] << 8 | vm_state.proc_script_or_object_id[active_script_slot];
+  active_script_id = make16(vm_state.proc_script_or_object_id[active_script_slot], vm_state.proc_object_id_msb[active_script_slot]);
 #endif
 
   SAVE_DS_AUTO_RESTORE
@@ -666,7 +666,7 @@ static void run_script_first_time(uint8_t slot)
     proc_slot_table_insert(slot);
     // increase exec counter so we don't execute it again in this cycle
     ++proc_slot_table_exec;
-    script_print_slot_table();
+    //script_print_slot_table();
   }
 }
 
@@ -2117,7 +2117,7 @@ void chain_script(void)
   vm_state.proc_script_or_object_id[active_script_slot] = script_id;
   vm_state.proc_object_id_msb[active_script_slot]       = 0;
 
-  script_print_slot_table();
+  //script_print_slot_table();
 
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
 }

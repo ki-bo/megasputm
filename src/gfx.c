@@ -1599,8 +1599,8 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   }
 
   uint8_t  rowmask   = ~row_masks[shift_y];
-  uint16_t gotox_col = (uint8_t)0x98 | (rowmask << 8);
-  uint16_t gotox_scr = shift_y << 13;
+  uint16_t gotox_col = make16(0x98, rowmask);
+  uint16_t gotox_scr = make16(0, shift_y << 5); // gotox_scr = shift_y << 13
   --char_num;
 
   SAVE_DS_AUTO_RESTORE
@@ -1633,8 +1633,8 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
       colram_start_ptr += CHRCOUNT;
     }
     if (y == last_but_one_row) {
-      rowmask = row_masks[shift_y];
-      gotox_col = (uint8_t)0x98 | (rowmask << 8);
+      rowmask   = row_masks[shift_y];
+      gotox_col = make16(0x98, rowmask);
     }
     else if (y == -1) {
       gotox_col = 0x0090;

@@ -246,7 +246,7 @@ uint8_t vm_load_game(uint8_t slot);
 static inline uint16_t vm_read_var(uint8_t var)
 {
   volatile uint16_t value;
-  value = vm_state.variables_lo[var] | (vm_state.variables_hi[var] << 8);
+  value = make16(vm_state.variables_lo[var], vm_state.variables_hi[var]);
   return value;
 }
 

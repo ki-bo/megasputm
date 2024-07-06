@@ -329,7 +329,7 @@ uint8_t res_get_locked_resources(uint16_t *locked_resources, uint8_t max_entries
   
   do {
     if (page_res_type[slot] & RES_LOCKED_MASK) {
-      uint16_t type_index = ((page_res_type[slot] & RES_TYPE_MASK) << 8) | page_res_index[slot];
+      uint16_t type_index = make16(page_res_index[slot], page_res_type[slot] & RES_TYPE_MASK);
       if (type_index != last_type_index) {
         if (num_entries == max_entries) {
           fatal_error(ERR_TOO_MANY_LOCKED_RESOURCES);
