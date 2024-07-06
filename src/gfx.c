@@ -88,7 +88,29 @@ static const uint8_t cursor_cross_init[] = {
   0b00000001,0b00000000,0b00000000,
   0b00000001,0b00000000,0b00000000,
   0b00000000,0b00000000,0b00000000,
-}; 
+};
+
+static const uint8_t flashlight_corner_tl_init[] = {
+    0b11111111,
+    0b11111000,
+    0b11110000,
+    0b11100000,
+    0b11000000,
+    0b10000000,
+    0b10000000,
+    0b00000000
+};
+
+static const uint8_t flashlight_corner_tr_init[] = {
+    0b11111111,
+    0b00111111,
+    0b00001111,
+    0b00001111,
+    0b00000011,
+    0b00000011,
+    0b00000011,
+    0b00000000
+};
 
 //-----------------------------------------------------------------------------------------------
 
@@ -148,6 +170,7 @@ static uint16_t times_chrcount[25];
 // Private init functions
 static void setup_irq(void);
 static void init_dma_lists(void);
+static void decode_flashlight_char(uint8_t *char_data, uint8_t __far *dst, uint8_t flip_y);
 // Private interrupt function
 static void raster_irq(void);
 // Private gfx functions
@@ -185,9 +208,10 @@ void gfx_init()
 
   VICIV.sdbdrwd_msb  &= ~VIC4_HOTREG_MASK;
   VICII.ctrl1        &= ~0x10; // disable video output
+  VICII.ctrl2        &= ~0x10; // disable multi-colour mode
   VICIV.palsel        = 0x00; // select and map palette 0 (for both text and sprites)
   VICIV.ctrla        |= 0x04; // enable RAM palette
-  VICIV.ctrlb         = VIC4_VFAST_MASK;
+  VICIV.ctrlb         = VIC3_FAST_MASK;
   VICIV.ctrlc        &= ~VIC4_FCLRLO_MASK;
   VICIV.ctrlc        |= VIC4_FCLRHI_MASK | VIC4_CHR16_MASK;
   VICIV.xpos_msb     &= ~(VIC4_NORRDEL_MASK | VIC4_DBLRR_MASK);
@@ -291,6 +315,11 @@ void gfx_init()
   for (uint8_t i = 0; i < 25; ++i) {
     times_chrcount[i] = CHRCOUNT * i;
   }
+
+  decode_flashlight_char((uint8_t *)flashlight_corner_tl_init, (uint8_t __far *)(FLASHLIGHT_CHARS +   0), 0);
+  decode_flashlight_char((uint8_t *)flashlight_corner_tr_init, (uint8_t __far *)(FLASHLIGHT_CHARS +  64), 0);
+  decode_flashlight_char((uint8_t *)flashlight_corner_tl_init, (uint8_t __far *)(FLASHLIGHT_CHARS + 128), 1);
+  decode_flashlight_char((uint8_t *)flashlight_corner_tr_init, (uint8_t __far *)(FLASHLIGHT_CHARS + 192), 1);
 
   setup_irq();
 
@@ -469,6 +498,32 @@ static void init_dma_lists(void)
   };
 }
 
+static void decode_flashlight_char(uint8_t *char_data, uint8_t __far *dst, uint8_t flip_y)
+{
+  if (flip_y) {
+    char_data += 7;
+  }
+  for (uint8_t i = 0; i < 8; ++i) {
+    uint8_t mask = 0x80;
+    for (uint8_t j = 0; j < 8; ++j) {
+      if (*char_data & mask) {
+        *dst = 0xff;
+      }
+      else {
+        *dst = 0x00;
+      }
+      mask >>= 1;
+      ++dst;
+    }
+    if (flip_y) {
+      --char_data;
+    }
+    else {
+      ++char_data;
+    }
+  }
+}
+
 /** @} */ // gfx_init
 
 //-----------------------------------------------------------------------------------------------
@@ -561,7 +616,7 @@ void gfx_update_flashlight(void)
 {
   SAVE_DS_AUTO_RESTORE
 
-  static uint8_t row_masks[8] = {0x7f, 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01, 0x00};
+  static uint8_t row_masks[8] = {0xff, 0xfe, 0xfc, 0xf8, 0xf0, 0xe0, 0xc0, 0x80};
 
   // screen ram is banked to 0x2000 when mapping the gfx2 memory block
   //__auto_type bg_scr_ptr = NEAR_U16_PTR(0x2000) + CHRCOUNT * 2 + 1;
@@ -599,31 +654,23 @@ void gfx_update_flashlight(void)
     }
   }
 
-  uint8_t rowmask;
   uint8_t first_row = pos_y_pixels / 8;
   uint8_t shift_y   = pos_y_pixels & 0x07;
-  ++fl_rows_left;
-  //if (shift_y) {
-    shift_y = 7 - shift_y;
-  //}
+  uint8_t y_offset  = shift_y ? (8 - shift_y) << 5 : 0;
+  uint8_t rowmask   = row_masks[shift_y];
 
-  // uint8_t char_fl_tl = CHAR_FLASHLIGHT_TL;
-  // uint8_t char_fl_tr = CHAR_FLASHLIGHT_TR;
-  // uint8_t char_fl_bl = CHAR_FLASHLIGHT_BL;
-  // uint8_t char_fl_br = CHAR_FLASHLIGHT_BR;
-  // if (shift_y) {
-  //   --char_fl_tl;
-  //   --char_fl_tr;
-  //   --char_fl_bl;
-  //   --char_fl_br;
-  // }
-  
+  ++fl_rows_left;
+
   uint16_t gotox_scr     = pos_x_char << 3;
-  //uint16_t fl_corner_col = 0x1100; // color 0x11 is 2nd col in 1st actor palette and is always black
+  uint16_t fl_corner_col = 0x1100; // color 0x61 is 2nd col in alternate palette and is always black
   for (uint8_t y = 0; y < 16; ++y) {
     uint16_t col_val;
     uint16_t scr_val;
-
+    uint8_t  scr_idx_corner_left  = 41 + fl_width;
+    uint8_t  scr_idx_corner_right = scr_idx_corner_left + 2;
+    uint16_t corner_char = 0;
+    uint8_t  corner_rowmask;
+    
     if (y < first_row || !fl_rows_left) {
       // row outside of flashlight area: move rrb outside of screen
       col_val = 0x0010;
@@ -650,30 +697,64 @@ void gfx_update_flashlight(void)
       }
 
       if (y == first_row) {
-        rowmask = ~row_masks[shift_y];
-        col_val = make16(0x18, rowmask);
-
-        // draw flashlight corner overlay characters
-        /*
-        uint16_t gotox_col_fl = col_val & 0x0080;
-        *bg_col_dst++ = gotox_col_fl;
-        *bg_scr_dst++ = gotox_scr;
-        *bg_col_dst++ = fl_corner_col;
-        *bg_scr_dst++ = shift_y ? CHAR_FLASHLIGHT_TL;
-        *bg_col_dst++ = gotox_col_fl;
-        *bg_scr_dst++ = gotox_scr;
-        */
+        col_val        = make16(0x18, rowmask);
+        corner_char    = FLASHLIGHT_CHARS / 64;
+        corner_rowmask = rowmask;
+        if (shift_y) {
+          --corner_char;
+        }
+      }
+      else if ((y == first_row + 1) && shift_y) {
+        corner_char    = FLASHLIGHT_CHARS / 64;
+        corner_rowmask = ~rowmask;
+        col_val        = 0x0010;
+      }
+      else if (fl_rows_left == 1) {
+        col_val        = 0x0010;
+        corner_char    = FLASHLIGHT_CHARS / 64 + 2;
+        corner_rowmask = rowmask;
+        if (shift_y) {
+          --corner_char;
+        }
       }
       else if (fl_rows_left == 0) {
         col_val = make16(0x18, ~rowmask);
+        if (shift_y) {
+          corner_char    = FLASHLIGHT_CHARS / 64 + 2;
+          corner_rowmask = ~rowmask;
+        }
       }
       else {
         col_val = 0x0010;
       }
-
     }
 
-    //debug_out("y: %d rows_left: %d fr %d sy %d col %4x scr %4x rm %x", y, fl_rows_left, first_row, shift_y, col_val, scr_val, rowmask);
+    // draw flashlight corner overlay characters
+    if (!corner_char) {
+      bg_scr_ptr[scr_idx_corner_left]  = 0x0140;
+      bg_scr_ptr[scr_idx_corner_right] = 0x0140;
+    }
+    else {
+      __auto_type fl_col = bg_col_ptr + 1 + fl_width;
+
+      // left corner
+      uint16_t gotox_scr_corner_left = make16(LSB(gotox_scr), MSB(gotox_scr) | y_offset);
+      bg_scr_ptr[scr_idx_corner_left]     = gotox_scr_corner_left;
+      bg_scr_ptr[scr_idx_corner_left + 1] = corner_char;
+      *fl_col = make16(0x98, corner_rowmask);
+      ++fl_col;
+      *fl_col = fl_corner_col;
+      ++fl_col;
+
+      // right corner
+      uint16_t x_position = gotox_scr + fl_width * 8 - 8;
+      bg_scr_ptr[scr_idx_corner_right]     = make16(LSB(x_position), MSB(x_position) | y_offset);
+      bg_scr_ptr[scr_idx_corner_right + 1] = corner_char + 1;
+      *fl_col = make16(0x98, corner_rowmask);
+      ++fl_col;
+      *fl_col = fl_corner_col;
+      ++fl_col;
+    }
 
     *bg_col_ptr = col_val;
     bg_col_ptr += CHRCOUNT;
@@ -1137,9 +1218,10 @@ void gfx_enable_flashlight(void)
   __auto_type screen_ptr = NEAR_U16_PTR(BACKBUFFER_SCREEN) + CHRCOUNT * 2 + 41;
   __auto_type colram_ptr = NEAR_U16_PTR(BACKBUFFER_COLRAM) + CHRCOUNT * 2 + 41;
 
-  bg_chars_per_row  = 41 + 1 + vm_state.flashlight_width;
+  // 1x gotox for flashlight (+ flashlight_width for flashlight chars),
+  // 2x gotox + 2x char for flashlight corners
+  bg_chars_per_row  = 41 + 5 + vm_state.flashlight_width;
 
-  debug_out("flashlight on");
   for (uint8_t i = 0; i < 16; ++i) {
     num_chars_at_row[i] = bg_chars_per_row;
     *screen_ptr = 0x0140;
@@ -1152,6 +1234,17 @@ void gfx_enable_flashlight(void)
       ++screen_ptr2;
       ++colram_ptr2;
     }
+
+    // prepare two characers for flashlight corners (incl. GOTOX)
+    *screen_ptr2++ = 0x0140;
+    *colram_ptr2++ = 0x0010;
+    *screen_ptr2++ = 0x0000;
+    *colram_ptr2++ = 0xff00;
+    *screen_ptr2++ = 0x0140;
+    *colram_ptr2++ = 0x0010;
+    *screen_ptr2++ = 0x0000;
+    *colram_ptr2++ = 0xff00;
+
     screen_ptr += CHRCOUNT;
     colram_ptr += CHRCOUNT;
   }

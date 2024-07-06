@@ -10,6 +10,7 @@
 #include "util.h"
 #include "vm.h"
 #include "walk_box.h"
+#include <mega65.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2472,5 +2473,6 @@ static void verb(void)
 static void unimplemented_opcode(void)
 {
   debug_out("Unimplemented opcode: %x at %x", opcode, (uint16_t)(pc - 1));
+  VICIV.bordercol = 4;
   fatal_error(ERR_UNKNOWN_OPCODE);
 }
