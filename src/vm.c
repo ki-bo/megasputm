@@ -895,37 +895,34 @@ void vm_set_camera_follow_actor(uint8_t actor_id)
   uint8_t room_of_actor = actors.room[actor_id];
   if (room_of_actor != vm_read_var8(VAR_SELECTED_ROOM)) {
     vm_set_current_room(room_of_actor);
-    vm_set_camera_to(actors.x[actor_id]);
-  }
-  else {
-    uint16_t target = actors.x[actor_id];
-    if (abs((int16_t)camera_x - (int16_t)target) > 20) {
-      vm_set_camera_to(target);
-    }
   }
 
+  vm_set_camera_to(actors.x[actor_id]);
   camera_follow_actor_id = actor_id;
   camera_state           = CAMERA_STATE_FOLLOW_ACTOR;
 }
 
 void vm_set_camera_to(uint8_t x)
 {
+  uint8_t new_camera = x;
   uint8_t max_camera_x = room_width / 8 - 20;
   if (x > max_camera_x) {
-    x = max_camera_x;
+    new_camera = max_camera_x;
   }
   else if (x < 20) {
-    x = 20;
+    new_camera = 20;
   }
 
-  if (camera_x != x) {
-    //debug_out("set camera to %d", x);
-    camera_x = x;
+  if (abs((int16_t)camera_x - (int16_t)x) > 20) {
+    camera_x = new_camera;
     vm_write_var(VAR_CAMERA_X, x);
     vm_update_bg();
     vm_update_actors();
+    camera_state = 0;
   }
-  camera_state = 0;
+  else {
+    vm_camera_pan_to(new_camera);
+  }
 }
 
 void vm_camera_pan_to(uint8_t x)
