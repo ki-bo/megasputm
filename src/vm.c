@@ -1482,15 +1482,44 @@ static void handle_input(void)
     if (input_key_pressed == vm_read_var8(VAR_CUTSCENEEXIT_KEY)) {
       override_cutscene();
     }
+    else if (input_key_pressed == 0x20) {
+      // handle space key, pause
+      static const char pause_str[] = "Game paused, press SPACE to continue.";
+
+      input_key_pressed = 0; // ack the space key
+      MAP_CS_GFX
+      gfx_print_interface_text(0, 18, pause_str, prev_sentence_highlighted ? TEXT_STYLE_HIGHLIGHTED : TEXT_STYLE_SENTENCE);
+      script_watchdog = WATCHDOG_TIMEOUT;
+
+      while (1) {
+        if (input_key_pressed) {
+          if (input_key_pressed == 0x20) {
+            wait_for_jiffy();  // this resets the elapsed jiffies timer
+            break;
+          }
+          else {
+            // ack all other key presses
+            input_key_pressed = 0;
+          }
+        }
+      }
+      
+      update_sentence_line();
+      UNMAP_CS
+    }
     else if (input_key_pressed == 8) {
       // handle restart key, ask user confirmation
       static const char restart_str[] = "Are you sure you want to restart? (y/n)";
 
       input_key_pressed = 0; // ack the F8 restart key
 
+      if (actor_talking != 0xff) {
+        actor_stop_talking(actor_talking);
+      }
       MAP_CS_GFX
       gfx_print_dialog(2, restart_str, sizeof(restart_str) - 1);
-
+      script_watchdog = WATCHDOG_TIMEOUT;
+      
       while (1) {
         if (input_key_pressed) {
           if (input_key_pressed == 'y') {
@@ -1498,6 +1527,7 @@ static void handle_input(void)
             break;
           }
           else if (input_key_pressed == 'n') {
+            wait_for_jiffy();  // this resets the elapsed jiffies timer
             break;
           }
           else {
@@ -1510,9 +1540,11 @@ static void handle_input(void)
       UNMAP_CS
     }
     else {
-      vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
-      vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
-      script_start(SCRIPT_ID_INPUT_EVENT);
+      if (ui_state & UI_FLAGS_ENABLE_CURSOR) {
+        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
+        vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
+        script_start(SCRIPT_ID_INPUT_EVENT);
+      }
     }
     // ack the key press
     input_key_pressed = 0;
@@ -1744,7 +1776,7 @@ static void update_sentence_line(void)
 
 static void update_sentence_highlighting(void)
 {
-  if (!(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
+  if (!(ui_state & UI_FLAGS_ENABLE_CURSOR)) {
     return;
   }
 

@@ -8,6 +8,7 @@
 #define MAX_VERBS            22
 #define MAX_INVENTORY        80
 #define CMD_STACK_SIZE        6
+#define WATCHDOG_TIMEOUT     30
 
 enum {
   // bits 0-2 reserved for process state

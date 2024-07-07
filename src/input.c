@@ -102,6 +102,10 @@ void input_update(void)
         // handling A-Z keys
         input_key_pressed = key_pressed_ascii;
       }
+      else if (key_pressed_ascii == 0x20) {
+        // handling space key
+        input_key_pressed = 0x20;
+      }
       //debug_out("key pressed %d = %d", key_pressed_ascii, input_key_pressed);
     }
     else {

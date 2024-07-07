@@ -573,10 +573,10 @@ static void raster_irq ()
 
   input_update();
 
-  if (script_watchdog < 30) {
+  if (script_watchdog < WATCHDOG_TIMEOUT) {
     ++script_watchdog;
   }
-  update_cursor(script_watchdog == 30);
+  update_cursor(script_watchdog == WATCHDOG_TIMEOUT);
 
   /*
   if (flashlight_irq_update) {
