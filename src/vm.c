@@ -100,6 +100,7 @@ static const char *get_object_name(uint16_t global_object_id);
 static uint8_t start_child_script_at_address(uint8_t script_slot, uint8_t res_slot, uint16_t offset);
 static void execute_sentence_stack(void);
 static void load_room(uint8_t room_no);
+static uint16_t clamp_camera_x(uint16_t x);
 static void update_actors(void);
 static void animate_actors(void);
 static void override_cutscene(void);
@@ -895,39 +896,38 @@ void vm_set_camera_follow_actor(uint8_t actor_id)
   uint8_t room_of_actor = actors.room[actor_id];
   if (room_of_actor != vm_read_var8(VAR_SELECTED_ROOM)) {
     vm_set_current_room(room_of_actor);
+    vm_set_camera_to(actors.x[actor_id]);
+  }
+  else {
+    vm_camera_at(actors.x[actor_id]);
   }
 
-  vm_set_camera_to(actors.x[actor_id]);
   camera_follow_actor_id = actor_id;
   camera_state           = CAMERA_STATE_FOLLOW_ACTOR;
 }
 
-void vm_set_camera_to(uint8_t x)
+void vm_camera_at(uint8_t x)
 {
-  uint8_t new_camera = x;
-  uint8_t max_camera_x = room_width / 8 - 20;
-  if (x > max_camera_x) {
-    new_camera = max_camera_x;
-  }
-  else if (x < 20) {
-    new_camera = 20;
-  }
-
   if (abs((int16_t)camera_x - (int16_t)x) > 20) {
-    camera_x = new_camera;
-    vm_write_var(VAR_CAMERA_X, x);
-    vm_update_bg();
-    vm_update_actors();
-    camera_state = 0;
+    vm_set_camera_to(x);
   }
   else {
-    vm_camera_pan_to(new_camera);
+    vm_camera_pan_to(x);
   }
+}
+
+void vm_set_camera_to(uint8_t x)
+{
+  camera_x = clamp_camera_x(x);
+  vm_write_var(VAR_CAMERA_X, camera_x);
+  vm_update_bg();
+  vm_update_actors();
+  camera_state = 0;
 }
 
 void vm_camera_pan_to(uint8_t x)
 {
-  camera_target          = x;
+  camera_target          = clamp_camera_x(x);
   camera_follow_actor_id = 0xff;
   camera_state           = CAMERA_STATE_MOVE_TO_TARGET_POS;
 }
@@ -1676,6 +1676,18 @@ static void load_room(uint8_t room_no)
   read_objects();
   MAP_CS_MAIN_PRIV
   read_walk_boxes();
+}
+
+static uint16_t clamp_camera_x(uint16_t x)
+{
+  uint8_t max_camera_x = room_width / 8 - 20;
+  if (x > max_camera_x) {
+    return max_camera_x;
+  }
+  else if (x < 20) {
+    return 20;
+  }
+  return x;
 }
 
 static void update_actors(void)
