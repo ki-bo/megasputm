@@ -1578,7 +1578,8 @@ static void update_script_timers(uint8_t elapsed_jiffies)
 {
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
-    if (vm_get_proc_state(slot) == PROC_STATE_WAITING_FOR_TIMER)
+    // checking for equality will also make sure we won't update slots that are frozen
+    if (vm_state.proc_state[slot] == PROC_STATE_WAITING_FOR_TIMER)
     {
       vm_state.proc_wait_timer[slot] += elapsed_jiffies;
       uint8_t timer_msb = (uint8_t)((uintptr_t)(vm_state.proc_wait_timer[slot]) >> 24);
