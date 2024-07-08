@@ -156,7 +156,6 @@ void inv_update_displayed_inventory(void)
 
     if (inv_ui_entries.num_entries == 0) {
       if (inventory_pos == 0) {
-        debug_out("inv p %d n %d, num %d, entries %d %d %d %d", inv_ui_entries.prev_id, inv_ui_entries.next_id, inv_ui_entries.num_entries, inv_ui_entries.displayed_ids[0], inv_ui_entries.displayed_ids[1], inv_ui_entries.displayed_ids[2], inv_ui_entries.displayed_ids[3]);
         return;
       }
       inv_ui_entries.prev_id = 0xff;

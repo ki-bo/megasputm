@@ -1064,7 +1064,7 @@ static void assign_array(void)
   //debug_scr("assign array at VAR[%d] (size=%d)", var_idx, array_size);
   do {
     uint16_t value = (opcode & 0x80) ? read_word() : read_byte();
-    vm_write_var(var_idx, 0);
+    vm_write_var(var_idx, value);
     ++var_idx;
   } 
   while (--array_size);
