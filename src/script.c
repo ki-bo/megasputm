@@ -114,6 +114,7 @@ static void lights(void);
 static void current_room(void);
 static void jump_if_greater_or_equal(void);
 static void verb(void);
+static void sound_running(void);
 static void say_line_selected_actor(void);
 static void unimplemented_opcode(void);
 
@@ -269,6 +270,7 @@ void script_init(void)
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &do_sentence;
   opcode_jump_table[0x7a] = &verb;
+  opcode_jump_table[0x7c] = &sound_running;
   opcode_jump_table[0x3d] = &actor_elevation;
   opcode_jump_table[0x7e] = &walk_to;
   opcode_jump_table[0x7f] = &jump_if_or_if_not_pickupable;
@@ -1742,6 +1744,9 @@ static void set_box(void)
 {
   uint8_t box_id = resolve_next_param8();
   uint8_t value  = read_byte();
+  debug_out("set-box %d to %d", box_id, value);
+  SAVE_DS_AUTO_RESTORE
+  map_ds_resource(room_res_slot);
   walk_boxes[box_id].flags = value;
 }
 
@@ -2494,6 +2499,13 @@ static void verb(void)
   char name[80];
   read_null_terminated_string(name);
   vm_verb_new(slot, verb_id, x, y, name);
+}
+
+static void sound_running(void)
+{
+  uint8_t var_idx = read_byte();
+  uint8_t sound_id = resolve_next_param8();
+  vm_write_var(var_idx, 0);
 }
 
 /**

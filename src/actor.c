@@ -789,14 +789,14 @@ static void calculate_next_box_point(uint8_t local_id)
   SAVE_DS_AUTO_RESTORE
   map_ds_resource(room_res_slot);
 
-  uint8_t cur_box = local_actors.cur_box[local_id];
+  uint8_t cur_box    = local_actors.cur_box[local_id];
   uint8_t target_box = local_actors.walk_to_box[local_id];
-  uint8_t next_box = walkbox_get_next_box(cur_box, target_box);
+  uint8_t next_box   = walkbox_get_next_box(cur_box, target_box);
   
-  // It seems there are boxes that you can't reach.
-  // We will be told to stay in the current box in that case.
+  // There are boxes you can't reach (either locked or no transition to them).
+  // In case of no transition, we will be told to stay in the current box.
   // Go to the closest point to the target that we can find in the current box.
-  if (next_box == cur_box) {
+  if (next_box == cur_box || walk_boxes[next_box].flags & WALKBOX_FLAGS_LOCKED) {
     uint8_t target_x = local_actors.walk_to_x[local_id];
     uint8_t target_y = local_actors.walk_to_y[local_id];
 

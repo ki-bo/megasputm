@@ -13,6 +13,10 @@ struct walk_box {
   uint8_t flags;
 };
 
+enum walk_box_flags {
+  WALKBOX_FLAGS_LOCKED = 0x40
+};
+
 extern uint8_t          num_walk_boxes;
 extern struct walk_box *walk_boxes;
 extern uint8_t         *walk_box_matrix;
