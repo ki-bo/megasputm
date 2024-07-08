@@ -78,6 +78,7 @@ static void put_actor_in_room(void);
 static void subtract(void);
 static void wait_for_actor(void);
 static void stop_sound(void);
+static void actor_elevation(void);
 static void jump_if_or_if_not_pickupable(void);
 static void add(void);
 static void sleep_for_or_wait_for_message(void);
@@ -219,6 +220,7 @@ void script_init(void)
   opcode_jump_table[0x3a] = &subtract;
   opcode_jump_table[0x3b] = &wait_for_actor;
   opcode_jump_table[0x3c] = &stop_sound;
+  opcode_jump_table[0x3d] = &actor_elevation;
   opcode_jump_table[0x3f] = &jump_if_or_if_not_pickupable;
   opcode_jump_table[0x40] = &cut_scene;
   opcode_jump_table[0x41] = &put_actor;
@@ -267,6 +269,7 @@ void script_init(void)
   opcode_jump_table[0x78] = &jump_if_greater_or_equal;
   opcode_jump_table[0x79] = &do_sentence;
   opcode_jump_table[0x7a] = &verb;
+  opcode_jump_table[0x3d] = &actor_elevation;
   opcode_jump_table[0x7e] = &walk_to;
   opcode_jump_table[0x7f] = &jump_if_or_if_not_pickupable;
 }
@@ -358,7 +361,7 @@ uint8_t script_start(uint8_t script_id)
   // init script slot
   reset_script_slot(slot, PROC_TYPE_GLOBAL, script_id, parent, new_page, 4 /* skipping script header directly to first opcode*/);
 
-  debug_out("Starting global script %d in slot %d", script_id, slot);
+  //debug_out("Starting global script %d in slot %d", script_id, slot);
 
   run_script_first_time(slot);
 
@@ -367,7 +370,7 @@ uint8_t script_start(uint8_t script_id)
 
 void script_execute_room_script(uint16_t room_script_offset)
 {
-  debug_out("Starting room entry/exit script at offset %x", room_script_offset);
+  //debug_out("Starting room entry/exit script at offset %x", room_script_offset);
 
   uint8_t  res_slot = room_res_slot + MSB(room_script_offset);
   uint16_t offset   = LSB(room_script_offset);
@@ -426,7 +429,7 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
         vm_state.proc_type[script_slot] == (type & (PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB)) &&
         vm_state.proc_script_or_object_id[script_slot] == LSB(global_object_id) &&
         vm_state.proc_object_id_msb[script_slot] == MSB(global_object_id)) {
-      debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
+      //debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
       break;
     }
   }
@@ -435,7 +438,7 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
     script_slot = find_free_script_slot();
   }
 
-  debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
+  //debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
   reset_script_slot(script_slot, type, global_object_id, 0xff /*parent*/, res_slot, script_offset);
 
   run_script_first_time(script_slot);
@@ -493,6 +496,15 @@ void script_stop_slot(uint8_t slot)
 
 void script_stop(uint8_t script_id)
 {
+  // check active script
+  if (active_script_slot != 0xff &&
+      vm_state.proc_type[active_script_slot] == PROC_TYPE_GLOBAL &&
+      vm_state.proc_script_or_object_id[active_script_slot] == script_id)
+  {
+    script_stop_slot(active_script_slot);
+  }
+
+  // check all scripts in slot table
   for (uint8_t table_idx = 0; table_idx < vm_state.num_active_proc_slots; ++table_idx)
   {
     uint8_t slot = vm_state.proc_slot_table[table_idx];
@@ -505,39 +517,39 @@ void script_stop(uint8_t script_id)
   }
 }
 
-void script_print_slot_table(void)
-{
-  debug_out2("Table (%d slots):", vm_state.num_active_proc_slots);
-  for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
-    uint8_t slot = vm_state.proc_slot_table[i];
-    if (slot == 0xff) {
-      debug_msg2(" X");
-      continue;
-    }
-    uint16_t id = make16(vm_state.proc_script_or_object_id[slot], vm_state.proc_object_id_msb[slot]);
-    debug_out2(" %d(%d)", slot, id);
-    uint8_t state = vm_get_proc_state(slot);
-    if (!(vm_state.proc_type[slot] & PROC_TYPE_GLOBAL)) {
-      debug_msg2("o");
-    }
-    if (state == PROC_STATE_FREE) {
-      debug_msg2("X");
-    }
-    else if (state == PROC_STATE_WAITING_FOR_TIMER) {
-      debug_msg2("W");
-    }
-    else if (state == PROC_STATE_RUNNING) {
-      debug_msg2("R");
-    }
-    else {
-      debug_out2("?%d", state);
-    }
-    if (vm_state.proc_state[slot] & PROC_FLAGS_FROZEN) {
-      debug_msg2("F");
-    }
-  }
-  debug_out("");
-}
+// void script_print_slot_table(void)
+// {
+//   debug_out2("Table (%d slots):", vm_state.num_active_proc_slots);
+//   for (uint8_t i = 0; i < vm_state.num_active_proc_slots; ++i) {
+//     uint8_t slot = vm_state.proc_slot_table[i];
+//     if (slot == 0xff) {
+//       debug_msg2(" X");
+//       continue;
+//     }
+//     uint16_t id = make16(vm_state.proc_script_or_object_id[slot], vm_state.proc_object_id_msb[slot]);
+//     debug_out2(" %d(%d)", slot, id);
+//     uint8_t state = vm_get_proc_state(slot);
+//     if (!(vm_state.proc_type[slot] & PROC_TYPE_GLOBAL)) {
+//       debug_msg2("o");
+//     }
+//     if (state == PROC_STATE_FREE) {
+//       debug_msg2("X");
+//     }
+//     else if (state == PROC_STATE_WAITING_FOR_TIMER) {
+//       debug_msg2("W");
+//     }
+//     else if (state == PROC_STATE_RUNNING) {
+//       debug_msg2("R");
+//     }
+//     else {
+//       debug_out2("?%d", state);
+//     }
+//     if (vm_state.proc_state[slot] & PROC_FLAGS_FROZEN) {
+//       debug_msg2("F");
+//     }
+//   }
+//   debug_out("");
+// }
 
 uint8_t script_is_room_object_script(uint8_t slot)
 {
@@ -1758,7 +1770,7 @@ static void camera_at(void)
 {
   uint16_t new_camera_x = resolve_next_param8();
   //debug_scr("camera-at %d", new_camera_x);
-  vm_set_camera_to(new_camera_x);
+  vm_camera_at(new_camera_x);
 }
 
 static void proximity(void)
@@ -1938,6 +1950,20 @@ static void stop_sound(void)
 {
   //debug_msg("Stop sound");
   uint8_t sound_id = resolve_next_param8();
+}
+
+static void actor_elevation(void)
+{
+  uint8_t actor_id  = resolve_next_param8();
+  uint8_t elevation = resolve_next_param8();
+  // debug_out("act %d elev %d", actor_id, elevation);
+
+  if (actors.elevation[actor_id] != elevation) {
+    actors.elevation[actor_id] = elevation;
+    if (actors.local_id[actor_id] != 0xff) {
+      vm_update_actors();
+    }
+  }
 }
 
 static void jump_if_or_if_not_pickupable(void)
@@ -2281,12 +2307,17 @@ static void add(void)
   * Reads the cursor state and the state of the interface. The cursor state
   * is stored in VAR_CURSOR_STATE and the interface state is stored in state_iface.
   *
+  * The lower 8 bits of the parameter are the cursor state, the upper 8 bits
+  * are the interface state. If cursor state is 0, the cursor is not changed.
+  *
   * Code section: code_script
   */
 static void cursor(void)
 {
   uint16_t param = resolve_next_param16();
-  vm_write_var(VAR_CURSOR_STATE, param & 0xff);
+  if (param & 0xff) {
+    vm_write_var(VAR_CURSOR_STATE, param & 0xff);
+  }
   vm_change_ui_flags(param >> 8);
   //debug_scr("cursor cursor-state %x ui-flags %x", param & 0xff, param >> 8);
 }
@@ -2299,7 +2330,7 @@ static void stop_script(void)
     script_stop_slot(active_script_slot);
   }
   else {
-  script_stop(script_id);
+    script_stop(script_id);
   }
 }
 

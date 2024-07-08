@@ -17,7 +17,7 @@ typedef struct {
   uint8_t       local_id[NUM_ACTORS];
   uint8_t       x[NUM_ACTORS];
   uint8_t       y[NUM_ACTORS];
-  uint8_t       z[NUM_ACTORS]; // distance above ground
+  uint8_t       elevation[NUM_ACTORS]; // distance above ground
   uint8_t       dir[NUM_ACTORS];
 } actors_t;
 
@@ -81,6 +81,7 @@ void actor_init(void);
 void actor_map_palette(uint8_t actor_id, uint8_t dest_idx, uint8_t src_idx);
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
 void actor_room_changed(void);
+void actor_change_costume(uint8_t actor_id, uint8_t costume_id);
 uint8_t actor_find(uint8_t x, uint8_t y);
 void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y);
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y, uint8_t target_dir);

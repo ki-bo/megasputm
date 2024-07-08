@@ -283,7 +283,7 @@ __task void vm_mainloop(void)
       MAP_CS_MAIN_PRIV
       cleanup_slot_table();
       UNMAP_CS
-      script_print_slot_table();
+      //script_print_slot_table();
     }
     active_script_slot = 0xff;
 
@@ -571,6 +571,7 @@ void vm_cut_scene_begin(void)
   vm_state.cs_override_pc = 0;
   vm_state.cs_camera_state = camera_state;
   vm_state.cs_ui_state = ui_state;
+  vm_write_var(VAR_CURSOR_STATE, 0x80);
   vm_change_ui_flags(UI_FLAGS_APPLY_FREEZE | UI_FLAGS_ENABLE_FREEZE |
                      UI_FLAGS_APPLY_CURSOR |
                      UI_FLAGS_APPLY_INTERFACE);
@@ -638,7 +639,7 @@ void vm_say_line(uint8_t actor_id)
       return;
     }
 
-    message_color = 0x09;
+    message_color = actors.talk_color[0];
   } else {
     actor_start_talking(actor_id);
     message_color = actors.talk_color[actor_id];
@@ -1537,11 +1538,9 @@ static void handle_input(void)
       UNMAP_CS
     }
     else {
-      if (ui_state & UI_FLAGS_ENABLE_CURSOR) {
-        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
-        vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
-        script_start(SCRIPT_ID_INPUT_EVENT);
-      }
+      vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
+      vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
+      script_start(SCRIPT_ID_INPUT_EVENT);
     }
     // ack the key press
     input_key_pressed = 0;
