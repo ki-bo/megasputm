@@ -239,14 +239,6 @@ __task void vm_mainloop(void)
     diskio_check_motor_off(elapsed_jiffies);
     UNMAP_CS
 
-    if (last_selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
-      if (last_selected_actor != 0xff) {
-        // makes sure inventory pos is kept when loading a savegame
-        inventory_pos = 0;
-      }
-      last_selected_actor = vm_read_var8(VAR_SELECTED_ACTOR);
-    }
-
     proc_table_cleanup_needed = 0;
     proc_slot_table_idx = -1;
     handle_input();
@@ -297,6 +289,14 @@ __task void vm_mainloop(void)
     MAP_CS_MAIN_PRIV
     update_camera();
     UNMAP_CS
+
+    if (last_selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
+      if (last_selected_actor != 0xff) { // makes sure inventory pos is kept when loading a savegame
+        inventory_pos = 0;
+      }
+      last_selected_actor = vm_read_var8(VAR_SELECTED_ACTOR);
+    }
+
 
     uint8_t flashlight_on = vm_read_var8(VAR_CURRENT_LIGHTS) == 12;
     //debug_out("Flashlight on: %d", flashlight_on);
