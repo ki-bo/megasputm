@@ -337,7 +337,7 @@ void script_break(void)
   * @brief Starts a global script
   * 
   * The script with the given id is added to a free process slot and marked with state
-  * PROC_STATE_RUNNING. The script will start execution at the next cycle of the main loop.
+  * PROC_STATE_RUNNING. The script will start execution immediately.
   *
   * @param script_id 
   *

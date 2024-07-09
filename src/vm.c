@@ -464,6 +464,13 @@ void vm_set_current_room(uint8_t room_no)
       script_execute_room_script(exit_script_offset);
     }
 
+    // stop all room scripts before deactivating the room
+    for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
+      if (vm_state.proc_state[i] != PROC_STATE_FREE && script_is_room_object_script(i)) {
+        script_stop_slot(i);
+      }
+    }
+
     res_deactivate_slot(room_res_slot);
   }
 
