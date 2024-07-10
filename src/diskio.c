@@ -1497,7 +1497,7 @@ static uint8_t find_free_sector(struct bam_entry *entry)
     for (uint8_t i = 0; i < 5; ++i) {
       mask = 3;
       for (uint8_t j = 0; j < 4; ++j) {
-        if (entry->block_usage[i] & mask) {
+        if ((entry->block_usage[i] & mask) == mask) {
           entry->block_usage[i] &= ~mask;
           entry->num_free_blocks -= 2;
           return sector;
@@ -1587,7 +1587,7 @@ static void write_block(uint8_t track, uint8_t block, uint8_t __far *block_data_
 
 static void write_sector(uint8_t track, uint8_t sector, uint8_t __far *sector_buf_far)
 {
-  //debug_out("writing track %d, sector %d from buffer %lx", track, sector, (uint32_t)sector_buf_far);
+  // debug_out("writing track %d, sector %d from buffer %lx", track, sector, (uint32_t)sector_buf_far);
   __auto_type fdc_dst = FAR_U8_PTR(0xffd6c00);
   memcpy_far(fdc_dst, sector_buf_far, 0x200);
   write_sector_from_fdc_buf(track, sector);
@@ -1630,7 +1630,7 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
 
   step_to_track(track);
 
-  debug_out(" write t %d, s %d, side %d", track, sector, side);
+  // debug_out(" write t %d, s %d, side %d", track, sector, side);
   FDC.track = track;
   FDC.sector = sector;
   FDC.side = side;
