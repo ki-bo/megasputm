@@ -431,7 +431,11 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
         vm_state.proc_type[script_slot] == (type & (PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB)) &&
         vm_state.proc_script_or_object_id[script_slot] == LSB(global_object_id) &&
         vm_state.proc_object_id_msb[script_slot] == MSB(global_object_id)) {
-      //debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
+      if (script_slot == active_script_slot) {
+        debug_out("Current script tried to execute object script %d again, ignoring", global_object_id);
+        return;
+      }
+      debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
       break;
     }
   }
