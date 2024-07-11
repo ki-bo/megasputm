@@ -10,11 +10,12 @@ struct walk_box {
   uint8_t bottomleft_x;
   uint8_t bottomright_x;
   uint8_t mask;
-  uint8_t flags;
+  uint8_t classes;
 };
 
-enum walk_box_flags {
-  WALKBOX_FLAGS_LOCKED = 0x40
+enum walk_box_class {
+  WALKBOX_CLASS_BOX_LOCKED    = 0x40,
+  WALKBOX_CLASS_BOX_INVISIBLE = 0x80
 };
 
 extern uint8_t          num_walk_boxes;

@@ -1747,11 +1747,11 @@ static void jump_if_or_if_not_locked(void)
 static void set_box(void)
 {
   uint8_t box_id = resolve_next_param8();
-  uint8_t value  = read_byte();
-  debug_out("set-box %d to %d", box_id, value);
+  uint8_t class  = read_byte();
+  debug_out("set-box %d to %d", box_id, class);
   SAVE_DS_AUTO_RESTORE
   map_ds_resource(room_res_slot);
-  walk_boxes[box_id].flags = value;
+  walk_boxes[box_id].classes = class;
 }
 
 /**

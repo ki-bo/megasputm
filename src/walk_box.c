@@ -59,7 +59,11 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
   struct walk_box *walk_box = walk_boxes;
 
   //debug_out("Correct pos %d, %d", *x, *y);
-  for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx) {
+  for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx, ++walk_box) {
+    // skip invisible walk boxes when determining a point within one of the available walk boxes
+    if (walk_box->classes & WALKBOX_CLASS_BOX_INVISIBLE) {
+      continue;
+    }
     uint8_t walk_box_x = *x;
     uint8_t walk_box_y = *y;
     //debug_out("Checking box %d", box_idx);
@@ -75,7 +79,6 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
       corr_pos_y = walk_box_y;
       dest_walk_box = box_idx;
     }
-    ++walk_box;
   }
 
   //debug_out("Final %d, %d wb %d", corr_pos_x, corr_pos_y, dest_walk_box);
