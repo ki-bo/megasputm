@@ -182,9 +182,9 @@ uint8_t actor_find(uint8_t x, uint8_t y)
     uint8_t width = local_actors.bounding_box_width[local_id];
     uint8_t height = local_actors.bounding_box_height[local_id];
     uint8_t x1 = local_actors.bounding_box_x[local_id];
-    uint8_t y1 = local_actors.bounding_box_y[local_id];
+    int16_t y1 = local_actors.bounding_box_y[local_id] + actors.elevation[actor_id];
     uint8_t x2 = x1 + width;
-    uint8_t y2 = y1 + height;
+    int16_t y2 = y1 + height + actors.elevation[actor_id];
     if (x >= x1 && x < x2 && y >= y1 && y < y2) {
       return actor_id;
     }
