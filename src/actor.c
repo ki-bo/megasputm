@@ -32,7 +32,9 @@ static void calculate_step(uint8_t local_id);
 static void add_local_actor(uint8_t actor_id);
 static void remove_local_actor(uint8_t actor_id);
 static void reset_animation(uint8_t local_id);
-static void turn_to_walk_to_direction(uint8_t local_id);
+static uint8_t get_target_direction(uint8_t local_id);
+static void turn_to_target_direction(uint8_t local_id);
+static void turn_to_direction(uint8_t local_id, uint8_t target_dir);
 static void turn(uint8_t local_id);
 
 //-----------------------------------------------------------------------------------------------
@@ -212,6 +214,7 @@ void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y)
     local_actors.walking[local_id]     = WALKING_STATE_STOPPED;
     actors.x[actor_id]                 = local_actors.walk_to_x[local_id];
     actors.y[actor_id]                 = local_actors.walk_to_y[local_id];
+    actors.dir[actor_id]               = get_target_direction(local_id);
   
     vm_update_actors();
   }
@@ -314,6 +317,8 @@ void actor_next_step(uint8_t local_id)
     calculate_step(local_id);
   }
 
+  uint8_t target_dir = get_target_direction(local_id);
+
   if (is_walk_to_done(local_id)) {
     // debug_out("stop walking");
     stop_walking(local_id);
@@ -324,13 +329,13 @@ void actor_next_step(uint8_t local_id)
       actor_start_animation(local_id, ANIM_WALKING + actors.dir[actor_id]);
       local_actors.walking[local_id] = WALKING_STATE_CONTINUE;
     }
-    else if (local_actors.walk_dir[local_id] != actors.dir[actor_id]) {
+    else if (actors.dir[actor_id] != target_dir) {
       // debug_out("Turn");
       // turn but keep on walking
-      turn_to_walk_to_direction(local_id);
+      turn_to_direction(local_id, target_dir);
     }
     
-    if (local_actors.walk_dir[local_id] == actors.dir[actor_id]) {
+    if (actors.dir[actor_id] == target_dir) {
       int32_t x = actors.x[actor_id] * 0x10000 + local_actors.x_fraction[local_id];
       int32_t y = actors.y[actor_id] * 0x10000 + local_actors.y_fraction[local_id];
 
@@ -769,7 +774,7 @@ static void stop_walking(uint8_t local_id)
     }
     // debug_out(" turning to %d", target_dir);
     local_actors.walking[local_id] = WALKING_STATE_STOPPING;
-    turn_to_walk_to_direction(local_id);
+    turn_to_target_direction(local_id);
   }
   if (local_actors.walking[local_id] == WALKING_STATE_STOPPING && 
       (target_dir == 0xff || target_dir == actors.dir[actor_id])) {
@@ -812,8 +817,8 @@ static void calculate_next_box_point(uint8_t local_id)
   }
 
   uint8_t actor_id = local_actors.global_id[local_id];
-  uint8_t cur_x = actors.x[actor_id];
-  uint8_t cur_y = actors.y[actor_id];
+  uint8_t cur_x    = actors.x[actor_id];
+  uint8_t cur_y    = actors.y[actor_id];
 
   // debug_out("Cur %d Next %d Target %d", cur_box, next_box, target_box);
   walkbox_find_closest_box_point(next_box, &cur_x, &cur_y);
@@ -822,8 +827,8 @@ static void calculate_next_box_point(uint8_t local_id)
   uint8_t next_box_y = cur_y;
   walkbox_find_closest_box_point(cur_box, &cur_x, &cur_y);
   // debug_out("Current box point %d, %d", cur_x, cur_y);
-  local_actors.next_x[local_id] = cur_x;
-  local_actors.next_y[local_id] = cur_y;
+  local_actors.next_x[local_id]   = cur_x;
+  local_actors.next_y[local_id]   = cur_y;
   local_actors.next_box[local_id] = next_box;
   // debug_out("Adapted next box point %d, %d", cur_x, cur_y);
 }
@@ -831,10 +836,10 @@ static void calculate_next_box_point(uint8_t local_id)
 static void calculate_step(uint8_t local_id)
 {
   uint8_t actor_id = local_actors.global_id[local_id];
-  uint8_t x = actors.x[actor_id];
-  uint8_t y = actors.y[actor_id];
-  uint8_t next_x = local_actors.next_x[local_id];
-  uint8_t next_y = local_actors.next_y[local_id];
+  uint8_t x        = actors.x[actor_id];
+  uint8_t y        = actors.y[actor_id];
+  uint8_t next_x   = local_actors.next_x[local_id];
+  uint8_t next_y   = local_actors.next_y[local_id];
 
   // Take the diff between the current position and the walk_to position. Then, calculate the
   // fraction of the diff that the actor will move in this step. The dominant direction is always
@@ -842,8 +847,8 @@ static void calculate_step(uint8_t local_id)
   // the actor moves in a straight line from the current position to the walk_to position. The fraction 
   // is used with 16 bits of precision to avoid rounding errors.
 
-  int8_t x_diff = next_x - x;
-  int8_t y_diff = next_y - y;
+  int8_t x_diff  = next_x - x;
+  int8_t y_diff  = next_y - y;
   int32_t x_step = 0;
   int32_t y_step = 0;
 
@@ -898,14 +903,16 @@ static void calculate_step(uint8_t local_id)
 
 static void add_local_actor(uint8_t actor_id)
 {
-  uint8_t local_id = get_free_local_id();
-  actors.local_id[actor_id] = local_id;
+  uint8_t local_id                 = get_free_local_id();
+  actors.local_id[actor_id]        = local_id;
   local_actors.global_id[local_id] = actor_id;
-  activate_costume(actor_id);
-  uint8_t dir = actors.dir[actor_id];
-  reset_animation(local_id);
 
+  activate_costume(actor_id);
+  
+  uint8_t dir = actors.dir[actor_id];
   actor_place_at(actor_id, actors.x[actor_id], actors.y[actor_id]);
+
+  reset_animation(local_id);
 }
 
 static void remove_local_actor(uint8_t actor_id)
@@ -937,10 +944,49 @@ static void reset_animation(uint8_t local_id)
   actor_start_animation(local_id, ANIM_MOUTH_SHUT + dir);
 }
 
-static void turn_to_walk_to_direction(uint8_t local_id)
+/**
+  * @brief Get the direction the actor should face to walk to the target position.
+  *
+  * This function calculates the direction the actor should face to walk to the target position.
+  * The function takes into account the current direction of the actor and the walk-to direction.
+  *
+  * The function needs to have the current room mapped to DS when being called in order to access
+  * the walk boxes.
+  *
+  * @param local_id The local id of the actor.
+  * @return The direction the actor should face to walk to the target position.
+  */
+static uint8_t get_target_direction(uint8_t local_id)
+{
+  uint8_t target_dir;
+  uint8_t walk_box_direction = walkbox_get_box_classes(local_actors.cur_box[local_id]) & 0x07;
+  
+  switch (walk_box_direction) {
+    case 5:
+      target_dir = FACING_BACK;
+      break;
+    default:
+      if (local_actors.walking[local_id]) {
+        target_dir = local_actors.walk_dir[local_id];
+      }
+      else {
+        uint8_t actor_id = local_actors.global_id[local_id];
+        target_dir = actors.dir[actor_id];
+      }
+  }
+
+  return target_dir;
+}
+
+static void turn_to_target_direction(uint8_t local_id)
+{
+  uint8_t target_dir = get_target_direction(local_id);
+  turn_to_direction(local_id, target_dir);
+}
+
+static void turn_to_direction(uint8_t local_id, uint8_t target_dir)
 {
   uint8_t actor_id   = local_actors.global_id[local_id];
-  uint8_t target_dir = local_actors.walk_dir[local_id];
 
   if (target_dir == actor_invert_direction(actors.dir[actor_id])) {
     // actor is facing the opposite direction of the target direction

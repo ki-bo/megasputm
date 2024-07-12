@@ -1748,7 +1748,7 @@ static void set_box(void)
 {
   uint8_t box_id = resolve_next_param8();
   uint8_t class  = read_byte();
-  debug_out("set-box %d to %d", box_id, class);
+  // debug_out("set-box %d to %d", box_id, class);
   SAVE_DS_AUTO_RESTORE
   map_ds_resource(room_res_slot);
   walk_boxes[box_id].classes = class;
@@ -1852,7 +1852,7 @@ static void do_sentence(void)
   }
 
   case 2:
-    debug_msg("  print sentence on screen");
+    // debug_msg("  print sentence on screen");
     // prepare a new sentence for printing on screen
     vm_write_var(VAR_SENTENCE_VERB, sentence_verb);
     vm_write_var(VAR_SENTENCE_NOUN1, sentence_noun1);

@@ -46,6 +46,15 @@ uint8_t walkbox_get_box_masking(uint8_t box_id)
   return masking;
 }
 
+uint8_t walkbox_get_box_classes(uint8_t box_id)
+{
+  SAVE_DS_AUTO_RESTORE
+  map_ds_resource(room_res_slot);
+  __auto_type box = walk_boxes[box_id];
+  uint8_t classes = box.classes;
+  return classes;
+}
+
 uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
 {
   SAVE_DS_AUTO_RESTORE
