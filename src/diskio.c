@@ -41,8 +41,8 @@ static struct {
   uint8_t costume_room[40];
   uint16_t costume_offset[40];
   uint8_t num_script_resources;
-  uint8_t script_room[179];
-  uint16_t script_offset[179];
+  uint8_t script_room[155];
+  uint16_t script_offset[155];
   uint8_t num_sound_resources;
   uint8_t sound_room[120];
   uint16_t sound_offset[120];
@@ -84,8 +84,8 @@ static struct {
   uint8_t costume_room[40];
   uint16_t costume_offset[40];
   
-  uint8_t script_room[179];
-  uint16_t script_offset[179];
+  uint8_t script_room[155];
+  uint16_t script_offset[155];
 
   uint8_t sound_room[120];
   uint16_t sound_offset[120];
