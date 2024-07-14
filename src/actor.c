@@ -343,18 +343,25 @@ void actor_next_step(uint8_t local_id)
     stop_walking(local_id);
   }
   else {
+    uint8_t do_step;
+    uint8_t actor_dir = actors.dir[actor_id];
     if (local_actors.walking[local_id] == WALKING_STATE_STARTING) {
       // debug_out("Start walking");
       actor_start_animation(local_id, ANIM_WALKING + actors.dir[actor_id]);
       local_actors.walking[local_id] = WALKING_STATE_CONTINUE;
+      do_step = 1;
     }
-    else if (actors.dir[actor_id] != target_dir) {
+    else if (actor_dir != target_dir) {
       // debug_out("Turn");
       // turn but keep on walking
       turn_to_direction(local_id, target_dir);
+      do_step = 0;
+    }
+    else {
+      do_step = 1;
     }
     
-    if (actors.dir[actor_id] == target_dir) {
+    if (do_step && actor_dir == target_dir) {
       int32_t x = actors.x[actor_id] * 0x10000 + local_actors.x_fraction[local_id];
       int32_t y = actors.y[actor_id] * 0x10000 + local_actors.y_fraction[local_id];
 
