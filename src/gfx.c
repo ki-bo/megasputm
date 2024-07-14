@@ -1892,7 +1892,7 @@ static uint16_t text_style_to_color(enum text_style style)
       return 0x0e00;
     case TEXT_STYLE_SENTENCE:
     case TEXT_STYLE_INVENTORY:
-      return 0x0500;
+      return 0x0d00;
     case TEXT_STYLE_INVENTORY_ARROW:
       return 0x0100;
     default:
