@@ -1,28 +1,42 @@
+### Variablen
+
+# Definiert das Verzeichnis, in dem nach Quellcodes gesucht wird.
 VPATH = src
 
+# Assembler-, Compiler- und Linkerprogramme für den 6502-Prozessor
 AS = as6502
 CC = cc6502
 LN = ln6502
 
+# Konfigurationsvariable, die standardmäßig auf "default" gesetzt
 CONFIG ?= default
 
+# Sucht nach allen Dateien, die mit mm.sav. beginnen
 SAVE_FILES = $(wildcard mm.sav.*)
 
+# Flags für den Compiler, den Abhängigkeitsgenerator, den Assembler und den Linker
 CC_FLAGS  = --target=mega65 --code-model=plain -O2 -Werror --no-cross-call --strong-inline --inline-on-matching-custom-text-section --no-interprocedural-cross-jump --list-file=$(@:%.o=%.lst)
 DEP_FLAGS = -MMD -MP
 ASM_FLAGS = --target=mega65 --list-file=$(@:%.o=%.lst)
 LN_FLAGS  = --target=mega65 mega65-mm.scm --verbose --raw-multiple-memories --cstartup=mm --rtattr exit=simplified --rtattr printf=nofloat --output-format=raw --list-file=mm-mega65.lst
 
+### Tools und Emulatoren
+# Programme für das Laden von Dateien auf den MEGA65, den FTP-Client, das C1541-Tool und den 
+# Xemu-Emulator
 ETHLOAD   = etherload.osx
 M65FTP    = mega65_ftp.osx
 C1541     = c1541
 XMEGA65   = /Applications/Xemu/xmega65.app/Contents/MacOS/xmega65
 
+### Quell- und Objektdateien
+# Listen der C-Quellcodes, Assembler-Quellcodes, Objektdateien und Abhängigkeitsdateien
 C_SRCS    = $(wildcard src/*.c)
 ASM_SRCS  = $(wildcard src/*.s)
 OBJS      = $(ASM_SRCS:src/%.s=obj/%_s.o) $(C_SRCS:src/%.c=obj/%.o)
 DEPS      = $(OBJS:%.o=%.d)
 
+### Abhängigkeiten für die Konfigurationen
+# Fügt zusätzliche Flags hinzu, wenn die Konfiguration auf debug oder debug_scripts gesetzt ist
 ifeq ($(CONFIG),debug)
 	CC_FLAGS += -DDEBUG
 endif
@@ -35,14 +49,18 @@ export ETHLOAD_IP_PARAM
 
 -include $(DEPS)
 
+# Definiert Pseudotargets, die keine Dateien sind.
 .PHONY: all clean run debug_xemu doxygen
 
+# Definiert das Standardziel, das das Erstellen der mm.d81-Datei beinhaltet
 all: mm.d81
 
+# Lädt die mm.d81-Datei auf den MEGA65 hoch und startet sie
 run: mm.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm.d81"
 	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm.d81 -r autoboot.raw
 
+# Startet den Xemu-Emulator in einem tmux-Fenster
 debug_xemu: mm.d81
 	@echo "--------------------------------------------------"
 	@echo "Starting Xemu..."
@@ -51,6 +69,7 @@ debug_xemu: mm.d81
 	@echo "--------------------------------------------------"
 	tmux send-keys -t mmxemu "$(XMEGA65) -uartmon :4510 -8 mm.d81 -besure -curskeyjoy -videostd 0" C-m
 
+# Regeln zum Erstellen von Objektdateien aus Assembler- und C-Quellcodes.
 obj/%_s.o: %.s
 	@mkdir -p obj
 	$(AS) $(ASM_FLAGS) -o $@ $<
@@ -59,9 +78,11 @@ obj/%.o: %.c
 	@mkdir -p obj
 	$(CC) $(CC_FLAGS) $(DEP_FLAGS) -c $< -o $@ -MFobj/$*.d
 
+# Regel zum Linken der Objektdateien
 runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
+# Regel zum Erstellen des D81-Disk-Images
 mm.d81: runtime.raw $(SAVE_FILES)
 	@if [ ! -f gamedata/MM.D81 ]; then \
 		echo "MM.D81 not found, creating new .d81 disk image..."; \
@@ -79,9 +100,11 @@ mm.d81: runtime.raw $(SAVE_FILES)
 		fi \
 	done
 
+# Ziel zum Generieren der Dokumentation mit Doxygen
 doxygen:
 	doxygen Doxyfile
 
+# Löscht alle generierten Dateien
 clean:
 	-rm -rf obj
 	-rm *.raw *.d mm-mega65.lst mm.d81

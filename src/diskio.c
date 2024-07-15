@@ -704,7 +704,7 @@ void diskio_read(uint8_t *target_ptr, uint16_t size)
     uint8_t bytes_to_read = min(size, bytes_left_in_block);
     for (uint8_t i = 0; i < bytes_to_read; ++i) {
       *target_ptr = FDC.data;
-      //debug_out("%x=%x", ((uint16_t)target_ptr), *target_ptr);
+      // debug_out("%x=%x", ((uint16_t)target_ptr), *target_ptr);
       ++target_ptr;
     }
     
