@@ -121,6 +121,7 @@ static void jump_if_object_active_or_not_active(void);
 static void pick_up_object(void);
 static void camera_follows_actor(void);
 static void new_name_of(void);
+static void actor_moving(void);
 static void begin_override_or_say_line_selected_actor(void);
 static void begin_override(void);
 static void cursor(void);
@@ -262,6 +263,7 @@ void script_init(void)
   opcode_jump_table[0x53] = &actor_ops;
   opcode_jump_table[0x54] = &new_name_of;
   opcode_jump_table[0x55] = &find_actor;
+  opcode_jump_table[0x56] = &actor_moving;
   opcode_jump_table[0x57] = &set_or_clear_untouchable;
   opcode_jump_table[0x58] = &begin_override_or_say_line_selected_actor;
   opcode_jump_table[0x59] = &do_sentence;
@@ -1329,7 +1331,8 @@ static void do_animation(void)
   uint8_t local_id = actors.local_id[actor_id];
   if (local_id != 0xff) {
     if (animation_id < 0xf8) {
-      animation_id += actors.dir[actor_id];
+      animation_id &= ~0x03;
+      animation_id |= actors.dir[actor_id];
     }
     actor_start_animation(local_id, animation_id);
   }
@@ -2256,6 +2259,15 @@ static void new_name_of(void)
 
   vm_set_object_name(obj_id, new_name);
   vm_update_inventory();
+}
+
+static void actor_moving(void)
+{
+  uint8_t var_idx  = read_byte();
+  uint8_t actor_id = resolve_next_param8();
+  uint8_t local_id = actors.local_id[actor_id];
+  uint8_t moving   = local_id == 0xff ? 0 : local_actors.walking[local_id];
+  vm_write_var(var_idx, moving);
 }
 
 /**

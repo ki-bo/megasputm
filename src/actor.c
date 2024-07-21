@@ -935,7 +935,6 @@ static void add_local_actor(uint8_t actor_id)
 
   activate_costume(actor_id);
   
-  uint8_t dir = actors.dir[actor_id];
   actor_place_at(actor_id, actors.x[actor_id], actors.y[actor_id]);
 
   reset_animation(local_id);

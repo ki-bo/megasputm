@@ -80,10 +80,10 @@ enum {
 };
 
 enum {
-  FACING_LEFT = 0,
+  FACING_LEFT  = 0,
   FACING_RIGHT = 1,
   FACING_FRONT = 2,
-  FACING_BACK = 3
+  FACING_BACK  = 3
 };
 
 //-----------------------------------------------------------------------------------------------
