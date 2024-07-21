@@ -130,6 +130,7 @@ static void closest_actor(void);
 static void lock_or_unlock(void);
 static void script_running(void);
 static void preposition(void);
+static void no_operation(void);
 static void lights(void);
 static void current_room(void);
 static void jump_if_greater_or_equal(void);
@@ -281,6 +282,7 @@ void script_init(void)
   opcode_jump_table[0x69] = &set_owner_of;
   opcode_jump_table[0x6c] = &preposition;
   opcode_jump_table[0x6d] = &put_actor_in_room;
+  opcode_jump_table[0x6e] = &no_operation;
   opcode_jump_table[0x6f] = &jump_if_or_if_not_locked;
   opcode_jump_table[0x70] = &lights;
   opcode_jump_table[0x72] = &current_room;
@@ -2440,6 +2442,10 @@ static void preposition(void)
   }
 
   vm_write_var(var_idx, preposition);
+}
+
+static void no_operation(void)
+{
 }
 
 static void lights(void)

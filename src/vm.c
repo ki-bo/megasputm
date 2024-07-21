@@ -502,6 +502,7 @@ void vm_set_current_room(uint8_t room_no)
 
   if (room_no == 0) {
     gfx_clear_bg_image();
+    actor_room_changed();
     num_objects = 0;
   }
   else {
@@ -1169,9 +1170,9 @@ static void reset_game_state(void)
   while (++var_idx != 0);
 
   vm_state.num_actor_palettes = 1;
+  memset(&actors, 0, sizeof(actors));
   for (uint8_t i = 0; i < NUM_ACTORS; ++i) {
     actors.local_id[i]    = 0xff;
-    actors.room[i]        = 0;
     actors.palette_idx[i] = 1; // default actor palette is index 1
     if (i < MAX_LOCAL_ACTORS) {
       local_actors.global_id[i] = 0xff;
