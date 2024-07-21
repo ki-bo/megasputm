@@ -1384,7 +1384,7 @@ static void actor_ops(void)
       break;
     case 0x04:
       //debug_scr("actor %d costume %d", actor_id, param);
-      actors.costume[actor_id] = param;
+      actor_change_costume(actor_id, param);
       break;
     case 0x05:
       //debug_scr("actor %d talk-color %d", actor_id, param);
