@@ -648,6 +648,7 @@ static uint8_t run_active_slot(void)
     map_ds_resource(proc_res_slot[active_script_slot]);
   }
   pc = NEAR_U8_PTR(RES_MAPPED) + vm_state.proc_pc[active_script_slot];
+  ++proc_exec_count[active_script_slot];
   // check for PROC_STATE_RUNNING only will also mean we won't continue executing if
   // PROC_FLAGS_FROZEN is set.
   while (vm_get_active_proc_state_and_flags() == PROC_STATE_RUNNING && !(break_script)) {
@@ -729,7 +730,7 @@ static uint8_t find_free_script_slot(void)
   uint8_t slot;
   for (slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
-    if (vm_state.proc_state[slot] == PROC_STATE_FREE)
+    if (vm_state.proc_state[slot] == PROC_STATE_FREE && proc_exec_count[slot] == 0)
     {
       return slot;
     }

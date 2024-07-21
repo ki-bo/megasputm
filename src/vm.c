@@ -60,6 +60,7 @@ struct room_header {
 struct vm vm_state;
 uint8_t reset_game;
 uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
+uint8_t proc_exec_count[NUM_SCRIPT_SLOTS];
 
 volatile uint8_t script_watchdog;
 uint8_t ui_state;
@@ -265,6 +266,7 @@ __task void vm_mainloop(void)
     update_script_timers(elapsed_jiffies);
 
     //debug_out("New cycle, %d scripts active", vm_state.num_active_proc_slots);
+    memset(proc_exec_count, 0, NUM_SCRIPT_SLOTS);
     proc_slot_table_exec = 0;
     for (proc_slot_table_idx = 0; 
          proc_slot_table_idx < vm_state.num_active_proc_slots;
