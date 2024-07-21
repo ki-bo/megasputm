@@ -128,11 +128,13 @@ void actor_put_in_room(uint8_t actor_id, uint8_t room_no)
 
   if (actor_is_in_current_room(actor_id)) {
     remove_local_actor(actor_id);
+    vm_update_actors();
   }
 
   actors.room[actor_id] = room_no;
   if (room_no == vm_read_var8(VAR_SELECTED_ROOM)) {
     add_local_actor(actor_id);
+    vm_update_actors();
   }
 }
 
