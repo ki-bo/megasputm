@@ -105,7 +105,6 @@ uint8_t actor_find(uint8_t x, uint8_t y);
 void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y);
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y, uint8_t target_dir);
 void actor_walk_to_object(uint8_t actor_id, uint16_t object_id);
-uint8_t actor_is_walking(uint8_t local_id);
 void actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);
 void actor_update_animation(uint8_t local_id);

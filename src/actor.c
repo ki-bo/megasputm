@@ -305,12 +305,6 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
   actor_walk_to(actor_id, x, y, obj_actor_dir);
 }
 
-uint8_t actor_is_walking(uint8_t local_id)
-{
-  uint8_t walking = local_actors.walking[local_id];
-  return walking == WALKING_STATE_STARTING || walking == WALKING_STATE_CONTINUE;
-}
-
 void actor_next_step(uint8_t local_id)
 {
   if (local_actors.walking[local_id] == WALKING_STATE_STOPPED) {
@@ -597,7 +591,7 @@ void actor_draw(uint8_t local_id)
 
     if (cmd_offset != 0xff) {
       uint8_t *cmd_ptr = *cel_level_cmd_ptr;
-      uint8_t cmd      = cmd_ptr[cmd_offset];
+      uint8_t cmd = cmd_ptr[cmd_offset];
 
       if (cmd < 0x79) {
         __auto_type cel_ptrs_for_cur_level = NEAR_U16_PTR(RES_MAPPED + *cel_level_table_offset);
@@ -711,26 +705,15 @@ uint8_t actor_invert_direction(uint8_t dir)
 
 void actor_change_direction(uint8_t local_id, uint8_t dir)
 {
-  uint8_t walking      = actor_is_walking(local_id);
-  uint8_t actor_id     = local_actors.global_id[local_id];
+  uint8_t actor_id = local_actors.global_id[local_id];
   actors.dir[actor_id] = dir;
 
   __auto_type cel_anim = local_actors.cel_anim[local_id];
   for (uint8_t level = 0; level < 16; ++level) {
     if (cel_anim[level] != 0xff) {
       uint8_t cur_anim = cel_anim[level];
-      
-      // correct any animation that is not in sync with the current walking state
-      uint8_t cur_anim_without_dir = cur_anim & 0xfc;
-      if (cur_anim_without_dir == ANIM_STANDING && walking) {
-        cur_anim_without_dir = ANIM_WALKING;
-      }
-      else if (cur_anim_without_dir == ANIM_WALKING && !walking) {
-        cur_anim_without_dir = ANIM_STANDING;
-      }
-
       if ((cur_anim & 3) != dir) {
-        uint8_t new_anim = cur_anim_without_dir | dir;
+        uint8_t new_anim = (cel_anim[level] & 0xfc) | dir;
         actor_start_animation(local_id, new_anim);
       }
     }
