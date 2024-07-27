@@ -438,13 +438,15 @@ void vm_change_ui_flags(uint8_t flags)
                 (flags & (UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS));
     screen_update_needed |= SCREEN_UPDATE_SENTENCE | SCREEN_UPDATE_VERBS | SCREEN_UPDATE_INVENTORY;
     MAP_CS_GFX
-    if (screen_update_needed & SCREEN_UPDATE_SENTENCE && !(ui_state & UI_FLAGS_ENABLE_SENTENCE)) {
+    if (ui_state & UI_FLAGS_ENABLE_SENTENCE) {
+      vm_print_sentence();
+    } else {
       gfx_clear_sentence();
     }
-    if (screen_update_needed & SCREEN_UPDATE_VERBS && !(ui_state & UI_FLAGS_ENABLE_VERBS)) {
+    if (!(ui_state & UI_FLAGS_ENABLE_VERBS)) {
       gfx_clear_verbs();
     }
-    if (screen_update_needed & SCREEN_UPDATE_INVENTORY && !(ui_state & UI_FLAGS_ENABLE_INVENTORY)) {
+    if (!(ui_state & UI_FLAGS_ENABLE_INVENTORY)) {
       gfx_clear_inventory();
     }
     UNMAP_CS
@@ -525,7 +527,7 @@ void vm_set_current_room(uint8_t room_no)
 
   redraw_screen();
   vm_update_bg();
-  vm_update_sentence();
+  vm_print_sentence();
   UNMAP_CS
 }
 
@@ -960,6 +962,57 @@ void vm_camera_pan_to(uint8_t x)
   camera_target          = clamp_camera_x(x);
   camera_follow_actor_id = 0xff;
   camera_state           = CAMERA_STATE_MOVE_TO_TARGET_POS;
+}
+
+void vm_print_sentence(void)
+{
+  SAVE_DS_AUTO_RESTORE
+
+  sentence_length = 0;
+
+  //debug_out("Printing sentence");
+  uint8_t verb_slot = get_verb_slot_by_id(vm_read_var8(VAR_SENTENCE_VERB));
+  //debug_out("  Verb id %d slot %d", vm_read_var8(VAR_SENTENCE_VERB), verb_slot);
+  if (verb_slot != 0xff) {
+    map_ds_heap();
+    add_string_to_sentence(vm_state.verbs.name[verb_slot], 0);
+  }
+
+  uint16_t noun1 = vm_read_var(VAR_SENTENCE_NOUN1);
+  if (noun1) {
+    const char *noun1_name = get_object_name(noun1);
+    if (noun1_name) {
+      //debug_out("  Noun1 name: %s", noun1_name);
+      add_string_to_sentence(noun1_name, 1);
+    }
+  }
+  
+  uint8_t preposition = vm_read_var8(VAR_SENTENCE_PREPOSITION);
+  if (preposition) {
+    const char *preposition_name = get_preposition_name(preposition);
+    if (preposition_name) {
+      //debug_out("  Preposition name: %s", preposition_name);
+      add_string_to_sentence(preposition_name, 1);
+    }
+  }
+
+  uint16_t noun2 = vm_read_var(VAR_SENTENCE_NOUN2);
+  if (noun2) {
+    const char *noun2_name = get_object_name(noun2);
+    if (noun2_name) {
+      //debug_out("  Noun2 name: %s", noun2_name);
+      add_string_to_sentence(noun2_name, 1);
+    }
+  }
+
+  uint8_t num_chars = sentence_length;
+  while (num_chars < 40) {
+    sentence_text[num_chars] = '@';
+    ++num_chars;
+  }  
+  sentence_text[40] = '\0';
+
+  vm_update_sentence();
 }
 
 void vm_revert_sentence(void)
@@ -1487,7 +1540,6 @@ static void handle_input(void)
               vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
               vm_write_var(VAR_CLICKED_NOUN, inv_get_global_object_id(inventory_item_id));
               script_start(SCRIPT_ID_INPUT_EVENT);
-              vm_update_sentence();
               return;
             }
           }
@@ -1531,7 +1583,7 @@ static void handle_input(void)
         }
       }
       
-      update_sentence_line();
+      vm_print_sentence();
       UNMAP_CS
     }
     else if (input_key_pressed == 8) {
@@ -1758,58 +1810,9 @@ static void update_sentence_line(void)
     return;
   }
 
-  // no auto restore as this function is inlined
-  SAVE_DS
-
-  sentence_length = 0;
-
-  //debug_out("Printing sentence");
-  uint8_t verb_slot = get_verb_slot_by_id(vm_read_var8(VAR_SENTENCE_VERB));
-  //debug_out("  Verb id %d slot %d", vm_read_var8(VAR_SENTENCE_VERB), verb_slot);
-  if (verb_slot != 0xff) {
-    map_ds_heap();
-    add_string_to_sentence(vm_state.verbs.name[verb_slot], 0);
-  }
-
-  uint16_t noun1 = vm_read_var(VAR_SENTENCE_NOUN1);
-  if (noun1) {
-    const char *noun1_name = get_object_name(noun1);
-    if (noun1_name) {
-      //debug_out("  Noun1 name: %s", noun1_name);
-      add_string_to_sentence(noun1_name, 1);
-    }
-  }
-  
-  uint8_t preposition = vm_read_var8(VAR_SENTENCE_PREPOSITION);
-  if (preposition) {
-    const char *preposition_name = get_preposition_name(preposition);
-    if (preposition_name) {
-      //debug_out("  Preposition name: %s", preposition_name);
-      add_string_to_sentence(preposition_name, 1);
-    }
-  }
-
-  uint16_t noun2 = vm_read_var(VAR_SENTENCE_NOUN2);
-  if (noun2) {
-    const char *noun2_name = get_object_name(noun2);
-    if (noun2_name) {
-      //debug_out("  Noun2 name: %s", noun2_name);
-      add_string_to_sentence(noun2_name, 1);
-    }
-  }
-
-  uint8_t num_chars = sentence_length;
-  while (num_chars < 40) {
-    sentence_text[num_chars] = '@';
-    ++num_chars;
-  }  
-  sentence_text[40] = '\0';
-
   gfx_print_interface_text(0, 18, sentence_text, TEXT_STYLE_SENTENCE);
 
   prev_sentence_highlighted = 0;
-
-  RESTORE_DS
 }
 
 static void update_sentence_highlighting(void)
@@ -1906,7 +1909,6 @@ static void select_verb(uint8_t verb_id)
   vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_VERB_SELECT);
   vm_write_var(VAR_SELECTED_VERB, verb_id);
   script_start(SCRIPT_ID_INPUT_EVENT);
-  vm_update_sentence();
 }
 
 static const char *get_preposition_name(uint8_t preposition)

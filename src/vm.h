@@ -256,6 +256,7 @@ void vm_set_camera_follow_actor(uint8_t actor_id);
 void vm_camera_at(uint8_t x);
 void vm_set_camera_to(uint8_t x);
 void vm_camera_pan_to(uint8_t x);
+void vm_print_sentence(void);
 void vm_revert_sentence(void);
 void vm_verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name);
 void vm_verb_delete(uint8_t slot);

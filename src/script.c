@@ -1883,7 +1883,7 @@ static void do_sentence(void)
     vm_write_var(VAR_SENTENCE_VERB, sentence_verb);
     vm_write_var(VAR_SENTENCE_NOUN1, sentence_noun1);
     vm_write_var(VAR_SENTENCE_NOUN2, sentence_noun2);
-    vm_update_sentence();
+    vm_print_sentence();
   }
   
 }
