@@ -83,11 +83,11 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
   uint8_t corr_pos_x;
   uint8_t corr_pos_y;
   uint8_t dest_walk_box;
-
-  struct walk_box *walk_box = walk_boxes;
+  int8_t box_idx;
+  struct walk_box *walk_box;
 
   //debug_out("Correct pos %d, %d", *x, *y);
-  for (uint8_t box_idx = 0; box_idx < num_walk_boxes; ++box_idx, ++walk_box) {
+  for (box_idx = num_walk_boxes - 1, walk_box = &walk_boxes[num_walk_boxes - 1]; box_idx >= 0; --box_idx, --walk_box) {
     // skip invisible walk boxes when determining a point within one of the available walk boxes
     if (walk_box->classes & WALKBOX_CLASS_BOX_INVISIBLE) {
       continue;
@@ -96,9 +96,11 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
     uint8_t walk_box_y = *y;
     //debug_out("Checking box %d", box_idx);
     uint16_t distance = walkbox_get_corrected_box_position(walk_box, &walk_box_x, &walk_box_y);
-    //debug_out("  w_x,y: %d, %d d %d", walk_box_x, walk_box_y, distance);
-    if (walk_box_x == *x && walk_box_y == *y) {
+    //debug_out(" box %d w_x,y: %d, %d d %d", box_idx, walk_box_x, walk_box_y, distance);
+    if (distance == 0) {
       //debug_out("  inside box");
+      *x = walk_box_x;
+      *y = walk_box_y;
       return box_idx;
     }
     if (distance <= min_distance) {

@@ -53,16 +53,19 @@ typedef struct {
   uint8_t       cel_level_cur_cmd[MAX_LOCAL_ACTORS][16];
   uint8_t       cel_level_last_cmd[MAX_LOCAL_ACTORS][16];
   uint8_t       walking[MAX_LOCAL_ACTORS];
-  uint16_t      x_fraction[MAX_LOCAL_ACTORS];
-  uint16_t      y_fraction[MAX_LOCAL_ACTORS];
+  uint8_t       x_accum[MAX_LOCAL_ACTORS];
+  uint8_t       y_accum[MAX_LOCAL_ACTORS];
+  uint8_t       x_inc[MAX_LOCAL_ACTORS];
+  uint8_t       y_inc[MAX_LOCAL_ACTORS];
+  uint8_t       walk_diff[MAX_LOCAL_ACTORS];
+  int8_t        walk_step_x[MAX_LOCAL_ACTORS];
+  int8_t        walk_step_y[MAX_LOCAL_ACTORS];
   uint8_t       cur_box[MAX_LOCAL_ACTORS];
   uint8_t       target_dir[MAX_LOCAL_ACTORS];
   uint8_t       walk_dir[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_box[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_x[MAX_LOCAL_ACTORS];
   uint8_t       walk_to_y[MAX_LOCAL_ACTORS];
-  int32_t       walk_step_x[MAX_LOCAL_ACTORS];
-  int32_t       walk_step_y[MAX_LOCAL_ACTORS];
   uint8_t       next_box[MAX_LOCAL_ACTORS];
   uint8_t       next_x[MAX_LOCAL_ACTORS];
   uint8_t       next_y[MAX_LOCAL_ACTORS];
@@ -72,11 +75,12 @@ typedef struct {
 //-----------------------------------------------------------------------------------------------
 
 enum {
-  WALKING_STATE_STOPPED,
-  WALKING_STATE_STARTING,
-  WALKING_STATE_CONTINUE,
-  WALKING_STATE_STOPPING,
-  WALKING_STATE_FINISHED
+  WALKING_STATE_STOPPED  = 0,
+  WALKING_STATE_TURNING  = 1,
+  WALKING_STATE_CONTINUE = 2,
+  WALKING_STATE_STOPPING = 3,
+  WALKING_STATE_FINISHED = 4,
+  WALKING_STATE_RESTART  = 0x80
 };
 
 enum {
@@ -105,6 +109,7 @@ uint8_t actor_find(uint8_t x, uint8_t y);
 void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y);
 void actor_walk_to(uint8_t actor_id, uint8_t x, uint8_t y, uint8_t target_dir);
 void actor_walk_to_object(uint8_t actor_id, uint16_t object_id);
+void actor_stop_and_turn(uint8_t actor_id, uint8_t dir);
 void actor_next_step(uint8_t local_id);
 void actor_start_animation(uint8_t actor_id, uint8_t animation);
 void actor_update_animation(uint8_t local_id);

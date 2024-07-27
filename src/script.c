@@ -1133,7 +1133,7 @@ static void face_towards(void)
   }
 
   uint8_t x1 = actors.x[actor_id];
-  uint8_t y1 = actors.y[actor_id];
+  uint8_t y1 = actors.y[actor_id] - actors.elevation[actor_id];
 
   uint8_t x2, y2;
   if (vm_get_object_position(object_or_actor_id, &x2, &y2)) {
@@ -1156,8 +1156,8 @@ static void face_towards(void)
         new_dir = FACING_BACK;
       }
     }
-    local_actors.walking[local_id] = WALKING_STATE_STOPPED;
-    actor_walk_to(actor_id, x1, y1, new_dir);
+    
+    actor_stop_and_turn(actor_id, new_dir);
   }
 }
 
@@ -1636,6 +1636,7 @@ static void come_out_door(void)
   uint8_t dir = actor_invert_direction(obj_hdr->height_and_actor_dir & 0x03);
   actor_place_at(actor_id, x, y);
   actor_change_direction(actors.local_id[actor_id], dir);
+  actor_stop_and_turn(actor_id, dir);
   vm_set_camera_to(actors.x[actor_id]);
   vm_set_camera_follow_actor(actor_id);
   vm_revert_sentence();
@@ -1822,7 +1823,7 @@ static void do_sentence(void)
   uint8_t sentence_verb = resolve_next_param8();
 
   if (sentence_verb == 0xfb) {
-    //debug_scr("  sentence_verb: %d = RESET", sentence_verb);
+    // debug_scr("  sentence_verb: %d = RESET", sentence_verb);
     vm_revert_sentence();
     return;
   }

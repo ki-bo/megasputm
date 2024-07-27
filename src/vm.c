@@ -816,7 +816,7 @@ uint8_t vm_get_object_position(uint16_t global_object_id, uint8_t *x, uint8_t *y
       return 0;
     }
     *x = actors.x[global_object_id];
-    *y = actors.y[global_object_id];
+    *y = actors.y[global_object_id] - actors.elevation[global_object_id];
     return 1;
   }
 
@@ -2095,15 +2095,15 @@ static void read_walk_boxes(void)
   for (uint8_t i = 0; i < num_walk_boxes; ++i) {
     __auto_type box = (struct walk_box *)box_ptr;
     box_ptr += sizeof(struct walk_box);
-    // debug_out("Walk box %d:", i);
-    // debug_out("  uy:  %d", box->top_y);
-    // debug_out("  ly:  %d", box->bottom_y);
-    // debug_out("  ulx: %d", box->topleft_x);
-    // debug_out("  urx: %d", box->topright_x);
-    // debug_out("  llx: %d", box->bottomleft_x);
-    // debug_out("  lrx: %d", box->bottomright_x);
-    // debug_out("  mask: %x", box->mask);
-    // debug_out("  flags: %x", box->flags);
+    //debug_out("Walk box %d:", i);
+    //debug_out("  uy:  %d", box->top_y);
+    //debug_out("  ly:  %d", box->bottom_y);
+    //debug_out("  ulx: %d", box->topleft_x);
+    //debug_out("  urx: %d", box->topright_x);
+    //debug_out("  llx: %d", box->bottomleft_x);
+    //debug_out("  lrx: %d", box->bottomright_x);
+    //debug_out("  mask: %x", box->mask);
+    //debug_out("  classes: %x", box->classes);
   }
   walk_box_matrix = box_ptr;
   /*
