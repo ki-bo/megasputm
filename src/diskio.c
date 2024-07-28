@@ -1272,6 +1272,7 @@ static void load_block(uint8_t track, uint8_t block)
   }
 
   FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
+  *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
 
   if (!disable_cache && *cache_block >= 0) {
     // block is in cache
