@@ -975,7 +975,7 @@ void vm_print_sentence(void)
   uint8_t verb_slot = get_verb_slot_by_id(vm_read_var8(VAR_SENTENCE_VERB));
   //debug_out("  Verb id %d slot %d", vm_read_var8(VAR_SENTENCE_VERB), verb_slot);
   if (verb_slot != 0xff) {
-    map_ds_heap();
+    UNMAP_DS
     add_string_to_sentence(vm_state.verbs.name[verb_slot], 0);
   }
 
@@ -1084,13 +1084,29 @@ uint8_t vm_save_game(uint8_t slot)
   diskio_open_for_writing();
   diskio_write((uint8_t __huge *)savegame_magic, sizeof(savegame_magic));
   diskio_write((uint8_t __huge *)&version, 1);
+
+  // write global vm state
   diskio_write((uint8_t __huge *)&vm_state, sizeof(vm_state));
-  uint16_t inventory_num_bytes = (uint16_t)vm_state.inv_next_free - (uint16_t)INVENTORY_BASE;
-  diskio_write((uint8_t __huge *)INVENTORY_BASE, inventory_num_bytes);
+
+  // write inventory objects
+  UNMAP_DS
+  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
+    __auto_type object = vm_state.inv_objects[i];
+    if (object) {
+      diskio_write((uint8_t __huge *)object, object->chunk_size);
+    } 
+  }
+
+  // write actors
   diskio_write((uint8_t __huge *)&actors, sizeof(actors));
+
+  // write locked resources states
   diskio_write((uint8_t __huge *)&num_locked_resources, 1);
-  diskio_write(res_get_huge_ptr(heap_slot),     num_locked_resources * 2);
+  diskio_write(res_get_huge_ptr(heap_slot), num_locked_resources * 2);
+
+  // write palettes
   diskio_write(res_get_huge_ptr(heap_slot + 2), 0x300);
+
   diskio_close_for_writing(filename, FILE_TYPE_SEQ);
 
   res_free_heap(heap_slot);
@@ -1104,11 +1120,13 @@ uint8_t vm_load_game(uint8_t slot)
   uint8_t  magic_hdr[8];
   uint8_t  num_locked_resources;
 
-  uint8_t   cur_pc           = script_get_current_pc();
-  uint8_t   cur_script_id    = vm_state.proc_script_or_object_id[active_script_slot];
-  uint8_t   heap_slot        = res_reserve_heap(5);
-  uint16_t *locked_resources = NEAR_U16_PTR(RES_MAPPED);
-  uint8_t  *pal_ptr          = NEAR_U8_PTR(RES_MAPPED + 0x200);
+  uint8_t      cur_pc           = script_get_current_pc();
+  uint8_t      cur_script_id    = vm_state.proc_script_or_object_id[active_script_slot];
+  uint8_t      heap_slot        = res_reserve_heap(5);
+  __auto_type  heap_obj_huge    = (struct object_code __huge *)res_get_huge_ptr(heap_slot);
+  __auto_type  heap_obj_near    = (struct object_code *)RES_MAPPED;
+  uint16_t    *locked_resources = NEAR_U16_PTR(RES_MAPPED);
+  uint8_t     *pal_ptr          = NEAR_U8_PTR(RES_MAPPED + 0x200);
 
   SAVE_CS_AUTO_RESTORE
   MAP_CS_DISKIO
@@ -1132,15 +1150,31 @@ uint8_t vm_load_game(uint8_t slot)
 
   // read data from disk
   diskio_read((uint8_t *)&vm_state, sizeof(vm_state));
-  SAVE_DS_AUTO_RESTORE
-  UNMAP_DS
-  uint16_t inventory_num_bytes = (uint16_t)vm_state.inv_next_free - (uint16_t)INVENTORY_BASE;
-  diskio_read((uint8_t *)INVENTORY_BASE, inventory_num_bytes);
+
+  // read inventory objects
+  map_ds_resource(heap_slot);
+  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
+    if (!vm_state.inv_objects[i]) {
+      continue;
+    }
+    diskio_read((uint8_t *)heap_obj_near, 2);
+    diskio_read(((uint8_t *)heap_obj_near) + 2, heap_obj_near->chunk_size - 2);
+    // This will overwrite the inventory pointer vm_state.inv_objects[i] as it will
+    // allocate new memory for the object via malloc.
+    inv_copy_object_data(i, heap_obj_huge);
+  }
+
+  // read actors
   diskio_read((uint8_t *)&actors, sizeof(actors));
+
+  // read locked resources states
   diskio_read((uint8_t *)&num_locked_resources, 1);
   map_ds_resource(heap_slot);
   diskio_read((uint8_t *)locked_resources, num_locked_resources * 2);
+
+  // read palettes
   diskio_read(pal_ptr, 0x300);
+
   diskio_close_for_reading();
 
   // restore palettes
@@ -1209,15 +1243,16 @@ static void reset_game_state(void)
     vm_state.proc_wait_timer[i]          = 0;
   }
 
+  UNMAP_DS
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
     vm_state.verbs.id[i] = 0xff;
-    map_ds_heap();
-    if (vm_state.verbs.name[i]) {
-      free(vm_state.verbs.name[i]);
-      vm_state.verbs.name[i] = NULL;
-    }
-    UNMAP_DS
+    free(vm_state.verbs.name[i]);
   }
+  memset(&vm_state.verbs.name, 0, sizeof(vm_state.verbs.name));
+  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
+    free(vm_state.inv_objects[i]);
+  }
+  memset(&vm_state.inv_objects, 0, sizeof(vm_state.inv_objects));
   res_deactivate_and_unlock_all();
 
   uint8_t var_idx = 0;
@@ -1237,8 +1272,6 @@ static void reset_game_state(void)
   }
 
   vm_state.inv_num_objects   = 0;
-  vm_state.inv_objects[0]    = NULL;
-  vm_state.inv_next_free     = (void *)INVENTORY_BASE;
   vm_state.flashlight_width  = 6;
   vm_state.flashlight_height = 4;
 
@@ -1856,14 +1889,13 @@ static void update_verb_interface(void)
   gfx_clear_verbs();
   if (ui_state & UI_FLAGS_ENABLE_VERBS) {
     //debug_out("Updating verbs");
-    map_ds_heap();
+    UNMAP_DS
     for (uint8_t i = 0; i < MAX_VERBS; ++i) {
       if (vm_state.verbs.id[i] != 0xff) {
         gfx_print_interface_text(vm_state.verbs.x[i], vm_state.verbs.y[i], vm_state.verbs.name[i], TEXT_STYLE_NORMAL);
       }
     }
     prev_verb_highlighted = 0xff;
-    UNMAP_DS
   }
 }
 
@@ -2282,7 +2314,7 @@ static uint8_t get_hovered_verb_slot(void)
 static void verb_new(uint8_t slot, uint8_t verb_id, uint8_t x, uint8_t y, const char* name)
 {
   SAVE_DS_AUTO_RESTORE
-  map_ds_heap();
+  UNMAP_DS
 
   vm_state.verbs.id[slot] = verb_id;
   vm_state.verbs.x[slot]  = x;
@@ -2312,7 +2344,7 @@ static void verb_delete(uint8_t slot)
   SAVE_DS_AUTO_RESTORE
 
   vm_state.verbs.id[slot] = 0xff;
-  map_ds_heap();
+  UNMAP_DS
   free(vm_state.verbs.name[slot]);
   vm_state.verbs.name[slot] = NULL;
 

@@ -181,16 +181,6 @@ uint8_t *map_ds_ptr(void __huge *ptr);
 void map_ds_resource(uint8_t res_page);
 
 /**
-  * @brief Maps the DS to the heap memory
-  * 
-  * Maps the DS to the default heap memory. The heap memory is located at the beginning of
-  * the resource memory (0x18000-0x187ff). The heap is always 1 page (256 bytes) in size.
-  *
-  * Code section: code
-  */
-void map_ds_heap(void);
-
-/**
   * @brief Maps a room offset to DS
   *
   * Maps a room offset to DS. The room offset is a 16-bit value that points to a location

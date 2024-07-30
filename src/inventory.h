@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "vm.h"
 #include <stdint.h>
 
 struct inventory_display {
@@ -35,6 +36,8 @@ void inv_init();
 
 //code_main functions
 void inv_add_object(uint8_t local_object_id);
+void inv_copy_object_data(uint8_t target_pos, struct object_code __huge *object);
+void inv_remove_object(uint8_t position);
 struct object_code *inv_get_object_by_id(uint16_t global_object_id);
 uint8_t inv_object_available(uint16_t global_object_id);
 const char *inv_get_object_name(uint8_t position);

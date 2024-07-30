@@ -100,7 +100,7 @@ void __far *memcpy_to_bank(void __far *dest, const void *src, size_t n)
   return dest; 
 }
 
-void __far *memcpy_bank(void __far *dest, const void __far *src, size_t n)
+void __far *memcpy_chipram(void __far *dest, const void __far *src, size_t n)
 {
   global_dma.no_opt.end_of_options = 0;
   global_dma.no_opt.command        = 0;      // DMA copy command

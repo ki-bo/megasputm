@@ -96,30 +96,24 @@ __data_initialization_needed:
 		.extern __initialize_sections
 		jsr __initialize_sections
 
-		.section startup, noroot, noreorder
-		.pubweak __call_initialize_global_streams
-__call_initialize_global_streams:
-		.extern __initialize_global_streams
-		jsr __initialize_global_streams
-
 ;;; **** Initialize heap if needed.
 		.section startup, noroot, noreorder
 		.pubweak __call_heap_initialize
 __call_heap_initialize:
-		;lda #.byte0 __default_heap
-		;sta zp:_Zp+0
-		;lda #.byte1 __default_heap
-		;sta zp:_Zp+1
-		;lda #.byte0 (.sectionStart heap)
-		;sta zp:_Zp+2
-		;lda #.byte1 (.sectionStart heap)
-		;sta zp:_Zp+3
-		;lda #.byte0 (.sectionSize heap)
-		;sta zp:_Zp+4
-		;lda #.byte1 (.sectionSize heap)
-		;sta zp:_Zp+5
+		lda #.byte0 __default_heap
+		sta zp:_Zp+0
+		lda #.byte1 __default_heap
+		sta zp:_Zp+1
+		lda #.byte0 (.sectionStart heap)
+		sta zp:_Zp+2
+		lda #.byte1 (.sectionStart heap)
+		sta zp:_Zp+3
+		lda #.byte0 (.sectionSize heap)
+		sta zp:_Zp+4
+		lda #.byte1 (.sectionSize heap)
+		sta zp:_Zp+5
 		.extern __heap_initialize, __default_heap
-		;jsr __heap_initialize
+		jsr __heap_initialize
 
 		.section startup, root, noreorder
 		.extern main

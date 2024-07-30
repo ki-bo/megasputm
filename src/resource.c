@@ -83,12 +83,6 @@ void res_init(void)
 {
   memset(page_res_type, RES_TYPE_NONE, 256);
   memset(page_res_index, 0, 256);
-
-  // allocate pages for the compiler's heap and activate them
-  uint8_t heap_pages = (HEAP_SIZE + 255) / 256;
-  for (uint8_t i = 0; i < heap_pages; ++i) {
-    page_res_type[i] = RES_TYPE_HEAP | RES_ACTIVE_MASK;
-  }
 }
 
 /** @} */ // res_init

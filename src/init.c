@@ -23,7 +23,6 @@
 #include "dma.h"
 #include "diskio.h"
 #include "gfx.h"
-#include "heap.h"
 #include "input.h"
 #include "inventory.h"
 #include "map.h"
@@ -65,7 +64,6 @@ void global_init(void)
 
   // init main engine code
   res_init();    // resource module
-  heap_init();   // heap
   inv_init();    // inventory
   script_init(); // script parser
   actor_init();  // actor module

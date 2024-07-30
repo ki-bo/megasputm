@@ -193,7 +193,8 @@ struct vm
   
   uint8_t             inv_num_objects;
   struct object_code *inv_objects[MAX_INVENTORY];
-  uint8_t            *inv_next_free;
+  uint8_t             reserved1;
+  uint8_t             reserved2;
 
   uint8_t             flashlight_width;
   uint8_t             flashlight_height;

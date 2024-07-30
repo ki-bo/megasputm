@@ -24,7 +24,7 @@
 		.extern _Zp
 		.extern room_res_slot
 
-		.section code
+		.section code, noreorder
 		.public map_cs_main_priv
 map_cs_main_priv:
 		pha
@@ -32,6 +32,7 @@ map_cs_main_priv:
 		ldx #0x20
 		bra apply_map_cs
 
+		.section code, noreorder
 		.public map_cs_diskio
 map_cs_diskio:
 		pha
@@ -39,6 +40,7 @@ map_cs_diskio:
 		ldx #0x21
 		bra apply_map_cs
 
+		.section code, noreorder
 		.public map_cs_gfx
 map_cs_gfx:
 		pha
@@ -46,6 +48,7 @@ map_cs_gfx:
 		ldx #0x21
 		bra apply_map_cs
 
+		.section code, noreorder
 		.public map_cs_gfx2
 map_cs_gfx2:
 		pha
@@ -53,6 +56,7 @@ map_cs_gfx2:
 		ldx #0x20
 		bra apply_map_cs
 
+		.section code, noreorder
 		.public unmap_cs
 unmap_cs:
 		pha
@@ -60,12 +64,14 @@ unmap_cs:
 		tax
 		bra apply_map_cs
 
+		.section code, noreorder
 		.public unmap_ds
 unmap_ds:
 		ldy #0x00
 		ldz #0x00
 		bra apply_map_ds
 
+		.section code, noreorder
 		.public unmap_all
 unmap_all:
 		pha
@@ -98,6 +104,7 @@ apply_map_ds:
 		pla
 		rts
 
+		.section code, noreorder
 		.public map_auto_restore_cs
 map_auto_restore_cs:
 		plx
@@ -113,6 +120,7 @@ map_auto_restore_cs:
 		pla
 		rts
 
+		.section code, noreorder
 		.public map_auto_restore_ds
 map_auto_restore_ds:
 		plz
@@ -127,6 +135,7 @@ map_auto_restore_ds:
 		pla
 		rts
 
+		.section code, noreorder
 		.public map_restore_cs
 map_restore_cs:
 		sta zp:map_regs
@@ -137,6 +146,7 @@ map_restore_cs:
 		eom
 		rts
 
+		.section code, noreorder
 		.public map_restore_ds
 map_restore_ds:
 		lda zp:map_regs
@@ -148,6 +158,7 @@ map_restore_ds:
 		rts
 
 		// uint8_t *map_ds_ptr(void __huge *ptr);
+		.section code, noreorder
 		.public map_ds_ptr
 		// map_regs.ds = 0x3000 - 0x80 + (uint16_t)((uint32_t)ptr / 256);
   		// apply_map();
@@ -171,6 +182,7 @@ map_ds_ptr:
 		rts
 
 		// void map_ds_resource(uint8_t res_page);
+		.section code, noreorder
 		.public map_ds_resource
 		// // map offset: RESOURCE_MEMORY + page*256 - 0x8000
 		// map_regs.ds = 0x3000 + (RESOURCE_BASE / 256) + res_page - 0x80;
@@ -186,23 +198,8 @@ map_ds_resource:
 		eom
 		rts
 
-		// void map_ds_heap(void);
-		.public map_ds_heap
-		// // assuming heap will always be at the beginning of the resource memory
-		// // and the map window is a single 8kb block.
-		// map_regs.ds = 0x1000 + (RESOURCE_BASE / 256) - 0x80;
-map_ds_heap:
-		lda zp:map_regs
-		ldx zp:map_regs+1
-		ldy #0
-		sty zp:map_regs+2
-		ldz #0x11
-		stz zp:map_regs+3
-		map
-		eom
-		rts
-
 		// uint8_t *map_ds_room_offset(uint16_t room_offset);
+		.section code, noreorder
 		.public map_ds_room_offset
 map_ds_room_offset:
 		// uint8_t res_slot = room_res_slot + MSB(room_offset);

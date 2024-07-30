@@ -24,6 +24,7 @@
 #include "resource.h"
 #include "util.h"
 #include "vm.h"
+#include <stdlib.h>
 
 #pragma clang section bss="zdata"
 
@@ -55,31 +56,59 @@ void inv_init()
   */
 void inv_add_object(uint8_t local_object_id)
 {
-  __auto_type obj_hdr = (struct object_code __huge *)(res_get_huge_ptr(obj_page[local_object_id]) + obj_offset[local_object_id]);
-  uint16_t size = obj_hdr->chunk_size;
+  uint8_t inv_slot = 0xff;
 
-  uint16_t free_bytes = INVENTORY_BASE + INVENTORY_SIZE - (uint16_t)vm_state.inv_next_free;
-  if (free_bytes < size) {
-    fatal_error(ERR_OUT_OF_INVENTORY_SPACE);
+  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
+    if (!vm_state.inv_objects[i]) {
+      inv_slot = i;
+      break;
+    }
   }
-  else if (vm_state.inv_num_objects == MAX_INVENTORY) {
+  if (inv_slot == 0xff) {
     fatal_error(ERR_TOO_MANY_INVENTORY_OBJECTS);
   }
 
-  memcpy_bank((void __far *)vm_state.inv_next_free, (void __far *)obj_hdr, size);
+  __auto_type obj_hdr = (struct object_code __huge *)(res_get_huge_ptr(obj_page[local_object_id]) + obj_offset[local_object_id]);
+  uint16_t size = obj_hdr->chunk_size;
 
-  vm_state.inv_objects[vm_state.inv_num_objects] = (struct object_code *)vm_state.inv_next_free;
+  inv_copy_object_data(inv_slot, obj_hdr);
   ++vm_state.inv_num_objects;
-  vm_state.inv_next_free += size;
+}
+
+void inv_copy_object_data(uint8_t target_pos, struct object_code __huge *object)
+{
+  SAVE_DS_AUTO_RESTORE
+  UNMAP_DS
+
+  uint16_t size = object->chunk_size;
+
+  void *inv_obj = malloc(size);
+  if (!inv_obj) {
+    fatal_error(ERR_OUT_OF_HEAP_MEMORY);
+  }
+  debug_out("copy size %d", size);
+  memcpy_chipram((void __far *)inv_obj, (void __far *)object, size);
+
+  vm_state.inv_objects[target_pos] = inv_obj;
+}
+
+void inv_remove_object(uint8_t position)
+{
+  SAVE_DS_AUTO_RESTORE
+  UNMAP_DS
+
+  free(vm_state.inv_objects[position]);
+  vm_state.inv_objects[position] = NULL;
 }
 
 struct object_code *inv_get_object_by_id(uint16_t global_object_id)
 {
   UNMAP_DS
 
-  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
-    if (vm_state.inv_objects[i]->id == global_object_id) {
-      return vm_state.inv_objects[i];
+  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
+    __auto_type obj_hdr = vm_state.inv_objects[i];
+    if (obj_hdr && obj_hdr->id == global_object_id) {
+      return obj_hdr;
     }
   }
 
@@ -89,17 +118,7 @@ struct object_code *inv_get_object_by_id(uint16_t global_object_id)
 uint8_t inv_object_available(uint16_t global_object_id)
 {
   SAVE_DS_AUTO_RESTORE
-  UNMAP_DS
-  uint8_t result = 0;
-
-  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
-    if (vm_state.inv_objects[i]->id == global_object_id) {
-      result = 1;
-      break;
-    }
-  }
-  
-  return result;
+  return inv_get_position_by_id(global_object_id) != 0xff;
 }
 
 const char *inv_get_object_name(uint8_t position)
@@ -118,8 +137,9 @@ uint8_t inv_get_position_by_id(uint16_t global_object_id)
 {
   UNMAP_DS
 
-  for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
-    if (vm_state.inv_objects[i]->id == global_object_id) {
+  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
+    __auto_type obj_hdr = vm_state.inv_objects[i];
+    if (obj_hdr && obj_hdr->id == global_object_id) {
       return i;
     }
   }
@@ -146,16 +166,25 @@ void inv_update_displayed_inventory(void)
 
   uint8_t actor_id            = vm_read_var8(VAR_SELECTED_ACTOR);
   uint8_t owner_inventory_pos = 0;
-  
+  uint8_t num_objects         = vm_state.inv_num_objects;
+
   inv_ui_entries.num_entries = 0;
   inv_ui_entries.prev_id     = 0xff;
   inv_ui_entries.next_id     = 0xff;
 
   do {
-    for (uint8_t i = 0; i < vm_state.inv_num_objects; ++i) {
-      __auto_type object_ptr   = vm_state.inv_objects[i];
-      uint16_t    object_id    = object_ptr->id;
-      uint8_t     object_owner = vm_state.global_game_objects[object_id] & 0x0f;
+    uint8_t inv_obj_processed = 0;
+    for (uint8_t i = 0; i < MAX_INVENTORY && inv_obj_processed < vm_state.inv_num_objects; ++i) {
+      __auto_type object_ptr = vm_state.inv_objects[i];
+      
+      if (!object_ptr) {
+        continue;
+      }
+
+      ++inv_obj_processed;
+
+      uint16_t object_id    = object_ptr->id;
+      uint8_t  object_owner = vm_state.global_game_objects[object_id] & 0x0f;
       
       if (object_owner == actor_id) {
         if (owner_inventory_pos < inventory_pos) {

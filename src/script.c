@@ -452,8 +452,7 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
   for (script_slot = 0; script_slot < NUM_SCRIPT_SLOTS; ++script_slot) {
     if (vm_state.proc_state[script_slot] != PROC_STATE_FREE &&
         vm_state.proc_type[script_slot] == (type & (PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB)) &&
-        vm_state.proc_script_or_object_id[script_slot] == LSB(global_object_id) &&
-        vm_state.proc_object_id_msb[script_slot] == MSB(global_object_id)) {
+        make16(vm_state.proc_script_or_object_id[script_slot], vm_state.proc_object_id_msb[script_slot]) == global_object_id) {
       if (script_slot == active_script_slot) {
         debug_out("Current script tried to execute object script %d again, ignoring", global_object_id);
         return;
@@ -1680,9 +1679,25 @@ static void jump_if_or_if_not_equal_zero(void)
 
 static void set_owner_of(void)
 {
-  uint16_t obj_id = resolve_next_param16();
-  uint8_t owner_id = resolve_next_param8();
+  uint16_t obj_id   = resolve_next_param16();
+  uint8_t  owner_id = resolve_next_param8();
+
   //debug_scr("owner-of %d is %d", obj_id, owner_id);
+  
+  if (owner_id == 0) {
+    SAVE_DS_AUTO_RESTORE
+    uint8_t inv_pos = inv_get_position_by_id(obj_id);
+    if (inv_pos != 0xff) {
+      inv_remove_object(inv_pos);
+      for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
+        if (vm_state.proc_state[i] != PROC_STATE_FREE && 
+            vm_state.proc_type[i] & PROC_TYPE_INVENTORY && 
+            make16(vm_state.proc_script_or_object_id[i], vm_state.proc_object_id_msb[i]) == obj_id) {
+          script_stop_slot(i);
+        }
+      }
+    }
+  }
   vm_state.global_game_objects[obj_id] = (vm_state.global_game_objects[obj_id] & 0xf0) | owner_id;
   vm_update_inventory();
 }

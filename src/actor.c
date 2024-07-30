@@ -602,7 +602,7 @@ void actor_draw(uint8_t local_id)
   local_actors.bounding_box_height[local_id] = (max_y - min_y + 1) >> 1;
 
   // step 2: allocate an empty canvas for the actor 
-  //  debug_out("prepare min_x %d, min_y %d, width %d, height %d", min_x, min_y, width, height);
+  //debug_out("prepare min_x %d, min_y %d, width %d, height %d", min_x, min_y, width, height);
   uint8_t palette;
   if (vm_read_var8(VAR_CURRENT_LIGHTS) >= 11) {
     palette = actors.palette_idx[global_id];
