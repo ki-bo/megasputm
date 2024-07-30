@@ -110,12 +110,29 @@ void input_update(void)
   if (input_key_pressed == 0) { // = 0 means previous key was processed
     uint8_t key_pressed_ascii = ASCIIKEY;
     if (key_pressed_ascii != 0) {
-      if (key_pressed_ascii == INPUT_ASCII_ESCAPE || key_pressed_ascii == INPUT_ASCII_RUNSTOP) {
-        input_key_pressed = vm_read_var8(VAR_CUTSCENEEXIT_KEY);
+      if (key_pressed_ascii == INPUT_ASCII_ESCAPE || key_pressed_ascii == INPUT_ASCII_RUNSTOP || key_pressed_ascii == 0xf4) {
+        input_key_pressed = vm_read_var8(VAR_OVERRIDE_KEY);
       }
       else if (key_pressed_ascii >= 0xf1 && key_pressed_ascii <= 0xfe) {
         // handling function keys
-        input_key_pressed = key_pressed_ascii - 0xf0;
+        switch (key_pressed_ascii)
+        {
+          case 0xf1:
+            input_key_pressed = 1;
+            break;
+          case 0xf3:
+            input_key_pressed = 2;
+            break;
+          case 0xf5:
+            input_key_pressed = 3;
+            break;
+          case 0xf8:
+            input_key_pressed = 8;
+            break;
+          case 0xf9:
+            input_key_pressed = 5;
+            break;
+        }
       }
       else if (key_pressed_ascii >= 0x61 && key_pressed_ascii <= 0x7a) {
         // handling A-Z keys

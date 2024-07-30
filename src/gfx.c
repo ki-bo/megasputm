@@ -977,7 +977,7 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 
   masking_data_room_offset = bg_masking_offset;
   uint8_t *src = map_ds_room_offset(bg_masking_offset);
-  // debug_out("Decode masking buffer, width: %d\n", width);
+  //debug_out("Decode masking buffer, width: %d\n", width);
   uint8_t mask_col = 0;
   uint16_t num_bytes = width * (GFX_HEIGHT / 8);
   uint8_t remaining_pixels = GFX_HEIGHT;
@@ -992,8 +992,8 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
 
     // count_byte &= 0x80;
     // uint8_t data_byte = *src;
-    // debug_out("  remaining pixels[%d]: %d\n", mask_col - 1, remaining_pixels);
-    // debug_out("bytes left: %d fill: %d, iterations: %d, data_byte: %d @offset %d", num_bytes, count_byte!=0, iterations, data_byte, mask_data_offset);
+    //debug_out("  remaining pixels[%d]: %d\n", mask_col - 1, remaining_pixels);
+    //debug_out("bytes left: %d fill: %d, iterations: %d, data_byte: %d @offset %d", num_bytes, count_byte!=0, iterations, data_byte, mask_data_offset);
 
     if (iterations > remaining_pixels) {
       num_bytes -= iterations;
@@ -1008,8 +1008,8 @@ void gfx_decode_masking_buffer(uint16_t bg_masking_offset, uint16_t width)
       }
       masking_cache_iterations[mask_col] = cache_iterations;
       masking_cache_data_offset[mask_col] = cache_data_offset;
-      // debug_out("  cache_iterations[%d] = %d (%d)\n", mask_col, masking_cache_iterations[mask_col] & 0x7f, masking_cache_iterations[mask_col]);
-      // debug_out("  cache_offset[%d]     = %d\n", mask_col, masking_cache_data_offset[mask_col]);
+      //debug_out("  cache_iterations[%d] = %d (%d)\n", mask_col, masking_cache_iterations[mask_col] & 0x7f, masking_cache_iterations[mask_col]);
+      //debug_out("  cache_offset[%d]     = %d\n", mask_col, masking_cache_data_offset[mask_col]);
       ++mask_col;
       remaining_pixels = GFX_HEIGHT - iterations;
     }

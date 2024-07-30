@@ -344,7 +344,7 @@ void actor_next_step(uint8_t local_id)
   }
 
   if (actors.dir[actor_id] != local_actors.walk_dir[local_id]) {
-    // debug_out("turn");
+    //debug_out("turn");
     turn_to_direction(local_id, local_actors.walk_dir[local_id]);
     return;
   }
@@ -382,7 +382,7 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
   map_ds_resource(local_actors.res_slot[local_id]);
 
   __auto_type costume_hdr = (struct costume_header *)RES_MAPPED;
-  // debug_out("Local actor %d start animation %d", local_id, animation);
+  //debug_out("Local actor %d start animation %d", local_id, animation);
   if (animation >= costume_hdr->num_animations + 1 || !costume_hdr->animation_offsets[animation]) {
     return;
   }
@@ -406,7 +406,7 @@ void actor_start_animation(uint8_t local_id, uint8_t animation)
         *cel_level_last_cmd = *anim_ptr++;
       }
       *cel_anim = animation;
-      // debug_out("    cur %d last %d cmd_ptr %x", *cel_level_cur_cmd, *cel_level_last_cmd, (uint16_t)*cel_level_cmd_ptr);
+      //debug_out("    cur %d last %d cmd_ptr %x", *cel_level_cur_cmd, *cel_level_last_cmd, (uint16_t)*cel_level_cmd_ptr);
     }  
     cel_level_mask <<= 1;
     ++cel_anim;
@@ -543,7 +543,7 @@ void actor_draw(uint8_t local_id)
   int16_t dy = -100;
 
   for (uint8_t level = 0; level < 16; ++level) {
-    // debug_out("level %d", level);
+    //debug_out("level %d", level);
     
     uint8_t cmd_offset = *cel_level_cur_cmd;
     cel_data[level] = NULL;
@@ -572,7 +572,7 @@ void actor_draw(uint8_t local_id)
         int16_t cel_y    = pos_y + dy_level;
         
         // adjust bounding box for all cels
-        // debug_out("min_y %d, cel_y %d, max_y %d", min_y, cel_y, max_y);
+        //debug_out("min_y %d, cel_y %d, max_y %d", min_y, cel_y, max_y);
         min_x = min(min_x, cel_x);
         min_y = min(min_y, cel_y);
         max_x = max(max_x, cel_x + (int16_t)cur_cel_data->width);
@@ -628,7 +628,7 @@ void actor_draw(uint8_t local_id)
   if (masking) {
     gfx_apply_actor_masking(min_x, min_y, masking);
   }
-  // debug_out("actor done");
+  //debug_out("actor done");
 }
 
 void actor_start_talking(uint8_t actor_id)
@@ -832,7 +832,7 @@ static void stop_walking(uint8_t local_id)
   }
 
   if (local_actors.walking[local_id] == WALKING_STATE_FINISHED) {
-    // debug_out(" stopped");
+    //debug_out(" stopped");
     local_actors.walking[local_id] = WALKING_STATE_STOPPED;
     actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
     return;
@@ -843,7 +843,7 @@ static void stop_walking(uint8_t local_id)
   }
   update_walk_direction(local_id);
   if (actors.dir[actor_id] != local_actors.walk_dir[local_id]) {
-    // debug_out(" turning to %d", target_dir);
+    //debug_out(" turning to %d", target_dir);
     
     if (!turn_to_target_direction(local_id)) {
       local_actors.walking[local_id] = WALKING_STATE_STOPPING;
@@ -853,7 +853,7 @@ static void stop_walking(uint8_t local_id)
     }
   }
   else {
-    // debug_out(" stopping");
+    //debug_out(" stopping");
     local_actors.walking[local_id] = WALKING_STATE_FINISHED;
   }
 }
@@ -968,7 +968,7 @@ static void remove_local_actor(uint8_t actor_id)
   deactivate_costume(actor_id);
   local_actors.global_id[actors.local_id[actor_id]] = 0xff;
   actors.local_id[actor_id] = 0xff;
-  // debug_out("Actor %d is no longer in current room", actor_id);
+  //debug_out("Actor %d is no longer in current room", actor_id);
 }
 
 static void reset_animation(uint8_t local_id)

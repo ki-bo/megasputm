@@ -615,6 +615,7 @@ void vm_cut_scene_begin(void)
 void vm_cut_scene_end(void)
 {
   //debug_out("cut-scene ended");
+  vm_write_var(VAR_OVERRIDE_HIT, 0);
   camera_state = vm_state.cs_camera_state;
   if (camera_state & CAMERA_STATE_FOLLOW_ACTOR) {
     vm_set_camera_follow_actor(vm_read_var8(VAR_SELECTED_ACTOR));
@@ -1197,7 +1198,8 @@ uint8_t vm_load_game(uint8_t slot)
   * @{
   */
 
-#pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
+#pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
+//#pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
 static void reset_game_state(void)
 {
   for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
@@ -1558,7 +1560,7 @@ static void handle_input(void)
 
   // keyboard handling
   if (input_key_pressed) {
-    if (input_key_pressed == vm_read_var8(VAR_CUTSCENEEXIT_KEY)) {
+    if (input_key_pressed == vm_read_var8(VAR_OVERRIDE_KEY)) {
       override_cutscene();
     }
     else if (input_key_pressed == 0x20) {
@@ -1653,14 +1655,16 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
 
 static void update_script_timers(uint8_t elapsed_jiffies)
 {
+  ++elapsed_jiffies;
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
     // checking for equality will also make sure we won't update slots that are frozen
     if (vm_state.proc_state[slot] == PROC_STATE_WAITING_FOR_TIMER)
     {
       vm_state.proc_wait_timer[slot] += elapsed_jiffies;
-      uint8_t timer_msb = (uint8_t)((uintptr_t)(vm_state.proc_wait_timer[slot]) >> 24);
-      if (timer_msb == 0)
+      //uint8_t timer_msb = (uint8_t)((uintptr_t)(vm_state.proc_wait_timer[slot]) >> 24);
+      //if (timer_msb == 0)
+      if (vm_state.proc_wait_timer[slot] > 0)
       {
         set_proc_state(slot, PROC_STATE_RUNNING);
       }
@@ -1800,6 +1804,7 @@ static void override_cutscene(void)
     if (vm_state.proc_state[vm_state.cs_proc_slot] == PROC_STATE_WAITING_FOR_TIMER) {
       vm_state.proc_state[vm_state.cs_proc_slot] = PROC_STATE_RUNNING;
     }
+    vm_write_var(VAR_OVERRIDE_KEY, 1);
   }
 }
 

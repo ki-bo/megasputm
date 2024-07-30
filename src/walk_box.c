@@ -209,28 +209,28 @@ void walkbox_find_closest_box_point(uint8_t box_id, uint8_t *px, uint8_t *py)
 
   struct walk_box *box = &walk_boxes[box_id];
 
-  // debug_out("Finding closest point on box %d to %d, %d", box_id, *px, *py);
+  //debug_out("Finding closest point on box %d to %d, %d", box_id, *px, *py);
   if (*py <= box->top_y) {
     // above box
-    // debug_out("  above box");
+    //debug_out("  above box");
     find_closest_point_on_line(box->topleft_x, box->top_y, box->topright_x, box->top_y, px, py);
   }
   else if (*py >= box->bottom_y) {
     // below box
-    // debug_out("  below box");
+    //debug_out("  below box");
     find_closest_point_on_line(box->bottomleft_x, box->bottom_y, box->bottomright_x, box->bottom_y, px, py);
   }
   else {
     // left of box
     if (*px < box->topright_x && *px < box->bottomright_x) {
-      // debug_out("  left of box");
+      //debug_out("  left of box");
       uint8_t x1 = min(box->topleft_x, box->bottomleft_x);
       uint8_t x2 = max(box->topleft_x, box->bottomleft_x);
       find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);
     }
     // right of box
     else {
-      // debug_out("  right of box");
+      //debug_out("  right of box");
       uint8_t x1 = min(box->topright_x, box->bottomright_x);
       uint8_t x2 = max(box->topright_x, box->bottomright_x);
       find_closest_point_on_line(x1, box->top_y, x2, box->bottom_y, px, py);

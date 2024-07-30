@@ -167,6 +167,7 @@ static void step_to_track(uint8_t track);
 static void search_file(const char *filename, uint8_t file_type);
 static void seek_to(uint16_t offset);
 static void load_block(uint8_t track, uint8_t block);
+static void read_whole_track(uint8_t track);
 static void prepare_drive(void);
 static void acquire_drive(void);
 static void release_drive(void);
@@ -1284,65 +1285,82 @@ static void load_block(uint8_t track, uint8_t block)
     last_side = side;
   }
   else {
-    prepare_drive();
-    // block is not in cache - need to read it from disk
-
-    if (physical_sector != last_physical_sector || track != last_physical_track || side != last_side) {
-      if (side == 0) {
-        FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
+    if (!disable_cache && (*(uint8_t *)(0xd6a1) & 1)) {
+      read_whole_track(track);
+      if (*cache_block < 0) {
+        disk_error(ERR_READ_TRACK_FAILED);
       }
       else {
-        FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
+        // block is in cache
+        dmalist_copy_from_cache.src_addr = LSB16(cache_block);
+        dmalist_copy_from_cache.src_bank = BANK(cache_block);
+        dma_trigger(&dmalist_copy_from_cache);
+        last_physical_track = track;
+        last_physical_sector = physical_sector;
+        last_side = side;
       }
+    }
+    else {
+      prepare_drive();
+      // block is not in cache - need to read it from disk
 
-      step_to_track(track);
+      if (physical_sector != last_physical_sector || track != last_physical_track || side != last_side) {
+        if (side == 0) {
+          FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
+        }
+        else {
+          FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
+        }
 
-      FDC.track = track;
-      FDC.sector = physical_sector;
-      FDC.side = side;
+        step_to_track(track);
 
-      FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
-    
-      FDC.command = FDC_CMD_READ_SECTOR;
+        FDC.track = track;
+        FDC.sector = physical_sector;
+        FDC.side = side;
 
-      // RNF or CRC flags indicate an error (RNF = not found, CRC = data error)
-      // DRQ and EQ flags both set indicates that the sector was completely read
-      // We need to make sure the CPU read pointer is reset to the beginning of the sector buffer
-      // (we made sure to disable SWAP first, otherwise the CPU read pointer will be reset to the
-      // middle of the sector buffer and EQ won't get set)
-      //
-      // NOTE: While this is true for real drives, seems the FDC in the MEGA65 does not set EQ
-      //       when the CPU read pointer is reset to the beginning of the sector buffer and
-      //       disk images are used. So, we dont check for EQ when the sector is read.
-      //       Usually, when BUSY is cleared, the status should report DRQ and EQ set.
-      //       We just rely on the data being in the buffer once BUSY is cleared.
-      while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
-      if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
-        //debug_out("unable to find track %d, sector %d, side %d\n", track, physical_sector, side);
-        disk_error(ERR_SECTOR_NOT_FOUND);
+        FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
+      
+        FDC.command = FDC_CMD_READ_SECTOR;
+
+        // RNF or CRC flags indicate an error (RNF = not found, CRC = data error)
+        // DRQ and EQ flags both set indicates that the sector was completely read
+        // We need to make sure the CPU read pointer is reset to the beginning of the sector buffer
+        // (we made sure to disable SWAP first, otherwise the CPU read pointer will be reset to the
+        // middle of the sector buffer and EQ won't get set)
+        //
+        // NOTE: While this is true for real drives, seems the FDC in the MEGA65 does not set EQ
+        //       when the CPU read pointer is reset to the beginning of the sector buffer and
+        //       disk images are used. So, we dont check for EQ when the sector is read.
+        //       Usually, when BUSY is cleared, the status should report DRQ and EQ set.
+        //       We just rely on the data being in the buffer once BUSY is cleared.
+        while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
+        if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
+          //debug_out("unable to find track %d, sector %d, side %d\n", track, physical_sector, side);
+          disk_error(ERR_SECTOR_NOT_FOUND);
+        }
+
+        wait_for_busy_clear(); // sector reading to buffer completed when BUSY is cleared
+
+        //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
+        if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
+          //debug_out("FDC status: %x", FDC.status)
+          disk_error(ERR_SECTOR_DATA_CORRUPT);
+        }
+
+        // copy the sector to the cache
+        if (!disable_cache) {
+          dmalist_copy_to_cache.dst_addr = LSB16(cache_block);
+          dmalist_copy_to_cache.dst_bank = BANK(cache_block);
+          dma_trigger(&dmalist_copy_to_cache);
+        }
+
+        last_physical_track = track;
+        last_physical_sector = physical_sector;
+        last_side = side;
+
+        // reset jiffy counter for drive access check
+        jiffies_elapsed_since_last_drive_access = 0;
       }
-
-      wait_for_busy_clear(); // sector reading to buffer completed when BUSY is cleared
-
-      //if ((status & (FDC_RNF_MASK | FDC_CRC_MASK | FDC_DRQ_MASK | FDC_EQ_MASK)) != (FDC_DRQ_MASK | FDC_EQ_MASK)) {
-      if (FDC.status & (FDC_RNF_MASK | FDC_CRC_MASK)) {
-        //debug_out("FDC status: %x", FDC.status)
-        disk_error(ERR_SECTOR_DATA_CORRUPT);
-      }
-
-      // copy the sector to the cache
-      if (!disable_cache) {
-        dmalist_copy_to_cache.dst_addr = LSB16(cache_block);
-        dmalist_copy_to_cache.dst_bank = BANK(cache_block);
-        dma_trigger(&dmalist_copy_to_cache);
-      }
-
-      last_physical_track = track;
-      last_physical_sector = physical_sector;
-      last_side = side;
-
-      // reset jiffy counter for drive access check
-      jiffies_elapsed_since_last_drive_access = 0;
     }
   }
 
@@ -1352,6 +1370,66 @@ static void load_block(uint8_t track, uint8_t block)
   else {
     FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap
   }
+}
+
+static void read_whole_track(uint8_t track)
+{
+  char buf[512];
+
+  prepare_drive();
+  step_to_track(track);
+  FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
+  FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
+  uint8_t __far *cache_block = NULL;
+  uint8_t sector = 1;
+  uint8_t side   = 0;
+
+  for (uint8_t s = 0; s < 21; ++s, ++sector) {
+
+    if (s != 0 && cache_block && *cache_block == 0xff) {
+      memcpy_far(cache_block, (uint8_t __far *)buf, 512);
+    }
+    if (s == 10) {
+      FDC.fdc_control &= ~FDC_SIDE_MASK; // select side 1
+      side = 1;
+      sector -= 10;
+    } else if (s == 20) {
+      break;
+    }
+
+    FDC.track  = current_track;
+    FDC.sector = sector;
+    FDC.side   = side;
+
+    //debug_out("loading track %d, sector %d, side %d\n", current_track, s + 1, side);
+    FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
+    FDC.command = FDC_CMD_READ_SECTOR;
+
+    while (!(FDC.status & (FDC_RDREQ_MASK | FDC_RNF_MASK | FDC_CRC_MASK))) continue; // wait for sector found (RDREQ) or error (RNF or CRC)
+    if (!(FDC.status & FDC_RDREQ_MASK)) { // sector not found (RNF or CRC error)
+      //debug_out("unable to find track %d, sector %d, side %d\n", track, physical_sector, side);
+      disk_error(ERR_SECTOR_NOT_FOUND);
+    }
+
+    const uint32_t cache_offset = (uint32_t)(current_track * 20 + s) * 512UL;
+    cache_block = FAR_U8_PTR(DISK_CACHE + cache_offset);
+
+    while (!(FDC.status & FDC_DRQ_MASK)) continue; // wait for DRQ set
+
+    if (*cache_block == 0xff) {
+      *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
+      for (uint16_t i = 0; i < 512; ++i) {
+        while (FDC.status & FDC_EQ_MASK && FDC.status & FDC_BUSY_MASK) continue; // wait for DRQ set and EQ cleared
+        buf[i] = FDC.data;
+      }
+    }
+    else {
+      wait_for_busy_clear();
+    }
+  }
+
+  // reset jiffy counter for drive access check
+  jiffies_elapsed_since_last_drive_access = 0;
 }
 
 /**
@@ -1618,7 +1696,7 @@ static void write_block(uint8_t track, uint8_t block, uint8_t __far *block_data_
 
 static void write_sector(uint8_t track, uint8_t sector, uint8_t __far *sector_buf_far)
 {
-  // debug_out("writing track %d, sector %d from buffer %lx", track, sector, (uint32_t)sector_buf_far);
+  //debug_out("writing track %d, sector %d from buffer %lx", track, sector, (uint32_t)sector_buf_far);
   __auto_type fdc_dst = FAR_U8_PTR(0xffd6c00);
   memcpy_far(fdc_dst, sector_buf_far, 0x200);
   write_sector_from_fdc_buf(track, sector);
@@ -1661,7 +1739,7 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
 
   step_to_track(track);
 
-  // debug_out(" write t %d, s %d, side %d", track, sector, side);
+  //debug_out(" write t %d, s %d, side %d", track, sector, side);
   FDC.track = track;
   FDC.sector = sector;
   FDC.side = side;

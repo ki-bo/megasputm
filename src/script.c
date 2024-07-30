@@ -502,7 +502,7 @@ void script_stop_slot(uint8_t slot)
 
   }
   else {
-    // debug_out("Object script %d ended slot %d", 
+    //debug_out("Object script %d ended slot %d", 
     //           make16(vm_state.proc_script_or_object_id[slot]), vm_state.proc_object_id_msb[slot]), 
     //           slot);
   }
@@ -1774,7 +1774,7 @@ static void set_box(void)
 {
   uint8_t box_id = resolve_next_param8();
   uint8_t class  = read_byte();
-  // debug_out("set-box %d to %d", box_id, class);
+  //debug_out("set-box %d to %d", box_id, class);
   SAVE_DS_AUTO_RESTORE
   map_ds_resource(room_res_slot);
   walk_boxes[box_id].classes = class;
@@ -1991,7 +1991,7 @@ static void actor_elevation(void)
 {
   uint8_t actor_id  = resolve_next_param8();
   uint8_t elevation = resolve_next_param8();
-  // debug_out("act %d elev %d", actor_id, elevation);
+  //debug_out("act %d elev %d", actor_id, elevation);
 
   if (actors.elevation[actor_id] != elevation) {
     actors.elevation[actor_id] = elevation;
