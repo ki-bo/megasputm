@@ -86,7 +86,6 @@ void inv_copy_object_data(uint8_t target_pos, struct object_code __huge *object)
   if (!inv_obj) {
     fatal_error(ERR_OUT_OF_HEAP_MEMORY);
   }
-  debug_out("copy size %d", size);
   memcpy_chipram((void __far *)inv_obj, (void __far *)object, size);
 
   vm_state.inv_objects[target_pos] = inv_obj;

@@ -41,7 +41,7 @@ __task void main(void)
   // initialize all modules
   global_init();
 
-  // Use diskio module to load the main code to the respective secions. Code resides
+  // Use diskio module to load the main code to the respective sections. Code resides
   // in 0x2000-0x7fff and 0xd000-0xdfff.
   // Be aware that this is overwriting both init code and init bss in memory.
   // So all init functions need to be complete at this point and can't be called anymore.

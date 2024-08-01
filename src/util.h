@@ -115,11 +115,11 @@ void __far *memset32(void __far *s, uint32_t c, size_t n);
 
 inline uint16_t make16(uint8_t low, uint8_t high) {
   uint16_t result;
-  __asm(" stx %0\n"
-        " sta %0+1\n"
+  __asm(" sta %0\n"
+        " stx %0+1\n"
         : "=Kzp16"(result)
-        : "Kx"(low),
-          "Ka"(high)
+        : "Ka"(low),
+          "Kx"(high)
         :);
   return result;
 }

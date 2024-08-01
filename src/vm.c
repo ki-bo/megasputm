@@ -1233,7 +1233,6 @@ uint8_t vm_load_game(uint8_t slot)
   */
 
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
-//#pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
 static void reset_game_state(void)
 {
   for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
@@ -1294,7 +1293,6 @@ static void reset_game_state(void)
   vm_write_var(VAR_CURSOR_STATE, 3);
 }
 
-#pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
 static void set_proc_state(uint8_t slot, uint8_t state)
 {
   vm_state.proc_state[slot] &= ~0x07; // clear state without changing flags
@@ -2114,6 +2112,11 @@ static void cleanup_slot_table()
   for (uint8_t read_ptr = 0; read_ptr < vm_state.num_active_proc_slots; ++read_ptr) {
     uint8_t slot = vm_state.proc_slot_table[read_ptr];
     if (slot != 0xff) {
+      if (vm_state.proc_parent[slot] != 0xff) {
+        // in theory, all slots in the table should be without any parent
+        VICIV.bordercol = 1;
+        fatal_error(ERR_SLOT_WITH_PARENT_IN_SLOT_TABLE);
+      }
       if (write_ptr != read_ptr) {
         vm_state.proc_slot_table[write_ptr] = slot;
       }

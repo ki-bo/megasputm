@@ -50,6 +50,7 @@ static uint8_t find_free_script_slot(void);
 static void reset_script_slot(uint8_t slot, uint8_t type, uint16_t script_or_object_id, uint8_t parent, uint8_t res_slot, uint16_t offset);
 static void stop_script_from_table(uint8_t table_idx);
 static void proc_slot_table_insert(uint8_t slot);
+static uint8_t find_matching_running_script(uint8_t type_mask, uint8_t type_match, uint16_t script_or_object_id);
 static void debug_header();
 static void exec_opcode(uint8_t opcode);
 static uint8_t read_byte(void);
@@ -393,6 +394,11 @@ uint8_t script_start(uint8_t script_id)
   return slot;
 }
 
+/**
+ * @brief Starts a room entry/exit script
+ * 
+ * @param room_script_offset Offset of the script relative to the start of the room resource
+ */
 void script_execute_room_script(uint16_t room_script_offset)
 {
   //debug_out("Starting room entry/exit script at offset %x", room_script_offset);
@@ -428,7 +434,7 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
       is_inventory  = 1;
       type          = PROC_TYPE_INVENTORY;
       res_slot      = 0;
-      script_offset = (uint16_t)vm_state.inv_objects[id] - RES_MAPPED;
+      script_offset = (uint16_t)vm_state.inv_objects[id] - HEAP;
     }
     else {
       // object not in room or inventory
@@ -449,22 +455,19 @@ void script_execute_object_script(uint8_t verb, uint16_t global_object_id, uint8
     type |= PROC_TYPE_REGULAR_VERB;
   }
 
-  for (script_slot = 0; script_slot < NUM_SCRIPT_SLOTS; ++script_slot) {
-    if (vm_state.proc_state[script_slot] != PROC_STATE_FREE &&
-        vm_state.proc_type[script_slot] == (type & (PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB)) &&
-        make16(vm_state.proc_script_or_object_id[script_slot], vm_state.proc_object_id_msb[script_slot]) == global_object_id) {
-      if (script_slot == active_script_slot) {
-        debug_out("Current script tried to execute object script %d again, ignoring", global_object_id);
-        return;
-      }
-      debug_out("reusing script slot %d for object %d verb %d", script_slot, global_object_id, verb);
-      break;
+  // check if script is already running (match either room or inventory script)
+  uint8_t mask  = PROC_TYPE_GLOBAL| PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB;
+  uint8_t match = type & (PROC_TYPE_BACKGROUND | PROC_TYPE_REGULAR_VERB);
+  script_slot = find_matching_running_script(mask, match, global_object_id);
+  if (script_slot != 0xff) {
+    if (script_slot == active_script_slot) {
+      debug_out("Current script tried to execute object script %d again, ignoring", global_object_id);
+      return;
     }
+    debug_out("stopping script slot %d for object %d verb %d", script_slot, global_object_id, verb);
+    script_stop_slot(script_slot);
   }
-  
-  if (script_slot == NUM_SCRIPT_SLOTS) {
-    script_slot = find_free_script_slot();
-  }
+  script_slot = find_free_script_slot();
 
   //debug_out("start object script %d verb %d type %d in slot %d", global_object_id, verb, type, script_slot);
   reset_script_slot(script_slot, type, global_object_id, 0xff /*parent*/, res_slot, script_offset);
@@ -763,7 +766,9 @@ static void stop_script_from_table(uint8_t table_idx)
   vm_state.proc_state[slot] = PROC_STATE_FREE;
 
   //debug_out(" Child script %d ended slot %d", vm_state.proc_script_or_object_id[slot], slot);
-  res_deactivate_slot(proc_res_slot[slot]);
+  if (!script_is_room_object_script(slot)) {
+    res_deactivate_slot(proc_res_slot[slot]);
+  }
   for (++table_idx; table_idx < vm_state.num_active_proc_slots; ++table_idx)
   {
     // stop children of us
@@ -784,6 +789,23 @@ static void proc_slot_table_insert(uint8_t slot)
 
   vm_state.proc_slot_table[new_entry] = slot;
   ++vm_state.num_active_proc_slots;
+}
+
+static uint8_t find_matching_running_script(uint8_t type_mask, uint8_t type_match, uint16_t script_or_object_id)
+{
+  for (uint8_t s = 0; s < NUM_SCRIPT_SLOTS; ++s) {
+    if (vm_state.proc_state[s] == PROC_STATE_FREE) {
+      continue;
+    }
+    if (((uint8_t)(vm_state.proc_type[s] & type_mask)) != type_match) {
+      continue;
+    }
+    if (vm_state.proc_script_or_object_id[s] == LSB(script_or_object_id) &&
+        vm_state.proc_object_id_msb[s] == MSB(script_or_object_id)) {
+      return s;
+    }
+  }
+  return 0xff;
 }
 
 /**
