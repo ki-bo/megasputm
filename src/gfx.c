@@ -28,6 +28,7 @@
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
+#include "sound.h"
 #include "vm.h"
 #include <mega65.h>
 #include <string.h>
@@ -613,6 +614,19 @@ static void raster_irq ()
     gfx_update_flashlight();
   }
   */
+
+  // set sound MAP
+  __asm(" lda #0x40\n"
+        " ldx #0x21\n"
+        " ldy #0\n"
+        " ldz #0\n"
+        " map\n"
+        " eom\n"
+        :
+        :
+        : "a", "x", "y", "z");
+
+  sound_process();
 
   VICIV.irr = VICIV.irr; // ack interrupt
 
@@ -1678,7 +1692,7 @@ static uint16_t check_next_char_data_wrap_around(uint8_t width, uint8_t height)
   uint16_t num_bytes          = width * height;
   uint32_t next_char_data_end = num_bytes + (uint32_t)next_char_data;
 
-  if (next_char_data_end > SOUND_DATA) {
+  if (next_char_data_end > MUSIC_DATA) { // end of gfx memory is where music data starts
     next_char_data = char_data_start_actors;
   }
   return num_bytes;

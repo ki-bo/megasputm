@@ -29,6 +29,7 @@
 #include "memory.h"
 #include "resource.h"
 #include "script.h"
+#include "sound.h"
 #include "util.h"
 #include "walk_box.h"
 #include <stdint.h>
@@ -257,6 +258,8 @@ __task void vm_mainloop(void)
 
     MAP_CS_DISKIO
     diskio_check_motor_off(elapsed_jiffies);
+    MAP_CS_SOUND
+    sound_stop_finished_slots();
     UNMAP_CS
 
     proc_table_cleanup_needed = 0;
@@ -1047,6 +1050,20 @@ void vm_verb_set_state(uint8_t slot, uint8_t state)
 char *vm_verb_get_name(uint8_t slot)
 {
   return vm_state.verbs.name[slot];
+}
+
+void vm_play_sound(uint8_t sound_id)
+{
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_SOUND
+  sound_play(sound_id);
+}
+
+void vm_stop_sound(uint8_t sound_id)
+{
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_SOUND
+  sound_stop(sound_id);
 }
 
 uint8_t vm_savegame_exists(uint8_t slot)

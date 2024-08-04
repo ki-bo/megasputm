@@ -26,6 +26,7 @@
 #include "input.h"
 #include "inventory.h"
 #include "map.h"
+#include "sound.h"
 #include "util.h"
 #include "resource.h"
 #include "script.h"
@@ -58,6 +59,11 @@ void global_init(void)
   diskio_load_file("M10", (uint8_t __far *)(0x11800)); // load gfx2 code
   diskio_load_file("M12", (uint8_t __far *)(0x14000)); // load gfx code
   gfx_init();
+
+  // load and init sound module
+  MAP_CS_DISKIO
+  diskio_load_file("M13", (uint8_t __far *)(0x16000)); // load sound code
+  sound_init();
 
   // init input module
   input_init();

@@ -41,7 +41,7 @@ all: mm.d81
 
 run: mm.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm.d81"
-	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm.d81 -r autoboot.raw
+	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm.d81 -r runtime.raw
 
 debug_xemu: mm.d81
 	@echo "--------------------------------------------------"
@@ -65,12 +65,12 @@ runtime.raw: $(OBJS) mega65-mm.scm
 mm.d81: runtime.raw $(SAVE_FILES)
 	@if [ ! -f gamedata/MM.D81 ]; then \
 		echo "MM.D81 not found, creating new .d81 disk image..."; \
-		$(C1541) -format "mm,00" d81 mm.d81; \
+		$(C1541) -format "mm,01" d81 mm.d81; \
 	else \
 		echo "Copying MM.D81 from gamedata..."; \
 		cp gamedata/MM.D81 mm.d81; \
 	fi
-	$(C1541) -attach mm.d81 -write autoboot.raw autoboot.c65 -write runtime.raw m00 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-1.raw m11 -write m1-2.raw m12
+	$(C1541) -attach mm.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13
 	@echo "Copying save game files to disk image..."
 	@for file in $(SAVE_FILES); do \
 		if [ -f "$$file" ]; then \

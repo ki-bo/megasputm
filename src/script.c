@@ -1049,7 +1049,7 @@ static void start_music(void)
 {
   //debug_msg("Start music");
   uint8_t music_id = resolve_next_param8();
-  //debug_scr("start-music %d", music_id);
+  vm_play_sound(music_id);
 }
 
 static void actor_room(void)
@@ -1240,7 +1240,7 @@ static void resource_cmd(void)
   switch (sub_opcode) {
     case 0x21: {
       //debug_scr("load-costume %d", resource_id);
-      uint8_t slot = res_provide(RES_TYPE_COSTUME, resource_id, 0);
+      res_provide(RES_TYPE_COSTUME, resource_id, 0);
       break;
     }
     case 0x22:
@@ -1555,7 +1555,8 @@ static void assign_bit_variable(void)
 static void start_sound(void)
 {
   //debug_scr("start-sound");
-  volatile uint8_t sound_id = resolve_next_param8();
+  uint8_t sound_id = resolve_next_param8();
+  vm_play_sound(sound_id);
 }
 
 static void walk_to(void)
@@ -2022,6 +2023,7 @@ static void stop_sound(void)
 {
   //debug_msg("Stop sound");
   uint8_t sound_id = resolve_next_param8();
+  vm_stop_sound(sound_id);
 }
 
 static void actor_elevation(void)

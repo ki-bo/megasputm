@@ -44,6 +44,7 @@ enum heap_strategy_t {
 
 uint8_t page_res_type[256];
 uint8_t page_res_index[256];
+uint8_t music_ids[] = { 50, 55, 58, 70 };
 
 //-----------------------------------------------------------------------------------------------
 
@@ -119,7 +120,11 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
   // will deal with sound later, as those resources are too big to fit into the chipram heap
   // (maybe will use attic ram for those)
-  if (type == RES_TYPE_SOUND) {
+  if (type == RES_TYPE_SOUND && res_is_music(id)) {
+    SAVE_CS_AUTO_RESTORE
+    MAP_CS_DISKIO
+    uint16_t chunk_size = diskio_start_resource_loading(RES_TYPE_SOUND, id);
+    diskio_continue_resource_loading(HUGE_U8_PTR(MUSIC_DATA));
     return 0;
   }
 
@@ -152,6 +157,16 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 #endif
 
   return allocated_page;
+}
+
+uint8_t res_is_music(uint8_t id)
+{
+  for (uint8_t i = 0; i < sizeof(music_ids); ++i) {
+    if (music_ids[i] == id) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 /**

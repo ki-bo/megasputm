@@ -19,17 +19,14 @@
 
 #pragma once
 
-#define RES_MAPPED          0x8000
-#define HEAP                0x8000
-#define BACKBUFFER_SCREEN   0xa000
-#define BACKBUFFER_COLRAM   0xb800
-#define SCREEN_RAM          0x10000UL
-#define DISKIO_SECTION      0x12000UL
-#define GFX_SECTION         0x14000UL
-#define RESOURCE_BASE       0x18000UL
-#define FLASHLIGHT_CHARS    0x28000
-#define BG_BITMAP           0x28100
-#define MUSIC_DATA          0x53800
-#define COLRAM              0xff80800UL
+#include <stdint.h>
 
-#define HEAP_SIZE           0x2000
+// code_init functions
+void sound_init(void);
+
+// code_main functions
+void sound_play(uint8_t sound_id);
+void sound_stop(uint8_t sound_id);
+uint8_t sound_is_playing(uint8_t sound_id);
+void sound_stop_finished_slots(void);
+void sound_process(void);

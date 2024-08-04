@@ -65,6 +65,14 @@ extern union map_t __attribute__((zpage)) map_regs;
           : \
           : "x", "y", "z");
 
+#define MAP_CS_SOUND \
+    __asm(" .extern map_cs_sound\n" \
+          " jsr map_cs_sound\n" \
+          : \
+          : \
+          : "x", "y", "z");
+
+
 #define UNMAP_CS \
     __asm(" .extern unmap_cs\n" \
           " jsr unmap_cs\n" \

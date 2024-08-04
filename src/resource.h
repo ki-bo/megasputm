@@ -39,6 +39,7 @@ void res_init(void);
 
 // code_main functions
 uint8_t res_provide(uint8_t type_and_flags, uint8_t id, uint8_t hint);
+uint8_t res_is_music(uint8_t id);
 void res_deactivate_and_unlock_all(void);
 uint8_t __huge *res_get_huge_ptr(uint8_t slot);
 void res_reset(void);

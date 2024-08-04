@@ -83,6 +83,34 @@ enum fdc_command_t
   FDC_CMD_WRITE_SECTOR = 0x84
 };
 
+typedef union adma24_value_t
+{
+  struct {
+    uint16_t addr16;
+    uint8_t  bank;
+  };
+  struct {
+    uint16_t lsb16;
+    uint8_t  msb;
+  };
+  struct
+  {
+    uint8_t l; // lsb
+    uint8_t c; // middle byte
+    uint8_t m; // msb
+  };
+} adma24_value_t;
+
+struct __audio_channel {
+  uint8_t ctrl;
+  adma24_value_t base_addr;
+  adma24_value_t freq;
+  uint16_t top_addr;
+  uint8_t volume;
+  adma24_value_t current_addr;
+  adma24_value_t timing_ctr;
+};
+
 struct __dma {
   uint8_t addrlsbtrig;
   uint8_t addrmsb;
@@ -92,6 +120,48 @@ struct __dma {
   uint8_t etrig;
   uint8_t etrig_mapped;
   uint8_t trig_inline;
+  uint8_t unused1[9];
+  uint8_t aud_ctrl;
+  uint8_t unused2[10];
+  uint8_t aud_ch_pan_vol[4];
+  struct __audio_channel aud_ch[4];
+};
+
+enum dma_audio_ctrl_mask_t
+{
+  /** Enable Audio DMA */
+  ADMA_EN_MASK = 0b10000000,
+  /** Audio DMA blocked (read only) */
+  AMDA_BLKD_MASK = 0b01000000,
+  /** Audio DMA block writes (samples still get read) */
+  ADMA_WRBLK_MASK = 0b00100000,
+  /** Audio DMA bypasses audio mixer */
+  ADMA_NOMIX_MASK = 0b00010000,
+  /** Audio DMA block timeout (read only) DEBUG */
+  ADMA_BLKTO_MASK = 0b00000111
+};
+
+enum dma_channel_ctrl_mask_t
+{
+  /** Enable Audio DMA channel */
+  ADMA_CHEN_MASK = 0b10000000,
+  /** Enable Audio DMA channel looping */
+  ADMA_CHLOOP_MASK = 0b01000000,
+  /** Enable Audio DMA channel unsigned samples */
+  ADMA_CHUSGN_MASK = 0b00100000,
+  /** Audio DMA channel play 32-sample sine wave instead of DMA data */
+  ADMA_CHSINE_MASK = 0b00010000,
+  /** Audio DMA channel stop flag */
+  ADMA_CHSTP_MASK = 0b00001000,
+  /** Audio DMA channel sample bits (11=16, 10=8, 01=upper nybl, 00=lower nybl) */
+  ADMA_CHSBITS_MASK = 0b00000011
+};
+
+enum {
+  ADMA_SBITS_16 = 0b11,
+  ADMA_SBITS_8  = 0b10,
+  ADMA_SBITS_4U = 0b01,
+  ADMA_SBITS_4L = 0b00
 };
 
 #define CPU_VECTORS (*(volatile struct __cpu_vectors *) 0xfffa)

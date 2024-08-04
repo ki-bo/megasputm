@@ -57,6 +57,14 @@ map_cs_gfx2:
 		bra apply_map_cs
 
 		.section code, noreorder
+		.public map_cs_sound
+map_cs_sound:
+		pha
+		lda #0x40
+		ldx #0x21
+		bra apply_map_cs
+
+		.section code, noreorder
 		.public unmap_cs
 unmap_cs:
 		pha

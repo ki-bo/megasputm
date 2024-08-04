@@ -20,6 +20,7 @@
 #include "diskio.h"
 #include "dma.h"
 #include "error.h"
+#include "index.h"
 #include "io.h"
 #include "map.h"
 #include "resource.h"
@@ -52,19 +53,19 @@
 static struct {
   uint16_t magic_number;
   uint16_t num_global_game_objects;
-  uint8_t global_game_objects[780];
+  uint8_t global_game_objects[NUM_GAME_OBJECTS];
   uint8_t num_room_resources;
-  uint8_t room_disk_num[61];
-  uint16_t room_offset[61];
+  uint8_t room_disk_num[NUM_ROOMS];
+  uint16_t room_offset[NUM_ROOMS];
   uint8_t num_costume_resources;
-  uint8_t costume_room[40];
-  uint16_t costume_offset[40];
+  uint8_t costume_room[NUM_COSTUMES];
+  uint16_t costume_offset[NUM_COSTUMES];
   uint8_t num_script_resources;
-  uint8_t script_room[179];
-  uint16_t script_offset[179];
+  uint8_t script_room[NUM_SCRIPTS];
+  uint16_t script_offset[NUM_SCRIPTS];
   uint8_t num_sound_resources;
-  uint8_t sound_room[120];
-  uint16_t sound_offset[120];
+  uint8_t sound_room[NUM_SOUNDS];
+  uint16_t sound_offset[NUM_SOUNDS];
 } lfl_index_file_contents;
 
   struct directory_entry {
@@ -97,17 +98,17 @@ static struct {
   * BSS section: bss_diskio
   */
 static struct {
-  uint8_t room_disk_num[61];
-  uint16_t room_offset[61];
+  uint8_t room_disk_num[NUM_ROOMS];
+  uint16_t room_offset[NUM_ROOMS];
   
-  uint8_t costume_room[40];
-  uint16_t costume_offset[40];
+  uint8_t costume_room[NUM_COSTUMES];
+  uint16_t costume_offset[NUM_COSTUMES];
   
-  uint8_t script_room[179];
-  uint16_t script_offset[179];
+  uint8_t script_room[NUM_SCRIPTS];
+  uint16_t script_offset[NUM_SCRIPTS];
 
-  uint8_t sound_room[120];
-  uint16_t sound_offset[120];
+  uint8_t sound_room[NUM_SOUNDS];
+  uint16_t sound_offset[NUM_SOUNDS];
 } lfl_index;
 
 struct bam_entry {
