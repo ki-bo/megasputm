@@ -636,11 +636,14 @@ void gfx_update_flashlight(void)
 
       // copy background chars to flashlight rrb area
 
-      // the following line was
-      //   uint16_t *bg_scr = bg_scr_ptr + pos_x_char;
-      // but that triggered a compiler bug so we split it up into two lines to avoid it
-      uint16_t *bg_scr = bg_scr_ptr;
-      bg_scr += pos_x_char;
+
+      // the following line triggers a compiler bug!
+      uint16_t *bg_scr = bg_scr_ptr + pos_x_char;
+      // this version would void it:
+      //uint16_t *bg_scr = bg_scr_ptr;
+      //bg_scr += pos_x_char;
+
+
       uint16_t *fl_scr = bg_scr_ptr + 41;
 
       for (uint8_t x = 0; x < fl_width; ++x) {
