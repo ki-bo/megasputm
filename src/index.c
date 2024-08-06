@@ -17,14 +17,10 @@
  *
  */
 
-#pragma once
+#pragma clang section data="cdata_diskio"
 
-#define NUM_GAME_OBJECTS 780
-#define NUM_ROOMS 61
-#define NUM_COSTUMES 40
-#define NUM_SCRIPTS 179
-#define NUM_SOUNDS 120
-
-#define MAX_DISKS 2
-
-extern char disk_header[29];
+char disk_header[29] = { 0x28, 0x03, 0x44, 0x00, 
+                         'M', 'A', 'N', 'I', 'A', 'C', ' ', 'M', 'A', 'N', 'S', 'I', 'O', 'N', 0xa0, 0xa0, 
+                         0xa0, 0xa0, 
+                         'M', 0x00,
+                         0xa0, 0x33, 0x44, 0xa0, 0xa0 };

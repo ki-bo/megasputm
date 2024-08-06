@@ -30,6 +30,7 @@ enum {
 void diskio_init(void);
 
 // code_diskio functions
+uint8_t diskio_is_real_drive(void);
 void diskio_switch_to_real_drive(void);
 void diskio_check_motor_off(uint8_t elapsed_jiffies);
 uint8_t diskio_file_exists(const char *filename);

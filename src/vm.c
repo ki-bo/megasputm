@@ -1240,6 +1240,40 @@ uint8_t vm_load_game(uint8_t slot)
   return 0;
 }
 
+void vm_handle_error_wrong_disk(uint8_t expected_disk)
+{
+  SAVE_CS_AUTO_RESTORE
+
+  char error_str[41];
+  sprintf(error_str, "Please insert disk %d. Press Return.", expected_disk);
+
+  input_key_pressed = 0; // ack the space key
+  MAP_CS_GFX
+  gfx_clear_dialog();
+  gfx_print_interface_text(0, 0, error_str, TEXT_STYLE_SENTENCE);
+  script_watchdog = WATCHDOG_TIMEOUT;
+
+  MAP_CS_DISKIO
+  while (1) {
+    if (input_key_pressed) {
+      if (input_key_pressed == 0x0d) {
+        wait_for_jiffy();  // this resets the elapsed jiffies timer
+        break;
+      }
+      else {
+        // ack all other key presses
+        input_key_pressed = 0;
+      }
+    }
+    uint8_t elapsed_jiffies = wait_for_jiffy();
+    diskio_check_motor_off(elapsed_jiffies);
+  }
+
+  MAP_CS_GFX
+  gfx_clear_dialog();
+  UNMAP_CS
+}
+
 /// @} // vm_public
 
 //-----------------------------------------------------------------------------------------------

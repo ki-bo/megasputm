@@ -128,6 +128,8 @@ struct bam_block {
   struct bam_entry bam_entries[40];
 };
 
+static uint16_t times_1600[MAX_DISKS + 1];
+static uint8_t current_disk;
 static uint8_t room_track_list[54];
 static uint8_t room_block_list[54];
 static uint8_t current_track;
@@ -159,14 +161,18 @@ static dmalist_single_option_t dmalist_copy_block;
 static void init_dma_lists(void);
 static uint8_t read_next_directory_block(void);
 static uint8_t read_lfl_file_entry(void);
-static void load_index(void);
+static uint8_t load_index(void);
 static void invalidate_disk_cache(void);
 
 // Private disk I/O functions
 static void wait_for_busy_clear(void);
+static void check_and_prompt_for_disk(uint8_t disk_num);
+static uint8_t check_disk(uint8_t disk_num);
+static void read_directory(void);
 static void step_to_track(uint8_t track);
 static void search_file(const char *filename, uint8_t file_type);
 static void seek_to(uint16_t offset);
+static int8_t __far *get_cache_ptr(uint8_t track, uint8_t sector);
 static void load_block(uint8_t track, uint8_t block);
 static void read_whole_track(uint8_t track);
 static void prepare_drive(void);
@@ -207,16 +213,17 @@ void diskio_init(void)
 
   init_dma_lists();
 
-  memset(room_track_list, 0, sizeof(room_track_list));
-  memset(room_block_list, 0, sizeof(room_block_list));
-  invalidate_disk_cache();
+  for (uint8_t i = 0; i <= MAX_DISKS; ++i) {
+    times_1600[i] = i * 1600;
+  }
+
   last_physical_track = 255;
+  current_disk = 0;
   drive_ready = 0;
   drive_in_use = 0;
   disable_cache = 0;
   jiffies_elapsed_since_last_drive_access = 0;
 
-  *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
   prepare_drive();
 
   while (!(FDC.status & FDC_TK0_MASK)) {
@@ -226,11 +233,12 @@ void diskio_init(void)
   }
   current_track = 0;
 
-  // Loading file list in the directory, starting at track 40, block 3
-  load_block(40, 3);
-  while (read_next_directory_block() != 0);
-  
-  load_index();
+  invalidate_disk_cache();
+  read_directory();
+  if (!load_index()) {
+    debug_out("Unable to load index file 00.LFL");
+    fatal_error(ERR_INDEX_FILE_NOT_LOADED);
+  }
 
   release_drive();
 }
@@ -279,111 +287,6 @@ static void init_dma_lists(void)
 }
 
 /**
-  * @brief Parses lfl file entries in the FDC buffer and caches them
-  * 
-  * The function assumes a directory block has been loaded into the FDC buffer.
-  * It will call read_lfl_file_entry() for each file entry in the buffer and
-  * cache the track and block numbers for each valid lfl file entry.
-  * Start track and sector of the file in the static variables room_track_list and
-  * room_block_list.
-  * 
-  * The directory block contains up to eight file entries. Each file entry is 32
-  * bytes long. If there are more blocks to read in the directory, the function will
-  * automatically load the next block and return 1. If there are no more
-  * blocks to read, the function will return 0.
-  *
-  * Code section: code_init
-  * Private function
-  *
-  * @return 0 if there are no more blocks to read, 1 otherwise
-  */
-static uint8_t read_next_directory_block() 
-{
-  uint8_t next_track = FDC.data;
-  uint8_t next_block = FDC.data;
-  for (uint8_t i = 0; i < 8; ++i) {
-    uint8_t skip = 32 - read_lfl_file_entry();
-    for (uint8_t j = 0; j < skip; ++j) {
-      FDC.data;
-    }
-  }
-  if (next_track == 0) {
-    return 0;
-  }
-
-  load_block(next_track, next_block);
-  return 1;
-}
-
-/**
-  * @brief Reads bytes from the sector buffer and parses them into a file entry.
-  * 
-  * The function reads bytes from the sector buffer and parses one file entry into
-  * room_track_list and room_block_list. The function returns the number of bytes actually
-  * read from the sector buffer.
-  * 
-  * @note The number of bytes actually read from the sector buffer can vary, 
-  *       as the function will stop reading when it encounters the first invalid
-  *       byte.
-  *
-  * Code section: code_init
-  * Private function
-  *
-  * @return The number of bytes actually read from the sector buffer
-  */
-static uint8_t read_lfl_file_entry()
-{
-  uint8_t i = 1;
-  uint8_t tmp;
-
-  if (FDC.data != 0x82) {
-    // not a PRG file
-    return i;   
-  }
-  ++i;
-  uint8_t file_track = FDC.data;
-  if (file_track == 0 || file_track > 80) {
-    // invalid track number
-    return i;
-  }
-  ++i;
-  uint8_t file_block = FDC.data;
-  if (file_block >= 40) {
-    // invalid block number
-    return i;
-  }
-  ++i;
-  tmp = FDC.data;
-  if (tmp < 0x30 || tmp > 0x39) {
-    // invalid room number
-    return i;
-  }
-  uint8_t room_number = (tmp - 0x30) * 10;
-  ++i;
-  tmp = FDC.data;
-  if (tmp < 0x30 || tmp > 0x39) {
-    // invalid room number
-    return i;
-  }
-  room_number += tmp - 0x30;
-  
-  const char *file_suffix = ".LFL\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0";
-  for (uint8_t j = 0; j < 14; ++j) {
-    ++i;
-    if (FDC.data != file_suffix[j]) {
-      // invalid file suffix
-      return i;
-    }
-  }
-
-  // all checks passed, we found a valid xx.lfl file with xx being the room number
-  room_track_list[room_number] = file_track;
-  room_block_list[room_number] = file_block;
-
-  return i;
-}
-
-/**
   * @brief Loads the index from disk into memory.
   *
   * The index is in file 00.lfl and contains room numbers (=file numbers) and
@@ -393,14 +296,22 @@ static uint8_t read_lfl_file_entry()
   * Code section: code_init
   * Private function
   */
-static void load_index(void)
+static uint8_t load_index(void)
 {
+  current_disk = 0;
+
+  if (!check_disk(0)) {
+    debug_out("Unable to detect disk 1 in drive");
+    return 0;
+  }
+
   uint8_t bytes_left_in_block;
   next_track = room_track_list[0];
   next_block = room_block_list[0];
   uint8_t *address = (uint8_t *)&lfl_index_file_contents;
+  uint16_t num_bytes_expected = sizeof(lfl_index_file_contents);
 
-  while (next_track != 0) {
+  while (next_track != 0 && num_bytes_expected != 0) {
     load_block(next_track, next_block);
     next_track = FDC.data;
     next_block = FDC.data;
@@ -414,7 +325,15 @@ static void load_index(void)
     while (bytes_left_in_block-- != 0) {
       *address = FDC.data ^ 0xff;
       ++address;
+      --num_bytes_expected;
+      if (num_bytes_expected == 0 && (next_track != 0 || bytes_left_in_block != 0)) {
+          return 0;
+      }
     }
+  }
+
+  if (num_bytes_expected != 0) {
+    return 0;
   }
 
   memcpy(&vm_state.global_game_objects, &lfl_index_file_contents.global_game_objects, sizeof(lfl_index_file_contents.global_game_objects));
@@ -434,13 +353,15 @@ static void load_index(void)
     lfl_index.sound_room[i] = lfl_index_file_contents.sound_room[i];
     lfl_index.sound_offset[i] = lfl_index_file_contents.sound_offset[i];
   }
+
+  return 1;
 }
 
 /**
   * @brief Marks all blocks in disk cache as not-available
   *
   * Disk cache is in attic ram, starting at 0x8000000. Each physical sector
-  * is 512 bytes long. The cache can hold 20*80=1600 sectors.
+  * is 512 bytes long. The cache can hold MAX_DISKS*20*80=MAX_DISKS*1600 sectors.
   * The first two bytes of each block are used to store the track and block
   * number of the next block. Legal values are only 0-80 for the track
   * number (0 = last block). Therefore, we use the unsused value 0xff to mark 
@@ -454,7 +375,9 @@ static void invalidate_disk_cache(void)
 {
   int8_t __huge *ptr = HUGE_I8_PTR(DISK_CACHE);
 
-  for (uint16_t sector = 0; sector < 20 * 80; ++sector) {
+  uint16_t max_sector = times_1600[MAX_DISKS];
+
+  for (uint16_t sector = 0; sector < max_sector; ++sector) {
     *ptr = -1; // mark cache sector as unused
     ptr += 0x200;
   }
@@ -469,6 +392,11 @@ static void invalidate_disk_cache(void)
   * @{
   */
 #pragma clang section text="code_diskio" rodata="cdata_diskio" data="data_diskio" bss="bss_diskio"
+
+uint8_t diskio_is_real_drive(void)
+{
+  return *(uint8_t *)(0xd6a1) & 1;
+}
 
 void diskio_switch_to_real_drive(void)
 {
@@ -674,6 +602,18 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
     disk_error(ERR_RESOURCE_NOT_FOUND);
   }
 
+  // check whether requested file is on current disk
+  if (room_track_list[room_id] == 0) {
+    // it is not available, determine needed disk number and prompt for disk
+    uint8_t disk_num = lfl_index.room_disk_num[room_id];
+    if (disk_num < 0x31 || disk_num > (0x30 + MAX_DISKS)) {
+      disk_error(ERR_DISK_NUM_OUT_OF_RANGE);
+    }
+    disk_num -= 0x31;
+    check_and_prompt_for_disk(disk_num);
+  }
+
+  // the requested file is on the current disk
   load_block(room_track_list[room_id], room_block_list[room_id]);
   next_track = FDC.data;
   next_block = FDC.data;
@@ -1068,6 +1008,168 @@ inline static void wait_for_busy_clear(void)
   while (FDC.status & FDC_BUSY_MASK);
 }
 
+static void check_and_prompt_for_disk(uint8_t disk_num)
+{
+  // if drive is already spinning with confirmed correct disk, we're done
+  if (drive_ready && current_disk == disk_num) {
+    return;
+  }
+
+  // check whether correct disk is inserted
+  uint8_t disk_found = 0;
+  while (!disk_found) {
+    disk_found = check_disk(disk_num);
+    if (!disk_found) {
+      vm_handle_error_wrong_disk(disk_num + 1);
+    }
+  }
+
+  if (current_disk != disk_num) {
+    current_disk = disk_num;
+    // if disk change was needed, update directory
+    read_directory();
+  }
+}
+static uint8_t check_disk(uint8_t disk_num)
+{
+  uint8_t disable_cache_save = disable_cache;
+  disable_cache = 1;
+  last_physical_track = 255;
+  load_block(40, 0);
+  for (uint8_t i = 0; i < sizeof(disk_header); ++i) {
+    uint8_t read_byte = FDC.data;
+    if (i == 23) {
+      if (read_byte != 0x30 + disk_num + 1) {
+        disable_cache = disable_cache_save;
+        return 0;
+      }
+    }
+    else {
+      if (read_byte != disk_header[i]) {
+        disable_cache = disable_cache_save;
+        return 0;
+      }
+    }
+  }
+  disable_cache = disable_cache_save;
+  return 1;
+} 
+
+static void read_directory(void)
+{
+  memset(room_track_list, 0, sizeof(room_track_list));
+  memset(room_block_list, 0, sizeof(room_block_list));
+
+  // Loading file list in the directory, starting at track 40, block 3
+  load_block(40, 3);
+  while (read_next_directory_block() != 0);
+}
+
+/**
+  * @brief Parses lfl file entries in the FDC buffer and caches them
+  * 
+  * The function assumes a directory block has been loaded into the FDC buffer.
+  * It will call read_lfl_file_entry() for each file entry in the buffer and
+  * cache the track and block numbers for each valid lfl file entry.
+  * Start track and sector of the file in the static variables room_track_list and
+  * room_block_list.
+  * 
+  * The directory block contains up to eight file entries. Each file entry is 32
+  * bytes long. If there are more blocks to read in the directory, the function will
+  * automatically load the next block and return 1. If there are no more
+  * blocks to read, the function will return 0.
+  *
+  * Code section: code_diskio
+  * Private function
+  *
+  * @return 0 if there are no more blocks to read, 1 otherwise
+  */
+static uint8_t read_next_directory_block() 
+{
+  uint8_t next_track = FDC.data;
+  uint8_t next_block = FDC.data;
+  for (uint8_t i = 0; i < 8; ++i) {
+    uint8_t skip = 32 - read_lfl_file_entry();
+    for (uint8_t j = 0; j < skip; ++j) {
+      FDC.data;
+    }
+  }
+  if (next_track == 0) {
+    return 0;
+  }
+
+  load_block(next_track, next_block);
+  return 1;
+}
+
+/**
+  * @brief Reads bytes from the sector buffer and parses them into a file entry.
+  * 
+  * The function reads bytes from the sector buffer and parses one file entry into
+  * room_track_list and room_block_list. The function returns the number of bytes actually
+  * read from the sector buffer.
+  * 
+  * @note The number of bytes actually read from the sector buffer can vary, 
+  *       as the function will stop reading when it encounters the first invalid
+  *       byte.
+  *
+  * Code section: code_diskio
+  * Private function
+  *
+  * @return The number of bytes actually read from the sector buffer
+  */
+static uint8_t read_lfl_file_entry()
+{
+  uint8_t i = 1;
+  uint8_t tmp;
+
+  if (FDC.data != 0x82) {
+    // not a PRG file
+    return i;   
+  }
+  ++i;
+  uint8_t file_track = FDC.data;
+  if (file_track == 0 || file_track > 80) {
+    // invalid track number
+    return i;
+  }
+  ++i;
+  uint8_t file_block = FDC.data;
+  if (file_block >= 40) {
+    // invalid block number
+    return i;
+  }
+  ++i;
+  tmp = FDC.data;
+  if (tmp < 0x30 || tmp > 0x39) {
+    // invalid room number
+    return i;
+  }
+  uint8_t room_number = (tmp - 0x30) * 10;
+  ++i;
+  tmp = FDC.data;
+  if (tmp < 0x30 || tmp > 0x39) {
+    // invalid room number
+    return i;
+  }
+  room_number += tmp - 0x30;
+  
+  const char *file_suffix = ".LFL\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0";
+  for (uint8_t j = 0; j < 14; ++j) {
+    ++i;
+    if (FDC.data != file_suffix[j]) {
+      // invalid file suffix
+      return i;
+    }
+  }
+
+  // all checks passed, we found a valid xx.lfl file with xx being the room number
+  room_track_list[room_number] = file_track;
+  room_block_list[room_number] = file_block;
+
+  return i;
+}
+
 /**
   * @brief Moves the floppy drive head to the provided track
   * 
@@ -1224,6 +1326,15 @@ static void seek_to(uint16_t offset)
   }
 }
 
+static int8_t __far *get_cache_ptr(uint8_t track, uint8_t sector)
+{
+  uint16_t cache_block = times_1600[current_disk];
+  cache_block += track * 20;
+  cache_block += sector;
+  uint32_t cache_offset = (uint32_t)cache_block * 512UL;
+  return FAR_I8_PTR(DISK_CACHE + cache_offset);
+}
+
 /**
   * @brief Loads a sector from disk cache or floppy disk into the floppy buffer
   *
@@ -1261,8 +1372,7 @@ static void load_block(uint8_t track, uint8_t block)
   physical_sector = block / 2;
   --track; // logical track numbers are 1-80, physical track numbers are 0-79
 
-  const uint32_t cache_offset = (uint32_t)(track * 20 + physical_sector) * 512UL;
-  const int8_t __far *cache_block = FAR_I8_PTR(DISK_CACHE + cache_offset);
+  __auto_type cache_block = get_cache_ptr(track, physical_sector);
 
   ++physical_sector;
   if (physical_sector > 10) {
@@ -1286,7 +1396,7 @@ static void load_block(uint8_t track, uint8_t block)
     last_side = side;
   }
   else {
-    if (!disable_cache && (*(uint8_t *)(0xd6a1) & 1)) {
+    if (!disable_cache && diskio_is_real_drive()) {
       read_whole_track(track);
       if (*cache_block < 0) {
         disk_error(ERR_READ_TRACK_FAILED);
@@ -1373,6 +1483,33 @@ static void load_block(uint8_t track, uint8_t block)
   }
 }
 
+/**
+  * @brief Reads a whole track from the floppy disk into the cache.
+  *
+  * The function will read a whole track from the floppy disk into the cache.
+  * In most cases, this is the fastest way to read sectors of a file as those
+  * typically are stored in sequential sectors of tracks. read_block() is automatically
+  * calling this function if an uncached block is requested and the physical drive is in
+  * use (as there usually is no performance gain in reading a whole track at once with
+  * virtual disk images).
+  *
+  * The track to be read is specified with its physical track number. The cache
+  * is updated for the disk selected via the global variable current_disk.
+  * If the cache is disabled, this function should not be called, as it doesn't
+  * check for the cache being disabled.
+  *
+  * The function will read all 20 sectors of the track starting at physical sector
+  * 1 of side 0 up to physical sector 10. Then, it will read the 10 sectors of side 1.
+  * 
+  * The variables last_physical_track, last_physical_sector and last_side will be
+  * updated to reflect the last track and sector read. This enables other functions like
+  * read_block() to check whether the requested block is already in the drive's sector buffer.
+  *
+  * Note that this function only works with real floppy drives and will not work with virtual
+  * disk images.
+  *
+  * @param track Physical track number (0-79)
+  */
 static void read_whole_track(uint8_t track)
 {
   char buf[512];
@@ -1381,13 +1518,13 @@ static void read_whole_track(uint8_t track)
   step_to_track(track);
   FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
   FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
-  uint8_t __far *cache_block = NULL;
+  int8_t __far *cache_block = NULL;
   uint8_t sector = 1;
   uint8_t side   = 0;
 
   for (uint8_t s = 0; s < 21; ++s, ++sector) {
 
-    if (s != 0 && cache_block && *cache_block == 0xff) {
+    if (s != 0 && cache_block && *cache_block == -1) {
       memcpy_far(cache_block, (uint8_t __far *)buf, 512);
     }
     if (s == 10) {
@@ -1412,12 +1549,11 @@ static void read_whole_track(uint8_t track)
       disk_error(ERR_SECTOR_NOT_FOUND);
     }
 
-    const uint32_t cache_offset = (uint32_t)(current_track * 20 + s) * 512UL;
-    cache_block = FAR_U8_PTR(DISK_CACHE + cache_offset);
+    cache_block = get_cache_ptr(current_track, s);
 
     while (!(FDC.status & FDC_DRQ_MASK)) continue; // wait for DRQ set
 
-    if (*cache_block == 0xff) {
+    if (*cache_block == -1) {
       *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
       for (uint16_t i = 0; i < 512; ++i) {
         while (FDC.status & FDC_EQ_MASK && FDC.status & FDC_BUSY_MASK) continue; // wait for DRQ set and EQ cleared
@@ -1427,6 +1563,10 @@ static void read_whole_track(uint8_t track)
     else {
       wait_for_busy_clear();
     }
+
+    last_physical_track  = current_track;
+    last_physical_sector = sector;
+    last_side            = side;
   }
 
   // reset jiffy counter for drive access check
@@ -1711,8 +1851,7 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
     disk_error(ERR_INVALID_DISK_LOCATION);
   }
 
-  const uint32_t cache_offset = (uint32_t)(track * 20 + sector) * 512UL;
-  int8_t __far *cache_block = FAR_I8_PTR(DISK_CACHE + cache_offset);
+  __auto_type cache_block = get_cache_ptr(track, sector);
   *cache_block = -1; // invalidate block in cache
 
   uint8_t side;
