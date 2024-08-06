@@ -140,7 +140,7 @@ static uint8_t next_track;
 static uint8_t next_block;
 static uint8_t cur_block_read_ptr;
 static uint16_t cur_chunk_size;
-static uint8_t drive_ready;
+static uint8_t drive_spinning;
 static uint8_t jiffies_elapsed_since_last_drive_access;
 static uint8_t drive_in_use;
 static uint8_t disable_cache;
@@ -219,7 +219,7 @@ void diskio_init(void)
 
   last_physical_track = 255;
   current_disk = 0;
-  drive_ready = 0;
+  drive_spinning = 0;
   drive_in_use = 0;
   disable_cache = 0;
   jiffies_elapsed_since_last_drive_access = 0;
@@ -431,7 +431,8 @@ void diskio_switch_to_real_drive(void)
   */
 void diskio_check_motor_off(uint8_t elapsed_jiffies)
 {
-  if (!drive_ready || drive_in_use) {
+  if (!drive_spinning || drive_in_use) {
+    // motor is already off or we are asked to keep it on
     return;
   }
 
@@ -445,7 +446,6 @@ void diskio_check_motor_off(uint8_t elapsed_jiffies)
 
 uint8_t diskio_file_exists(const char *filename)
 {
-  acquire_drive();
   uint8_t disable_cache_save = disable_cache;
   disable_cache = 1;
   search_file(filename, 0x81);
@@ -464,8 +464,6 @@ uint8_t diskio_file_exists(const char *filename)
   */
 void diskio_load_file(const char *filename, uint8_t __far *address)
 {
-  acquire_drive();
-
   search_file(filename, 0x82);
   
   if (next_track == 0) {
@@ -504,11 +502,11 @@ void diskio_load_file(const char *filename, uint8_t __far *address)
 void diskio_load_game_objects(void)
 {
   uint8_t bytes_left_in_block;
+  int16_t num_bytes_left;
+  check_and_prompt_for_disk(0);
+
   next_track = room_track_list[0];
   next_block = room_block_list[0];
-  int16_t num_bytes_left;
-
-  acquire_drive();
 
   uint8_t first = 1;
   uint8_t *address = (uint8_t *)&vm_state.global_game_objects;
@@ -574,8 +572,6 @@ void diskio_load_game_objects(void)
   */
 uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
 {
-  acquire_drive();
-
   uint8_t room_id = 0;
   uint16_t offset;
 
@@ -603,7 +599,7 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   }
 
   // check whether requested file is on current disk
-  if (room_track_list[room_id] == 0) {
+  while (room_track_list[room_id] == 0) {
     // it is not available, determine needed disk number and prompt for disk
     uint8_t disk_num = lfl_index.room_disk_num[room_id];
     if (disk_num < 0x31 || disk_num > (0x30 + MAX_DISKS)) {
@@ -680,7 +676,6 @@ void diskio_continue_resource_loading(uint8_t __huge *target_ptr)
 
 void diskio_open_for_reading(const char *filename, uint8_t file_type)
 {
-  acquire_drive();
   disable_cache = 1;
   search_file(filename, file_type);
   
@@ -733,8 +728,6 @@ void diskio_open_for_writing(void)
 {
   // allocating 4 blocks (2 for bam and 2 as sector write buffers)
   writebuf_res_slot = res_reserve_heap(4);
-
-  acquire_drive();
 
   // load BAM
   disable_cache = 1;
@@ -1011,7 +1004,7 @@ inline static void wait_for_busy_clear(void)
 static void check_and_prompt_for_disk(uint8_t disk_num)
 {
   // if drive is already spinning with confirmed correct disk, we're done
-  if (drive_ready && current_disk == disk_num) {
+  if (drive_spinning && current_disk == disk_num) {
     return;
   }
 
@@ -1590,15 +1583,15 @@ static void read_whole_track(uint8_t track)
   */
 static void prepare_drive(void)
 {
-  if (drive_ready) {
+  drive_in_use = 1; // acquire drive and prevent motor from turning off
+  if (drive_spinning) {
     return;
   }
   *NEAR_U8_PTR(0xd696) &= 0x7f; // disable auto-tune
   FDC.fdc_control |= FDC_MOTOR_MASK | FDC_LED_MASK; // enable LED and motor
   FDC.command = FDC_CMD_SPINUP;
   wait_for_busy_clear();
-  drive_ready = 1;
-  acquire_drive();
+  drive_spinning = 1;
 }
 
 /**
@@ -1656,7 +1649,7 @@ static void disk_error(error_code_t error_code)
 static void led_and_motor_off(void)
 {
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
-  drive_ready = 0;
+  drive_spinning = 0;
 }
 
 static uint16_t allocate_sector(uint8_t start_track)
@@ -1850,9 +1843,6 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
   if (track > 79 || sector > 19) {
     disk_error(ERR_INVALID_DISK_LOCATION);
   }
-
-  __auto_type cache_block = get_cache_ptr(track, sector);
-  *cache_block = -1; // invalidate block in cache
 
   uint8_t side;
   ++sector; // logical (0-19) to physical (1-20) sector
