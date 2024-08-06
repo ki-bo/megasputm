@@ -73,6 +73,8 @@
 #define LSB16(X) ((uint16_t)(X))
 #define BANK(X)  ((uint8_t)(((uint8_t)((uintptr_t)(X) >> 16)) & 0x0f))
 
+#define U8(x) ((uint8_t)(x))
+
 #define max(a,b)             \
 ({                           \
     __typeof__ (a) _a = (a); \

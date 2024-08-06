@@ -25,14 +25,21 @@
 #include "memory.h"
 #include "resource.h"
 #include "util.h"
+#include <mega65.h>
 #include <stdint.h>
 
 #define DMA_TIMER(f) \
     ((uint16_t)((double)(3579545.0 / (f) * 16777215.0 / 40500000.0) + 0.5))
 
+#define DMA_TIMER_RT(f) \
+    ((uint16_t)((uint32_t)(3579545ULL * 16777215ULL / 40500000ULL) / f));
+
 #define DMA_VOL(v) \
     ((uint8_t)((double)(v) / 63.0 * 96.0 + 0.5))
 
+#define DMA_VOL_RT(v) \
+    ((uint16_t)((((uint32_t)(v * 256) * (uint32_t)(96.0 / 63.0 * 256.0)) + 32768) / 65536));
+ 
 #define BYTE_SWAP16(x) \
     ((((x) & 0xff) << 8) | (((x) >> 8) & 0xff))
 
@@ -89,20 +96,19 @@ struct params_music {
   uint8_t  loop;
 };
 
-struct state_music_channel {
-  uint16_t dataptr_i[4];
-  uint16_t dataptr[4];
-  uint16_t volbase[4];
-  uint8_t  volptr[4];
-  uint16_t chan[4];
-  uint16_t dur[4];
-  uint16_t ticks[4];
+struct music_channel_state {
+  int8_t   __far *dataptr_i;
+  int8_t   __far *dataptr;
+  uint16_t __far *volbase;
+  uint8_t         volptr;
+  uint16_t        dur;
+  uint16_t        ticks;
 };
 
 struct priv_music {
   struct params_music *params;
-  struct state_music_channel chan;
-  uint8_t __far *data;
+  struct music_channel_state ch[4];
+  int8_t __far *data;
 };
 
 struct sound_params {
@@ -141,14 +147,19 @@ struct sound_params sounds[70] = {
 static uint8_t get_free_sound_slot(void);
 static uint8_t get_free_channel(void);
 static void stop_slot(struct sound_slot *slot);
-static uint8_t start_channel(uint8_t slot_id, int8_t __far *data, uint16_t size, uint8_t flags, uint16_t timer, uint8_t vol);
-static void start_sample(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *metadata);
+static uint16_t read_be16(void __far *ptr);
+static uint8_t read_be16_lsb(void __far *ptr);
+static uint16_t freq_to_timer(uint16_t freq);
+static uint8_t alloc_and_start_channel(uint8_t slot_id, int8_t __far *data, uint16_t size, uint8_t flags, uint16_t timer, uint8_t vol);
+static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint8_t flags, uint16_t timer, uint8_t vol);
+static void start_channel_looped(uint8_t ch, int8_t __far *data, uint16_t loop_offset, uint16_t size, uint16_t timer, uint8_t vol);
+static void start_sample(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params);
 static void update_sample(struct sound_slot *slot);
 static void stop_sample(struct sound_slot *slot);
-static void start_dual_sample_timed_loop(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *metadata);
+static void start_dual_sample_timed_loop(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params);
 static void update_dual_sample_timed_loop(struct sound_slot *slot);
 static void stop_dual_sample_timed_loop(struct sound_slot *slot);
-static void start_music(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *metadata);
+static void start_music(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params);
 static void update_music(struct sound_slot *slot);
 static void stop_music(struct sound_slot *slot);
 static void print_slots(void);
@@ -178,7 +189,7 @@ void sound_init(void)
 
 void sound_play(uint8_t sound_id)
 {
-  debug_out("sound play %d", sound_id);
+  //debug_out("sound play %d", sound_id);
   if (sounds[sound_id].type == SOUND_TYPE_NONE) {
     fatal_error(ERR_UNIMPLEMENTED_SOUND);
   }
@@ -203,14 +214,17 @@ void sound_play(uint8_t sound_id)
   uint16_t size          = BYTE_SWAP16(data->sample_size);
   uint16_t sample_offset = BYTE_SWAP16(data->code_size) + sizeof(struct sound_header);
   __auto_type sample_ptr = (int8_t __far *)(data) + sample_offset;
-  __auto_type metadata   = &sounds[sound_id];
+  __auto_type params     = &sounds[sound_id];
 
-  switch (metadata->type) {
+  switch (params->type) {
     case SOUND_TYPE_SAMPLE:
-      start_sample(slot, sample_ptr, size, metadata);
+      start_sample(slot, sample_ptr, size, params);
       break;
     case SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP:
-      start_dual_sample_timed_loop(slot, sample_ptr, size, metadata);
+      start_dual_sample_timed_loop(slot, sample_ptr, size, params);
+      break;
+    case SOUND_TYPE_MUSIC:
+      start_music(slot, (int8_t __far *)data, size, params);
       break;
   }
 }
@@ -219,6 +233,16 @@ void sound_stop(uint8_t sound_id)
 {
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (sound_slots[i].id == sound_id) {
+      sound_slots[i].stop(&sound_slots[i]);
+    }
+  }
+}
+
+void sound_stop_all(void)
+{
+  for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
+    if (sound_slots[i].type != SOUND_TYPE_NONE && sound_slots[i].id != 0) {
+      debug_out("stop slot %d id %d", i, sound_slots[i].id);
       sound_slots[i].stop(&sound_slots[i]);
     }
   }
@@ -238,6 +262,7 @@ void sound_stop_finished_slots(void)
 {
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (sound_slots[i].finished) {
+      debug_out("stop finished slot %d id %d", i, sound_slots[i].id);
       sound_slots[i].stop(&sound_slots[i]);
     }
   }
@@ -282,46 +307,95 @@ static uint8_t get_free_channel(void)
 
 static void stop_slot(struct sound_slot *slot)
 {
+  print_slots();
   slot->type     = SOUND_TYPE_NONE; // will prevent irq from calling update()
   res_deactivate(RES_TYPE_SOUND, slot->id, 0);
   slot->id       = 0;
   slot->finished = 0;
 }
 
-static uint8_t start_channel(uint8_t slot_id, int8_t __far *data, uint16_t size, uint8_t flags, uint16_t timer, uint8_t vol)
+static uint16_t read_be16(void __far *ptr)
+{
+  uint8_t __far *p8 = ptr;
+  uint8_t msb = p8[0];
+  uint8_t lsb = p8[1];
+  return (msb << 8) | lsb;
+}
+
+static uint8_t read_be16_lsb(void __far *ptr)
+{
+  uint8_t __far *p8 = ptr;
+  return p8[1];
+}
+
+static uint16_t freq_to_timer(uint16_t freq)
+{
+  static const uint32_t base = (uint32_t)(3579545ULL * 16777215ULL / 40500000ULL);
+  *(volatile uint32_t *)0xd770 = base;
+  *(volatile uint32_t *)0xd774 = freq;
+  VICIV.bordercol = 1;
+  while (PEEK(0xd70f) & 0x80) continue;
+  VICIV.bordercol = 0;
+  return *(volatile uint16_t *)0xd76c;
+}
+
+static uint8_t alloc_and_start_channel(uint8_t slot_id, int8_t __far *data, uint16_t size, uint8_t flags, uint16_t timer, uint8_t vol)
 {
   uint8_t ch = get_free_channel();
   if (ch != 0xff) {
-    channel_use[ch]                    = slot_id;
-    DMA.aud_ch[ch].ctrl                = 0;
-    DMA.aud_ch[ch].freq.lsb16          = timer;
-    DMA.aud_ch[ch].freq.msb            = 0;
-    DMA.aud_ch[ch].base_addr.addr16    = LSB16(data);
-    DMA.aud_ch[ch].current_addr.addr16 = LSB16(data);
-    DMA.aud_ch[ch].base_addr.bank      = BANK(data);
-    DMA.aud_ch[ch].current_addr.bank   = BANK(data);
-    DMA.aud_ch[ch].top_addr            = LSB16(data) + size - 1;
-    DMA.aud_ch[ch].volume              = vol;
-    DMA.aud_ch[ch].ctrl                = ADMA_CHEN_MASK | ADMA_SBITS_8 | flags;
-
-    debug_out("start channel %d base %lx, size %d, timer %d, vol %d, flags %02x taddr %x\n", ch, (uint32_t)data, size, timer, vol, flags, DMA.aud_ch[ch].top_addr);
-
+    channel_use[ch] = slot_id;
+    start_channel(ch, data, size, flags, timer, vol);
+    //debug_out("start channel %d base %lx, size %d, timer %d, vol %d, flags %02x taddr %x\n", ch, (uint32_t)data, size, timer, vol, flags, DMA.aud_ch[ch].top_addr);
   }
   return ch;
 }
 
-static void start_sample(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *metadata)
+static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint8_t flags, uint16_t timer, uint8_t vol)
+{
+  DMA.aud_ch[ch].ctrl                = 0;
+  DMA.aud_ch[ch].freq.lsb16          = timer;
+  DMA.aud_ch[ch].freq.msb            = 0;
+  DMA.aud_ch[ch].base_addr.addr16    = LSB16(data);
+  DMA.aud_ch[ch].current_addr.addr16 = LSB16(data);
+  DMA.aud_ch[ch].base_addr.bank      = BANK(data);
+  DMA.aud_ch[ch].current_addr.bank   = BANK(data);
+  DMA.aud_ch[ch].top_addr            = LSB16(data) + size - 1;
+  DMA.aud_ch[ch].volume              = vol;
+  DMA.aud_ch[ch].ctrl                = ADMA_CHEN_MASK | ADMA_SBITS_8 | flags;
+
+  //debug_out("start channel2 %d base %lx, size %d, timer %d, vol %d, flags %02x taddr %x\n", ch, (uint32_t)data, size, timer, vol, flags, DMA.aud_ch[ch].top_addr);
+}
+
+static void start_channel_looped(uint8_t ch, int8_t __far *data, uint16_t loop_offset, uint16_t size, uint16_t timer, uint8_t vol)
+{
+  __auto_type loop_address = data + loop_offset;
+
+  DMA.aud_ch[ch].ctrl                = 0;
+  DMA.aud_ch[ch].freq.lsb16          = timer;
+  DMA.aud_ch[ch].freq.msb            = 0;
+  DMA.aud_ch[ch].base_addr.addr16    = LSB16(loop_address);
+  DMA.aud_ch[ch].current_addr.addr16 = LSB16(data);
+  DMA.aud_ch[ch].base_addr.bank      = BANK(loop_address);
+  DMA.aud_ch[ch].current_addr.bank   = BANK(data);
+  DMA.aud_ch[ch].top_addr            = LSB16(data) + size - 1;
+  DMA.aud_ch[ch].volume              = vol;
+  DMA.aud_ch[ch].ctrl                = ADMA_CHEN_MASK | ADMA_SBITS_8 | ADMA_CHLOOP_MASK;
+
+  //debug_out("start channel looped %d base %lx, loop_offset %d, size %d, timer %d, vol %d, taddr %x\n", ch, (uint32_t)data, loop_offset, size, timer, vol, DMA.aud_ch[ch].top_addr);
+}
+
+static void start_sample(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params)
 {
   __auto_type slot = &sound_slots[slot_id];
   __auto_type priv = &slot->sample;
 
   slot->update  = update_sample;
   slot->stop    = stop_sample;
-  uint8_t flags = metadata->sample.loop ? ADMA_CHLOOP_MASK : 0;
+  uint8_t flags = params->sample.loop ? ADMA_CHLOOP_MASK : 0;
 
-  debug_out("start sample %d, %d, %d\n", slot_id, size, metadata->sample.timer);
-  priv->ch = start_channel(slot_id, data, size, flags, metadata->sample.timer, metadata->sample.vol);
-  debug_out("playing ch %d", priv->ch);
+  //debug_out("start sample %d, %d, %d\n", slot_id, size, params->sample.timer);
+  priv->ch = alloc_and_start_channel(slot_id, data, size, flags, params->sample.timer, params->sample.vol);
+  //debug_out("playing ch %d", priv->ch);
 }
 
 static void update_sample(struct sound_slot *slot)
@@ -334,7 +408,6 @@ static void update_sample(struct sound_slot *slot)
 
 static void stop_sample(struct sound_slot *slot)
 {
-  debug_out("stop sample loop %d", slot->id);
   stop_slot(slot);
 
   uint8_t ch = slot->sample.ch;
@@ -344,7 +417,7 @@ static void stop_sample(struct sound_slot *slot)
   }
 }
 
-static void start_dual_sample_timed_loop(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *metadata)
+static void start_dual_sample_timed_loop(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params)
 {
   __auto_type slot = &sound_slots[slot_id];
   __auto_type priv = &slot->dual_sample_timed_loop;
@@ -352,11 +425,9 @@ static void start_dual_sample_timed_loop(uint8_t slot_id, int8_t __far *data, ui
   slot->update     = update_dual_sample_timed_loop;
   slot->stop       = stop_dual_sample_timed_loop;
 
-  priv->num_frames = metadata->dual_sample_timed_loop.frames;
-  priv->ch[0]      = start_channel(slot_id, data, size, ADMA_CHLOOP_MASK, metadata->dual_sample_timed_loop.timer1, metadata->dual_sample_timed_loop.vol1);
-  priv->ch[1]      = start_channel(slot_id, data, size, ADMA_CHLOOP_MASK, metadata->dual_sample_timed_loop.timer2, metadata->dual_sample_timed_loop.vol2);
-
-  debug_out("playing ch %d,%d", priv->ch[0], priv->ch[1]);
+  priv->num_frames = params->dual_sample_timed_loop.frames;
+  priv->ch[0]      = alloc_and_start_channel(slot_id, data, size, ADMA_CHLOOP_MASK, params->dual_sample_timed_loop.timer1, params->dual_sample_timed_loop.vol1);
+  priv->ch[1]      = alloc_and_start_channel(slot_id, data, size, ADMA_CHLOOP_MASK, params->dual_sample_timed_loop.timer2, params->dual_sample_timed_loop.vol2);
 
   // setting the type will enable updates from within the irq, so we only set it once everything else is done
   slot->type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP;
@@ -387,19 +458,39 @@ static void stop_dual_sample_timed_loop(struct sound_slot *slot)
   for (uint8_t i = 0; i < 2; ++i) {
     uint8_t ch = slot->dual_sample_timed_loop.ch[i];
     if (ch != 0xff) {
-      DMA.aud_ch[ch].ctrl &= 0;
-      channel_use[ch] = 0xff;
+      DMA.aud_ch[ch].ctrl = 0;
+      channel_use[ch]     = 0xff;
     }
   }
 }
 
-static void start_music(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *metadata)
+static void start_music(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params)
 {
   __auto_type slot = &sound_slots[slot_id];
   __auto_type priv = &slot->music;
 
+  // music playback is exclusive, so stop all other sounds
+  sound_stop_all();
+
   slot->update     = update_music;
   slot->stop       = stop_music;
+
+  __auto_type p         = &params->music;
+  priv->params          = p;
+  priv->data            = data;
+  priv->ch[0].dataptr_i = data + p->chan1off;
+  priv->ch[1].dataptr_i = data + p->chan2off;
+  priv->ch[2].dataptr_i = data + p->chan3off;
+  priv->ch[3].dataptr_i = data + p->chan4off;
+  for (uint8_t i = 0; i < 4; ++i) {
+    __auto_type chan = &priv->ch[i];
+    chan->dataptr = chan->dataptr_i;
+    chan->volbase = 0;
+    chan->volptr  = 0;
+    //priv->chan    = 0;
+    chan->dur     = 0;
+    chan->ticks   = 0;
+  }
 
   // setting the type will enable updates from within the irq, so we only set it once everything else is done
   slot->type = SOUND_TYPE_MUSIC;
@@ -408,12 +499,118 @@ static void start_music(uint8_t slot_id, int8_t __far *data, uint16_t size, stru
 static void update_music(struct sound_slot *slot)
 {
   __auto_type priv = &slot->music;
+  uint8_t channels_finished = 0;
 
+  for (uint8_t i = 0; i < 4; ++i) {
+    __auto_type chan = &priv->ch[i];
+
+    if (chan->dur) {
+      if (!--chan->dur) {
+        DMA.aud_ch[i].ctrl = 0;
+      }
+      else {
+        uint8_t  vol         = read_be16_lsb(chan->volbase + chan->volptr);
+        DMA.aud_ch[i].volume = DMA_VOL_RT(vol);
+
+        if (++chan->volptr == 0) {
+          DMA.aud_ch[i].ctrl = 0;
+          chan->dur          = 0;
+        }
+      }
+    }
+
+    if (!chan->dataptr) {
+      ++channels_finished;
+      continue;
+    }
+
+    if (read_be16(chan->dataptr) <= chan->ticks) {
+      uint16_t freq = read_be16(chan->dataptr + 2);
+      if (freq == 0xffff) {
+        if (priv->params->loop) {
+          chan->dataptr = chan->dataptr_i;
+          chan->ticks   = 0;
+          if (read_be16(chan->dataptr) > 0) {
+            ++chan->ticks;
+            continue;
+          }
+          freq = read_be16(chan->dataptr + 2);
+        }
+        else {
+          chan->dataptr = NULL;
+          ++channels_finished;
+          continue;
+        }
+      }
+
+      uint16_t timer      = freq_to_timer(freq);
+      uint16_t inst       = read_be16(chan->dataptr + 8);
+      __auto_type instptr = priv->data + priv->params->instoff + (inst << 5);
+      chan->volbase       = (uint16_t __far *)(priv->data + priv->params->voloff + (read_be16(instptr) << 9));
+      chan->volptr        = 0;
+      uint8_t ch          = U8(read_be16(chan->dataptr + 6)) & U8(0x03);
+      if (ch != i) {
+        fatal_error(ERR_MUSIC_CHANNEL_MISMATCH);
+      }
+      if (chan->dur) {
+        DMA.aud_ch[i].ctrl = 0;
+      }
+      chan->dur = read_be16(chan->dataptr + 4);
+      
+      uint8_t vol = read_be16_lsb(chan->volbase + chan->volptr);
+      ++chan->volptr;
+      vol = DMA_VOL_RT(vol);
+
+      uint16_t offset      = read_be16(instptr + 0x14);
+      uint16_t len         = read_be16(instptr + 0x18);
+      uint16_t loop_offset = read_be16(instptr + 0x16);
+      uint16_t loop_len    = read_be16(instptr + 0x10);
+
+      if (loop_len > 100) {
+        debug_out("sample offset %d len %d loop_offset %d loop_len %d vol %d", offset, len, loop_offset, loop_len, vol);
+      }
+
+      if (loop_offset == 0 || loop_len < 10) {
+        loop_len = 0;
+        loop_offset = offset + len;
+        //debug_out("loop_len < 10");
+      }
+
+      uint16_t size       = len;// + loop_len;
+
+      // if (offset + len != loop_offset) {
+      //   fatal_error(ERR_NON_CONTIGUOUS_LOOP_SAMPLE);
+      // }
+
+      __auto_type sample_data = priv->data + priv->params->sampoff + offset;
+
+      // if (loop_len) {
+      //   fatal_error(1);
+      //   //start_channel_looped(i, sample_data, loop_offset, size, timer, vol);
+      // }
+      // else {
+        //fatal_error(2);
+        start_channel(i, sample_data, size, 0, timer, vol);
+      // }
+
+      chan->dataptr += 16;
+    }
+    ++chan->ticks;
+  }
+
+  if (channels_finished == 4) {
+    slot->finished = 1;
+  }
 }
 
 static void stop_music(struct sound_slot *slot)
 {
   stop_slot(slot);
+
+  for (uint8_t i = 0; i < 4; ++i) {
+    DMA.aud_ch[i].ctrl = 0;
+    channel_use[i]     = 0xff;
+  }
 }
 
 static void print_slots(void)

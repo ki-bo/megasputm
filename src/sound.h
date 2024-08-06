@@ -27,6 +27,7 @@ void sound_init(void);
 // code_main functions
 void sound_play(uint8_t sound_id);
 void sound_stop(uint8_t sound_id);
+void sound_stop_all(void);
 uint8_t sound_is_playing(uint8_t sound_id);
 void sound_stop_finished_slots(void);
 void sound_process(void);
