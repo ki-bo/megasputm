@@ -482,6 +482,13 @@ void vm_set_current_room(uint8_t room_no)
   // exit and free old room
   //debug_out("Deactivating old room %d", vm_read_var8(VAR_SELECTED_ROOM));
   stop_all_dialog();
+  vm_revert_sentence();
+
+  MAP_CS_GFX
+  gfx_clear_dialog();
+  gfx_fade_out();
+  UNMAP_CS
+
   if (vm_read_var(VAR_SELECTED_ROOM) != 0) {
     map_ds_resource(room_res_slot);
     uint16_t exit_script_offset = room_hdr->exit_script_offset;
@@ -500,14 +507,10 @@ void vm_set_current_room(uint8_t room_no)
     res_deactivate_slot(room_res_slot);
   }
 
-  vm_revert_sentence();
-  MAP_CS_GFX
-  gfx_clear_dialog();
-  gfx_fade_out();
-
   vm_write_var(VAR_SELECTED_ROOM, room_no);
 
   if (room_no == 0) {
+    MAP_CS_GFX
     gfx_clear_bg_image();
     actor_room_changed();
     num_objects = 0;
@@ -623,7 +626,7 @@ void vm_cut_scene_end(void)
   if (camera_state & CAMERA_STATE_FOLLOW_ACTOR) {
     vm_set_camera_follow_actor(vm_read_var8(VAR_SELECTED_ACTOR));
   }
-  else if (vm_read_var8(VAR_SELECTED_ROOM) != vm_state.cs_room) {
+  else if (vm_state.cs_room != 0 && vm_read_var8(VAR_SELECTED_ROOM) != vm_state.cs_room) {
     vm_set_current_room(vm_state.cs_room);
   }
   vm_write_var(VAR_CURSOR_STATE, vm_state.cs_cursor_state);
@@ -1245,7 +1248,7 @@ void vm_handle_error_wrong_disk(uint8_t expected_disk)
   SAVE_CS_AUTO_RESTORE
 
   char error_str[41];
-  sprintf(error_str, "Please insert disk %d. Press Return.", expected_disk);
+  sprintf(error_str, "Please Insert Disk %d.  Press RETURN", expected_disk);
 
   input_key_pressed = 0; // ack the space key
   MAP_CS_GFX
