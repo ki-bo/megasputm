@@ -37,11 +37,11 @@ export ETHLOAD_IP_PARAM
 
 .PHONY: all clean run debug_xemu doxygen
 
-all: mm.d81
+all: mm1.d81
 
-run: mm.d81
-	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm.d81"
-	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm.d81 -r runtime.raw
+run: mm1.d81
+	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm1.d81"
+	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm1.d81 -r runtime.raw
 
 debug_xemu: mm.d81
 	@echo "--------------------------------------------------"
@@ -49,7 +49,7 @@ debug_xemu: mm.d81
 	@echo "Make sure a tmux session named 'mmxemu' is running"
 	@echo "Use 'xemu_tmux_session.sh' to create one"
 	@echo "--------------------------------------------------"
-	tmux send-keys -t mmxemu "$(XMEGA65) -uartmon :4510 -8 mm.d81 -besure -curskeyjoy -videostd 0" C-m
+	tmux send-keys -t mmxemu "$(XMEGA65) -uartmon :4510 -8 mm1.d81 -besure -curskeyjoy -videostd 0" C-m
 
 obj/%_s.o: %.s
 	@mkdir -p obj
@@ -63,19 +63,19 @@ runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
 mm.d81: runtime.raw $(SAVE_FILES)
-	@if [ ! -f gamedata/MM.D81 ]; then \
-		echo "MM.D81 not found, creating new .d81 disk image..."; \
-		$(C1541) -format "mm,01" d81 mm.d81; \
+	@if [ ! -f gamedata/mm1.D81 ]; then \
+		echo "mm1.d81 not found, creating new .d81 disk image..."; \
+		$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
 	else \
-		echo "Copying MM.D81 from gamedata..."; \
-		cp gamedata/MM.D81 mm.d81; \
+		echo "Copying mm1.d81 from gamedata..."; \
+		cp gamedata/mm1.d81 mm1.d81; \
 	fi
-	$(C1541) -attach mm.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13
+	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13
 	@echo "Copying save game files to disk image..."
 	@for file in $(SAVE_FILES); do \
 		if [ -f "$$file" ]; then \
-			echo "Adding $$file to mm.d81..."; \
-			$(C1541) -attach mm.d81 -write $$file $$(basename $$file),s; \
+			echo "Adding $$file to mm1.d81..."; \
+			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file),s; \
 		fi \
 	done
 
@@ -84,4 +84,4 @@ doxygen:
 
 clean:
 	-rm -rf obj
-	-rm *.raw *.d mm-mega65.lst mm.d81
+	-rm *.raw *.d mm-mega65.lst mm1.d81
