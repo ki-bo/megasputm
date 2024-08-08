@@ -46,9 +46,9 @@ __task void main(void)
   // Be aware that this is overwriting both init code and init bss in memory.
   // So all init functions need to be complete at this point and can't be called anymore.
   MAP_CS_DISKIO
-  diskio_load_file("M01", (uint8_t __far *)(0x2000));  // load script parser code
-  diskio_load_file("M02", (uint8_t __far *)(0x4000));  // load main code
-  diskio_load_file("M03", (uint8_t __far *)(0xd000));  // load main private code
+  diskio_load_file(0, "M01", (uint8_t __far *)(0x2000));  // load script parser code
+  diskio_load_file(0, "M02", (uint8_t __far *)(0x4000));  // load main code
+  diskio_load_file(0, "M03", (uint8_t __far *)(0xd000));  // load main private code
   // switch back to real drive
   //diskio_switch_to_real_drive();
   UNMAP_CS

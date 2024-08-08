@@ -170,6 +170,8 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
   */
 void vm_init(void)
 {
+  diskio_load_index();
+
   for (active_script_slot = 0; active_script_slot < NUM_SCRIPT_SLOTS; ++active_script_slot)
   {
     vm_state.proc_state[active_script_slot] = PROC_STATE_FREE;

@@ -28,13 +28,14 @@ enum {
 
 // code_init functions
 void diskio_init(void);
+uint8_t diskio_load_index(void);
 
 // code_diskio functions
 uint8_t diskio_is_real_drive(void);
 void diskio_switch_to_real_drive(void);
 void diskio_check_motor_off(uint8_t elapsed_jiffies);
 uint8_t diskio_file_exists(const char *filename);
-void diskio_load_file(const char *filename, uint8_t __far *address);
+void diskio_load_file(uint8_t disk_num, const char *filename, uint8_t __far *address);
 void diskio_load_game_objects(void);
 uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id);
 void diskio_continue_resource_loading(uint8_t __huge *target_ptr);
