@@ -59,7 +59,7 @@
 
         ; memory for boot program (autoboot.c65)
         ; contains copies of m00 (runtime) and m11 (diskio) and will relocate them to their final memory locations
-        (memory autoboot (address (#x1fff . #x79ff))
+        (memory autoboot (address (#x1fff . #x7a7f))
                 (section 
                         (autoboot_load_address #x1fff)
                         (programStart          #x2001) 
@@ -162,7 +162,7 @@
         ;;;; **** BANKED MEMORY diskio ****
 
         ; memory in bank 0 for mapping diskio module
-        (memory banked-code-1 (address (#x2000 . #x39ff)) 
+        (memory banked-code-1 (address (#x2000 . #x3a7f)) 
                 (scatter-to diskio_copy)
                 (section
                         code_diskio
@@ -171,8 +171,8 @@
                 )
         )
         ; memory in bank 0 for mapping diskio bss section
-        (memory banked-bss-1 (address (#x3a00 . #x3fff)) 
-                (scatter-to bank1_3a00)
+        (memory banked-bss-1 (address (#x3a80 . #x3fff)) 
+                (scatter-to bank1_3a80)
                 (section
                         bss_diskio
                 )
@@ -244,7 +244,7 @@
 
         (memory m1-1 (address (#x12000 . #x13fff))
                 (section 
-                        (bank1_3a00 #x13a00)
+                        (bank1_3a80 #x13a80)
                 )
         )
 

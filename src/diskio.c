@@ -134,6 +134,7 @@ static uint8_t enable_prompt_for_disk_change;
 static uint8_t room_track_list[54];
 static uint8_t room_block_list[54];
 static uint8_t current_track;
+static uint8_t last_disk;
 static uint8_t last_physical_track;
 static uint8_t last_physical_sector;
 static uint8_t last_side;
@@ -1042,6 +1043,7 @@ static void read_directory(uint8_t disk_num)
   load_block(disk_num, 40, 3);
   while (read_next_directory_block(disk_num) != 0);
   current_disk = disk_num;
+  last_physical_track = 0xff;
 }
 
 /**
@@ -1355,7 +1357,6 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
   --track; // logical track numbers are 1-80, physical track numbers are 0-79
 
   __auto_type cache_block = get_cache_ptr(disk_num, track, physical_sector);
-  //debug_out("cache %d", *cache_block != -1);
 
   ++physical_sector;
   if (physical_sector > 10) {
@@ -1373,7 +1374,9 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
     // block is in cache
     dmalist_copy_from_cache.src_addr = LSB16(cache_block);
     dmalist_copy_from_cache.src_bank = BANK(cache_block);
+    dmalist_copy_from_cache.opt_arg1 = (uint8_t)0x80 | MB_LO(cache_block);
     dma_trigger(&dmalist_copy_from_cache);
+    last_disk = disk_num;
     last_physical_track = track;
     last_physical_sector = physical_sector;
     last_side = side;
@@ -1381,8 +1384,8 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
   else {
     if (use_cache) {
       check_and_prompt_for_disk(disk_num);
-      FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
     }
+    FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
     if (use_cache && diskio_is_real_drive()) {
       read_whole_track(track);
       if (*cache_block < 0) { // should never happen
@@ -1391,7 +1394,9 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
       // block is in cache
       dmalist_copy_from_cache.src_addr = LSB16(cache_block);
       dmalist_copy_from_cache.src_bank = BANK(cache_block);
+      dmalist_copy_from_cache.opt_arg1 = (uint8_t)0x80 | MB_LO(cache_block);
       dma_trigger(&dmalist_copy_from_cache);
+      last_disk = disk_num;
       last_physical_track = track;
       last_physical_sector = physical_sector;
       last_side = side;
@@ -1401,7 +1406,10 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
       prepare_drive();
       //debug_out("nocach");
 
-      if (physical_sector != last_physical_sector || track != last_physical_track || side != last_side) {
+      if (disk_num != last_disk || 
+          physical_sector != last_physical_sector || 
+          track != last_physical_track || 
+          side != last_side) {
         if (side == 0) {
           FDC.fdc_control |= FDC_SIDE_MASK; // select side 0
         }
@@ -1448,9 +1456,11 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
         if (use_cache) {
           dmalist_copy_to_cache.dst_addr = LSB16(cache_block);
           dmalist_copy_to_cache.dst_bank = BANK(cache_block);
+          dmalist_copy_to_cache.opt_arg2 = (uint8_t)0x80 | MB_LO(cache_block);
           dma_trigger(&dmalist_copy_to_cache);
         }
 
+        last_disk = disk_num;
         last_physical_track = track;
         last_physical_sector = physical_sector;
         last_side = side;
@@ -1550,6 +1560,7 @@ static void read_whole_track(uint8_t track)
       wait_for_busy_clear();
     }
 
+    last_disk            = current_disk;
     last_physical_track  = current_track;
     last_physical_sector = sector;
     last_side            = side;
@@ -1876,7 +1887,7 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
     disk_error(ERR_SECTOR_DATA_CORRUPT);
   }
 
- 
+  last_disk = current_disk;
   last_physical_track = track;
   last_physical_sector = sector;
   last_side = side;
