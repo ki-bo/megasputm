@@ -138,6 +138,7 @@ static uint8_t last_disk;
 static uint8_t last_physical_track;
 static uint8_t last_physical_sector;
 static uint8_t last_side;
+static uint8_t dir_cache_sectors;
 static uint8_t next_track;
 static uint8_t next_block;
 static uint8_t cur_block_read_ptr;
@@ -173,6 +174,9 @@ static void step_to_track(uint8_t track);
 static void search_file(const char *filename, uint8_t file_type);
 static void seek_to(uint16_t offset);
 static int8_t __far *get_cache_ptr(uint8_t disk_num, uint8_t track, uint8_t sector);
+static void copy_sector_buf_to_cache(int8_t __far *cache_ptr);
+static void copy_cache_to_sector_buf(int8_t __far *cache_ptr);
+static void set_fdc_swap(uint8_t block);
 static void load_block(uint8_t disk_num, uint8_t track, uint8_t block);
 static void read_whole_track(uint8_t track);
 static void prepare_drive(void);
@@ -1193,6 +1197,8 @@ static void step_to_track(uint8_t track)
   */
 static void search_file(const char *filename, uint8_t file_type)
 {
+  int8_t __far *dir_cache_ptr = get_cache_ptr(MAX_DISKS, 0, 0);
+  uint8_t sectors_read = 0;
   uint8_t file_track;
   uint8_t file_block;
   next_track = 40;
@@ -1200,7 +1206,21 @@ static void search_file(const char *filename, uint8_t file_type)
 
   while (next_track != 0)
   {
-    load_block(0xff, next_track, next_block);
+    // debug_out("sr %d dcs%d dcp%lx", sectors_read, dir_cache_sectors, (uint32_t)dir_cache_ptr);
+    if (sectors_read < dir_cache_sectors) {
+      // debug_out("dir cache %d %d", next_track, next_block);
+      copy_cache_to_sector_buf(dir_cache_ptr);
+      set_fdc_swap(next_block);
+      last_physical_track = 0xff;
+    }
+    else {
+      load_block(0xff, next_track, next_block);
+      copy_sector_buf_to_cache(dir_cache_ptr);
+      ++dir_cache_sectors;
+    }
+    ++sectors_read;
+    dir_cache_ptr += 512;
+
     next_track = FDC.data;
     next_block = FDC.data;
     int8_t skip = 0;
@@ -1316,6 +1336,33 @@ static int8_t __far *get_cache_ptr(uint8_t disk_num, uint8_t track, uint8_t sect
   return FAR_I8_PTR(DISK_CACHE + cache_offset);
 }
 
+static void copy_sector_buf_to_cache(int8_t __far *cache_ptr)
+{
+  dmalist_copy_to_cache.dst_addr = LSB16(cache_ptr);
+  dmalist_copy_to_cache.dst_bank = BANK(cache_ptr);
+  dmalist_copy_to_cache.opt_arg2 = (uint8_t)0x80 | MB_LO(cache_ptr);
+  dma_trigger(&dmalist_copy_to_cache);
+}
+
+static void copy_cache_to_sector_buf(int8_t __far *cache_ptr)
+{
+  dmalist_copy_from_cache.src_addr = LSB16(cache_ptr);
+  dmalist_copy_from_cache.src_bank = BANK(cache_ptr);
+  dmalist_copy_from_cache.opt_arg1 = (uint8_t)0x80 | MB_LO(cache_ptr);
+  dma_trigger(&dmalist_copy_from_cache);
+}
+
+static void set_fdc_swap(uint8_t block)
+{
+  FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
+  if (block & 1) {
+    FDC.fdc_control |= FDC_SWAP_MASK; // swap upper and lower halves of data buffer
+  }
+  else {
+    FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap
+  }
+}
+
 /**
   * @brief Loads a sector from disk cache or floppy disk into the floppy buffer
   *
@@ -1367,39 +1414,25 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
     side = 0;
   }
 
-  FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
+  //FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
   *NEAR_U8_PTR(0xd689) &= 0x7f; // see floppy buffer, not SD buffer
 
   if (use_cache && *cache_block >= 0) {
     // block is in cache
-    dmalist_copy_from_cache.src_addr = LSB16(cache_block);
-    dmalist_copy_from_cache.src_bank = BANK(cache_block);
-    dmalist_copy_from_cache.opt_arg1 = (uint8_t)0x80 | MB_LO(cache_block);
-    dma_trigger(&dmalist_copy_from_cache);
-    last_disk = disk_num;
-    last_physical_track = track;
-    last_physical_sector = physical_sector;
-    last_side = side;
+    copy_cache_to_sector_buf(cache_block);
   }
   else {
     if (use_cache) {
       check_and_prompt_for_disk(disk_num);
     }
-    FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
+    //FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
     if (use_cache && diskio_is_real_drive()) {
       read_whole_track(track);
       if (*cache_block < 0) { // should never happen
         disk_error(ERR_READ_TRACK_FAILED);
       }
       // block is in cache
-      dmalist_copy_from_cache.src_addr = LSB16(cache_block);
-      dmalist_copy_from_cache.src_bank = BANK(cache_block);
-      dmalist_copy_from_cache.opt_arg1 = (uint8_t)0x80 | MB_LO(cache_block);
-      dma_trigger(&dmalist_copy_from_cache);
-      last_disk = disk_num;
-      last_physical_track = track;
-      last_physical_sector = physical_sector;
-      last_side = side;
+      copy_cache_to_sector_buf(cache_block);
     }
     else {
       // we are either on a virtual disk image or have cache disabled
@@ -1423,7 +1456,7 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
         FDC.sector = physical_sector;
         FDC.side = side;
 
-        FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU read pointer will be reset to beginning of sector buffer
+        set_fdc_swap(0); // disable swap so CPU read pointer will be reset to beginning of sector buffer
       
         FDC.command = FDC_CMD_READ_SECTOR;
 
@@ -1454,16 +1487,8 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
 
         // copy the sector to the cache
         if (use_cache) {
-          dmalist_copy_to_cache.dst_addr = LSB16(cache_block);
-          dmalist_copy_to_cache.dst_bank = BANK(cache_block);
-          dmalist_copy_to_cache.opt_arg2 = (uint8_t)0x80 | MB_LO(cache_block);
-          dma_trigger(&dmalist_copy_to_cache);
+          copy_sector_buf_to_cache(cache_block);
         }
-
-        last_disk = disk_num;
-        last_physical_track = track;
-        last_physical_sector = physical_sector;
-        last_side = side;
 
         // reset jiffy counter for drive access check
         jiffies_elapsed_since_last_drive_access = 0;
@@ -1471,12 +1496,12 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
     }
   }
 
-  if (block & 1) {
-    FDC.fdc_control |= FDC_SWAP_MASK; // swap upper and lower halves of data buffer
-  }
-  else {
-    FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap
-  }
+  last_disk = disk_num;
+  last_physical_track = track;
+  last_physical_sector = physical_sector;
+  last_side = side;
+
+  set_fdc_swap(block);
 }
 
 /**
@@ -1653,8 +1678,9 @@ static void disk_error(error_code_t error_code)
 static void led_and_motor_off(void)
 {
   FDC.fdc_control &= ~(FDC_MOTOR_MASK | FDC_LED_MASK); // disable LED and motor
-  drive_spinning = 0;
+  drive_spinning      = 0;
   last_physical_track = 0xff;
+  dir_cache_sectors   = 0;
 }
 
 static uint16_t allocate_sector(uint8_t start_track)
@@ -1858,8 +1884,6 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
     side = 0;
   }
 
-  FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
-
   prepare_drive();
 
   if (side == 0) {
@@ -1872,11 +1896,11 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
   step_to_track(track);
 
   //debug_out(" write t %d, s %d, side %d", track, sector, side);
-  FDC.track = track;
+  FDC.track  = track;
   FDC.sector = sector;
-  FDC.side = side;
+  FDC.side   = side;
 
-  FDC.fdc_control &= ~FDC_SWAP_MASK; // disable swap so CPU pointer will be reset to beginning of sector buffer
+  set_fdc_swap(0); // disable swap so CPU pointer will be reset to beginning of sector buffer
 
   FDC.command = FDC_CMD_WRITE_SECTOR;
 
@@ -1887,10 +1911,10 @@ static void write_sector_from_fdc_buf(uint8_t track, uint8_t sector)
     disk_error(ERR_SECTOR_DATA_CORRUPT);
   }
 
-  last_disk = current_disk;
-  last_physical_track = track;
+  last_disk            = current_disk;
+  last_physical_track  = track;
   last_physical_sector = sector;
-  last_side = side;
+  last_side            = side;
 
   // reset jiffy counter for drive access check
   jiffies_elapsed_since_last_drive_access = 0;
