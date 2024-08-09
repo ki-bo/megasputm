@@ -43,7 +43,7 @@ run: mm1.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm1.d81"
 	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm1.d81 -r runtime.raw
 
-debug_xemu: mm.d81
+debug_xemu: mm1.d81
 	@echo "--------------------------------------------------"
 	@echo "Starting Xemu..."
 	@echo "Make sure a tmux session named 'mmxemu' is running"
@@ -62,7 +62,7 @@ obj/%.o: %.c
 runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
-mm.d81: runtime.raw $(SAVE_FILES)
+mm1.d81: runtime.raw $(SAVE_FILES)
 	@if [ ! -f gamedata/mm1.D81 ]; then \
 		echo "mm1.d81 not found, creating new .d81 disk image..."; \
 		$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \

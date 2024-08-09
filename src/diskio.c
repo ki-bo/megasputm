@@ -131,6 +131,7 @@ struct bam_block {
 static uint16_t times_1600[MAX_DISKS + 1];
 static uint8_t current_disk;
 static uint8_t enable_prompt_for_disk_change;
+static uint8_t room_list_disk_num;
 static uint8_t room_track_list[54];
 static uint8_t room_block_list[54];
 static uint8_t current_track;
@@ -222,6 +223,7 @@ void diskio_init(void)
   }
 
   current_disk                            = 0xff;
+  room_list_disk_num                      = 0xff;
   last_physical_track                     = 0xff;
   drive_spinning                          = 0;
   drive_in_use                            = 0;
@@ -613,7 +615,7 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   }
 
   // the requested file is on the current disk
-  load_block(current_disk, room_track_list[room_id], room_block_list[room_id]);
+  load_block(room_list_disk_num, room_track_list[room_id], room_block_list[room_id]);
   next_track = FDC.data;
   next_block = FDC.data;
   cur_block_read_ptr = 0;
@@ -622,7 +624,7 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   uint8_t chunksize_low = FDC.data ^ 0xff;
   ++cur_block_read_ptr;
   if (cur_block_read_ptr == 254) {
-    load_block(current_disk, next_track, next_block);
+    load_block(room_list_disk_num, next_track, next_block);
     next_track = FDC.data;
     next_block = FDC.data;
     cur_block_read_ptr = 0;
@@ -666,7 +668,7 @@ void diskio_continue_resource_loading(uint8_t __huge *target_ptr)
     cur_chunk_size -= bytes_to_read;
 
     if (cur_chunk_size != 0) {
-      load_block(current_disk, next_track, next_block);
+      load_block(room_list_disk_num, next_track, next_block);
       next_track = FDC.data;
       next_block = FDC.data;
       cur_block_read_ptr = 0;
@@ -685,7 +687,7 @@ void diskio_open_for_reading(const char *filename, uint8_t file_type)
     disk_error(ERR_FILE_NOT_FOUND);
   }
 
-  // load first block of file, configuring disk to 0xff will effectively disabla caching
+  // load first block of file, configuring disk to 0xff will effectively disable caching
   load_block(0xff, next_track, next_block);
   next_track = FDC.data;
   next_block = FDC.data;
@@ -1046,7 +1048,7 @@ static void read_directory(uint8_t disk_num)
   // Loading file list in the directory, starting at track 40, block 3, disable caching
   load_block(disk_num, 40, 3);
   while (read_next_directory_block(disk_num) != 0);
-  current_disk = disk_num;
+  room_list_disk_num = disk_num;
   last_physical_track = 0xff;
 }
 
@@ -1312,7 +1314,7 @@ static void seek_to(uint16_t offset)
   bytes_left_in_block -= cur_block_read_ptr;
 
   while (bytes_left_in_block <= offset) {
-    load_block(current_disk, next_track, next_block);
+    load_block(room_list_disk_num, next_track, next_block);
     next_track = FDC.data;
     next_block = FDC.data;
     offset -= bytes_left_in_block;
@@ -1424,6 +1426,9 @@ static void load_block(uint8_t disk_num, uint8_t track, uint8_t block)
   else {
     if (use_cache) {
       check_and_prompt_for_disk(disk_num);
+    }
+    else {
+      current_disk = 0xff;
     }
     //FDC.command = FDC_CMD_CLR_BUFFER_PTRS;
     if (use_cache && diskio_is_real_drive()) {
