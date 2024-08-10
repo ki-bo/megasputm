@@ -2587,7 +2587,7 @@ static void sound_running(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t sound_id = resolve_next_param8();
-  vm_write_var(var_idx, 0);
+  vm_write_var(var_idx, vm_is_sound_running(sound_id));
 }
 
 /**

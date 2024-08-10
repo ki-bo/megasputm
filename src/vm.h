@@ -266,6 +266,7 @@ void vm_verb_set_state(uint8_t slot, uint8_t state);
 char *vm_verb_get_name(uint8_t slot);
 void vm_play_sound(uint8_t sound_id);
 void vm_stop_sound(uint8_t sound_id);
+uint8_t vm_is_sound_running(uint8_t sound_id);
 uint8_t vm_savegame_exists(uint8_t slot);
 uint8_t vm_save_game(uint8_t slot);
 uint8_t vm_load_game(uint8_t slot);

@@ -30,7 +30,7 @@
 
 //-----------------------------------------------------------------------------------------------
 
-#pragma clang section bss="zdata"
+#pragma clang section rodata="cdata_main" data="data_main" bss="zdata"
 
 //-----------------------------------------------------------------------------------------------
 
@@ -118,8 +118,6 @@ void res_init(void)
   */
 uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
-  // will deal with sound later, as those resources are too big to fit into the chipram heap
-  // (maybe will use attic ram for those)
   if (type == RES_TYPE_SOUND && res_is_music(id)) {
     SAVE_CS_AUTO_RESTORE
     MAP_CS_DISKIO

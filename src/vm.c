@@ -1071,6 +1071,13 @@ void vm_stop_sound(uint8_t sound_id)
   sound_stop(sound_id);
 }
 
+uint8_t vm_is_sound_running(uint8_t sound_id)
+{
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_SOUND
+  return sound_is_playing(sound_id);
+}
+
 uint8_t vm_savegame_exists(uint8_t slot)
 {
   char filename[11];
