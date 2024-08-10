@@ -256,6 +256,10 @@ __task void vm_mainloop(void)
     }
     while (jiffy_threshold && elapsed_jiffies < jiffy_threshold);
 
+    if (elapsed_jiffies > 15) {
+      elapsed_jiffies = 15;
+    }
+
     //VICIV.bordercol = 0x01;
 
     MAP_CS_DISKIO
