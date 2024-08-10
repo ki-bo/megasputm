@@ -288,6 +288,7 @@ void actor_walk_to_object(uint8_t actor_id, uint16_t object_id)
   uint8_t y             = (object_hdr->walk_to_y_and_preposition & 0x1f) << 2;
   uint8_t obj_actor_dir = object_hdr->height_and_actor_dir & 0x03;
 
+  walkbox_correct_position_to_closest_box(&x, &y);
   actor_walk_to(actor_id, x, y, obj_actor_dir);
 }
 
