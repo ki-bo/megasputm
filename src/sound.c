@@ -158,6 +158,8 @@ struct sound_params sounds[70] = {
   [28] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0078), .vol = DMA_VOL(0x28), .loop = 0}},
   [32] = {.type = SOUND_TYPE_ALARM},
   [33] = {.type = SOUND_TYPE_ALARM},
+  [38] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = DMA_VOL(0x1e), .loop = 1}},
+  [39] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x017c), .vol = DMA_VOL(0x39), .loop = 0}},
   [42] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f8), .vol = DMA_VOL(0x3f), .loop = 0}},
   [50] = {.type = SOUND_TYPE_MUSIC, .music = {.instoff = 0x0032, .voloff = 0x00b2, .chan1off = 0x08b2, .chan2off = 0x1222, .chan3off = 0x1a52, .chan4off = 0x23c2, .sampoff = 0x3074, .loop = 0}},
   [54] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x7c), .timer2 = DMA_TIMER(0x7b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
@@ -243,6 +245,8 @@ void sound_play(uint8_t sound_id)
   __auto_type sample_ptr = (int8_t __far *)(data) + sample_offset;
   __auto_type params     = &sounds[sound_id];
 
+  sound_stop(sound_id);
+  
   switch (params->type) {
     case SOUND_TYPE_IGNORED:
       res_deactivate_slot(res_page);
