@@ -26,6 +26,7 @@
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
+#include "sound.h"
 #include "util.h"
 #include "vm.h"
 #include "walk_box.h"
@@ -1019,6 +1020,7 @@ static void stop_or_break(void)
   }
   else if (opcode == 0x20){
     //debug_scr("stop-music");
+    sound_stop_music();
   }
   else {
     //debug_scr("stop-script");
@@ -1049,7 +1051,7 @@ static void start_music(void)
 {
   //debug_msg("Start music");
   uint8_t music_id = resolve_next_param8();
-  vm_play_sound(music_id);
+  sound_play_music(music_id);
 }
 
 static void actor_room(void)
@@ -1556,7 +1558,7 @@ static void start_sound(void)
 {
   //debug_scr("start-sound");
   uint8_t sound_id = resolve_next_param8();
-  vm_play_sound(sound_id);
+  sound_play(sound_id);
 }
 
 static void walk_to(void)
@@ -2023,7 +2025,7 @@ static void stop_sound(void)
 {
   //debug_msg("Stop sound");
   uint8_t sound_id = resolve_next_param8();
-  vm_stop_sound(sound_id);
+  sound_stop(sound_id);
 }
 
 static void actor_elevation(void)
@@ -2587,7 +2589,7 @@ static void sound_running(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t sound_id = resolve_next_param8();
-  vm_write_var(var_idx, vm_is_sound_running(sound_id));
+  vm_write_var(var_idx, sound_is_playing(sound_id));
 }
 
 /**

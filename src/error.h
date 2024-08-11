@@ -60,4 +60,5 @@ typedef enum {
     ERR_DISK_NUM_OUT_OF_RANGE = 38,
     ERR_LFL_FILE_NOT_FOUND = 39,
     ERR_STOPPING_EMPTY_SOUND_SLOT = 40,
+    ERR_UNDEFINED_MUSIC = 41,
 } error_code_t;
