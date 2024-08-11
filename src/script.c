@@ -1302,8 +1302,7 @@ static void walk_to_actor(void)
   uint8_t target_distance = read_byte();
 
   if (actor_id1 >= vm_read_var8(VAR_NUMBER_OF_ACTORS) || 
-      actor_id2 >= vm_read_var8(VAR_NUMBER_OF_ACTORS) ||
-      actors.room[actor_id1] != vm_read_var8(VAR_SELECTED_ROOM) || 
+      actor_id2 >= vm_read_var8(VAR_NUMBER_OF_ACTORS) || 
       actors.room[actor_id1] != actors.room[actor_id2]) {
     return;
   }
@@ -1318,6 +1317,12 @@ static void walk_to_actor(void)
   }
   else {
     x += target_distance;
+  }
+
+  if (actors.room[actor_id1] != vm_read_var8(VAR_SELECTED_ROOM)) {
+    actors.x[actor_id1] = x;
+    actors.y[actor_id1] = y;
+    return;    
   }
 
   actor_walk_to(actor_id1, x, y, 0xff);
@@ -1444,13 +1449,9 @@ static void say_line(void)
     msg_ptr = message_buffer;
   }
   read_encoded_string_null_terminated(msg_ptr);
-  if (actor_id == 0xff) {
-    //debug_scr("print-line");
+  if (actor_id == 0xff || actors.room[actor_id] == vm_read_var8(VAR_SELECTED_ROOM)) {
+    vm_say_line(actor_id);
   }
-  else {
-    //debug_scr("say-line");
-  }
-  vm_say_line(actor_id);
 }
 
 static void find_actor(void)
@@ -2427,17 +2428,21 @@ static void closest_actor(void)
   uint8_t cur_actor        = NUM_ACTORS - 1;
   uint8_t closest_actor    = 0xff;
   uint8_t closest_distance = 0xff;
-  do {
-    if (actors.local_id[cur_actor] != 0xff && cur_actor != actor_or_object_id) {
-      uint8_t distance = vm_calc_proximity(actor_or_object_id, cur_actor);
-      //debug_out("dist a%d a%d = %d", actor_or_object_id, cur_actor, distance);
-      if (distance < closest_distance) {
-        closest_distance = distance;
-        closest_actor    = cur_actor;
+
+  uint8_t room_id = vm_get_actor_or_object_room(actor_or_object_id);
+  if (room_id != 0xff) {
+    do {
+      if (cur_actor != actor_or_object_id && actors.room[cur_actor] == room_id) {
+        uint8_t distance = vm_calc_proximity(actor_or_object_id, cur_actor);
+        //debug_out("dist a%d a%d = %d", actor_or_object_id, cur_actor, distance);
+        if (distance < closest_distance) {
+          closest_distance = distance;
+          closest_actor    = cur_actor;
+        }
       }
     }
+    while (--cur_actor);
   }
-  while (--cur_actor);
 
   vm_write_var(var_idx, closest_actor);
 }

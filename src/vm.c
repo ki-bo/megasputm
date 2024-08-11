@@ -152,7 +152,7 @@ static void verb_delete(uint8_t slot);
 static void freeze_non_active_scripts(void);
 static void unfreeze_scripts(void);
 static void add_string_to_sentence_priv(const char *str, uint8_t prepend_space);
-static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y);
+static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y, uint8_t *room_id);
 
 
 /**
@@ -868,22 +868,37 @@ uint8_t vm_get_local_object_id(uint16_t global_object_id)
   return 0xff;
 }
 
+uint8_t vm_get_actor_or_object_room(uint16_t actor_or_object_id)
+{
+  SAVE_DS_AUTO_RESTORE
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_MAIN_PRIV
+  uint8_t x, y, room_id;
+  resolve_position(actor_or_object_id, &x, &y, &room_id);
+  return room_id;
+}
+
 uint8_t vm_calc_proximity(uint16_t actor_or_object_id1, uint16_t actor_or_object_id2)
 {
   SAVE_DS_AUTO_RESTORE
 
-  uint8_t x1, y1, x2, y2;
+  uint8_t x1, y1, x2, y2, room_id1, room_id2;
   uint8_t is_actor1 = 0;
   uint8_t is_actor2 = 0;
 
   // resolve the positions of the objects (or actors if id < number of actors)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_MAIN_PRIV
-  is_actor1 = resolve_position(actor_or_object_id1, &x1, &y1);
-  is_actor2 = resolve_position(actor_or_object_id2, &x2, &y2);
+  is_actor1 = resolve_position(actor_or_object_id1, &x1, &y1, &room_id1);
+  is_actor2 = resolve_position(actor_or_object_id2, &x2, &y2, &room_id2);
 
   // if one of the objects is not found, we set the distance to 0xff (maximum)
-  if (x1 == 0xff || x2 == 0xff) {
+  if (room_id1 == 0xff || room_id2 == 0xff) {
+    return 0xff;
+  }
+
+  // actors/objects in different rooms report maximum distance, as well
+  if (room_id1 != room_id2) {
     return 0xff;
   }
 
@@ -2434,46 +2449,43 @@ static void add_string_to_sentence_priv(const char *str, uint8_t prepend_space)
   }
 }
 
-static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y)
+static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y, uint8_t *room_id)
 {
+  uint8_t is_actor = 0;
+  uint8_t actor_id = 0xff;
   if (object_or_actor_id < vm_read_var(VAR_NUMBER_OF_ACTORS)) {
     // is an actor
-    if (actors.room[object_or_actor_id] == vm_read_var(VAR_SELECTED_ROOM)) {
-      *x = actors.x[object_or_actor_id];
-      *y = actors.y[object_or_actor_id];
-    }
-    else {
-      *x = 0xff;
-    }
-    return 1;
+    is_actor = 1;
+    actor_id = object_or_actor_id;
   }
   else {
     // is an object
-    
     if (inv_object_available(object_or_actor_id)) {
-      // is inventory, return position of owner actor if in current room
-      uint8_t owner_actor_id = vm_state.global_game_objects[object_or_actor_id] & 0x0f;
-      if (actor_is_in_current_room(owner_actor_id)) {
-        *x = actors.x[owner_actor_id];
-        *y = actors.y[owner_actor_id];
-      }
-      else {
-        *x = 0xff;
-      }
-      return 0;
+      // is inventory, return position of owner actor if in current room, but report as object
+      is_actor = 0;
+      actor_id = vm_state.global_game_objects[object_or_actor_id] & 0x0f;
     }
-
-    // is room object
-    __auto_type obj_hdr = vm_get_room_object_hdr(object_or_actor_id);
-    if (!obj_hdr) {
-      *x = 0xff;
-    } 
-    else {
-      *x = obj_hdr->walk_to_x;
-      *y = (obj_hdr->walk_to_y_and_preposition & 0x1f) << 2;
-    }
-    return 0;
   }
+
+  // if it is an actor or an inventory object owned by an actor, return (owner) actor position and room
+  if (actor_id != 0xff) {
+    *x       = actors.x[actor_id];
+    *y       = actors.y[actor_id];
+    *room_id = actors.room[actor_id];
+    return is_actor;
+  }
+
+  // is room object
+  __auto_type obj_hdr = vm_get_room_object_hdr(object_or_actor_id);
+  if (!obj_hdr) {
+    *room_id = 0xff;
+  } 
+  else {
+    *x       = obj_hdr->walk_to_x;
+    *y       = (obj_hdr->walk_to_y_and_preposition & 0x1f) << 2;
+    *room_id = vm_read_var(VAR_SELECTED_ROOM);
+  }
+  return 0;
 }
 
 //-----------------------------------------------------------------------------------------------
