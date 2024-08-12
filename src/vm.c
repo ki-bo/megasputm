@@ -153,7 +153,9 @@ static void freeze_non_active_scripts(void);
 static void unfreeze_scripts(void);
 static void add_string_to_sentence_priv(const char *str, uint8_t prepend_space);
 static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t *y, uint8_t *room_id);
-
+static void decrease_message_speed(void);
+static void increase_message_speed(void);
+static void output_text_rate(uint8_t color);
 
 /**
   * @defgroup vm_init VM Init Functions
@@ -1680,7 +1682,6 @@ static void handle_input(void)
       }
       
       vm_print_sentence();
-      UNMAP_CS
     }
     else if (input_key_pressed == 8) {
       // handle restart key, ask user confirmation
@@ -1712,13 +1713,22 @@ static void handle_input(void)
       }
       
       gfx_clear_dialog();
-      UNMAP_CS
+    }
+    // handle < and > keys, change message speed
+    else if (input_key_pressed == 0x3c) {
+      MAP_CS_MAIN_PRIV
+      decrease_message_speed();
+    }
+    else if (input_key_pressed == 0x3e) {      
+      MAP_CS_MAIN_PRIV
+      increase_message_speed();
     }
     else {
       vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
       vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
       script_start(SCRIPT_ID_INPUT_EVENT);
     }
+    UNMAP_CS
     // ack the key press
     input_key_pressed = 0;
   }
@@ -2488,6 +2498,31 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
     *room_id = vm_read_var(VAR_SELECTED_ROOM);
   }
   return 0;
+}
+
+static void decrease_message_speed(void)
+{
+  if (vm_state.message_speed < 9) {
+    ++vm_state.message_speed;
+  }
+  output_text_rate(0x0a);
+}
+
+static void increase_message_speed(void)
+{
+  if (vm_state.message_speed > 0) {
+    --vm_state.message_speed;
+  }
+  output_text_rate(0x0f);
+}
+
+static void output_text_rate(uint8_t color)
+{
+  uint8_t color_save = actors.talk_color[0];
+  actors.talk_color[0] = color;
+  sprintf(message_buffer, "TextRate %u", 9 - vm_state.message_speed);
+  vm_say_line(0xff);
+  actors.talk_color[0] = color_save;
 }
 
 //-----------------------------------------------------------------------------------------------

@@ -146,6 +146,10 @@ void input_update(void)
         // handling return key
         input_key_pressed = 0x0d;
       }
+      else if (key_pressed_ascii == 0x3c || key_pressed_ascii == 0x3e) {
+        // handling < and > keys
+        input_key_pressed = key_pressed_ascii;
+      }
       //debug_out("key pressed %d = %d", key_pressed_ascii, input_key_pressed);
     }
     else {
