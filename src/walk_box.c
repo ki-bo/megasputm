@@ -103,7 +103,7 @@ uint8_t walkbox_correct_position_to_closest_box(uint8_t *x, uint8_t *y)
       *y = walk_box_y;
       return box_idx;
     }
-    if (distance <= min_distance) {
+    if (distance < min_distance) {
       min_distance = distance;
       corr_pos_x = walk_box_x;
       corr_pos_y = walk_box_y;
