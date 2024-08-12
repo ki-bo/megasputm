@@ -45,15 +45,17 @@
 #define BYTE_SWAP16(x) \
     ((((x) & 0xff) << 8) | (((x) >> 8) & 0xff))
 
+#define READ_BE16_LSB(far_ptr) \
+    (((uint8_t __far *)(far_ptr))[1])
+
 #define NUM_SOUND_SLOTS 4
 #define NUM_MUSIC       2
 
-#pragma clang section data="data_sound" rodata="cdata_sound" bss="bss_sound"
+#pragma clang section data="data_sound" rodata="cdata_sound" bss="zdata"
 
 enum
 {
   SOUND_TYPE_NONE,
-  SOUND_TYPE_IGNORED,
   SOUND_TYPE_SAMPLE,
   SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP,
   SOUND_TYPE_ALARM,
@@ -61,6 +63,7 @@ enum
   SOUND_TYPE_TENTACLE,
   SOUND_TYPE_EXPLOSION,
   SOUND_TYPE_OLD_RECORD,
+  SOUND_TYPE_PHONE,
   SOUND_TYPE_MUSIC
 };
 
@@ -98,12 +101,18 @@ struct params_tentacle {
   uint8_t step;
 };
 
+struct params_phone {
+  uint16_t freq;
+  uint8_t  vol;
+};
+
 struct sound_params {
   uint8_t type;
   union {
     struct params_sample sample;
     struct params_dual_sample_timed_loop dual_sample_timed_loop;
     struct params_tentacle tentacle;
+    struct params_phone phone;
   };
 };
 
@@ -127,7 +136,6 @@ struct priv_dual_sample_timed_loop {
   uint8_t ch[2];
   uint8_t num_frames;
 };
-
 struct priv_alarm {
   uint16_t freq1;
   uint16_t freq2;
@@ -143,7 +151,6 @@ struct priv_microwave_ding {
   uint8_t ch;
   int8_t  vol;
 };
-
 
 struct priv_tentacle {
   uint8_t  ch;
@@ -164,6 +171,13 @@ struct priv_old_record {
   uint16_t      freq;
   uint8_t       step;
   uint8_t       frame;
+};
+
+struct priv_phone {
+  uint8_t              ch1;
+  uint8_t              ch2;
+  uint8_t              loop;
+  uint8_t              frames;
 };
 
 struct music_channel_state {
@@ -198,39 +212,66 @@ struct sound_slot {
     struct priv_tentacle tentacle;
     struct priv_explosion explosion;
     struct priv_old_record old_record;
+    struct priv_phone phone;
   };
 } sound_slots[NUM_SOUND_SLOTS];
 
 uint8_t channel_use[4] = {0xff, 0xff, 0xff, 0xff};
 struct sound_params sounds[71] = {
+  // [6]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = DMA_VOL(0x32), .loop = 0}}, // footsteps human actors
   [7]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0258), .vol = DMA_VOL(0x32), .loop = 0}},
   [8]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
   [9]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
   [10] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}},
+  /**/[11] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // coin in slot
   [12] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x017c), .vol = DMA_VOL(0x3f), .loop = 0}},
   [13] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = DMA_VOL(0x3f), .loop = 0}},
   [14] = {.type = SOUND_TYPE_MICROWAVE_DING},
   [15] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 7124, .loop_len = 0}},
   [16] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}},
   [17] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}},
-  [19] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0xf8), .timer2 = DMA_TIMER(0xf7), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
-  [25] = {.type = SOUND_TYPE_TENTACLE, .tentacle = {.step = 1}},
+  /**/[18] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}}, // water faucet in bathroom
+  [19] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x00f8), .timer2 = DMA_TIMER(0x00f7), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
+  [20] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x023d), .timer2 = DMA_TIMER(0x0224), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x0000}}, // pool radio noise
+  /**/[21] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x001e}}, // phone dial tone
+  /**/[22] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x012c), .timer2 = DMA_TIMER(0x0149), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x001e}}, // phone busy signal
+  /* 23 phone */ [23] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x007c, .vol = DMA_VOL(0x3f)}},
+  /* 24 phone */ [24] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x00be, .vol = DMA_VOL(0x37)}},
+  [25] = {.type = SOUND_TYPE_TENTACLE, .tentacle = {.step = 1}}, // record with tentacle mating call
+  [26] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}}, // glass breaking
+  [27] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = DMA_VOL(0x3f), .loop = 0}}, // red pool button, police arriving
   [28] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0078), .vol = DMA_VOL(0x28), .loop = 0}},
+  [29] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x023d), .timer2 = DMA_TIMER(0x0224), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x0000}}, // old fashioned radio noise
   [30] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x00c8), .vol = DMA_VOL(0x32), .loop = 0}},
   [31] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x00c8), .vol = DMA_VOL(0x32), .loop = 0}},
   [32] = {.type = SOUND_TYPE_ALARM},
   [33] = {.type = SOUND_TYPE_ALARM},
   [34] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = DMA_VOL(0x3f), .loop = 0}},
+  /**/[35] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // playing meteor mess
   [36] = {.type = SOUND_TYPE_TENTACLE, .tentacle = {.step = 7}},
+  /**/[37] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // police arriving
   [38] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = DMA_VOL(0x1e), .loop = 1, .loop_offset = 0, .loop_len = 0}},
   [39] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x017c), .vol = DMA_VOL(0x39), .loop = 0}},
   [40] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = DMA_VOL(0x3f), .loop = 0}},
+  /**/[41] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x012e), .vol = DMA_VOL(0x3f), .loop = 0}}, // fill developer tray
   [42] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f8), .vol = DMA_VOL(0x3f), .loop = 0}},
   [43] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
   [44] = {.type = SOUND_TYPE_OLD_RECORD},
-  [54] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x7c), .timer2 = DMA_TIMER(0x7b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
+  /* 45 type writer */
+  /* 46 wrench on pipe, not used in game */
+  [54] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
   [56] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = DMA_VOL(0x1e), .loop = 1, .loop_offset = 0, .loop_len = 0}},
   [57] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}},
+  /* 59 electronic noise? */
+  /**/[60] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = DMA_VOL(0x3f), .loop = 0}}, // self-destruct countdown
+  /* 61 special unknown? */ // meteor room switch
+  /**/[62] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fa), .vol = DMA_VOL(0x3f), .loop = 0}}, // meteor firing
+  // [63] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}}, // "footsteps" tentacles
+  /* 64 pitch bend loop */ // car rocket engine 1
+  /**/[65] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = DMA_VOL(0x1e), .loop = 0}}, // car rocket engine 2
+  /**/[66] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // meteor "talking" evil
+  /**/[67] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x02a8), .vol = DMA_VOL(0x3f), .loop = 0}}, // meteor "talking" friendly
+  /**/[68] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // put meteor in car trunk
   [69] = {.type = SOUND_TYPE_EXPLOSION}
 };
 
@@ -255,6 +296,8 @@ static uint16_t freq_to_timer(uint16_t freq);
 static void set_ch_freq(uint8_t ch, uint16_t freq);
 static uint8_t alloc_and_start_channel(uint8_t sound_id, int8_t __far *data, uint16_t size, uint16_t loop_offset, uint8_t flags, uint16_t timer, uint8_t vol, uint8_t pan);
 static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint16_t loop_offset, uint8_t flags, uint16_t timer, uint8_t vol, uint8_t pan);
+static void restart_channel(uint8_t ch);
+static void stop_channel(uint8_t ch);
 static void set_channel_vol_and_pan(uint8_t ch, uint8_t vol, uint8_t pan_left);
 static void start_sample(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params);
 static void update_sample(struct sound_slot *slot);
@@ -272,6 +315,8 @@ static void start_explosion(uint8_t slot_id, int8_t __far *data, uint16_t size);
 static void update_explosion(struct sound_slot *slot);
 static void start_old_record(uint8_t slot_id, int8_t __far *data);
 static void update_old_record(struct sound_slot *slot);
+static void start_phone(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params);
+static void update_phone(struct sound_slot *slot);
 static void print_slots(void);
 
 /**
@@ -331,13 +376,32 @@ uint8_t sound_is_playing(uint8_t sound_id)
   return is_playing(sound_id);
 }
 
-
 #pragma clang section text="code_sound" data="data_sound" rodata="cdata_sound" bss="bss_sound"
+void sound_reset(void)
+{
+  __auto_type slot = sound_slots;
+  for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i, ++slot) {
+    if (slot->type != SOUND_TYPE_NONE) {
+      slot->stop(&sound_slots[i]);
+    }
+  }
+}
+
+uint8_t sound_is_music_id(uint8_t sound_id)
+{
+  for (uint8_t i = 0; i < NUM_MUSIC; ++i) {
+    if (music[i].music_id == sound_id) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 void sound_stop_finished_slots(void)
 {
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (sound_slots[i].finished) {
-      debug_out("stop finished slot %d id %d", i, sound_slots[i].id);
+      // debug_out("stop finished slot %d id %d", i, sound_slots[i].id);
       sound_slots[i].stop(&sound_slots[i]);
     }
   }
@@ -347,7 +411,7 @@ void sound_process(void)
 {
   __auto_type slot = &sound_slots[0];
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i, ++slot) {
-    if (slot->type != SOUND_TYPE_NONE && !slot->finished && slot->update) {
+    if (slot->type != SOUND_TYPE_NONE && !slot->finished) {
       slot->update(slot);
     }
   }
@@ -362,9 +426,12 @@ void sound_process(void)
 #pragma clang section text="code_sound" data="data_sound" rodata="cdata_sound" bss="bss_sound"
 static void play(uint8_t sound_id)
 {
-  debug_out("sound play %d", sound_id);
+  // debug_out("sound play %d", sound_id);
   if (sounds[sound_id].type == SOUND_TYPE_NONE) {
     fatal_error(ERR_UNIMPLEMENTED_SOUND);
+  }
+  if (sound_is_music_id(sound_id)) {
+    fatal_error(ERR_PLAYING_MUSIC_AS_SFX);
   }
 
   uint8_t slot = get_free_sound_slot();
@@ -375,15 +442,9 @@ static void play(uint8_t sound_id)
   sound_slots[slot].id       = sound_id;
   sound_slots[slot].finished = 0;
 
-  struct sound_header __far *data;
   uint8_t res_page = res_provide(RES_TYPE_SOUND, sound_id, 0);
-  if (res_is_music(sound_id)) {
-    data = (struct sound_header __far *)MUSIC_DATA;
-  }
-  else {
-    res_activate_slot(res_page);
-    data = (struct sound_header __far *)res_get_huge_ptr(res_page);
-  }
+  res_activate_slot(res_page);
+  __auto_type data = (struct sound_header __far *)res_get_huge_ptr(res_page);
 
   uint16_t size          = BYTE_SWAP16(data->sample_size);
   uint16_t sample_offset = BYTE_SWAP16(data->code_size) + sizeof(struct sound_header);
@@ -393,10 +454,6 @@ static void play(uint8_t sound_id)
   sound_stop(sound_id);
 
   switch (params->type) {
-    case SOUND_TYPE_IGNORED:
-      sound_slots[slot].id = 0;
-      res_deactivate_slot(res_page);
-      break;
     case SOUND_TYPE_SAMPLE:
       start_sample(slot, sample_ptr, size, params);
       break;
@@ -418,21 +475,25 @@ static void play(uint8_t sound_id)
     case SOUND_TYPE_OLD_RECORD:
       start_old_record(slot, sample_ptr);
       break;
+    case SOUND_TYPE_PHONE:
+      start_phone(slot, sample_ptr, size, params);
+      break;
   }
 }
 
 static void stop(uint8_t sound_id)
 {
-  for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
-    if (sound_slots[i].type != SOUND_TYPE_NONE && sound_slots[i].id == sound_id) {
-      sound_slots[i].stop(&sound_slots[i]);
+  __auto_type slot = sound_slots;
+  for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i, ++slot) {
+    if (slot->type != SOUND_TYPE_NONE && slot->id == sound_id) {
+      slot->stop(&sound_slots[i]);
     }
   }
 }
 
 static void play_music(uint8_t music_id)
 {
-  debug_out("music play %d", music_id);
+  // debug_out("music play %d", music_id);
 
   struct music_params *params;
   uint8_t i;
@@ -454,6 +515,7 @@ static void play_music(uint8_t music_id)
   sound_slots[slot].id       = music_id;
   sound_slots[slot].finished = 0;
 
+  res_provide_music(music_id);
   __auto_type data = (int8_t __far *)MUSIC_DATA;
   start_music(slot, data, params);
 }
@@ -508,15 +570,15 @@ static uint8_t get_free_channel(void)
 
 static void stop_slot(struct sound_slot *slot)
 {
-  debug_out("stop slot sound id %d", slot->id);
-  if (slot->type == SOUND_TYPE_NONE || slot->type == SOUND_TYPE_IGNORED) {
+  // debug_out("stop slot sound id %d", slot->id);
+  if (slot->type == SOUND_TYPE_NONE) {
     fatal_error(ERR_STOPPING_EMPTY_SOUND_SLOT);
   }
   uint8_t is_music = slot->type == SOUND_TYPE_MUSIC;
   slot->type       = SOUND_TYPE_NONE; // will prevent irq from calling update()
   for (uint8_t i = 0; i < 4; ++i) {
     if (channel_use[i] == slot->id) {
-      DMA.aud_ch[i].ctrl = 0;
+      stop_channel(i);
       channel_use[i]     = 0xff;
     }
   }
@@ -573,7 +635,8 @@ static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint16_
 
   //debug_out("loop sample %lx, %lx, %lx, %d", (uint32_t)data, (uint32_t)loop_address, (uint32_t)(data+size), loop_offset);
 
-  DMA.aud_ch[ch].ctrl                = 0;
+  stop_channel(ch);
+
   DMA.aud_ch[ch].freq.lsb16          = timer;
   DMA.aud_ch[ch].freq.msb            = 0;
   DMA.aud_ch[ch].base_addr.addr16    = LSB16(loop_address);
@@ -589,9 +652,24 @@ static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint16_
   //debug_out("start channel looped %d base %lx, loop_offset %d, size %d, timer %d, vol %d, taddr %x\n", ch, (uint32_t)data, loop_offset, size, timer, vol, DMA.aud_ch[ch].top_addr);
 }
 
+static void restart_channel(uint8_t ch)
+{
+  DMA.aud_ch[ch].current_addr.addr16 = DMA.aud_ch[ch].base_addr.addr16;
+  DMA.aud_ch[ch].current_addr.bank   = DMA.aud_ch[ch].base_addr.bank;
+  DMA.aud_ch[ch].ctrl |= ADMA_CHEN_MASK;
+}
+
+static void stop_channel(uint8_t ch)
+{
+  if (ch >= 4) {
+    return;
+  }
+  DMA.aud_ch[ch].ctrl &= ~ADMA_CHEN_MASK;
+}
+
 static void set_channel_vol_and_pan(uint8_t ch, uint8_t vol, uint8_t pan)
 {
-  vol >>= 1;
+  vol >>= 2;
   if (pan == PAN_CENTER) {
     DMA.aud_ch_pan_vol[ch] = vol;
     DMA.aud_ch[ch].volume  = vol;
@@ -686,7 +764,6 @@ static void start_music(uint8_t slot_id, int8_t __far *data, struct music_params
     chan->dataptr = chan->dataptr_i;
     chan->volbase = 0;
     chan->volptr  = 0;
-    //priv->chan    = 0;
     chan->dur     = 0;
     chan->ticks   = 0;
   }
@@ -715,15 +792,15 @@ static void update_music(struct sound_slot *slot)
 
     if (chan->dur) {
       if (!--chan->dur) {
-        DMA.aud_ch[i].ctrl = 0;
+        stop_channel(i);
       }
       else {
-        uint8_t vol = read_be16_lsb(chan->volbase + chan->volptr);
+        uint8_t vol = READ_BE16_LSB(chan->volbase + chan->volptr);
         set_channel_vol_and_pan(i, vol, ch_pan);
 
         if (++chan->volptr == 0) {
-          DMA.aud_ch[i].ctrl = 0;
-          chan->dur          = 0;
+          stop_channel(i);
+          chan->dur = 0;
         }
       }
     }
@@ -762,11 +839,11 @@ static void update_music(struct sound_slot *slot)
         fatal_error(ERR_MUSIC_CHANNEL_MISMATCH);
       }
       if (chan->dur) {
-        DMA.aud_ch[i].ctrl = 0;
+        stop_channel(i);
       }
       chan->dur = read_be16(chan->dataptr + 4);
       
-      uint8_t vol = read_be16_lsb(chan->volbase + chan->volptr);
+      uint8_t vol = READ_BE16_LSB(chan->volbase + chan->volptr);
       ++chan->volptr;
       //vol = DMA_VOL_RT(vol);
 
@@ -1046,6 +1123,56 @@ static void update_old_record(struct sound_slot *slot)
   priv->freq  = freq;
   priv->step  = step;
   priv->frame = frame;
+}
+
+static void start_phone(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params)
+{
+  __auto_type slot = &sound_slots[slot_id];
+  __auto_type priv = &slot->phone;
+  priv->loop   = 0;
+  priv->frames = 0;
+
+  slot->update = update_phone;
+  slot->stop   = stop_slot;
+  
+  uint16_t freq = params->phone.freq;
+  uint8_t  vol  = params->phone.vol;
+  priv->ch1 = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, freq_to_timer(freq),     vol, PAN_LEFT);
+  priv->ch2 = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, freq_to_timer(freq - 1), vol, PAN_RIGHT);
+
+  slot->type = SOUND_TYPE_PHONE;
+}
+
+static void update_phone(struct sound_slot *slot)
+{
+  __auto_type priv = &slot->phone;
+
+  uint8_t ch1 = priv->ch1;
+  uint8_t ch2 = priv->ch2;
+  if (ch1 == 0xff && ch2 == 0xff) {
+    slot->finished = 1;
+    return;
+  }
+
+  uint8_t loop   = priv->loop;
+  uint8_t frames = priv->frames;
+
+  if (loop == 5) {
+    stop_channel(ch1);
+    stop_channel(ch2);
+  }
+  else if (loop == 6) {
+    loop = 0;
+    restart_channel(ch1);
+    restart_channel(ch2);
+  }
+  ++loop;
+  ++frames;
+  if (frames >= 0x3c) {
+    slot->finished = 1;
+  }
+  priv->loop   = loop;
+  priv->frames = frames;
 }
 
 // static void print_slots(void)

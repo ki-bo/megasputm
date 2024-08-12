@@ -61,4 +61,5 @@ typedef enum {
     ERR_LFL_FILE_NOT_FOUND = 39,
     ERR_STOPPING_EMPTY_SOUND_SLOT = 40,
     ERR_UNDEFINED_MUSIC = 41,
+    ERR_PLAYING_MUSIC_AS_SFX = 42,
 } error_code_t;

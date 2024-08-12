@@ -23,6 +23,7 @@
 #include "error.h"
 #include "map.h"
 #include "memory.h"
+#include "sound.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -44,7 +45,7 @@ enum heap_strategy_t {
 
 uint8_t page_res_type[256];
 uint8_t page_res_index[256];
-uint8_t music_ids[] = { 50, 55, 58, 70 };
+uint8_t music_res_loaded = 0;
 
 //-----------------------------------------------------------------------------------------------
 
@@ -118,12 +119,14 @@ void res_init(void)
   */
 uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
-  if (type == RES_TYPE_SOUND && res_is_music(id)) {
-    SAVE_CS_AUTO_RESTORE
-    MAP_CS_DISKIO
-    uint16_t chunk_size = diskio_start_resource_loading(RES_TYPE_SOUND, id);
-    diskio_continue_resource_loading(HUGE_U8_PTR(MUSIC_DATA));
-    return 0;
+  SAVE_CS_AUTO_RESTORE
+  
+  if (type == RES_TYPE_SOUND) {
+    MAP_CS_SOUND
+    if (sound_is_music_id(id)) {
+      res_provide_music(id);
+      return 0;
+    }
   }
 
   uint8_t i = hint;
@@ -134,8 +137,6 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
     i++;
   }
   while(i != hint);
-
-  SAVE_CS_AUTO_RESTORE
 
   MAP_CS_DISKIO
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
@@ -157,14 +158,16 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   return allocated_page;
 }
 
-uint8_t res_is_music(uint8_t id)
+void res_provide_music(uint8_t id)
 {
-  for (uint8_t i = 0; i < sizeof(music_ids); ++i) {
-    if (music_ids[i] == id) {
-      return 1;
-    }
+  if (music_res_loaded == id) {
+    return;
   }
-  return 0;
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_DISKIO
+  uint16_t chunk_size = diskio_start_resource_loading(RES_TYPE_SOUND, id);
+  diskio_continue_resource_loading(HUGE_U8_PTR(MUSIC_DATA));
+  music_res_loaded = id;
 }
 
 /**

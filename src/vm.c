@@ -233,6 +233,8 @@ __task void vm_mainloop(void)
     if (reset_game == RESET_RESTART) {
       reset_game = 0;
       UNMAP_ALL
+      MAP_CS_SOUND
+      sound_reset();
       MAP_CS_GFX
       gfx_fade_out();
       gfx_clear_bg_image();
