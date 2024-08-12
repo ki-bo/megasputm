@@ -104,6 +104,11 @@ uint8_t inventory_pos;
 uint8_t last_selected_actor;
 
 static const uint8_t savegame_magic[] = {'M', '6', '5', 'M', 'C', 'M', 'N'};
+static const uint8_t verb_keys[] = {
+  0x71, 0x77, 0x65, 0x72, 0x74, // q w e r t
+  0x61, 0x73, 0x64, 0x66, 0x67, // a s d f g
+  0x7a, 0x78, 0x63, 0x76, 0x62  // z x c v b
+};
 
 // Private functions
 static void reset_game_state(void);
@@ -1724,9 +1729,22 @@ static void handle_input(void)
       increase_message_speed();
     }
     else {
-      vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
-      vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
-      script_start(SCRIPT_ID_INPUT_EVENT);
+      uint8_t key_idx = 0;
+      for (key_idx = 0; key_idx < sizeof(verb_keys); ++key_idx) {
+        if (input_key_pressed == verb_keys[key_idx]) {
+          if (vm_state.verbs.id[key_idx] != 0xff) {
+            select_verb(vm_state.verbs.id[key_idx]);
+          }
+          break;
+        }
+      }
+
+      if (key_idx == sizeof(verb_keys)) {
+        // handle other key presses
+        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
+        vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
+        script_start(SCRIPT_ID_INPUT_EVENT);
+      }
     }
     UNMAP_CS
     // ack the key press
