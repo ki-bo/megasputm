@@ -12,8 +12,8 @@
 ;;;           |                                         | gfx code    | gfx bss           |
 ;;;            \                                        | (0x14000)   | (0x15800)         |
 ;;;           |                                         +-------------+------+------------+             +---------------------------------+
-;;;           |                                         | sound code  | sound bss         |             | resource (room, script, ...)    |
-;;;            \                                        | (0x16000)   | (0x17800)         |             | (64 pages from 0x18000-0x27fff) |                                 
+;;;           |                                         | sound code                      |             | resource (room, script, ...)    |
+;;;            \                                        | (0x16000)                       |             | (64 pages from 0x18000-0x27fff) |                                 
 ;;;            / +-----------+--------+-------+---------+-------------+-------------------+-------------+------------+-------------+------+------+--------------+----------+-------+------------+--------+--------+--------+-------+-------+-------+-------+----------------+-------------------+---------------+
 ;;; physical  |  | registers | zzpage | CPU   | runtime | script                          | main        | heap       | backbuffer  | backbuffer  | main_private | bss      | soft  | screen ram | gfx2   | diskio | diskio | gfx   | gfx   | sound | sound | resource heap  | gfx/char memory   | sound memory  |
 ;;; placement |  |           |        | stack |         | parser code                     | code        | (strings,  | screen ram  | color ram   | code         | main     | stack |            | code   | code   | bss    | code  | bss   | code  | bss   | 256 pages      | (room, objects,   | (music, sfx)  |
@@ -114,7 +114,7 @@
                         (heap              (#x8000 . #x9fff))
                         (backbuffer-screen (#xa000 . #xb7ff))
                         (backbuffer-color  (#xb800 . #xbfff))
-                        (zdata             (#xe000 . #xf7ff))
+                        (zdata             (#xe300 . #xf7ff))
                         (cstack            (#xf800 . #xfff9))
                 )
         )
@@ -207,16 +207,8 @@
                 (section
                         code_sound
                         cdata_sound
-                        data_sound
                 )
         )
-        ; memory in bank 0 for mapping sound bss section
-        ;(memory banked-bss-3 (address (#x3e00 . #x3fff)) 
-        ;        (scatter-to bank1_7e00)
-        ;        (section
-        ;                bss_sound
-        ;        )
-        ;)
  
 
         ;;;; ********************************************
@@ -224,9 +216,10 @@
         ;;;; ********************************************
 
         ; memory holding code_main_private section (will be mapped to 0x3000 during execution)
-        (memory m0-3 (address (#xd000 . #xdfff))
+        (memory m0-3 (address (#xd000 . #xe2ff))
                 (section
-                        bank0_d000
+                        (bank0_d000 #xd000)
+                        (data_sound #xe000)
                 )
         )
 

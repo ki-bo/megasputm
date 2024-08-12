@@ -64,6 +64,10 @@ enum
   SOUND_TYPE_EXPLOSION,
   SOUND_TYPE_OLD_RECORD,
   SOUND_TYPE_PHONE,
+  SOUND_TYPE_TYPEWRITER,
+  SOUND_TYPE_LABATMO,
+  SOUND_TYPE_METEORSWITCH,
+  SOUND_TYPE_PITCHBEND_LOOP,
   SOUND_TYPE_MUSIC
 };
 
@@ -133,7 +137,8 @@ struct priv_sample {
 };
 
 struct priv_dual_sample_timed_loop {
-  uint8_t ch[2];
+  uint8_t ch1;
+  uint8_t ch2;
   uint8_t num_frames;
 };
 struct priv_alarm {
@@ -180,6 +185,29 @@ struct priv_phone {
   uint8_t              frames;
 };
 
+struct priv_typewriter {
+  uint8_t ch;
+  uint8_t frames;
+  uint8_t iteration;
+};
+
+struct priv_labatmo {
+  uint8_t  ch;
+  uint16_t freq;
+  int8_t   step;
+};
+
+struct priv_meteorswitch {
+  uint8_t  ch;
+  uint16_t freq;
+  uint8_t  vol;
+};
+
+struct priv_pitchbend_loop {
+  uint8_t  ch;
+  uint16_t freq;
+};
+
 struct music_channel_state {
   int8_t   __far *dataptr_i;
   int8_t   __far *dataptr;
@@ -213,11 +241,15 @@ struct sound_slot {
     struct priv_explosion explosion;
     struct priv_old_record old_record;
     struct priv_phone phone;
+    struct priv_typewriter typewriter;
+    struct priv_labatmo labatmo;
+    struct priv_meteorswitch meteorswitch;
+    struct priv_pitchbend_loop pitchbend_loop;
   };
 } sound_slots[NUM_SOUND_SLOTS];
 
 uint8_t channel_use[4] = {0xff, 0xff, 0xff, 0xff};
-struct sound_params sounds[71] = {
+struct sound_params sounds[70] = {
   // [6]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = DMA_VOL(0x32), .loop = 0}}, // footsteps human actors
   [7]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0258), .vol = DMA_VOL(0x32), .loop = 0}},
   [8]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
@@ -235,8 +267,8 @@ struct sound_params sounds[71] = {
   [20] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x023d), .timer2 = DMA_TIMER(0x0224), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x0000}}, // pool radio noise
   /**/[21] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x001e}}, // phone dial tone
   /**/[22] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x012c), .timer2 = DMA_TIMER(0x0149), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x001e}}, // phone busy signal
-  /* 23 phone */ [23] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x007c, .vol = DMA_VOL(0x3f)}},
-  /* 24 phone */ [24] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x00be, .vol = DMA_VOL(0x37)}},
+  [23] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x007c, .vol = DMA_VOL(0x3f)}}, // phone ring 1
+  [24] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x00be, .vol = DMA_VOL(0x37)}}, // phone ring 2
   [25] = {.type = SOUND_TYPE_TENTACLE, .tentacle = {.step = 1}}, // record with tentacle mating call
   [26] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}}, // glass breaking
   [27] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = DMA_VOL(0x3f), .loop = 0}}, // red pool button, police arriving
@@ -257,17 +289,17 @@ struct sound_params sounds[71] = {
   [42] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f8), .vol = DMA_VOL(0x3f), .loop = 0}},
   [43] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
   [44] = {.type = SOUND_TYPE_OLD_RECORD},
-  /* 45 type writer */
+  /**/[45] = {.type = SOUND_TYPE_TYPEWRITER},
   /* 46 wrench on pipe, not used in game */
   [54] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
   [56] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = DMA_VOL(0x1e), .loop = 1, .loop_offset = 0, .loop_len = 0}},
   [57] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}},
-  /* 59 electronic noise? */
+  /**/[59] = {.type = SOUND_TYPE_LABATMO}, // lab background sound
   /**/[60] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = DMA_VOL(0x3f), .loop = 0}}, // self-destruct countdown
-  /* 61 special unknown? */ // meteor room switch
+  /**/[61] = {.type = SOUND_TYPE_METEORSWITCH}, // meteor room switch
   /**/[62] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fa), .vol = DMA_VOL(0x3f), .loop = 0}}, // meteor firing
   // [63] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}}, // "footsteps" tentacles
-  /* 64 pitch bend loop */ // car rocket engine 1
+  /**/[64] = {.type = SOUND_TYPE_PITCHBEND_LOOP}, // car rocket engine 1
   /**/[65] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = DMA_VOL(0x1e), .loop = 0}}, // car rocket engine 2
   /**/[66] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // meteor "talking" evil
   /**/[67] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x02a8), .vol = DMA_VOL(0x3f), .loop = 0}}, // meteor "talking" friendly
@@ -317,6 +349,14 @@ static void start_old_record(uint8_t slot_id, int8_t __far *data);
 static void update_old_record(struct sound_slot *slot);
 static void start_phone(uint8_t slot_id, int8_t __far *data, uint16_t size, struct sound_params *params);
 static void update_phone(struct sound_slot *slot);
+static void start_typewriter(uint8_t slot_id, int8_t __far *data, uint16_t size);
+static void update_typewriter(struct sound_slot *slot);
+static void start_labatmo(uint8_t slot_id, int8_t __far *data, uint16_t size);
+static void update_labatmo(struct sound_slot *slot);
+static void start_meteorswitch(uint8_t slot_id, int8_t __far *data, uint16_t size);
+static void update_meteorswitch(struct sound_slot *slot);
+static void start_pitchbend_loop(uint8_t slot_id, int8_t __far *data, uint16_t size);
+static void update_pitchbend_loop(struct sound_slot *slot);
 static void print_slots(void);
 
 /**
@@ -478,6 +518,18 @@ static void play(uint8_t sound_id)
     case SOUND_TYPE_PHONE:
       start_phone(slot, sample_ptr, size, params);
       break;
+    case SOUND_TYPE_TYPEWRITER:
+      start_typewriter(slot, sample_ptr, size);
+      break;
+    case SOUND_TYPE_LABATMO:
+      start_labatmo(slot, sample_ptr, size);
+      break;
+    case SOUND_TYPE_METEORSWITCH:
+      start_meteorswitch(slot, sample_ptr, size);
+      break;
+    case SOUND_TYPE_PITCHBEND_LOOP:
+      start_pitchbend_loop(slot, sample_ptr, size);
+      break;
   }
 }
 
@@ -615,6 +667,9 @@ static uint16_t freq_to_timer(uint16_t freq)
 
 static void set_ch_freq(uint8_t ch, uint16_t freq)
 {
+  if (ch >= 4) {
+    return;
+  }
   DMA.aud_ch[ch].freq.lsb16 = freq_to_timer(freq);
 }
 
@@ -631,6 +686,9 @@ static uint8_t alloc_and_start_channel(uint8_t sound_id, int8_t __far *data, uin
 
 static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint16_t loop_offset, uint8_t flags, uint16_t timer, uint8_t vol, uint8_t pan)
 {
+  if (ch >= 4) {
+    return;
+  }
   __auto_type loop_address = (flags & ADMA_CHLOOP_MASK) ? data + loop_offset : data;
 
   //debug_out("loop sample %lx, %lx, %lx, %d", (uint32_t)data, (uint32_t)loop_address, (uint32_t)(data+size), loop_offset);
@@ -654,9 +712,14 @@ static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint16_
 
 static void restart_channel(uint8_t ch)
 {
+  if (ch >= 4) {
+    return;
+  }
+  uint8_t flags = DMA.aud_ch[ch].ctrl & ADMA_CHLOOP_MASK;
+  DMA.aud_ch[ch].ctrl = 0;
   DMA.aud_ch[ch].current_addr.addr16 = DMA.aud_ch[ch].base_addr.addr16;
   DMA.aud_ch[ch].current_addr.bank   = DMA.aud_ch[ch].base_addr.bank;
-  DMA.aud_ch[ch].ctrl |= ADMA_CHEN_MASK;
+  DMA.aud_ch[ch].ctrl = ADMA_CHEN_MASK | ADMA_SBITS_8 | flags;
 }
 
 static void stop_channel(uint8_t ch)
@@ -669,6 +732,9 @@ static void stop_channel(uint8_t ch)
 
 static void set_channel_vol_and_pan(uint8_t ch, uint8_t vol, uint8_t pan)
 {
+  if (ch >= 4) {
+    return;
+  }
   vol >>= 2;
   if (pan == PAN_CENTER) {
     DMA.aud_ch_pan_vol[ch] = vol;
@@ -716,9 +782,10 @@ static void start_dual_sample_timed_loop(uint8_t slot_id, int8_t __far *data, ui
   slot->update     = update_dual_sample_timed_loop;
   slot->stop       = stop_slot;
 
+  __auto_type p    = &params->dual_sample_timed_loop;
   priv->num_frames = params->dual_sample_timed_loop.frames;
-  priv->ch[0]      = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, params->dual_sample_timed_loop.timer1, params->dual_sample_timed_loop.vol1, PAN_LEFT);
-  priv->ch[1]      = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, params->dual_sample_timed_loop.timer2, params->dual_sample_timed_loop.vol2, PAN_RIGHT);
+  priv->ch1        = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, p->timer1, p->vol1, PAN_LEFT);
+  priv->ch2        = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, p->timer2, p->vol2, PAN_RIGHT);
 
   // setting the type will enable updates from within the irq, so we only set it once everything else is done
   slot->type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP;
@@ -728,18 +795,16 @@ static void update_dual_sample_timed_loop(struct sound_slot *slot)
 {
   __auto_type priv = &slot->dual_sample_timed_loop;
 
-  if (priv->num_frames > 0) {
-    --priv->num_frames;
-    if (priv->num_frames == 0) {
-      for (uint8_t i = 0; i < 2; ++i) {
-        uint8_t ch = priv->ch[i];
-        if (ch != 0xff) {
-          DMA.aud_ch[ch].ctrl &= ~ADMA_CHLOOP_MASK; // stop loop
-        }
-      }
+  uint8_t num_frames = priv->num_frames;
+  if (num_frames > 0) {
+    --num_frames;
+    if (num_frames == 0) {
+      stop_channel(priv->ch1);
+      stop_channel(priv->ch2);
       slot->finished = 1;
     }
   }
+  priv->num_frames = num_frames;
 }
 
 static void start_music(uint8_t slot_id, int8_t __far *data, struct music_params *params)
@@ -779,10 +844,6 @@ static void start_music(uint8_t slot_id, int8_t __far *data, struct music_params
 
 static void update_music(struct sound_slot *slot)
 {
-  if (slot->finished) {
-    return;
-  }
-
   __auto_type priv = &slot->music;
   uint8_t channels_finished = 0;
 
@@ -849,33 +910,10 @@ static void update_music(struct sound_slot *slot)
 
       uint16_t offset      = read_be16(instptr + 0x14);
       uint16_t len         = read_be16(instptr + 0x18);
-      uint16_t loop_offset = read_be16(instptr + 0x16);
-      uint16_t loop_len    = read_be16(instptr + 0x10);
-
-      if (loop_len > 100) {
-        //debug_out("sample offset %d len %d loop_offset %d loop_len %d vol %d", offset, len, loop_offset, loop_len, vol);
-      }
-
-      if (loop_offset == 0 || loop_len < 10) {
-        loop_len = 0;
-        loop_offset = offset + len;
-        //debug_out("loop_len < 10");
-      }
-
-      uint16_t size = len;// + loop_len;
-
-      // if (offset + len != loop_offset) {
-      //   fatal_error(ERR_NON_CONTIGUOUS_LOOP_SAMPLE);
-      // }
 
       __auto_type sample_data = priv->data + priv->params->sampoff + offset;
 
-      // if (loop_len) {
-      //   //start_channel_looped(i, sample_data, loop_offset, size, timer, vol);
-      // }
-      // else {
-        start_channel(i, sample_data, size, 0, 0, timer, vol, ch_pan);
-      // }
+      start_channel(i, sample_data, len, 0, 0, timer, vol, ch_pan);
 
       chan->dataptr += 16;
     }
@@ -962,11 +1000,6 @@ static void update_microwave_ding(struct sound_slot *slot)
 {
   __auto_type priv = &slot->microwave_ding;
 
-  if (priv->ch == 0xff) {
-    slot->finished = 1;
-    return;
-  }
-
   uint8_t step = priv->fade_in_step;
   int8_t  vol  = priv->vol;
 
@@ -1011,10 +1044,6 @@ static void update_tentacle(struct sound_slot *slot)
   __auto_type priv = &slot->tentacle;
 
   uint8_t ch = priv->ch;
-  if (ch == 0xff) {
-    slot->finished = 1;
-    return;
-  }
 
   const uint16_t target_freq = 0x016d;
 
@@ -1036,6 +1065,7 @@ static void start_explosion(uint8_t slot_id, int8_t __far *data, uint16_t size)
 
   __auto_type priv = &slot->explosion;
   priv->freq = 0x0190;
+  priv->vol  = 0x3f;
 
   slot->update = update_explosion;
   slot->stop   = stop_slot;
@@ -1050,20 +1080,23 @@ static void update_explosion(struct sound_slot *slot)
   __auto_type priv = &slot->explosion;
 
   uint8_t ch = priv->ch;
-  if (ch == 0xff) {
+
+  uint16_t freq = priv->freq;
+  uint8_t  vol  = priv->vol;
+
+  freq += 2;
+  set_ch_freq(ch, freq);
+
+  --vol;
+  if (vol == 0) {
     slot->finished = 1;
     return;
   }
 
-  priv->freq += 2;
-  set_ch_freq(ch, priv->freq);
+  priv->freq = freq;
+  priv->vol  = vol;
 
-  --priv->vol;
-  if (priv->vol == 0) {
-    slot->finished = 1;
-    return;
-  }
-  set_channel_vol_and_pan(ch, priv->vol >> 1, PAN_CENTER);  
+  set_channel_vol_and_pan(ch, vol >> 1, PAN_CENTER);
 }
 
 static void start_old_record(uint8_t slot_id, int8_t __far *data)
@@ -1097,11 +1130,6 @@ static void update_old_record(struct sound_slot *slot)
   uint16_t freq  = priv->freq;
   uint16_t step  = priv->step;
   uint8_t  frame = priv->frame;
-
-  if (ch1 == 0xff && ch2 == 0xff) {
-    slot->finished = 1;
-    return;
-  }
 
   set_ch_freq(ch1, freq);
   set_ch_freq(ch2, freq + 3);
@@ -1149,10 +1177,6 @@ static void update_phone(struct sound_slot *slot)
 
   uint8_t ch1 = priv->ch1;
   uint8_t ch2 = priv->ch2;
-  if (ch1 == 0xff && ch2 == 0xff) {
-    slot->finished = 1;
-    return;
-  }
 
   uint8_t loop   = priv->loop;
   uint8_t frames = priv->frames;
@@ -1173,6 +1197,147 @@ static void update_phone(struct sound_slot *slot)
   }
   priv->loop   = loop;
   priv->frames = frames;
+}
+
+static void start_typewriter(uint8_t slot_id, int8_t __far *data, uint16_t size)
+{
+  __auto_type slot = &sound_slots[slot_id];
+  __auto_type priv = &slot->typewriter;
+
+  priv->frames    = 0x20;
+  priv->iteration = 0;
+
+  slot->update = update_typewriter;
+  slot->stop   = stop_slot;
+  
+  priv->ch = alloc_and_start_channel(slot->id, data, size, 0, 0, DMA_TIMER(0x023c), 0x3f, PAN_CENTER);
+
+  slot->type = SOUND_TYPE_TYPEWRITER;
+}
+
+static void update_typewriter(struct sound_slot *slot)
+{
+  __auto_type priv = &slot->typewriter;
+
+  static const uint8_t dur[] = {0x20, 0x41, 0x04, 0x21, 0x08, 0x10, 0x13, 0x07};
+  uint8_t frames    = priv->frames;
+  uint8_t iteration = priv->iteration;
+
+  --frames;
+  if (!frames) {
+    if (iteration == sizeof(dur)) {
+      iteration = 0;
+    }
+    restart_channel(priv->ch);
+    frames = dur[iteration++];
+  }
+
+  priv->frames    = frames;
+  priv->iteration = iteration;
+}
+
+static void start_labatmo(uint8_t slot_id, int8_t __far *data, uint16_t size)
+{
+  __auto_type slot = &sound_slots[slot_id];
+  __auto_type priv = &slot->labatmo;
+
+  priv->freq = 0x00e9;
+  priv->step = 4;
+
+  slot->update = update_labatmo;
+  slot->stop   = stop_slot;
+  
+  priv->ch = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, DMA_TIMER(0x00e9), 0x0a, PAN_CENTER);
+
+  slot->type = SOUND_TYPE_LABATMO;
+}
+
+static void update_labatmo(struct sound_slot *slot)
+{
+  __auto_type priv = &slot->labatmo;
+
+  uint16_t freq = priv->freq;
+  int8_t   step = priv->step;
+  freq += step;
+  if (freq > 0x0111) {
+    freq = 0x0111;
+    step = -step;
+  }
+  else if (freq < 0x00e9) {
+    freq = 0x00e9;
+    step = -step;
+  }
+  set_ch_freq(priv->ch, freq);
+  priv->freq = freq;
+  priv->step = step;
+}
+
+static void start_meteorswitch(uint8_t slot_id, int8_t __far *data, uint16_t size)
+{
+  __auto_type slot = &sound_slots[slot_id];
+  __auto_type priv = &slot->meteorswitch;
+
+  priv->freq = 0x00c8;
+  priv->vol  = 0x3f;
+
+  slot->update = update_meteorswitch;
+  slot->stop   = stop_slot;
+  
+  priv->ch = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, DMA_TIMER(0x00c8), 0x3f, PAN_CENTER);
+
+  slot->type = SOUND_TYPE_METEORSWITCH;
+}
+
+static void update_meteorswitch(struct sound_slot *slot)
+{
+  __auto_type priv = &slot->meteorswitch;
+
+  uint16_t freq = priv->freq;
+  uint8_t  vol  = priv->vol;
+  ++freq;
+  if (!(freq & 3)) {
+    --vol;
+  }
+  if (freq == 0x01c2 || vol == 0) {
+    slot->finished = 1;
+    return;
+  }
+  uint8_t ch = priv->ch;
+  set_ch_freq(ch, freq);
+  set_channel_vol_and_pan(ch, vol, PAN_CENTER);
+  priv->freq = freq;
+  priv->vol  = vol;
+}
+
+static void start_pitchbend_loop(uint8_t slot_id, int8_t __far *data, uint16_t size)
+{
+  __auto_type slot = &sound_slots[slot_id];
+  __auto_type priv = &slot->pitchbend_loop;
+
+  priv->freq = 0x03E8;
+
+  slot->update = update_pitchbend_loop;
+  slot->stop   = stop_slot;
+  
+  priv->ch = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, DMA_TIMER(0x03E8), 0x3f, PAN_CENTER);
+
+  slot->type = SOUND_TYPE_PITCHBEND_LOOP;
+}
+
+static void update_pitchbend_loop(struct sound_slot *slot)
+{
+  __auto_type priv = &slot->pitchbend_loop;
+
+  uint16_t freq = priv->freq;
+  freq -= 5;
+  if (freq < 0x0190) {
+    freq = 0x0190;
+    return;
+  }
+  else {
+    set_ch_freq(priv->ch, freq);
+  }
+  priv->freq = freq;
 }
 
 // static void print_slots(void)
