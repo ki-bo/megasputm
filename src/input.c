@@ -64,6 +64,7 @@ void input_init(void)
   input_cursor_x = 0;
   input_cursor_y = 0;
   CIA1.ddra = 0xff; // set CIA1 port A as input
+  CIA1.ddrb = 0x00; // set CIA1 port B as output
   CIA1.pra  = 0x40; // connect mouse port 1 to SID1
 }
 
@@ -157,7 +158,8 @@ static void handle_mouse(void)
   static uint8_t old_poty = 0;
   uint8_t potx = POT.x;
   uint8_t poty = POT.y;
-  CIA1.pra = 0xff; // prepare CIA1 directly for sampling joystick, as this takes some time
+  // prepare CIA1 already now for joystick handling, as this takes some time
+  CIA1.pra  = 0xff;
 
   int8_t diff = check_mouse_movement(potx, old_potx);
   if (diff) {
@@ -193,12 +195,12 @@ static int8_t apply_acceleration(int8_t value)
   //uint8_t abs_diff = abs8(value);
   uint8_t abs_diff;
   __asm(" tax\n"
-      " bpl done\n"
-      " neg a\n"
-      "done:"
-      : "=Ka"(abs_diff)
-      : "Ka"(value)
-      : "a", "x");
+        " bpl done\n"
+        " neg a\n"
+        "done:"
+        : "=Ka"(abs_diff)
+        : "Ka"(value)
+        : "a", "x");
 
   if (abs_diff > 15) {
     return value << 2;

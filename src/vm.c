@@ -109,6 +109,11 @@ static const uint8_t verb_keys[] = {
   0x61, 0x73, 0x64, 0x66, 0x67, // a s d f g
   0x7a, 0x78, 0x63, 0x76, 0x62  // z x c v b
 };
+static const uint8_t inventory_keys[] = {
+  0x69, 0x6f, // i o (inv ul, ur)
+  0x6b, 0x6c, // k l (inv bl, br)
+  0x75, 0x6a  // u j (inv scroll up, down)
+};
 
 // Private functions
 static void reset_game_state(void);
@@ -145,6 +150,7 @@ static uint8_t inventory_ui_pos_to_x(uint8_t pos);
 static uint8_t inventory_ui_pos_to_y(uint8_t pos);
 static void inventory_scroll_up(void);
 static void inventory_scroll_down(void);
+static void select_inventory(uint8_t inventory_ui_slot);
 
 // Private functions (code_main_private)
 static void cleanup_slot_table();
@@ -161,6 +167,8 @@ static uint8_t resolve_position(uint16_t object_or_actor_id, uint8_t *x, uint8_t
 static void decrease_message_speed(void);
 static void increase_message_speed(void);
 static void output_text_rate(uint8_t color);
+static uint8_t key_to_verb(uint8_t key_code);
+static uint8_t key_to_inventory(uint8_t key_code);
 
 /**
   * @defgroup vm_init VM Init Functions
@@ -1600,65 +1608,6 @@ static void handle_input(void)
   vm_write_var(VAR_SCENE_CURSOR_X, (INPUT_CURSOR_X2 >> 2) + camera_offset);
   vm_write_var(VAR_SCENE_CURSOR_Y, (input_cursor_y >> 1) - 8);
 
-  if (input_button_pressed != last_input_button_pressed)
-  {
-    last_input_button_pressed = input_button_pressed;
-
-    if (input_button_pressed == INPUT_BUTTON_LEFT)
-    {
-      if (input_cursor_y >= 16 && input_cursor_y < 144) {
-        // clicked in gfx scene
-        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SCENE_CLICK);
-        script_start(SCRIPT_ID_INPUT_EVENT);
-        return;
-      }
-      else if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
-        // clicked on sentence line
-        if (ui_state & UI_FLAGS_ENABLE_SENTENCE) {
-          vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SENTENCE_CLICK);
-          script_start(SCRIPT_ID_INPUT_EVENT);
-          return;
-        }
-      }
-      else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
-        // clicked in verb zone
-        if (ui_state & UI_FLAGS_ENABLE_VERBS) {
-          MAP_CS_MAIN_PRIV
-          uint8_t verb_slot = get_hovered_verb_slot();
-          UNMAP_CS
-          if (verb_slot != 0xff) {
-            select_verb(vm_state.verbs.id[verb_slot]);
-          }
-          return;
-        }
-      }
-      else if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
-        // clicked in inventory zone
-        if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
-          uint8_t inventory_ui_slot = get_hovered_inventory_slot();
-          if (inventory_ui_slot < 4 && 
-              inventory_ui_slot < inv_ui_entries.num_entries) {
-            uint8_t inventory_item_id = inv_ui_entries.displayed_ids[inventory_ui_slot];
-            if (inventory_item_id < vm_state.inv_num_objects) {
-              vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
-              vm_write_var(VAR_CLICKED_NOUN, inv_get_global_object_id(inventory_item_id));
-              script_start(SCRIPT_ID_INPUT_EVENT);
-              return;
-            }
-          }
-          else if (inventory_ui_slot == 4) {
-            inventory_scroll_up();
-            return;
-          }
-          else if (inventory_ui_slot == 5) {
-            inventory_scroll_down();
-            return;
-          }
-        }
-      }
-    }
-  }
-
   // keyboard handling
   if (input_key_pressed) {
     if (input_key_pressed == vm_read_var8(VAR_OVERRIDE_KEY)) {
@@ -1729,17 +1678,18 @@ static void handle_input(void)
       increase_message_speed();
     }
     else {
-      uint8_t key_idx = 0;
-      for (key_idx = 0; key_idx < sizeof(verb_keys); ++key_idx) {
-        if (input_key_pressed == verb_keys[key_idx]) {
-          if (vm_state.verbs.id[key_idx] != 0xff) {
-            select_verb(vm_state.verbs.id[key_idx]);
-          }
-          break;
-        }
+      MAP_CS_MAIN_PRIV
+      uint8_t idx = key_to_verb(input_key_pressed);
+      if (idx != 0xff) {
+        UNMAP_CS
+        select_verb(vm_state.verbs.id[idx]);
       }
-
-      if (key_idx == sizeof(verb_keys)) {
+      else if ((idx = key_to_inventory(input_key_pressed)) != 0xff) {
+        UNMAP_CS
+        select_inventory(idx);
+      }
+      else {
+        UNMAP_CS
         // handle other key presses
         vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
         vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
@@ -1749,6 +1699,50 @@ static void handle_input(void)
     UNMAP_CS
     // ack the key press
     input_key_pressed = 0;
+    // no further processing of joystick/mouse input as those might have happened as phantom input of key presses
+    return;
+  }
+
+  // joystick/mouse button handling is only done if no keyboard activity was detected
+  if (input_button_pressed != last_input_button_pressed)
+  {
+    last_input_button_pressed = input_button_pressed;
+
+    if (input_button_pressed == INPUT_BUTTON_LEFT)
+    {
+      if (input_cursor_y >= 16 && input_cursor_y < 144) {
+        // clicked in gfx scene
+        vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SCENE_CLICK);
+        script_start(SCRIPT_ID_INPUT_EVENT);
+        return;
+      }
+      else if (input_cursor_y >= 18 * 8 && input_cursor_y < 19 * 8) {
+        // clicked on sentence line
+        if (ui_state & UI_FLAGS_ENABLE_SENTENCE) {
+          vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_SENTENCE_CLICK);
+          script_start(SCRIPT_ID_INPUT_EVENT);
+          return;
+        }
+      }
+      else if (input_cursor_y >= 19 * 8 && input_cursor_y < 22 * 8) {
+        // clicked in verb zone
+        if (ui_state & UI_FLAGS_ENABLE_VERBS) {
+          MAP_CS_MAIN_PRIV
+          uint8_t verb_slot = get_hovered_verb_slot();
+          UNMAP_CS
+          if (verb_slot != 0xff) {
+            select_verb(vm_state.verbs.id[verb_slot]);
+          }
+          return;
+        }
+      }
+      else if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
+        // clicked in inventory zone
+        if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
+          select_inventory(get_hovered_inventory_slot());
+        }
+      }
+    }
   }
 }
 
@@ -2185,6 +2179,28 @@ static void inventory_scroll_down(void)
   }
 }
 
+static void select_inventory(uint8_t inventory_ui_slot)
+{
+  if (inventory_ui_slot < 4 && 
+      inventory_ui_slot < inv_ui_entries.num_entries) {
+    uint8_t inventory_item_id = inv_ui_entries.displayed_ids[inventory_ui_slot];
+    if (inventory_item_id < vm_state.inv_num_objects) {
+      vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_INVENTORY_CLICK);
+      vm_write_var(VAR_CLICKED_NOUN, inv_get_global_object_id(inventory_item_id));
+      script_start(SCRIPT_ID_INPUT_EVENT);
+      return;
+    }
+  }
+  else if (inventory_ui_slot == 4) {
+    inventory_scroll_up();
+    return;
+  }
+  else if (inventory_ui_slot == 5) {
+    inventory_scroll_down();
+    return;
+  }
+}
+
 /// @} // vm_private
 
 #pragma clang section text="code_main_private"
@@ -2541,6 +2557,30 @@ static void output_text_rate(uint8_t color)
   sprintf(message_buffer, "TextRate %u", 9 - vm_state.message_speed);
   vm_say_line(0xff);
   actors.talk_color[0] = color_save;
+}
+
+static uint8_t key_to_verb(uint8_t key_code)
+{
+  if (ui_state & UI_FLAGS_ENABLE_VERBS) {
+    for (uint8_t i = 0; i < sizeof(verb_keys); ++i) {
+      if (verb_keys[i] == key_code) {
+        return i;
+      }
+    }
+  }
+  return 0xff;
+}
+
+static uint8_t key_to_inventory(uint8_t key_code)
+{
+  if (ui_state & UI_FLAGS_ENABLE_INVENTORY) {
+    for (uint8_t i = 0; i < sizeof(inventory_keys); ++i) {
+      if (inventory_keys[i] == key_code) {
+        return i;
+      }
+    }
+  }
+  return 0xff;
 }
 
 //-----------------------------------------------------------------------------------------------
