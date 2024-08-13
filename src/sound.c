@@ -25,7 +25,6 @@
 #include "memory.h"
 #include "resource.h"
 #include "util.h"
-#include <mega65.h>
 #include <stdint.h>
 
 #define MAX_VOL 63

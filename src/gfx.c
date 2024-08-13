@@ -30,7 +30,6 @@
 #include "resource.h"
 #include "sound.h"
 #include "vm.h"
-#include <mega65.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -578,6 +577,14 @@ static void raster_irq ()
     return;
   }
 
+  ++raster_irq_counter;
+
+  input_update();
+
+  if (script_watchdog < WATCHDOG_TIMEOUT) {
+    ++script_watchdog;
+  }
+
   // set gfx MAP
   __asm(" lda #0x20\n"
         " ldx #0x21\n"
@@ -588,14 +595,6 @@ static void raster_irq ()
         :
         :
         : "a", "x", "y", "z");
-
-  ++raster_irq_counter;
-
-  input_update();
-
-  if (script_watchdog < WATCHDOG_TIMEOUT) {
-    ++script_watchdog;
-  }
   update_cursor(script_watchdog == WATCHDOG_TIMEOUT);
 
   /*
@@ -658,7 +657,7 @@ void gfx_update_flashlight(void)
   __auto_type bg_col_ptr = FAR_U16_PTR(COLRAM) + CHRCOUNT * 2 + 41;
 
   uint8_t fl_width   = vm_state.flashlight_width;
-  uint8_t pos_x_char = (input_cursor_x / 4) - (fl_width / 2);
+  uint8_t pos_x_char = (INPUT_CURSOR_X2 / 4) - (fl_width / 2);
   if (pos_x_char & 0x80 ) {
     // result was negative
     pos_x_char = 0;
@@ -1638,7 +1637,7 @@ void update_cursor(uint8_t snail_override)
     return;
   }
 
-  uint16_t spr_pos_x = (input_cursor_x + 12) * 2 - HOTSPOT_OFFSET_X;
+  uint16_t spr_pos_x = (INPUT_CURSOR_X2 + 12) * 2 - HOTSPOT_OFFSET_X;
   uint8_t  spr_pos_y = (input_cursor_y + 50)     - HOTSPOT_OFFSET_Y;
   // cursor_image bit 1 = snail/regular cursor
   if (!snail_override) {

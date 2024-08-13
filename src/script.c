@@ -30,7 +30,6 @@
 #include "util.h"
 #include "vm.h"
 #include "walk_box.h"
-#include <mega65.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

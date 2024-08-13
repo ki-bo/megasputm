@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <mega65.h>
 #include <stdint.h>
 
 struct __cpu_vectors {
@@ -164,8 +165,14 @@ enum {
   ADMA_SBITS_4L = 0b00
 };
 
+struct __pot {
+  uint8_t x;
+  uint8_t y;
+};
+
 #define CPU_VECTORS (*(volatile struct __cpu_vectors *) 0xfffa)
 #define FDC         (*(volatile struct __f011 *)        0xd080)
+#define POT         (*(volatile struct __pot *)         0xd419)
 #define ASCIIKEY    (*(volatile uint8_t *)              0xd610)
 #define DMA         (*(volatile struct __dma *)         0xd700)
 #define RNDGEN      (*(volatile uint8_t *)              0xd7ef)

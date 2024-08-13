@@ -26,13 +26,14 @@ enum {
     INPUT_BUTTON_RIGHT = 2
 };
 
-extern uint8_t input_cursor_x;
-extern uint8_t input_cursor_y;
-extern uint8_t input_button_pressed;
-extern uint8_t input_key_pressed;
+extern uint16_t input_cursor_x;
+extern uint8_t  input_cursor_y;
+extern uint8_t  input_button_pressed;
+extern uint8_t  input_key_pressed;
 
 #define HOTSPOT_OFFSET_X 7
 #define HOTSPOT_OFFSET_Y 7
+#define INPUT_CURSOR_X2 (U8(input_cursor_x >> 1))
 
 // code_init functions
 void input_init(void);

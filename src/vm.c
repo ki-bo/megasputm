@@ -25,6 +25,7 @@
 #include "gfx.h"
 #include "input.h"
 #include "inventory.h"
+#include "io.h"
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
@@ -35,7 +36,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <mega65.h>
 
 struct room_header {
   uint16_t chunk_size;
@@ -531,7 +531,7 @@ void vm_set_current_room(uint8_t room_no)
     num_objects = 0;
   }
   else {
-    debug_out("Activating new room %d", room_no);
+    //debug_out("Activating new room %d", room_no);
     // activate new room data
     load_room(room_no);
     camera_x = 20;
@@ -1597,7 +1597,7 @@ static void handle_input(void)
 
   uint8_t camera_offset = camera_x - 20;
 
-  vm_write_var(VAR_SCENE_CURSOR_X, (input_cursor_x >> 2) + camera_offset);
+  vm_write_var(VAR_SCENE_CURSOR_X, (INPUT_CURSOR_X2 >> 2) + camera_offset);
   vm_write_var(VAR_SCENE_CURSOR_Y, (input_cursor_y >> 1) - 8);
 
   if (input_button_pressed != last_input_button_pressed)
@@ -2130,10 +2130,10 @@ static uint8_t get_hovered_inventory_slot(void)
   uint8_t cur_inventory = 0xff;
   
   if (input_cursor_y >= 22 * 8 && input_cursor_y < 24 * 8) {
-    if (input_cursor_x >= 22 * 4) {
+    if (INPUT_CURSOR_X2 >= 22 * 4) {
       cur_inventory = 1;
     }
-    else if (input_cursor_x < 18 * 4) {
+    else if (INPUT_CURSOR_X2 < 18 * 4) {
       cur_inventory = 0;
     }
     else {
@@ -2380,7 +2380,7 @@ static uint8_t get_hovered_verb_slot(void)
 {
   uint8_t row = input_cursor_y >> 3;
   for (uint8_t i = 0; i < MAX_VERBS; ++i) {
-    uint8_t col = input_cursor_x >> 2;
+    uint8_t col = INPUT_CURSOR_X2 >> 2;
     if (vm_state.verbs.id[i] != 0xff) {
       if (row == vm_state.verbs.y[i] && col >= vm_state.verbs.x[i] && col < vm_state.verbs.x[i] + vm_state.verbs.len[i]) {
         return i;

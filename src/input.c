@@ -21,7 +21,6 @@
 #include "io.h"
 #include "util.h"
 #include "vm.h"
-#include <mega65.h>
 
 //-----------------------------------------------------------------------------------------------
 
@@ -34,12 +33,20 @@ enum {
     INPUT_ASCII_ESCAPE  = 0x1b
 };
 
-uint8_t input_cursor_x;
-uint8_t input_cursor_y;
-uint8_t input_button_pressed;
-uint8_t input_key_pressed;
 
-//-----------------------------------------------------------------------------------------------
+uint16_t input_cursor_x;
+uint8_t  input_cursor_y;
+uint8_t  input_button_pressed;
+uint8_t  input_key_pressed;
+
+static int16_t new_x;
+static int16_t new_y;
+
+static void handle_joystick(void);
+static void handle_mouse(void);
+static int8_t check_mouse_movement(uint8_t pot, uint8_t old_pot);
+static int8_t apply_acceleration(int8_t value);
+static void handle_keyboard(void);
 
 /**
   * @defgroup input_init Input Init Functions
@@ -57,6 +64,7 @@ void input_init(void)
   input_cursor_x = 0;
   input_cursor_y = 0;
   CIA1.ddra = 0xff; // set CIA1 port A as input
+  CIA1.pra  = 0x40; // connect mouse port 1 to SID1
 }
 
 /** @} */ // input_init
@@ -79,34 +87,130 @@ void input_init(void)
   */
 void input_update(void)
 {
-  uint8_t joy = CIA1.pra;
-  if (!(joy & 0x01)) {
-    if (input_cursor_y < 2) {
-      input_cursor_y = 0;
-    } 
-    else {
-      input_cursor_y -= 2;
-    }
-  } 
-  else if (!(joy & 0x02)) {
-    if (input_cursor_y > 197) {
-      input_cursor_y = 199;
-    } 
-    else {
-      input_cursor_y += 2;
-    }
+  // manually map main_priv, as we are called in irq context
+  __asm(" lda #0xa0\n"
+        " ldx #0x20\n"
+        " ldy #0\n"
+        " ldz #0\n"
+        " map\n"
+        " eom\n"
+        :
+        :
+        : "a", "x", "y", "z");
+
+  new_x = input_cursor_x;
+  new_y = input_cursor_y;
+
+  handle_mouse();
+  handle_keyboard();
+  handle_joystick();
+  CIA1.pra = 0x40; // prepare CIA1 alredy for sampling mouse, as this takes some time
+
+  if (new_x < 0) {
+    new_x = 0;
   }
-  if (!(joy & 0x04) && input_cursor_x != 0) {
-    input_cursor_x -= 1;
-  } 
-  else if (!(joy & 0x08) && input_cursor_x != 159) {
-    input_cursor_x += 1;
+  else if (new_x > 319) {
+    new_x = 319;
   }
-  if (ui_state & UI_FLAGS_ENABLE_CURSOR) {
-    input_button_pressed = !(joy & 0x10) ? INPUT_BUTTON_LEFT : 0;
+  if (new_y < 0) {
+    new_y = 0;
+  }
+  else if (new_y > 199) {
+    new_y = 199;
   }
 
-  // keyboard handling
+  input_cursor_x = new_x;
+  input_cursor_y = new_y;
+}
+
+static void handle_joystick(void)
+{
+  static uint8_t old_joy1;
+  uint8_t joy2 = CIA1.pra;
+  uint8_t joy1 = CIA1.prb;
+  if (!(joy2 & 0x01)) {
+    new_y -= 2;
+  } 
+  else if (!(joy2 & 0x02)) {
+    new_y += 2;
+  }
+  if (!(joy2 & 0x04)) {
+    new_x -= 2;
+  }
+  else if (!(joy2 & 0x08)) {
+    new_x += 2;
+  }
+  if (ui_state & UI_FLAGS_ENABLE_CURSOR) {
+    input_button_pressed = (!(joy2 & 0x10) || !(joy1 & 0x10)) ? INPUT_BUTTON_LEFT : 0;
+  }
+  
+  if ((old_joy1 & 1) && !(joy1 & 1)) {
+    // edge triggered right mouse button is handled as override key
+    input_key_pressed = vm_read_var8(VAR_OVERRIDE_KEY);
+  }
+  old_joy1 = joy1;
+}
+
+static void handle_mouse(void)
+{
+  static uint8_t old_potx = 0;
+  static uint8_t old_poty = 0;
+  uint8_t potx = POT.x;
+  uint8_t poty = POT.y;
+  CIA1.pra = 0xff; // prepare CIA1 directly for sampling joystick, as this takes some time
+
+  int8_t diff = check_mouse_movement(potx, old_potx);
+  if (diff) {
+    new_x += apply_acceleration(diff);
+    old_potx = potx;
+  }
+  diff = check_mouse_movement(poty, old_poty);
+  if (diff) {
+    new_y -= apply_acceleration(diff);
+    old_poty = poty;
+  }
+}
+
+#pragma clang section text="code_main_private" rodata="cdata_main_private" data="data_main_private"
+
+static int8_t check_mouse_movement(uint8_t pot, uint8_t old_pot) 
+{
+  uint8_t diff = (pot - old_pot) & 0x7f;
+  if (diff < 64) {
+    return (int8_t)diff >> 1; // divide by 2 but keep sign/msb
+  }
+  // handle negative value, add two msb sign bits and mask out noise bit
+  diff |= 0xc1;
+  if (diff != 0xff) {
+    ++diff;
+    return (int8_t)diff >> 1;
+  }
+  return 0;
+}
+
+static int8_t apply_acceleration(int8_t value)
+{
+  //uint8_t abs_diff = abs8(value);
+  uint8_t abs_diff;
+  __asm(" tax\n"
+      " bpl done\n"
+      " neg a\n"
+      "done:"
+      : "=Ka"(abs_diff)
+      : "Ka"(value)
+      : "a", "x");
+
+  if (abs_diff > 15) {
+    return value << 2;
+  }
+  if (abs_diff > 10) {
+    return value << 1;
+  }
+  return value;
+}
+
+static void handle_keyboard(void)
+{
   if (input_key_pressed == 0) { // = 0 means previous key was processed
     uint8_t key_pressed_ascii = ASCIIKEY;
     if (key_pressed_ascii != 0) {
