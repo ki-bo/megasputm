@@ -175,5 +175,15 @@ __call_heap_initialize:
 		.extern __heap_initialize, __default_heap
 		jsr __heap_initialize
 
+		lda #.byte0(nmi_handler)
+		sta 0xfffa
+		lda #.byte1(nmi_handler)
+		sta 0xfffb
+
 ;;; Jump into C main function.
 		jmp main
+
+;;; Disable NMI
+		.section code
+nmi_handler:
+		rti
