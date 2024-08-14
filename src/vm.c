@@ -1602,6 +1602,8 @@ static void handle_input(void)
 {
   // mouse cursor handling
   static uint8_t last_input_button_pressed = 0;
+  uint8_t current_button_pressed = input_button_pressed;
+  uint8_t current_key_pressed    = input_key_pressed;
 
   uint8_t camera_offset = camera_x - 20;
 
@@ -1609,11 +1611,11 @@ static void handle_input(void)
   vm_write_var(VAR_SCENE_CURSOR_Y, (input_cursor_y >> 1) - 8);
 
   // keyboard handling
-  if (input_key_pressed) {
-    if (input_key_pressed == vm_read_var8(VAR_OVERRIDE_KEY)) {
+  if (current_key_pressed) {
+    if (current_key_pressed == vm_read_var8(VAR_OVERRIDE_KEY)) {
       override_cutscene();
     }
-    else if (input_key_pressed == 0x20) {
+    else if (current_key_pressed == 0x20) {
       // handle space key, pause
       static const char pause_str[] = "Game paused, press SPACE to continue.";
 
@@ -1637,7 +1639,7 @@ static void handle_input(void)
       
       vm_print_sentence();
     }
-    else if (input_key_pressed == 8) {
+    else if (current_key_pressed == 8) {
       // handle restart key, ask user confirmation
       static const char restart_str[] = "Are you sure you want to restart? (y/n)";
 
@@ -1669,22 +1671,22 @@ static void handle_input(void)
       gfx_clear_dialog();
     }
     // handle < and > keys, change message speed
-    else if (input_key_pressed == 0x3c) {
+    else if (current_key_pressed == 0x3c) {
       MAP_CS_MAIN_PRIV
       decrease_message_speed();
     }
-    else if (input_key_pressed == 0x3e) {      
+    else if (current_key_pressed == 0x3e) {      
       MAP_CS_MAIN_PRIV
       increase_message_speed();
     }
     else {
       MAP_CS_MAIN_PRIV
-      uint8_t idx = key_to_verb(input_key_pressed);
+      uint8_t idx = key_to_verb(current_key_pressed);
       if (idx != 0xff) {
         UNMAP_CS
         select_verb(vm_state.verbs.id[idx]);
       }
-      else if ((idx = key_to_inventory(input_key_pressed)) != 0xff) {
+      else if ((idx = key_to_inventory(current_key_pressed)) != 0xff) {
         UNMAP_CS
         select_inventory(idx);
       }
@@ -1692,7 +1694,7 @@ static void handle_input(void)
         UNMAP_CS
         // handle other key presses
         vm_write_var(VAR_INPUT_EVENT, INPUT_EVENT_KEYPRESS);
-        vm_write_var(VAR_CURRENT_KEY, input_key_pressed);
+        vm_write_var(VAR_CURRENT_KEY, current_key_pressed);
         script_start(SCRIPT_ID_INPUT_EVENT);
       }
     }
@@ -1704,11 +1706,11 @@ static void handle_input(void)
   }
 
   // joystick/mouse button handling is only done if no keyboard activity was detected
-  if (input_button_pressed != last_input_button_pressed)
+  if (current_button_pressed != last_input_button_pressed)
   {
-    last_input_button_pressed = input_button_pressed;
+    last_input_button_pressed = current_button_pressed;
 
-    if (input_button_pressed == INPUT_BUTTON_LEFT)
+    if (current_button_pressed == INPUT_BUTTON_LEFT)
     {
       if (input_cursor_y >= 16 && input_cursor_y < 144) {
         // clicked in gfx scene
