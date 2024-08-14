@@ -2424,7 +2424,8 @@ static void closest_actor(void)
   uint8_t var_idx = read_byte();
   uint8_t actor_or_object_id = resolve_next_param16();
 
-  uint8_t cur_actor        = NUM_ACTORS - 1;
+  uint8_t cur_actor        = vm_read_var(VAR_ACTOR_RANGE_MAX);
+  uint8_t min_actor        = vm_read_var(VAR_ACTOR_RANGE_MIN);
   uint8_t closest_actor    = 0xff;
   uint8_t closest_distance = 0xff;
 
@@ -2440,7 +2441,7 @@ static void closest_actor(void)
         }
       }
     }
-    while (--cur_actor);
+    while (--cur_actor >= min_actor);
   }
 
   vm_write_var(var_idx, closest_actor);
