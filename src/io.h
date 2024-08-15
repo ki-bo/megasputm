@@ -173,6 +173,8 @@ struct __pot {
 #define CPU_VECTORS (*(volatile struct __cpu_vectors *) 0xfffa)
 #define FDC         (*(volatile struct __f011 *)        0xd080)
 #define POT         (*(volatile struct __pot *)         0xd419)
+#define UART_E_PRA  (*(volatile uint8_t *)              0xd607)
+#define UART_E_DDR  (*(volatile uint8_t *)              0xd608)
 #define ASCIIKEY    (*(volatile uint8_t *)              0xd610)
 #define DMA         (*(volatile struct __dma *)         0xd700)
 #define RNDGEN      (*(volatile uint8_t *)              0xd7ef)

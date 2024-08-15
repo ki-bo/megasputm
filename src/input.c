@@ -63,9 +63,12 @@ void input_init(void)
 {
   input_cursor_x = 0;
   input_cursor_y = 0;
-  CIA1.ddra = 0xff; // set CIA1 port A as input
-  CIA1.ddrb = 0x00; // set CIA1 port B as output
-  CIA1.pra  = 0x40; // connect mouse port 1 to SID1
+  CIA1.ddra   = 0xff; // set CIA1 port A as output
+  CIA1.ddrb   = 0xff; // set CIA1 port B as output
+  CIA1.pra    = 0xff; // connect mouse port 1 to SID1
+  CIA1.prb    = 0xff; // pull all pins of port B high
+  UART_E_DDR |= 0x02; // set UART_E pin as output
+  UART_E_PRA |= 0x02; // set UART_E pin to high (controlling keyboard column C8 on the C65/MEGA65)
 }
 
 /** @} */ // input_init

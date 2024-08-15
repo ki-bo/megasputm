@@ -1011,7 +1011,10 @@ static void check_and_prompt_for_disk(uint8_t disk_num)
     disk_found = check_disk(disk_num);
     if (!disk_found) {
       if (enable_prompt_for_disk_change) {
+        uint8_t drive_in_use_save = drive_in_use;
+        drive_in_use = 0;
         vm_handle_error_wrong_disk(disk_num + 1);
+        drive_in_use = drive_in_use_save;
       }
       else {
         disk_error(ERR_WRONG_DISK);

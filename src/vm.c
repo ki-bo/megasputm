@@ -105,6 +105,7 @@ uint8_t inventory_pos;
 uint8_t last_selected_actor;
 
 static const uint8_t savegame_magic[] = {'M', '6', '5', 'M', 'C', 'M', 'N'};
+static char savegame_file[] = "MM.SAV.0";
 static const uint8_t verb_keys[] = {
   0x71, 0x77, 0x65, 0x72, 0x74, // q w e r t
   0x61, 0x73, 0x64, 0x66, 0x67, // a s d f g
@@ -536,6 +537,8 @@ void vm_set_current_room(uint8_t room_no)
 
   if (room_no == 0) {
     MAP_CS_GFX
+    room_width = 40;
+    vm_set_camera_to(20);
     gfx_clear_bg_image();
     actor_room_changed();
     num_objects = 0;
@@ -1097,10 +1100,9 @@ char *vm_verb_get_name(uint8_t slot)
 
 uint8_t vm_savegame_exists(uint8_t slot)
 {
-  char filename[11];
-  sprintf(filename, "MM.SAV.%u", slot);
+  savegame_file[7] = slot + 0x30;
   MAP_CS_DISKIO
-  uint8_t exists = diskio_file_exists(filename);
+  uint8_t exists = diskio_file_exists(savegame_file);
   UNMAP_CS
   return exists;
 }
@@ -1126,7 +1128,7 @@ uint8_t vm_save_game(uint8_t slot)
   uint8_t *pal_ptr = NEAR_U8_PTR(RES_MAPPED + 0x200);
   memcpy(pal_ptr, (const void *)0xd100, 0x300);
 
-  sprintf(filename, "MM.SAV.%u", slot);
+  savegame_file[7] = slot + 0x30;
   diskio_open_for_writing();
   diskio_write((uint8_t __huge *)savegame_magic, sizeof(savegame_magic));
   diskio_write((uint8_t __huge *)&version, 1);
@@ -1153,7 +1155,7 @@ uint8_t vm_save_game(uint8_t slot)
   // write palettes
   diskio_write(res_get_huge_ptr(heap_slot + 2), 0x300);
 
-  diskio_close_for_writing(filename, FILE_TYPE_SEQ);
+  diskio_close_for_writing(savegame_file, FILE_TYPE_SEQ);
 
   res_free_heap(heap_slot);
 
@@ -1177,8 +1179,8 @@ uint8_t vm_load_game(uint8_t slot)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_DISKIO
 
-  sprintf(filename, "MM.SAV.%u", slot);
-  diskio_open_for_reading(filename, FILE_TYPE_SEQ);
+  savegame_file[7] = slot + 0x30;
+  diskio_open_for_reading(savegame_file, FILE_TYPE_SEQ);
   diskio_read(magic_hdr, sizeof(magic_hdr));
   for (uint8_t i = 0; i < 7; ++i) {
     if (magic_hdr[i] != savegame_magic[i]) {
@@ -1276,11 +1278,12 @@ void vm_handle_error_wrong_disk(uint8_t expected_disk)
   char error_str[41];
   sprintf(error_str, "Please Insert Disk %d.  Press RETURN", expected_disk);
 
-  input_key_pressed = 0; // ack the space key
+  input_key_pressed = 0; // ack the latest key in the queue
   MAP_CS_GFX
   gfx_clear_dialog();
   gfx_print_interface_text(0, 0, error_str, TEXT_STYLE_SENTENCE);
   script_watchdog = WATCHDOG_TIMEOUT;
+  wait_for_jiffy();  // this resets the elapsed jiffies timer
 
   MAP_CS_DISKIO
   while (1) {
