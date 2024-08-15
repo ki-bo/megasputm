@@ -822,8 +822,7 @@ static void stop_walking(uint8_t local_id)
   if (walk_state != WALKING_STATE_STOPPING && walk_state != WALKING_STATE_FINISHED) {
     local_actors.walking[local_id] = WALKING_STATE_STOPPING;
     actor_start_animation(local_id, ANIM_STANDING + actors.dir[actor_id]);
-    uint8_t cur_box = walkbox_correct_position_to_closest_box(&(actors.x[actor_id]), &(actors.y[actor_id]));
-    local_actors.cur_box[local_id]     = cur_box;
+    uint8_t cur_box = local_actors.cur_box[local_id];
     local_actors.walk_to_box[local_id] = cur_box;
     local_actors.next_box[local_id]    = cur_box;
     local_actors.walk_to_x[local_id]   = actors.x[actor_id];
