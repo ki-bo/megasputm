@@ -703,7 +703,7 @@ static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint16_
   if (ch >= 4) {
     return;
   }
-  __auto_type loop_address = (flags & ADMA_CHLOOP_MASK) ? data + loop_offset : data;
+  __auto_type loop_address = (flags & ADMA_CHLOOP_MASK) ? (int8_t __far *)((int8_t __huge *)data + loop_offset) : data;
 
   //debug_out("loop sample %lx, %lx, %lx, %d", (uint32_t)data, (uint32_t)loop_address, (uint32_t)(data+size), loop_offset);
 
