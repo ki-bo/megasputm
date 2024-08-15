@@ -218,6 +218,7 @@ extern uint8_t          room_res_slot;
 extern uint8_t          obj_page[MAX_OBJECTS];
 extern uint8_t          obj_offset[MAX_OBJECTS];
 extern uint16_t         obj_id[MAX_OBJECTS];
+extern uint8_t          ntsc;
 extern uint8_t          inventory_pos;
 extern uint8_t          last_selected_actor;
 

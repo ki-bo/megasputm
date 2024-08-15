@@ -225,6 +225,8 @@ void gfx_init()
 
   init_dma_lists();
 
+  ntsc = VICIV.rasline0 & VIC4_PALNTSC_MASK;
+
   VICIV.sdbdrwd_msb  &= ~VIC4_HOTREG_MASK;
   VICII.ctrl1        &= ~0x10; // disable video output
   VICII.ctrl2        &= ~0x10; // disable multi-colour mode
@@ -234,8 +236,8 @@ void gfx_init()
   VICIV.ctrlc        &= ~VIC4_FCLRLO_MASK;
   VICIV.ctrlc        |= VIC4_FCLRHI_MASK | VIC4_CHR16_MASK;
   VICIV.xpos_msb     &= ~(VIC4_NORRDEL_MASK | VIC4_DBLRR_MASK);
-  VICIV.tbdrpos       = 0x68;
-  VICIV.textypos_lsb  = 0x67; 
+  VICIV.tbdrpos       = ntsc ? 0x2a : 0x68;
+  VICIV.textypos_lsb  = VICIV.tbdrpos - 1; 
 
   memset20(FAR_U8_PTR(BG_BITMAP), 0, 0 /* 0 means 64kb */);
   memset20(FAR_U8_PTR(COLRAM), 0, 2000);
@@ -320,14 +322,15 @@ void gfx_init()
   sprite_pointers[6] = UNBANKED_SPR_PTR(blank_sprite);
   sprite_pointers[7] = UNBANKED_SPR_PTR(blank_sprite);
 
+  uint8_t sprite_miny = ntsc ? 26 : 50;
   VICIV.spr4_x = 24;
   VICIV.spr5_x = 24;
   VICIV.spr6_x = 24;
   VICIV.spr7_x = 24;
-  VICIV.spr4_y = 50 + 16 + 0 * 32;
-  VICIV.spr5_y = 50 + 16 + 1 * 32;
-  VICIV.spr6_y = 50 + 16 + 2 * 32;
-  VICIV.spr7_y = 50 + 16 + 3 * 32;
+  VICIV.spr4_y = sprite_miny + 16 + 0 * 32;
+  VICIV.spr5_y = sprite_miny + 16 + 1 * 32;
+  VICIV.spr6_y = sprite_miny + 16 + 2 * 32;
+  VICIV.spr7_y = sprite_miny + 16 + 3 * 32;
   VICII.spr_ena = 0xf0; // enable sprites 4-7
   VICII.spr_bg_prio = 0xf0;
   
@@ -1632,8 +1635,8 @@ void update_cursor(uint8_t snail_override)
     return;
   }
 
-  uint16_t spr_pos_x = (INPUT_CURSOR_X2 + 12) * 2 - HOTSPOT_OFFSET_X;
-  uint8_t  spr_pos_y = (input_cursor_y + 50)     - HOTSPOT_OFFSET_Y;
+  uint16_t spr_pos_x = input_cursor_x + 24               - HOTSPOT_OFFSET_X;
+  uint8_t  spr_pos_y = input_cursor_y + (ntsc ? 26 : 50) - HOTSPOT_OFFSET_Y;
   // cursor_image bit 1 = snail/regular cursor
   if (!snail_override) {
     // enable sprite 2 only = regular cursor

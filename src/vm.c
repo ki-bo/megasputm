@@ -91,6 +91,7 @@ uint8_t  obj_page[MAX_OBJECTS];
 uint8_t  obj_offset[MAX_OBJECTS];
 uint16_t obj_id[MAX_OBJECTS];
 uint8_t  screen_update_needed;
+uint8_t  ntsc;
 
 // sentence queue
 struct sentence_stack_t sentence_stack;
@@ -1774,7 +1775,9 @@ static uint8_t match_parent_object_state(uint8_t parent, uint8_t expected_state)
 
 static void update_script_timers(uint8_t elapsed_jiffies)
 {
-  ++elapsed_jiffies;
+  if (!ntsc) {
+    ++elapsed_jiffies;
+  }
   for (uint8_t slot = 0; slot < NUM_SCRIPT_SLOTS; ++slot)
   {
     // checking for equality will also make sure we won't update slots that are frozen
