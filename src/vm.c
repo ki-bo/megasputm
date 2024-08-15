@@ -336,6 +336,7 @@ __task void vm_mainloop(void)
     MAP_CS_MAIN_PRIV
     update_camera();
     UNMAP_CS
+    sound_handle_play_triggers();
 
     if (last_selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
       if (last_selected_actor != 0xff) { // makes sure inventory pos is kept when loading a savegame

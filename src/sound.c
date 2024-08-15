@@ -32,15 +32,9 @@
 #define DMA_TIMER(f) \
     ((uint16_t)((double)(3579545.0 / (f) * 16777215.0 / 40500000.0) + 0.5))
 
-#define DMA_TIMER_RT(f) \
-    ((uint16_t)((uint32_t)(3579545ULL * 16777215ULL / 40500000ULL) / f))
-
 #define DMA_VOL(v) \
     ((uint8_t)((double)(v) / 63.0 * (double)MAX_VOL + 0.5))
 
-#define DMA_VOL_RT(v) \
-    ((uint16_t)((((uint32_t)(v * 256) * (uint32_t)((double)MAX_VOL / 63.0 * 256.0)) + 32768) / 65536));
- 
 #define BYTE_SWAP16(x) \
     ((((x) & 0xff) << 8) | (((x) >> 8) & 0xff))
 
@@ -248,6 +242,7 @@ struct sound_slot {
 } sound_slots[NUM_SOUND_SLOTS];
 
 uint8_t channel_use[4] = {0xff, 0xff, 0xff, 0xff};
+uint8_t sound_triggers[NUM_SOUND_SLOTS];
 struct sound_params sounds[70] = {
   // [6]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = DMA_VOL(0x32), .loop = 0}}, // footsteps human actors
   [7]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0258), .vol = DMA_VOL(0x32), .loop = 0}},
@@ -382,9 +377,11 @@ void sound_init(void)
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
 void sound_play(uint8_t sound_id)
 {
-  SAVE_CS_AUTO_RESTORE
-  MAP_CS_SOUND
-  play(sound_id);
+  for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
+    if (!sound_triggers[i]) {
+      sound_triggers[i] = sound_id;
+    }
+  }
 }
 
 void sound_stop(uint8_t sound_id)
@@ -392,6 +389,11 @@ void sound_stop(uint8_t sound_id)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
   stop(sound_id);
+  for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
+    if (sound_triggers[i] == sound_id) {
+      sound_triggers[i] = 0;
+    }
+  }
 }
 
 void sound_play_music(uint8_t music_id)
@@ -415,6 +417,18 @@ uint8_t sound_is_playing(uint8_t sound_id)
   return is_playing(sound_id);
 }
 
+void sound_handle_play_triggers(void)
+{
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_SOUND
+  for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
+    if (sound_triggers[i]) {
+      play(sound_triggers[i]);
+      sound_triggers[i] = 0;
+    }
+  }
+}
+
 #pragma clang section text="code_sound" data="data_sound" rodata="cdata_sound" bss="bss_sound"
 void sound_reset(void)
 {
@@ -423,6 +437,7 @@ void sound_reset(void)
     if (slot->type != SOUND_TYPE_NONE) {
       slot->stop(&sound_slots[i]);
     }
+    sound_triggers[i] = 0;
   }
 }
 
@@ -905,7 +920,6 @@ static void update_music(struct sound_slot *slot)
       
       uint8_t vol = READ_BE16_LSB(chan->volbase + chan->volptr);
       ++chan->volptr;
-      //vol = DMA_VOL_RT(vol);
 
       uint16_t offset      = read_be16(instptr + 0x14);
       uint16_t len         = read_be16(instptr + 0x18);

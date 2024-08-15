@@ -30,7 +30,7 @@ void sound_stop(uint8_t sound_id);
 void sound_play_music(uint8_t music_id);
 void sound_stop_music(void);
 uint8_t sound_is_playing(uint8_t sound_id);
-
+void sound_handle_play_triggers(void);
 
 // code_sound functions
 void sound_reset(void);
