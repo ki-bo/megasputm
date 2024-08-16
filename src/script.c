@@ -1478,7 +1478,7 @@ static void random_number(void)
   uint8_t upper_bound = resolve_next_param8();
   //debug_scr("VAR[%d] = random %d", var_idx, upper_bound);
   while (RNDRDY & 0x80); // wait for random number generator to be ready
-  uint8_t rnd_number = RNDGEN * (upper_bound + 1) / 256;
+  uint8_t rnd_number = (RNDGEN * (upper_bound + 1)) >> 8;
   vm_write_var(var_idx, rnd_number);
 }
 

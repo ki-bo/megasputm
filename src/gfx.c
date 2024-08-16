@@ -1393,7 +1393,7 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
   uint8_t  mask     = 0x80;
   uint16_t col_incr = (actor_height - 1) * 8;
 
-  decode_single_mask_column(xpos / 8, ypos, actor_height);
+  decode_single_mask_column(i16_div_by_8(xpos), ypos, actor_height);
   mask >>= xpos & 7;
   dmalist_rle_strip_copy.count = actor_height;
   dmalist_rle_strip_copy.opt_token3 = 0x06; // disable transparent color handling
@@ -1413,7 +1413,7 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
       cur_y = 0;
       mask >>= 1;
       if (!mask) {
-        decode_single_mask_column((xpos + cur_x) / 8, ypos, actor_height);
+        decode_single_mask_column(i16_div_by_8(xpos + cur_x), ypos, actor_height);
         mask = 0x80;
       }
     }
@@ -1702,9 +1702,13 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
   //debug_out("place rrb object: char_num %d, x %d, y %d, width %d, height %d", char_num, screen_pos_x, screen_pos_y, width_chars, height_chars);
 
   // place cel using rrb features
-  int8_t char_row = screen_pos_y / 8;
+  int8_t char_row;
   if (screen_pos_y < 0) {
+    char_row = (int8_t)(screen_pos_y + 7) >> 3;  // This is the same as  char_row = screen_pos_y / 8;  for negative values
     --char_row;
+  }
+  else {
+    char_row = screen_pos_y >> 3;
   }
   screen_pos_x &= 0x3ff;
   int8_t last_but_one_row = height_chars - 2;

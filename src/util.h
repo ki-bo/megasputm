@@ -116,7 +116,8 @@ void __far *memcpy_far(void __far *dest, const void __far *src, size_t n);
 void __far *memset20(void __far *s, int c, size_t n);
 void __far *memset32(void __far *s, uint32_t c, size_t n);
 
-inline uint16_t make16(uint8_t low, uint8_t high) {
+inline uint16_t make16(uint8_t low, uint8_t high) 
+{
   uint16_t result;
   __asm(" sta %0\n"
         " stx %0+1\n"
@@ -125,4 +126,15 @@ inline uint16_t make16(uint8_t low, uint8_t high) {
           "Kx"(high)
         :);
   return result;
+}
+
+/**
+ * @brief Optimized signed division by 8 for int16_t numbers (arithmetic shift incl. rounding toward zero)
+ */
+inline int16_t i16_div_by_8(int16_t x)
+{
+  if (x < 0) {
+    x += 7;
+  }
+  return x >> 3;
 }
