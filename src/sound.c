@@ -254,7 +254,7 @@ struct sound_params sounds[70] = {
   [13] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = DMA_VOL(0x3f), .loop = 0}},
   [14] = {.type = SOUND_TYPE_MICROWAVE_DING},
   [15] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 7124, .loop_len = 0}},
-  [16] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}},
+  [16] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 0}},
   [17] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}},
   /**/[18] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}}, // water faucet in bathroom
   [19] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x00f8), .timer2 = DMA_TIMER(0x00f7), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
