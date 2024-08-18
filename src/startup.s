@@ -52,6 +52,24 @@ nextLine:	.word 0                ; end of program
 		.section startup, root, noreorder
 __program_start:
 		sei
+		lda 0xd60f
+		and #0x20
+		bne fadeout
+		lda #2
+		sta 0xd020
+		ldx #0
+loop$:
+		lda xemu_err_str,x
+		beq exit$
+		jsr 0xffd2		; kernal: BSOUT
+		inx
+		bra loop$
+exit$:
+		rts
+xemu_err_str:
+		.ascii "ERROR: NO REAL HW DETECTED"
+		.byte 0
+fadeout:
 		; fade out screen
 		ldy #60
 loop1$:		ldx #0

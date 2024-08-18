@@ -63,4 +63,5 @@ typedef enum {
     ERR_UNDEFINED_MUSIC = 41,
     ERR_PLAYING_MUSIC_AS_SFX = 42,
     ERR_INDEX_LOAD_FAILED = 43,
+    ERR_REALHW_ONLY = 44,
 } error_code_t;
