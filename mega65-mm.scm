@@ -47,7 +47,7 @@
 
         ; Memory m0-0 for the runtime module
         ; The runtime code will be moved to 0x200 in startup
-        (memory runtime (address (#x200 . #x1fff))
+        (memory runtime (address (#x208 . #x1fff))
                 (scatter-to runtime_copy)
                 (section
                         code

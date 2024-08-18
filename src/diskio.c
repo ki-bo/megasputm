@@ -20,6 +20,7 @@
 #include "diskio.h"
 #include "dma.h"
 #include "error.h"
+#include "hyppo.h"
 #include "index.h"
 #include "io.h"
 #include "map.h"
@@ -93,7 +94,7 @@ static struct {
   * The index is in file 00.lfl and contains room numbers (=file numbers) and
   * offsets for each resource within that file. We cache this in memory to
   * speed up access to resources.
-  * The numbers are hard-coded for the Maniac Mansion (Scumm V2) game.
+  * The numbers are hard-coded for MM (SCUMM V2).
   *
   * BSS section: bss_diskio
   */
@@ -1024,8 +1025,16 @@ static void check_and_prompt_for_disk(uint8_t disk_num)
 
   current_disk = disk_num;
 }
+
 static uint8_t check_disk(uint8_t disk_num)
 {
+  if (!diskio_is_real_drive() && current_disk != disk_num && disk_num < MAX_DISKS) {
+    // we try to automatically mount the requested disk
+    strcpy((char *)0x0200, "mm1.d81");
+    *(char *)0x0202 = '1' + disk_num;
+    hyppo_mount();
+  }
+
   load_block(0xff, 40, 0);
   for (uint8_t i = 0; i < sizeof(disk_header); ++i) {
     uint8_t read_byte = FDC.data;
