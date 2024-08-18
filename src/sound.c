@@ -380,6 +380,9 @@ void sound_play(uint8_t sound_id)
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (!sound_triggers[i]) {
       sound_triggers[i] = sound_id;
+      // we do a first res_provide() for each sound to avoid loading latency in sound_handle_play_triggers() later
+      res_provide(RES_TYPE_SOUND, sound_id, 0);
+      return;
     }
   }
 }
@@ -496,6 +499,10 @@ static void play(uint8_t sound_id)
   sound_slots[slot].id       = sound_id;
   sound_slots[slot].finished = 0;
 
+  // stop all already running instances of this sound
+  // do this before we allocate the resource as stopping will dectivate/deallocate it
+  stop(sound_id);
+
   uint8_t res_page = res_provide(RES_TYPE_SOUND, sound_id, 0);
   res_activate_slot(res_page);
   __auto_type data = (struct sound_header __far *)res_get_huge_ptr(res_page);
@@ -504,8 +511,6 @@ static void play(uint8_t sound_id)
   uint16_t sample_offset = BYTE_SWAP16(data->code_size) + sizeof(struct sound_header);
   __auto_type sample_ptr = (int8_t __far *)(data) + sample_offset;
   __auto_type params     = &sounds[sound_id];
-
-  sound_stop(sound_id);
 
   switch (params->type) {
     case SOUND_TYPE_SAMPLE:
@@ -552,7 +557,7 @@ static void stop(uint8_t sound_id)
   __auto_type slot = sound_slots;
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i, ++slot) {
     if (slot->type != SOUND_TYPE_NONE && slot->id == sound_id) {
-      slot->stop(&sound_slots[i]);
+      slot->stop(slot);
     }
   }
 }
@@ -645,7 +650,7 @@ static void stop_slot(struct sound_slot *slot)
   for (uint8_t i = 0; i < 4; ++i) {
     if (channel_use[i] == slot->id) {
       stop_channel(i);
-      channel_use[i]     = 0xff;
+      channel_use[i] = 0xff;
     }
   }
   if (!is_music) {
@@ -713,18 +718,18 @@ static void start_channel(uint8_t ch, int8_t __far *data, uint16_t size, uint16_
   //debug_out("loop sample %lx, %lx, %lx, %d", (uint32_t)data, (uint32_t)loop_address, (uint32_t)(data+size), loop_offset);
 
   stop_channel(ch);
-
-  DMA.aud_ch[ch].freq.lsb16          = timer;
-  DMA.aud_ch[ch].freq.msb            = 0;
-  DMA.aud_ch[ch].base_addr.addr16    = LSB16(loop_address);
-  DMA.aud_ch[ch].base_addr.bank      = BANK(loop_address);
-  DMA.aud_ch[ch].current_addr.addr16 = LSB16(data);
-  DMA.aud_ch[ch].current_addr.bank   = BANK(data);
-  DMA.aud_ch[ch].top_addr            = LSB16(data) + size - 1;
+  __auto_type dma_ch = &DMA.aud_ch[ch];
+  dma_ch->freq.lsb16          = timer;
+  dma_ch->freq.msb            = 0;
+  dma_ch->base_addr.addr16    = LSB16(loop_address);
+  dma_ch->base_addr.bank      = BANK(loop_address);
+  dma_ch->current_addr.addr16 = LSB16(data);
+  dma_ch->current_addr.bank   = BANK(data);
+  dma_ch->top_addr            = LSB16(data) + size - 1;
 
   set_channel_vol_and_pan(ch, vol, pan);
 
-  DMA.aud_ch[ch].ctrl                = ADMA_CHEN_MASK | ADMA_SBITS_8 | flags;
+  dma_ch->ctrl                = ADMA_CHEN_MASK | ADMA_SBITS_8 | flags;
 
   //debug_out("start channel looped %d base %lx, loop_offset %d, size %d, timer %d, vol %d, taddr %x\n", ch, (uint32_t)data, loop_offset, size, timer, vol, DMA.aud_ch[ch].top_addr);
 }
@@ -734,11 +739,13 @@ static void restart_channel(uint8_t ch)
   if (ch >= 4) {
     return;
   }
-  uint8_t flags = DMA.aud_ch[ch].ctrl & ADMA_CHLOOP_MASK;
-  DMA.aud_ch[ch].ctrl = 0;
-  DMA.aud_ch[ch].current_addr.addr16 = DMA.aud_ch[ch].base_addr.addr16;
-  DMA.aud_ch[ch].current_addr.bank   = DMA.aud_ch[ch].base_addr.bank;
-  DMA.aud_ch[ch].ctrl = ADMA_CHEN_MASK | ADMA_SBITS_8 | flags;
+  __auto_type dma_ch = &DMA.aud_ch[ch];
+
+  uint8_t flags = dma_ch->ctrl & ADMA_CHLOOP_MASK;
+  dma_ch->ctrl = 0;
+  dma_ch->current_addr.addr16 = dma_ch->base_addr.addr16;
+  dma_ch->current_addr.bank   = dma_ch->base_addr.bank;
+  dma_ch->ctrl = ADMA_CHEN_MASK | ADMA_SBITS_8 | flags;
 }
 
 static void stop_channel(uint8_t ch)
@@ -746,6 +753,8 @@ static void stop_channel(uint8_t ch)
   if (ch >= 4) {
     return;
   }
+  // we don't set ctrl to 0 but just disable the ENABLE flag, because we want to keep the other settings
+  // (to be able to easily restart the channel without complete reconfiguring, see restart_channel())
   DMA.aud_ch[ch].ctrl &= ~ADMA_CHEN_MASK;
 }
 
@@ -755,17 +764,18 @@ static void set_channel_vol_and_pan(uint8_t ch, uint8_t vol, uint8_t pan)
     return;
   }
   vol >>= 2;
+  __auto_type dma_ch = &DMA.aud_ch[ch];
   if (pan == PAN_CENTER) {
     DMA.aud_ch_pan_vol[ch] = vol;
-    DMA.aud_ch[ch].volume  = vol;
+    dma_ch->volume  = vol;
   }
   else if ((ch < 2 && pan == PAN_LEFT) || (ch >= 2 && pan == PAN_RIGHT)) {
     DMA.aud_ch_pan_vol[ch] = 0;
-    DMA.aud_ch[ch].volume  = vol;
+    dma_ch->volume  = vol;
   }
   else {
     DMA.aud_ch_pan_vol[ch] = vol;
-    DMA.aud_ch[ch].volume  = 0;
+    dma_ch->volume  = 0;
   }
 }
 
