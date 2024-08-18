@@ -65,6 +65,13 @@ extern union map_t __attribute__((zpage)) map_regs;
           : \
           : "x", "y", "z");
 
+#define MAP_CS_GFX_HELPSCREEN \
+    __asm(" .extern map_cs_gfx_helpscreen\n" \
+          " jsr map_cs_gfx_helpscreen\n" \
+          : \
+          : \
+          : "a", "x", "y", "z");
+
 #define MAP_CS_SOUND \
     __asm(" .extern map_cs_sound\n" \
           " jsr map_cs_sound\n" \
@@ -79,6 +86,13 @@ extern union map_t __attribute__((zpage)) map_regs;
           : \
           : \
           : "x", "y", "z");
+
+#define UNMAP_CS_GFX_HELPSCREEN \
+    __asm(" .extern unmap_cs_gfx_helpscreen\n" \
+          " jsr unmap_cs_gfx_helpscreen\n" \
+          : \
+          : \
+          : "a", "x", "y", "z");
 
 #define UNMAP_DS \
     __asm(" .extern unmap_ds\n" \

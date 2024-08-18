@@ -98,7 +98,7 @@ void actor_init(void)
   * zero needs to stay reserved for the transparent color. The default palette for actors is using
   * index 1 for black, so the color at index 1 (blue for EGA and Amiga style rendering) is not
   * available for actors. Therefore, actors that need blue in their costume need to map blue to one
-  * of the other palette entries (eg. for Dave in Maniac Mansion).
+  * of the other palette entries (eg. for Dave in MM).
   *
   * @param actor_id The id of the actor to map the palette for.
   * @param dest_idx The destination palette index to map the source palette to.

@@ -199,6 +199,15 @@ void charset_init(void)
   // copy quotation mark
   copy_chars(0x22, 0x60, 0x01);
 
+  // copy symbols for drawing borders
+  copy_chars(0x70, 0x0d, 0x01); // symbol upper left corner
+  copy_chars(0x6e, 0x0e, 0x01); // symbol upper right corner
+  copy_chars(0x7d, 0x0f, 0x01); // symbol lower right corner
+  copy_chars(0x6d, 0x10, 0x01); // symbol lower left corner
+  copy_chars(0x5d, 0x1a, 0x01); // symbol vertical line
+  copy_chars(0x40, 0x1b, 0x01); // symbol horizontal line
+
+  // copy special characters
   uint8_t num_char_definitions = sizeof(char_definitions) / sizeof(char_definitions[0]);
   for (uint8_t c = 0; c < num_char_definitions; ++c) {
     uint8_t char_idx = char_definitions[c][0];

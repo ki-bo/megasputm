@@ -196,12 +196,28 @@
                         bss_gfx
                 )
         )
+
+        ; memory in colram for mapping gfx helpscreen module
+        (memory banked-code-3 (address (#x2000 . #x3fff)) 
+                (scatter-to bankc_2000)
+                (section
+                        code_gfx_helpscreen
+                        cdata_gfx_helpscreen
+                )
+        )
+        ; memory in colram for mapping gfx helpscreen bss section
+        (memory banked-bss-3 (address (#x3f00 . #x3fff)) 
+                (scatter-to bankc_3f00)
+                (section
+                        bss_gfx_helpscreen
+                )
+        )
  
 
         ;;;; **** BANKED MEMORY sound ****
 
         ; memory in bank 0 for mapping sound module
-        (memory banked-code-3 (address (#x2000 . #x3fff)) 
+        (memory banked-code-4 (address (#x2000 . #x3fff)) 
                 (scatter-to bank1_6000)
                 (section
                         code_sound
@@ -251,8 +267,13 @@
         (memory m1-3 (address (#x16000 . #x17fff))
                 (section 
                         (bank1_6000 #x16000)
-                        ;(bank1_7e00 #x17e00)
                 )
         )
 
+        (memory mc-0 (address (#xff82000 . #xff83fff))
+                (section
+                        (bankc_2000 #xff82000)
+                        (bankc_3f00 #xff83f00)
+                )
+        )
 ))

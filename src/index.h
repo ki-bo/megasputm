@@ -19,6 +19,8 @@
 
 #pragma once
 
+#define INDEX_FILE_CHKS 0xdd69
+
 #define NUM_GAME_OBJECTS 780
 #define NUM_ROOMS 61
 #define NUM_COSTUMES 40

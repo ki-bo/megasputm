@@ -66,3 +66,5 @@ void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, enum te
 void gfx_clear_sentence(void);
 void gfx_clear_verbs(void);
 void gfx_clear_inventory(void);
+void gfx_helpscreen(void);
+

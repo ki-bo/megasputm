@@ -70,7 +70,7 @@ mm1.d81: runtime.raw $(SAVE_FILES)
 		echo "Copying mm1.d81 from gamedata..."; \
 		cp gamedata/mm1.d81 mm1.d81; \
 	fi
-	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13
+	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0
 	@echo "Copying save game files to disk image..."
 	@for file in $(SAVE_FILES); do \
 		if [ -f "$$file" ]; then \

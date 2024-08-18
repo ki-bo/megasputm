@@ -159,7 +159,6 @@ static uint8_t *write_file_data_ptr;
 // DMA lists
 static dmalist_two_options_t   dmalist_copy_from_cache;
 static dmalist_two_options_t   dmalist_copy_to_cache;
-static dmalist_single_option_t dmalist_copy_block;
 
 // Private init functions
 static void init_dma_lists(void);
@@ -295,6 +294,18 @@ uint8_t diskio_load_index(void)
     return 0;
   }
 
+  uint16_t  index_chks = 0;
+  uint16_t  num_words  = sizeof(lfl_index_file_contents) >> 1;
+  uint16_t *ptr        = (uint16_t *)&lfl_index_file_contents;
+  for (uint16_t i = 0; i < num_words; ++i) {
+    index_chks += *ptr++;
+  }
+  
+  if (index_chks != INDEX_FILE_CHKS) {
+    release_drive();
+    return 0;
+  }
+
   memcpy(&vm_state.global_game_objects, &lfl_index_file_contents.global_game_objects, sizeof(lfl_index_file_contents.global_game_objects));
   for (uint8_t i = 0; i < sizeof(lfl_index.room_disk_num); ++i) {
     lfl_index.room_disk_num[i] = lfl_index_file_contents.room_disk_num[i];
@@ -342,18 +353,6 @@ static void init_dma_lists(void)
     .command        = DMA_CMD_COPY,
     .count          = 0x0200,
     .src_addr       = 0x6c00,
-    .src_bank       = 0x0d,
-    .dst_addr       = 0x0000,
-    .dst_bank       = 0x00
-  };
-
-  dmalist_copy_block = (dmalist_single_option_t) {
-    .opt_token      = 0x80,
-    .opt_arg        = 0xff,
-    .end_of_options = 0x00,
-    .command        = DMA_CMD_COPY,
-    .count          = 0x00fe,
-    .src_addr       = 0x6c02,
     .src_bank       = 0x0d,
     .dst_addr       = 0x0000,
     .dst_bank       = 0x00
@@ -472,21 +471,19 @@ void diskio_load_file(uint8_t disk_num, const char *filename, uint8_t __far *add
     disk_error(ERR_FILE_NOT_FOUND);
   }
 
-  dmalist_copy_block.count = 254;
+  uint8_t count = 254;
 
   while (next_track != 0) {
     load_block(disk_num, next_track, next_block);
-    dmalist_copy_block.src_addr = next_block % 2 == 0 ? 0x6c02 : 0x6d02;
+    __auto_type src_addr = (void __far *)((next_block % 2 == 0 ? 0xffd6c02 : 0xffd6d02));
 
     next_track = FDC.data;
     next_block = FDC.data;
 
     if (next_track == 0) {
-      dmalist_copy_block.count = next_block - 1;
+      count = next_block - 1;
     }
-    dmalist_copy_block.dst_addr = (uint16_t)address;
-    dmalist_copy_block.dst_bank = BANK(address);
-    dma_trigger(&dmalist_copy_block);
+    memcpy_far(address, src_addr, count);
     address += 254;
   }
   

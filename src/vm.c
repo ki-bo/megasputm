@@ -153,6 +153,7 @@ static uint8_t inventory_ui_pos_to_y(uint8_t pos);
 static void inventory_scroll_up(void);
 static void inventory_scroll_down(void);
 static void select_inventory(uint8_t inventory_ui_slot);
+static void show_helpscreen(void);
 
 // Private functions (code_main_private)
 static void cleanup_slot_table();
@@ -187,7 +188,12 @@ static uint8_t key_to_inventory(uint8_t key_code);
   */
 void vm_init(void)
 {
-  diskio_load_index();
+  if (!diskio_load_index()) {
+    MAP_CS_GFX
+    VICII.ctrl1 = 0x1b;
+    gfx_print_dialog(0x0e, "Loading 00.lfl (Amiga/EN) failed", 32);
+    fatal_error(ERR_INDEX_LOAD_FAILED);
+  }
 
   for (active_script_slot = 0; active_script_slot < NUM_SCRIPT_SLOTS; ++active_script_slot)
   {
@@ -927,7 +933,7 @@ uint8_t vm_calc_proximity(uint16_t actor_or_object_id1, uint16_t actor_or_object
   if (is_actor1 && !is_actor2) {
     // if object1 is an actor and object2 is an object, we need to correct the walk-to position
     // of the object to be in the closest box (seems walk-to positions are often outside of
-    // walk boxes, eg. the doorbell in maniac mansion)
+    // walk boxes, eg. the doorbell in MM)
     walkbox_correct_position_to_closest_box(&x2, &y2);
   }
 
@@ -1260,6 +1266,9 @@ uint8_t vm_load_game(uint8_t slot)
   }
   
   res_free_heap(heap_slot);
+
+  MAP_CS_SOUND
+  sound_reset();
 
   load_room(vm_read_var8(VAR_SELECTED_ROOM));
 
@@ -1643,6 +1652,11 @@ static void handle_input(void)
       }
       
       vm_print_sentence();
+    }
+    else if (current_key_pressed == 0x1f) {
+      // handle HELP key
+      show_helpscreen();
+      wait_for_jiffy(); // this resets the elapsed jiffies timer
     }
     else if (current_key_pressed == 8) {
       // handle restart key, ask user confirmation
@@ -2208,6 +2222,30 @@ static void select_inventory(uint8_t inventory_ui_slot)
     inventory_scroll_down();
     return;
   }
+}
+
+static void show_helpscreen(void)
+{
+  MAP_CS_GFX
+  gfx_fade_out();
+  gfx_clear_dialog();
+  gfx_clear_sentence();
+  gfx_clear_verbs();
+  gfx_clear_inventory();
+
+  // map 0xFF82000 to 0x2000 (CS)
+  __disable_interrupts();
+  MAP_CS_GFX_HELPSCREEN
+  gfx_helpscreen();
+  UNMAP_CS_GFX_HELPSCREEN
+  __enable_interrupts();
+
+  vm_update_actors();
+  vm_update_bg();
+  vm_update_dialog();
+  vm_update_sentence();
+  vm_update_verbs();
+  vm_update_inventory();
 }
 
 /// @} // vm_private

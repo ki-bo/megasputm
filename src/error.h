@@ -62,4 +62,5 @@ typedef enum {
     ERR_STOPPING_EMPTY_SOUND_SLOT = 40,
     ERR_UNDEFINED_MUSIC = 41,
     ERR_PLAYING_MUSIC_AS_SFX = 42,
+    ERR_INDEX_LOAD_FAILED = 43,
 } error_code_t;

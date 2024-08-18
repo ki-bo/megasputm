@@ -203,6 +203,9 @@ static void apply_actor_masking(void);
 static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_lines);
 static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_start, uint8_t num_lines, uint8_t idx_dst);
 static uint16_t text_style_to_color(enum text_style style);
+// private gfx helpscreen functions
+static void draw_helpscreen_border(void);
+static void print_helpscreen_text(uint8_t x, uint8_t y, const char *text, uint8_t color);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -263,8 +266,8 @@ void gfx_init()
   VICIV.bordercol = COLOR_BLACK;
   VICIV.screencol = COLOR_BLACK;
   VICIV.colptr    = 0x800;
-  VICIV.chrcount  = CHRCOUNT;     // 80 chars per row
-  VICIV.linestep  = CHRCOUNT * 2; // 160 bytes per row (2 bytes per char)
+  VICIV.chrcount  = CHRCOUNT;     // 120 chars per row
+  VICIV.linestep  = CHRCOUNT * 2; // 240 bytes per row (2 bytes per char)
 
   // setup EGA palette
   for (uint8_t i = 0; i < sizeof(palette_red); ++i) {
@@ -801,7 +804,7 @@ void gfx_update_flashlight(void)
 /**
   * @brief Starts the gfx module and enables video output.
   * 
-  * This function must be called after gfx_init. It enabled the raster interrupt and video output.
+  * This function must be called after gfx_init. It enables the raster interrupt and video output.
   *
   * Code section: code_gfx
   */
@@ -812,7 +815,7 @@ void gfx_start(void)
   // bit8 of the current raster line, and writing it again will set the raster line
   // for the raster interrupt. This can lead to strange errors where the wrong raster line
   // might get set depending on when the write happens. To avoid all this, we just set
-  // the whole byte dirctly, making sure we keep the MSB clear.
+  // the whole byte directly, making sure we keep the MSB clear.
   VICII.ctrl1 = 0x1b; // enable video output
   __enable_interrupts();
 }
@@ -1548,6 +1551,63 @@ void gfx_clear_inventory(void)
   dma_trigger(&dmalist_clear_inventory);
 }
 
+#pragma clang section text="code_gfx_helpscreen" rodata="cdata_gfx_helpscreen" data="data_gfx_helpscreen" bss="bss_gfx_helpscreen"
+void gfx_helpscreen(void)
+{
+  memset32(FAR_U16_PTR(SCREEN_RAM), 0x00, 6000);
+  memset32(FAR_U16_PTR(COLRAM),     0x00, 6000);
+  VICIV.spr_ena  = 0; // disable sprites
+  VICIV.ctrlb   |= VIC3_H640_MASK;
+  DMA.aud_ctrl  &= 0x7f;
+
+  draw_helpscreen_border();
+
+  uint8_t y = 1;
+  uint8_t color1 = 0x02;
+  uint8_t color2 = 0x0d;
+
+  print_helpscreen_text(14, y, "MEGASPUTM - Graphic Adventure Engine for the MEGA65", color1);
+  y = 3;
+  print_helpscreen_text( 2, y  , "Coding:", color2);
+  print_helpscreen_text(15, y++, "Robert Steffens (kibo)", color1);
+  print_helpscreen_text( 2, y  , "Testers:", color2);
+  print_helpscreen_text(15, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
+  y += 2;
+  print_helpscreen_text( 2, y++, "Special Thanks:", color2);
+  print_helpscreen_text( 2, y++, "SCUMMVM Team - This project was made possible thanks to their extensive", color1);
+  print_helpscreen_text( 2, y++, "wiki and codebase, which provided invaluable insights into the details ", color1);
+  print_helpscreen_text( 2, y++, "of SCUMM games.", color1);
+  y = 12;
+  print_helpscreen_text( 2, y++, "Key Controls:", color2);
+  print_helpscreen_text( 2, y++, "F1,F3,F5     Select kid", color1);
+  print_helpscreen_text( 2, y++, "F8           Restart game", color1);
+  print_helpscreen_text( 2, y++, "F9           Load/save game", color1);
+  print_helpscreen_text( 2, y++, "ESC,STOP,F4  Skip cutscene", color1);
+  print_helpscreen_text( 2, y++, "<,>          Change text rate", color1);
+  print_helpscreen_text( 2, y++, "SPACE        Pause game", color1);
+  print_helpscreen_text( 2, y++, "RETURN       Execute sentence", color1);
+  y = 13;
+  print_helpscreen_text(40, y++, "Q,W,E,R,T   Select verb 1st row", color1);
+  print_helpscreen_text(40, y++, "A,S,D,F,G   Select verb 2nd row", color1);
+  print_helpscreen_text(40, y++, "Z,X,C,V,B   Select verb 3rd row", color1);
+  print_helpscreen_text(40, y++, "U,J         Scroll inventory up/down", color1); 
+  print_helpscreen_text(40, y++, "I,O         Upper left/right inventory", color1);
+  print_helpscreen_text(40, y++, "K,L         Lower left/right inventory", color1);
+  y += 2;
+  print_helpscreen_text(22, y++, "Port 1 - Mouse     Port 2 - Joystick", color1);
+  print_helpscreen_text( 2,  23, "github.com/ki-bo/megasputm", color2);
+  print_helpscreen_text(64,  23, "Version 1.0-MM", color2);
+
+  ASCIIKEY = 0; // ack any keypress still pending
+  for (;!ASCIIKEY;); // wait for new keypress
+  ASCIIKEY = 0; // ack keypress
+
+  memset32(FAR_U16_PTR(SCREEN_RAM), 0x00, 6000);
+  memset32(FAR_U16_PTR(COLRAM), 0x00, 6000);
+  VICIV.ctrlb &= ~VIC3_H640_MASK;
+  DMA.aud_ctrl |= 0x80;
+}
+
 /** @} */ // gfx_public
 
 //-----------------------------------------------------------------------------------------------
@@ -1557,6 +1617,7 @@ void gfx_clear_inventory(void)
   * @{
   */
 
+#pragma clang section text="code_gfx" rodata="cdata_gfx" data="data_gfx" bss="bss_gfx"
 static uint8_t __huge *decode_rle_bitmap(uint8_t __huge *src, uint16_t width, uint8_t height)
 {
   uint8_t rle_counter = 1;
@@ -1912,6 +1973,47 @@ static uint16_t text_style_to_color(enum text_style style)
       return 0x0100;
     default:
       return 0x0200;
+  }
+}
+
+#pragma clang section text="code_gfx_helpscreen" rodata="cdata_gfx_helpscreen" data="data_gfx_helpscreen" bss="bss_gfx_helpscreen"
+static void draw_helpscreen_border(void)
+{
+  uint16_t color = 0x0e00;
+  uint16_t __far *screen_ptr = FAR_U16_PTR(SCREEN_RAM);
+  uint16_t __far *colram_ptr = FAR_U16_PTR(COLRAM);
+  screen_ptr[0]  = 0x000d;
+  colram_ptr[0]  = color;
+  screen_ptr[79] = 0x000e;
+  colram_ptr[79] = color;
+  screen_ptr[24 * CHRCOUNT] = 0x0010;
+  colram_ptr[24 * CHRCOUNT] = color;
+  screen_ptr[24 * CHRCOUNT + 79] = 0x000f;
+  colram_ptr[24 * CHRCOUNT + 79] = color;
+
+  for (uint8_t x = 1; x < 79; ++x) {
+    screen_ptr[x] = 0x001b;
+    colram_ptr[x] = color;
+    screen_ptr[24 * CHRCOUNT + x] = 0x001b;
+    colram_ptr[24 * CHRCOUNT + x] = color;
+  }
+  for (uint8_t y = 1; y < 24; ++y) {
+    screen_ptr[y * CHRCOUNT] = 0x001a;
+    colram_ptr[y * CHRCOUNT] = color;
+    screen_ptr[y * CHRCOUNT + 79] = 0x001a;
+    colram_ptr[y * CHRCOUNT + 79] = color;
+  }
+}
+
+static void print_helpscreen_text(uint8_t x, uint8_t y, const char *text, uint8_t color)
+{
+  uint16_t offset = CHRCOUNT * y + x;
+  uint16_t colram_val = color << 8;
+  uint16_t __far *screen_ptr = FAR_U16_PTR(SCREEN_RAM) + offset;
+  uint16_t __far *colram_ptr = FAR_U16_PTR(COLRAM) + offset;
+  while (*text) {
+    *screen_ptr++ = *text++;
+    *colram_ptr++ = colram_val;
   }
 }
 

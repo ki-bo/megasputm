@@ -247,6 +247,10 @@ static void handle_keyboard(void)
         // handling A-Z keys
         input_key_pressed = key_pressed_ascii;
       }
+      else if (key_pressed_ascii == 0x1f) {
+        // handling HELP key
+        input_key_pressed = 0x1f;
+      }
       else if (key_pressed_ascii == 0x20) {
         // handling space key
         input_key_pressed = 0x20;

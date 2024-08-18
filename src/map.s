@@ -228,3 +228,32 @@ map_ds_room_offset:
 		lda #0x80
 		sta zp:_Zp+1
 		rts
+
+		// maps 0xff82000 (within colram) to CS (0x2000)
+		.section code, noreorder
+		.public map_cs_gfx_helpscreen
+map_cs_gfx_helpscreen:
+		lda #0xff		// set MAP MB part to FF for MAP LO
+		ldx #0x0f
+		ldy #0x00
+		ldz #0x0f
+		map
+		lda #0x00
+		ldx #0x28
+		ldy #0
+		ldz #0
+		map
+		rts
+
+		.public unmap_cs_gfx_helpscreen
+unmap_cs_gfx_helpscreen:
+		lda #0x00		// set MAP MB part to FF for MAP LO
+		ldx #0x0f
+		tay
+		ldz #0x0f
+		map
+		tax
+		taz
+		map
+		eom
+		rts
