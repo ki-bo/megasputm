@@ -27,13 +27,8 @@
 #include "util.h"
 #include <stdint.h>
 
-#define MAX_VOL 63
-
 #define DMA_TIMER(f) \
     ((uint16_t)((double)(3579545.0 / (f) * 16777215.0 / 40500000.0) + 0.5))
-
-#define DMA_VOL(v) \
-    ((uint8_t)((double)(v) / 63.0 * (double)MAX_VOL + 0.5))
 
 #define BYTE_SWAP16(x) \
     ((((x) & 0xff) << 8) | (((x) >> 8) & 0xff))
@@ -244,60 +239,60 @@ struct sound_slot {
 uint8_t channel_use[4] = {0xff, 0xff, 0xff, 0xff};
 uint8_t sound_triggers[NUM_SOUND_SLOTS];
 struct sound_params sounds[70] = {
-  // [6]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = DMA_VOL(0x32), .loop = 0}}, // footsteps human actors
-  [7]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0258), .vol = DMA_VOL(0x32), .loop = 0}},
-  [8]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
-  [9]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
-  [10] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}},
-  /**/[11] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // coin in slot
-  [12] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x017c), .vol = DMA_VOL(0x3f), .loop = 0}},
-  [13] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = DMA_VOL(0x3f), .loop = 0}},
+  // [6]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = 0x32, .loop = 0}}, // footsteps human actors
+  [7]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0258), .vol = 0x32, .loop = 0}},
+  [8]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = 0x3f, .loop = 0}},
+  [9]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = 0x3f, .loop = 0}},
+  [10] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = 0x3f, .loop = 0}},
+  /**/[11] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x000a}}, // coin in slot
+  [12] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x017c), .vol = 0x3f, .loop = 0}},
+  [13] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = 0x3f, .loop = 0}},
   [14] = {.type = SOUND_TYPE_MICROWAVE_DING},
-  [15] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 7124, .loop_len = 0}},
-  [16] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 0}},
-  [17] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}},
-  /**/[18] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}}, // water faucet in bathroom
-  [19] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x00f8), .timer2 = DMA_TIMER(0x00f7), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
-  [20] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x023d), .timer2 = DMA_TIMER(0x0224), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x0000}}, // pool radio noise
-  /**/[21] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x001e}}, // phone dial tone
-  /**/[22] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x012c), .timer2 = DMA_TIMER(0x0149), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x001e}}, // phone busy signal
-  [23] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x007c, .vol = DMA_VOL(0x3f)}}, // phone ring 1
-  [24] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x00be, .vol = DMA_VOL(0x37)}}, // phone ring 2
+  [15] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = 0x3f, .loop = 1, .loop_offset = 7124, .loop_len = 0}},
+  [16] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = 0x3f, .loop = 0}},
+  [17] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = 0x3f, .loop = 1, .loop_offset = 0, .loop_len = 0}},
+  /**/[18] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = 0x3f, .loop = 1, .loop_offset = 0, .loop_len = 0}}, // water faucet in bathroom
+  [19] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x00f8), .timer2 = DMA_TIMER(0x00f7), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x000a}},
+  [20] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x023d), .timer2 = DMA_TIMER(0x0224), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x0000}}, // pool radio noise
+  /**/[21] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x001e}}, // phone dial tone
+  /**/[22] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x012c), .timer2 = DMA_TIMER(0x0149), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x001e}}, // phone busy signal
+  [23] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x007c, .vol = 0x3f}}, // phone ring 1
+  [24] = {.type = SOUND_TYPE_PHONE, .phone = {.freq = 0x00be, .vol = 0x37}}, // phone ring 2
   [25] = {.type = SOUND_TYPE_TENTACLE, .tentacle = {.step = 1}}, // record with tentacle mating call
-  [26] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}}, // glass breaking
-  [27] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = DMA_VOL(0x3f), .loop = 0}}, // red pool button, police arriving
-  [28] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0078), .vol = DMA_VOL(0x28), .loop = 0}},
-  [29] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x023d), .timer2 = DMA_TIMER(0x0224), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x0000}}, // old fashioned radio noise
-  [30] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x00c8), .vol = DMA_VOL(0x32), .loop = 0}},
-  [31] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x00c8), .vol = DMA_VOL(0x32), .loop = 0}},
+  [26] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = 0x3f, .loop = 0}}, // glass breaking
+  [27] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = 0x3f, .loop = 0}}, // red pool button, police arriving
+  [28] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0078), .vol = 0x28, .loop = 0}},
+  [29] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x023d), .timer2 = DMA_TIMER(0x0224), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x0000}}, // old fashioned radio noise
+  [30] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x00c8), .vol = 0x32, .loop = 0}},
+  [31] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x00c8), .vol = 0x32, .loop = 0}},
   [32] = {.type = SOUND_TYPE_ALARM},
   [33] = {.type = SOUND_TYPE_ALARM},
-  [34] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = DMA_VOL(0x3f), .loop = 0}},
-  /**/[35] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // playing meteor mess
+  [34] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = 0x3f, .loop = 0}},
+  /**/[35] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x000a}}, // playing meteor mess
   [36] = {.type = SOUND_TYPE_TENTACLE, .tentacle = {.step = 7}},
-  /**/[37] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // police arriving
-  [38] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = DMA_VOL(0x1e), .loop = 1, .loop_offset = 0, .loop_len = 0}},
-  [39] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x017c), .vol = DMA_VOL(0x39), .loop = 0}},
-  [40] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = DMA_VOL(0x3f), .loop = 0}},
-  /**/[41] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x012e), .vol = DMA_VOL(0x3f), .loop = 0}}, // fill developer tray
-  [42] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f8), .vol = DMA_VOL(0x3f), .loop = 0}},
-  [43] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = DMA_VOL(0x3f), .loop = 0}},
+  /**/[37] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x000a}}, // police arriving
+  [38] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = 0x1e, .loop = 1, .loop_offset = 0, .loop_len = 0}},
+  [39] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x017c), .vol = 0x39, .loop = 0}},
+  [40] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f4), .vol = 0x3f, .loop = 0}},
+  /**/[41] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x012e), .vol = 0x3f, .loop = 0}}, // fill developer tray
+  [42] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01f8), .vol = 0x3f, .loop = 0}},
+  [43] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01ac), .vol = 0x3f, .loop = 0}},
   [44] = {.type = SOUND_TYPE_OLD_RECORD},
   /**/[45] = {.type = SOUND_TYPE_TYPEWRITER},
   /* 46 wrench on pipe, not used in game */
-  [54] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}},
-  [56] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = DMA_VOL(0x1e), .loop = 1, .loop_offset = 0, .loop_len = 0}},
-  [57] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = DMA_VOL(0x3f), .loop = 0}},
+  [54] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x000a}},
+  [56] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01c2), .vol = 0x1e, .loop = 1, .loop_offset = 0, .loop_len = 0}},
+  [57] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fc), .vol = 0x3f, .loop = 0}},
   /**/[59] = {.type = SOUND_TYPE_LABATMO}, // lab background sound
-  /**/[60] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = DMA_VOL(0x3f), .loop = 0}}, // self-destruct countdown
+  /**/[60] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01cb), .vol = 0x3f, .loop = 0}}, // self-destruct countdown
   /**/[61] = {.type = SOUND_TYPE_METEORSWITCH}, // meteor room switch
-  /**/[62] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fa), .vol = DMA_VOL(0x3f), .loop = 0}}, // meteor firing
-  // [63] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = DMA_VOL(0x3f), .loop = 1, .loop_offset = 0, .loop_len = 0}}, // "footsteps" tentacles
+  /**/[62] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x01fa), .vol = 0x3f, .loop = 0}}, // meteor firing
+  // [63] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x016e), .vol = 0x3f, .loop = 1, .loop_offset = 0, .loop_len = 0}}, // "footsteps" tentacles
   /**/[64] = {.type = SOUND_TYPE_PITCHBEND_LOOP}, // car rocket engine 1
-  /**/[65] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = DMA_VOL(0x1e), .loop = 0}}, // car rocket engine 2
-  /**/[66] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // meteor "talking" evil
-  /**/[67] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x02a8), .vol = DMA_VOL(0x3f), .loop = 0}}, // meteor "talking" friendly
-  /**/[68] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = DMA_VOL(0x3f), .vol2 = DMA_VOL(0x3f), .frames = 0x000a}}, // put meteor in car trunk
+  /**/[65] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = 0x1e, .loop = 0}}, // car rocket engine 2
+  /**/[66] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x000a}}, // meteor "talking" evil
+  /**/[67] = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x02a8), .vol = 0x3f, .loop = 0}}, // meteor "talking" friendly
+  /**/[68] = {.type = SOUND_TYPE_DUAL_SAMPLE_TIMED_LOOP, .dual_sample_timed_loop = {.timer1 = DMA_TIMER(0x007c), .timer2 = DMA_TIMER(0x007b), .vol1 = 0x3f, .vol2 = 0x3f, .frames = 0x000a}}, // put meteor in car trunk
   [69] = {.type = SOUND_TYPE_EXPLOSION}
 };
 
