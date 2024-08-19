@@ -63,20 +63,27 @@ runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
 mm1.d81: runtime.raw $(SAVE_FILES)
-	@if [ ! -f gamedata/mm1.D81 ]; then \
-		echo "mm1.d81 not found, creating new .d81 disk image..."; \
-		$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
-	else \
-		echo "Copying mm1.d81 from gamedata..."; \
-		cp gamedata/mm1.d81 mm1.d81; \
-	fi
-	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0
-	@echo "Copying save game files to disk image..."
-	@for file in $(SAVE_FILES); do \
-		if [ -f "$$file" ]; then \
-			echo "Adding $$file to mm1.d81..."; \
-			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file),s; \
-		fi \
+	echo "creating new .d81 disk images..."; \
+	$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
+	$(C1541) -format "maniac mansion,m2" d81 mm2.d81; \
+	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0; \
+	for file in gamedata/disk1/*; do \
+		ext=$${file##*.}; \
+		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \
+		if [ "$$ext" = "LFL" ]; then \
+			$(C1541) -attach mm1.d81 -write $$file $$lowercasefile; \
+		elif [ "$$ext" = "lfl" ]; then \
+			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file); \
+		fi; \
+	done; \
+	for file in gamedata/disk2/*; do \
+		ext=$${file##*.}; \
+		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \
+		if [ "$$ext" = "LFL" ]; then \
+			$(C1541) -attach mm2.d81 -write $$file $$lowercasefile; \
+		elif [ "$$ext" = "lfl" ]; then \
+			$(C1541) -attach mm2.d81 -write $$file $$(basename $$file); \
+		fi; \
 	done
 
 doxygen:
@@ -84,4 +91,4 @@ doxygen:
 
 clean:
 	-rm -rf obj
-	-rm *.raw *.d mm-mega65.lst mm1.d81
+	-rm *.raw *.d mm-mega65.lst mm1.d81 mm2.d81
