@@ -373,6 +373,11 @@ void setup_irq(void)
   CIA2.icr;
 }
 
+/**
+  * @brief Initialises the DMA lists.
+  * 
+  * Code section: code_init
+  */
 static void init_dma_lists(void)
 {
   dmalist_copy_gfx[0] = (dmalist_single_option_t) {
@@ -523,6 +528,16 @@ static void init_dma_lists(void)
   };
 }
 
+/**
+  * @brief Decodes a flashlight character.
+  *
+  * This function decodes a flashlight character from a 8x8 bitmap to a 64 byte
+  * character data. The character data is stored in the destination buffer.
+  *
+  * @param char_data Pointer to the 8x8 bitmap data.
+  * @param dst Pointer to the destination buffer.
+  * @param flip_y If true, the bitmap is flipped vertically.
+  */
 static void decode_flashlight_char(uint8_t *char_data, uint8_t __far *dst, uint8_t flip_y)
 {
   if (flip_y) {
@@ -650,6 +665,17 @@ static void raster_irq ()
 
 #pragma clang section text="code_gfx2" rodata="cdata_gfx2" data="data_gfx2" bss="zdata"
 
+/**
+  * @brief Draws the flashlight overlay in a dark room.
+  *
+  * This function is called from the main loop when the flashlight is enabled.
+  * It draws a flashlight overlay on the screen. The overlay is created by copying
+  * the covered background characters to an own rrb layer. The flashlight overlay
+  * is then drawn on top of the background characters.
+  * Round corners are added to the flashlight overlay as a separate rrb layer.
+  * The rrb layers are put before any actor rrb layers in the screen rows so the
+  * actors will appear in front of them.
+  */
 void gfx_update_flashlight(void)
 {
   SAVE_DS_AUTO_RESTORE
@@ -1574,7 +1600,7 @@ void gfx_helpscreen(void)
   print_helpscreen_text(15, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
   y += 2;
   print_helpscreen_text( 2, y++, "Special Thanks:", color2);
-  print_helpscreen_text( 2, y++, "SCUMMVM Team - This project was made possible thanks to their extensive", color1);
+  print_helpscreen_text( 2, y++, "ScummVM Team - This project was made possible thanks to their extensive", color1);
   print_helpscreen_text( 2, y++, "wiki and codebase, which provided invaluable insights into the details ", color1);
   print_helpscreen_text( 2, y++, "of SCUMM games.", color1);
   y = 12;

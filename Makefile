@@ -43,7 +43,7 @@ run: mm1.d81 mm2.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm1.d81"
 	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm1.d81 -r runtime.raw
 
-debug_xemu: mm1.d81
+debug_xemu: mm1.d81 mm2.d81
 	@echo "--------------------------------------------------"
 	@echo "Starting Xemu..."
 	@echo "Make sure a tmux session named 'mmxemu' is running"
