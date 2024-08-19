@@ -37,9 +37,9 @@ export ETHLOAD_IP_PARAM
 
 .PHONY: all clean run debug_xemu doxygen
 
-all: mm1.d81
+all: mm1.d81 mm2.d81
 
-run: mm1.d81
+run: mm1.d81 mm2.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm1.d81"
 	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm1.d81 -r runtime.raw
 
@@ -63,9 +63,8 @@ runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
 mm1.d81: runtime.raw $(SAVE_FILES)
-	echo "creating new .d81 disk images..."; \
+	echo "creating  mm2.d81 disk image"; \
 	$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
-	$(C1541) -format "maniac mansion,m2" d81 mm2.d81; \
 	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0; \
 	for file in gamedata/disk1/*; do \
 		ext=$${file##*.}; \
@@ -76,6 +75,10 @@ mm1.d81: runtime.raw $(SAVE_FILES)
 			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file); \
 		fi; \
 	done; \
+
+mm2.d81:
+	echo "creating mm2.d81 disk image"; \
+	$(C1541) -format "maniac mansion,m2" d81 mm2.d81; \
 	for file in gamedata/disk2/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \

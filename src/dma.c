@@ -43,4 +43,23 @@ void dma_init(void)
 
 /** @} */ // dma_init
 
-//-----------------------------------------------------------------------------------------------
+
+/**
+  * @defgroup dma_public DMA Public Functions
+  * @{
+  */
+#pragma clang section text="code" rodata="cdata" data="data" bss="zdata"
+void dma_trigger(const void *dma_list)
+{
+
+  DMA.addrmsb      = MSB(dma_list);
+  DMA.etrig_mapped = LSB(dma_list);
+}
+
+void dma_trigger_global(void)
+{
+  DMA.addrmsb      = MSB(&global_dma);
+  DMA.etrig_mapped = LSB(&global_dma);
+}
+
+/** @} */ // dma_public

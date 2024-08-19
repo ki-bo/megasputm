@@ -162,15 +162,6 @@ enum {
 // code_init functions
 void dma_init(void);
 
-static inline void dma_trigger(const void *dma_list)
-{
-
-  DMA.addrmsb      = MSB(dma_list);
-  DMA.etrig_mapped = LSB(dma_list);
-}
-
-static inline void dma_trigger_global(void)
-{
-  DMA.addrmsb      = MSB(&global_dma);
-  DMA.etrig_mapped = LSB(&global_dma);
-}
+// code functions
+void dma_trigger(const void *dma_list);
+void dma_trigger_global(void);
