@@ -24,6 +24,7 @@
 #include "map.h"
 #include "memory.h"
 #include "sound.h"
+#include "vm.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -149,6 +150,13 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   
   MAP_CS_DISKIO
   diskio_continue_resource_loading(dest);
+
+  if (type == RES_TYPE_SCRIPT && id == 167) {
+    if (dest[0x129] == 0xa8 && dest[0x12a] == 67) {
+      dest[0x129] = 0x6e;
+      dest[0x12a] = 0x18;
+    }
+  }
 
 #ifdef HEAP_DEBUG_OUT  
   MAP_CS_MAIN_PRIV
