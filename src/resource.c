@@ -123,6 +123,10 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   SAVE_CS_AUTO_RESTORE
   
   if (type == RES_TYPE_SOUND) {
+    // we don't load sounds 6 and 63 as those are never used
+    if (id == 6 || id == 63) {
+      return 0;
+    }
     MAP_CS_SOUND
     if (sound_is_music_id(id)) {
       res_provide_music(id);
@@ -352,6 +356,10 @@ void res_deactivate_slot(uint8_t slot)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_MAIN_PRIV
   clear_flags(slot, RES_ACTIVE_MASK);
+  if ((page_res_type[slot] & RES_TYPE_MASK) == RES_TYPE_ROOM) {
+    //debug_out("free %d", page_res_index[slot]);
+    free_resource(slot);
+  }
 #ifdef HEAP_DEBUG_OUT
   //debug_out("Deactivating slot %d", slot);
   //print_heap();
