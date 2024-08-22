@@ -19,6 +19,9 @@
 
 #pragma once
 
+#include "vm.h"
+#include <stdint.h>
+
 #define INDEX_FILE_CHKS 0xdd69
 
 #define NUM_GAME_OBJECTS 780
@@ -30,3 +33,4 @@
 #define MAX_DISKS 2
 
 extern char disk_header[29];
+extern uint16_t index_lang_chks[LANG_COUNT];

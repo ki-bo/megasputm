@@ -30,6 +30,12 @@
 #define WATCHDOG_TIMEOUT     30
 
 enum {
+  LANG_EN,
+  LANG_DE,
+  LANG_COUNT
+};
+
+enum {
   // bits 0-2 reserved for process state
   PROC_STATE_FREE              = 0,
   PROC_STATE_RUNNING           = 1,
@@ -214,6 +220,7 @@ extern uint8_t          proc_table_cleanup_needed;
 extern uint8_t          active_script_slot;
 extern uint8_t          proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint8_t          proc_exec_count[NUM_SCRIPT_SLOTS];
+extern uint8_t          lang;
 extern uint8_t          room_res_slot;
 extern uint8_t          obj_page[MAX_OBJECTS];
 extern uint8_t          obj_offset[MAX_OBJECTS];

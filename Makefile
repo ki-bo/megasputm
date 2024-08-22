@@ -75,6 +75,13 @@ mm1.d81: runtime.raw $(SAVE_FILES)
 			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file); \
 		fi; \
 	done; \
+	echo "Copying save game files to disk image..."
+	for file in $(SAVE_FILES); do \
+		if [ -f "$$file" ]; then \
+			echo "Adding $$file to mm1.d81..."; \
+			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file),s; \
+		fi \
+	done
 
 mm2.d81:
 	echo "creating mm2.d81 disk image"; \

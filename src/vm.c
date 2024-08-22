@@ -31,6 +31,7 @@
 #include "resource.h"
 #include "script.h"
 #include "sound.h"
+#include "ui_strings.h"
 #include "util.h"
 #include "walk_box.h"
 #include <stdint.h>
@@ -62,6 +63,7 @@ struct vm vm_state;
 uint8_t reset_game;
 uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 uint8_t proc_exec_count[NUM_SCRIPT_SLOTS];
+uint8_t lang;
 
 volatile uint8_t script_watchdog;
 uint8_t ui_state;
@@ -193,6 +195,18 @@ void vm_init(void)
     VICII.ctrl1 = 0x1b;
     gfx_print_dialog(0x0e, "Loading 00.lfl (Amiga/EN) failed", 32);
     fatal_error(ERR_INDEX_LOAD_FAILED);
+  }
+
+  // init translated strings according to detected language of the index file
+  switch (lang) {
+    case LANG_EN:
+      init_strings_en();
+      break;
+    case LANG_DE:
+      init_strings_de();
+      break;
+    default:
+      fatal_error(ERR_LANG_NOT_SUPPORTED);
   }
 
   for (active_script_slot = 0; active_script_slot < NUM_SCRIPT_SLOTS; ++active_script_slot)
@@ -1045,6 +1059,7 @@ void vm_print_sentence(void)
   
   uint8_t preposition = vm_read_var8(VAR_SENTENCE_PREPOSITION);
   if (preposition) {
+    UNMAP_DS
     const char *preposition_name = get_preposition_name(preposition);
     if (preposition_name) {
       //debug_out("  Preposition name: %s", preposition_name);
@@ -1283,9 +1298,11 @@ uint8_t vm_load_game(uint8_t slot)
 void vm_handle_error_wrong_disk(uint8_t expected_disk)
 {
   SAVE_CS_AUTO_RESTORE
+  SAVE_DS_AUTO_RESTORE
+  UNMAP_DS
 
   char error_str[41];
-  sprintf(error_str, "Please Insert Disk %d.  Press RETURN", expected_disk);
+  sprintf(error_str, ui_strings[UI_STR_SWITCH_DISK], expected_disk);
 
   input_key_pressed = 0; // ack the latest key in the queue
   MAP_CS_GFX
@@ -1312,7 +1329,6 @@ void vm_handle_error_wrong_disk(uint8_t expected_disk)
 
   MAP_CS_GFX
   gfx_clear_dialog();
-  UNMAP_CS
 }
 
 /// @} // vm_public
@@ -1631,11 +1647,12 @@ static void handle_input(void)
     }
     else if (current_key_pressed == 0x20) {
       // handle space key, pause
-      static const char pause_str[] = "Game paused, press SPACE to continue.";
+      //static const char pause_str[] = "Game paused, press SPACE to continue.";
 
       input_key_pressed = 0; // ack the space key
       MAP_CS_GFX
-      gfx_print_interface_text(0, 18, pause_str, prev_sentence_highlighted ? TEXT_STYLE_HIGHLIGHTED : TEXT_STYLE_SENTENCE);
+      UNMAP_DS
+      gfx_print_interface_text(0, 18, ui_strings[UI_STR_PAUSED], prev_sentence_highlighted ? TEXT_STYLE_HIGHLIGHTED : TEXT_STYLE_SENTENCE);
       script_watchdog = WATCHDOG_TIMEOUT;
 
       while (1) {
@@ -2056,8 +2073,10 @@ static void select_verb(uint8_t verb_id)
 
 static const char *get_preposition_name(uint8_t preposition)
 {
-  static const char *prepositions_english[] = { NULL, "in", "with", "on", "to" };
-  return prepositions_english[preposition];
+  if (preposition == 0) {
+    return NULL;
+  }
+  return ui_strings[UI_STR_PREP_IN + preposition - 1];
 }
 
 static void update_inventory_interface()

@@ -206,6 +206,8 @@ static uint16_t text_style_to_color(enum text_style style);
 // private gfx helpscreen functions
 static void draw_helpscreen_border(void);
 static void print_helpscreen_text(uint8_t x, uint8_t y, const char *text, uint8_t color);
+static void print_helpscreen_en(void);
+static void print_helpscreen_de(void);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -1588,41 +1590,16 @@ void gfx_helpscreen(void)
 
   draw_helpscreen_border();
 
-  uint8_t y = 1;
-  uint8_t color1 = 0x02;
-  uint8_t color2 = 0x0d;
+  switch (lang) {
+    case LANG_DE:
+      print_helpscreen_de();
+      break;
+    default:
+      print_helpscreen_en();
+      break;
+  }
+  print_helpscreen_text(72,  23, "1.1-MM", 0x0d);
 
-  print_helpscreen_text(14, y, "MEGASPUTM - Graphic Adventure Engine for the MEGA65", color1);
-  y = 3;
-  print_helpscreen_text( 2, y  , "Coding:", color2);
-  print_helpscreen_text(15, y++, "Robert Steffens (kibo)", color1);
-  print_helpscreen_text( 2, y  , "Testers:", color2);
-  print_helpscreen_text(15, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
-  y += 2;
-  print_helpscreen_text( 2, y++, "Special Thanks:", color2);
-  print_helpscreen_text( 2, y++, "ScummVM Team - This project was made possible thanks to their extensive", color1);
-  print_helpscreen_text( 2, y++, "wiki and codebase, which provided invaluable insights into the details ", color1);
-  print_helpscreen_text( 2, y++, "of SCUMM games.", color1);
-  y = 12;
-  print_helpscreen_text( 2, y++, "Key Controls:", color2);
-  print_helpscreen_text( 2, y++, "F1,F3,F5     Select kid", color1);
-  print_helpscreen_text( 2, y++, "F8           Restart game", color1);
-  print_helpscreen_text( 2, y++, "F9           Load/save game", color1);
-  print_helpscreen_text( 2, y++, "ESC,STOP,F4  Skip cutscene", color1);
-  print_helpscreen_text( 2, y++, "<,>          Change text rate", color1);
-  print_helpscreen_text( 2, y++, "SPACE        Pause game", color1);
-  print_helpscreen_text( 2, y++, "RETURN       Execute sentence", color1);
-  y = 13;
-  print_helpscreen_text(40, y++, "Q,W,E,R,T   Select verb 1st row", color1);
-  print_helpscreen_text(40, y++, "A,S,D,F,G   Select verb 2nd row", color1);
-  print_helpscreen_text(40, y++, "Z,X,C,V,B   Select verb 3rd row", color1);
-  print_helpscreen_text(40, y++, "U,J         Scroll inventory up/down", color1); 
-  print_helpscreen_text(40, y++, "I,O         Upper left/right inventory", color1);
-  print_helpscreen_text(40, y++, "K,L         Lower left/right inventory", color1);
-  y += 2;
-  print_helpscreen_text(22, y++, "Port 1 - Mouse     Port 2 - Joystick", color1);
-  print_helpscreen_text( 2,  23, "github.com/ki-bo/megasputm", color2);
-  print_helpscreen_text(64,  23, "Version 1.0-MM", color2);
 
   ASCIIKEY = 0; // ack any keypress still pending
   for (;!ASCIIKEY;); // wait for new keypress
@@ -2041,6 +2018,84 @@ static void print_helpscreen_text(uint8_t x, uint8_t y, const char *text, uint8_
     *screen_ptr++ = *text++;
     *colram_ptr++ = colram_val;
   }
+}
+
+static void print_helpscreen_en(void)
+{
+  uint8_t y = 1;
+  const uint8_t color1 = 0x02;
+  const uint8_t color2 = 0x0d;
+
+  print_helpscreen_text(14, y, "MEGASPUTM - Graphic Adventure Engine for the MEGA65", color1);
+  y = 3;
+  print_helpscreen_text( 2, y  , "Coding:", color2);
+  print_helpscreen_text(15, y++, "Robert Steffens (kibo)", color1);
+  print_helpscreen_text( 2, y  , "Testers:", color2);
+  print_helpscreen_text(15, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
+  y += 2;
+  print_helpscreen_text( 2, y++, "Special Thanks:", color2);
+  print_helpscreen_text( 2, y++, "ScummVM Team - This project was made possible thanks to their extensive", color1);
+  print_helpscreen_text( 2, y++, "wiki and codebase, which provided invaluable insights into the details ", color1);
+  print_helpscreen_text( 2, y++, "of SCUMM games.", color1);
+  y = 12;
+  print_helpscreen_text( 2, y++, "Key Controls:", color2);
+  print_helpscreen_text( 2, y++, "F1,F3,F5     Select kid", color1);
+  print_helpscreen_text( 2, y++, "F8           Restart game", color1);
+  print_helpscreen_text( 2, y++, "F9           Load/save game", color1);
+  print_helpscreen_text( 2, y++, "ESC,STOP,F4  Skip cutscene", color1);
+  print_helpscreen_text( 2, y++, "<,>          Change text rate", color1);
+  print_helpscreen_text( 2, y++, "SPACE        Pause game", color1);
+  print_helpscreen_text( 2, y++, "RETURN       Execute sentence", color1);
+  y = 13;
+  print_helpscreen_text(40, y++, "Q,W,E,R,T   Select verb 1st row", color1);
+  print_helpscreen_text(40, y++, "A,S,D,F,G   Select verb 2nd row", color1);
+  print_helpscreen_text(40, y++, "Z,X,C,V,B   Select verb 3rd row", color1);
+  print_helpscreen_text(40, y++, "U,J         Scroll inventory up/down", color1); 
+  print_helpscreen_text(40, y++, "I,O         Upper left/right inventory", color1);
+  print_helpscreen_text(40, y++, "K,L         Lower left/right inventory", color1);
+  y += 2;
+  print_helpscreen_text(22, y++, "Port 1 - Mouse     Port 2 - Joystick", color1);
+  print_helpscreen_text( 2,  23, "github.com/ki-bo/megasputm", color2);
+  print_helpscreen_text(64,  23, "Version", color2);
+}
+
+static void print_helpscreen_de(void)
+{
+  uint8_t y = 1;
+  const uint8_t color1 = 0x02;
+  const uint8_t color2 = 0x0d;
+
+  print_helpscreen_text(14, y, "MEGASPUTM - Grafische Adventure-Engine f\x5br den MEGA65", color1);
+  y = 3;
+  print_helpscreen_text( 2, y  , "Programmierung:", color2);
+  print_helpscreen_text(18, y++, "Robert Steffens (kibo)", color1);
+  print_helpscreen_text( 2, y  , "Tester:", color2);
+  print_helpscreen_text(18, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
+  y += 2;
+  print_helpscreen_text( 2, y++, "Besonderer Dank an:", color2);
+  print_helpscreen_text( 2, y++, "Das ScummVM-Team - Dieses Projekt wurde durch das umfassende ScummVM-Wiki", color1);
+  print_helpscreen_text( 2, y++, "und den ScummVM-Quellcode erm\x7bglicht, die wertvolle Einblicke in die", color1);
+  print_helpscreen_text( 2, y++, "Details von SCUMM-Spielen lieferten.", color1);
+  y = 12;
+  print_helpscreen_text( 2, y++, "Steuerung:", color2);
+  print_helpscreen_text( 2, y++, "F1,F3,F5     Charakter ausw\x5chlen", color1);
+  print_helpscreen_text( 2, y++, "F8           Spiel neu starten", color1);
+  print_helpscreen_text( 2, y++, "F9           Spiel laden/speichern", color1);
+  print_helpscreen_text( 2, y++, "ESC,STOP,F4  Szene \x5b""berspringen", color1);
+  print_helpscreen_text( 2, y++, "<,>          Texttempo \x5cndern", color1);
+  print_helpscreen_text( 2, y++, "Leertaste    Spiel pausieren", color1);
+  print_helpscreen_text( 2, y++, "RETURN       Befehl ausf\x5bhren", color1);
+  y = 13;
+  print_helpscreen_text(40, y++, "Q,W,E,R,T  Verb 1. Reihe", color1);
+  print_helpscreen_text(40, y++, "A,S,D,F,G  Verb 2. Reihe", color1);
+  print_helpscreen_text(40, y++, "Z,X,C,V,B  Verb 3. Reihe", color1);
+  print_helpscreen_text(40, y++, "U,J        Inventar scrollen", color1); 
+  print_helpscreen_text(40, y++, "I,O        Inventar oben links/rechts", color1);
+  print_helpscreen_text(40, y++, "K,L        Inventar unten links/rechts", color1);
+  y += 2;
+  print_helpscreen_text(22, y++, "Port 1 - Maus     Port 2 - Joystick", color1);
+  print_helpscreen_text( 2,  23, "github.com/ki-bo/megasputm", color2);
+  print_helpscreen_text(64,  23, "Version", color2);
 }
 
 /** @} */ // gfx_private

@@ -113,7 +113,7 @@
                         (heap              (#x8000 . #x9fff))
                         (backbuffer-screen (#xa000 . #xb7ff))
                         (backbuffer-color  (#xb800 . #xbfff))
-                        (zdata             (#xe360 . #xf7ff))
+                        (zdata             (#xe380 . #xf7ff))
                         (cstack            (#xf800 . #xfff9))
                 )
         )
@@ -231,7 +231,7 @@
         ;;;; ********************************************
 
         ; memory holding code_main_private section (will be mapped to 0x3000 during execution)
-        (memory m0-3 (address (#xd000 . #xe35f))
+        (memory m0-3 (address (#xd000 . #xe37f))
                 (section
                         (bank0_d000 #xd000)
                         (data_sound #xe000)
