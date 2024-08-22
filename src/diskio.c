@@ -301,7 +301,14 @@ uint8_t diskio_load_index(void)
     index_chks += *ptr++;
   }
   
-  if (index_chks != INDEX_FILE_CHKS) {
+  uint8_t lang_idx = 0;
+  for (; lang_idx < LANG_COUNT; ++lang_idx) {
+    if (index_chks == index_lang_chks[lang_idx]) {
+      lang = lang_idx;
+      break;
+    }
+  }
+  if (lang_idx == LANG_COUNT) {
     release_drive();
     return 0;
   }
@@ -1831,6 +1838,7 @@ static void free_block(uint8_t track, uint8_t block)
   uint8_t block_idx = block / 8;
   uint8_t mask = 1 << (block % 8);
   bam_entry->block_usage[block_idx] |= mask;
+  bam_entry->num_free_blocks++;
 }
 
 /**
