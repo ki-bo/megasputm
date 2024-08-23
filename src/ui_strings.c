@@ -18,6 +18,7 @@
  */
 
 #include "ui_strings.h"
+#include "vm.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,6 +36,9 @@ void init_strings_en(void)
   ui_strings[UI_STR_PREP_TO]     = add_string("to");
   ui_strings[UI_STR_PAUSED]      = add_string("Game paused, press SPACE to continue.");
   ui_strings[UI_STR_SWITCH_DISK] = add_string("Please Insert Disk %d.  Press RETURN");
+  ui_strings[UI_STR_RESTART]     = add_string("Are you sure you want to restart? (y/n)");
+
+  restart_key_yes = 'y';
 }
 
 void init_strings_de(void)
@@ -45,6 +49,9 @@ void init_strings_de(void)
   ui_strings[UI_STR_PREP_TO]     = add_string("zu");
   ui_strings[UI_STR_PAUSED]      = add_string("PAUSE - Zum Spielen Leertaste dr\x5b""cken.");
   ui_strings[UI_STR_SWITCH_DISK] = add_string("Diskette %d einlegen.  Best\x5ctige EINGABE.");
+  ui_strings[UI_STR_RESTART]     = add_string("Wollen Sie neu starten? (j/n)");
+
+  restart_key_yes = 'j';
 }
 
 static char *add_string(const char *str)

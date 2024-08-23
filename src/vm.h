@@ -221,6 +221,7 @@ extern uint8_t          active_script_slot;
 extern uint8_t          proc_res_slot[NUM_SCRIPT_SLOTS];
 extern uint8_t          proc_exec_count[NUM_SCRIPT_SLOTS];
 extern uint8_t          lang;
+extern uint8_t          restart_key_yes;
 extern uint8_t          room_res_slot;
 extern uint8_t          obj_page[MAX_OBJECTS];
 extern uint8_t          obj_offset[MAX_OBJECTS];

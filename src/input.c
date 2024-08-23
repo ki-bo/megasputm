@@ -155,6 +155,7 @@ static void handle_joystick(void)
   old_joy1 = joy1;
 }
 
+#pragma clang section text="code_main_private" rodata="cdata_main_private" data="data_main_private"
 static void handle_mouse(void)
 {
   static uint8_t old_potx = 0;
@@ -175,8 +176,6 @@ static void handle_mouse(void)
     old_poty = poty;
   }
 }
-
-#pragma clang section text="code_main_private" rodata="cdata_main_private" data="data_main_private"
 
 static int8_t check_mouse_movement(uint8_t pot, uint8_t old_pot) 
 {

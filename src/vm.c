@@ -64,6 +64,7 @@ uint8_t reset_game;
 uint8_t proc_res_slot[NUM_SCRIPT_SLOTS];
 uint8_t proc_exec_count[NUM_SCRIPT_SLOTS];
 uint8_t lang;
+uint8_t restart_key_yes;
 
 volatile uint8_t script_watchdog;
 uint8_t ui_state;
@@ -1677,29 +1678,25 @@ static void handle_input(void)
     }
     else if (current_key_pressed == 8) {
       // handle restart key, ask user confirmation
-      static const char restart_str[] = "Are you sure you want to restart? (y/n)";
-
       input_key_pressed = 0; // ack the F8 restart key
 
       if (actor_talking != 0xff) {
         actor_stop_talking(actor_talking);
       }
       MAP_CS_GFX
-      gfx_print_dialog(2, restart_str, sizeof(restart_str) - 1);
+      UNMAP_DS
+      gfx_print_dialog(2, ui_strings[UI_STR_RESTART], strlen(ui_strings[UI_STR_RESTART]));
       script_watchdog = WATCHDOG_TIMEOUT;
       
       while (1) {
         if (input_key_pressed) {
-          if (input_key_pressed == 'y') {
+          if (input_key_pressed == restart_key_yes) {
             reset_game = RESET_RESTART;
             break;
           }
-          else if (input_key_pressed == 'n') {
+          else {
             wait_for_jiffy();  // this resets the elapsed jiffies timer
             break;
-          }
-          else {
-            input_key_pressed = 0;
           }
         }
       }
