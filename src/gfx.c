@@ -1135,12 +1135,16 @@ void gfx_print_dialog(uint8_t color, const char *text, uint8_t num_chars)
   gfx_clear_dialog();
   set_dialog_color(color);
 
+  uint8_t first_line = 1;
   __auto_type screen_ptr = FAR_U16_PTR(SCREEN_RAM);
   for (uint8_t i = 0; i < num_chars; ++i) {
     char c = text[i];
-    if (c == 1) {
+    if (c == 1 || (i == 40 && first_line)) {
       screen_ptr = FAR_U16_PTR(SCREEN_RAM) + CHRCOUNT;
-      continue;
+      first_line = 0;
+      if (c == 1) {
+        continue;
+      }
     }
     *screen_ptr++ = (uint16_t)c;
   }
