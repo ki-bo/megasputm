@@ -175,7 +175,6 @@ static dmalist_single_option_t dmalist_copy_gfx_dark[3];
 static dmalist_t dmalist_clear_dialog_screen;
 static dmalist_t dmalist_clear_actor_chars;
 static dmalist_three_options_no_3rd_arg_t dmalist_rle_strip_copy;
-static dmalist_two_options_no_2nd_arg_t dmalist_apply_masking;
 static dmalist_t dmalist_reset_rrb;
 static dmalist_t dmalist_clear_sentence;
 static dmalist_t dmalist_clear_verbs;
@@ -463,19 +462,6 @@ static void init_dma_lists(void)
     .count          = 0,
     .src_addr       = LSB16(UNBANKED_PTR(color_strip)),
     .src_bank       = BANK(UNBANKED_PTR(color_strip)),
-    .dst_addr       = 0x0000,
-    .dst_bank       = 0x00
-  };
-
-  dmalist_apply_masking = (dmalist_two_options_no_2nd_arg_t) {
-    .opt_token1     = 0x86,                   // transparent color handling
-    .opt_arg1       = 0x01,                   // transparent color
-    .opt_token2     = 0x07,                   // enable (7) or disable (6) transparent color handling
-    .end_of_options = 0x00,
-    .command        = DMA_CMD_COPY,
-    .count          = 0,
-    .src_addr       = 0x0000,
-    .src_bank       = 0x00,
     .dst_addr       = 0x0000,
     .dst_bank       = 0x00
   };
@@ -1419,9 +1405,7 @@ void gfx_draw_actor_cel(uint8_t xpos, uint8_t ypos, struct costume_cel *cel_data
 
 void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
 {
-  __auto_type next_char_data_save = next_char_data;
-  uint16_t num_bytes = check_next_char_data_wrap_around(actor_width, actor_height);
-  masking_char_data = (uint32_t)next_char_data;
+  __auto_type cur_char_data = (uint32_t)actor_char_data;
 
   uint8_t  cur_x    = 0;
   uint8_t  cur_y    = 0;
@@ -1431,18 +1415,19 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
   decode_single_mask_column(i16_div_by_8(xpos), ypos, actor_height);
   mask >>= xpos & 7;
   dmalist_rle_strip_copy.count = actor_height;
-  dmalist_rle_strip_copy.opt_token3 = 0x06; // disable transparent color handling
+  dmalist_rle_strip_copy.opt_token3 = 0x07; // enable transparent color handling
+  dmalist_rle_strip_copy.opt_arg2   = 0x01; // transparent color
 
   do {
     color_strip[cur_y] = (masking_column[cur_y] & mask) ? 0x00 : 0x01;
     ++cur_y;
     if (cur_y == actor_height) {
-      dmalist_rle_strip_copy.dst_addr = LSB16(next_char_data);
-      dmalist_rle_strip_copy.dst_bank = BANK(next_char_data);
+      dmalist_rle_strip_copy.dst_addr = LSB16(cur_char_data);
+      dmalist_rle_strip_copy.dst_bank = BANK(cur_char_data);
       dma_trigger(&dmalist_rle_strip_copy);
-      ++next_char_data;
-      if ((((uint8_t)next_char_data) & 0x07) == 0) {
-        next_char_data += col_incr;
+      ++cur_char_data;
+      if ((((uint8_t)cur_char_data) & 0x07) == 0) {
+        cur_char_data += col_incr;
       }
       ++cur_x;
       cur_y = 0;
@@ -1454,16 +1439,6 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking)
     }
   }
   while (cur_x != actor_width);
-
-  // copy the masking data over the actor char data
-  dmalist_apply_masking.count    = num_bytes;
-  dmalist_apply_masking.src_addr = LSB16(masking_char_data);
-  dmalist_apply_masking.src_bank = BANK(masking_char_data);
-  dmalist_apply_masking.dst_addr = LSB16(actor_char_data);
-  dmalist_apply_masking.dst_bank = BANK(actor_char_data);
-  dma_trigger(&dmalist_apply_masking);
-
-  next_char_data = next_char_data_save;
 }
 
 /**
