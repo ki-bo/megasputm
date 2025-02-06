@@ -23,7 +23,7 @@
 #include "error.h"
 #include "map.h"
 #include "memory.h"
-#include "sound.h"
+//#include "sound.h"
 #include "vm.h"
 #include <stdint.h>
 #include <string.h>
@@ -122,7 +122,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
   SAVE_CS_AUTO_RESTORE
   
-  if (type == RES_TYPE_SOUND) {
+  /*if (type == RES_TYPE_SOUND) {
     // we don't load sounds 6 and 63 as those are never used
     if (id == 6 || id == 63) {
       return 0;
@@ -130,6 +130,12 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
     MAP_CS_SOUND
     if (sound_is_music_id(id)) {
       res_provide_music(id);
+      return 0;
+    }
+  }*/
+
+  if (type == RES_TYPE_C64SOUND) {
+    if (id < 6) {
       return 0;
     }
   }
@@ -146,6 +152,10 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   MAP_CS_DISKIO
   uint16_t chunk_size = diskio_start_resource_loading(type, id);
   //debug_out("Loading resource type %d id %d, size %d", type, id, chunk_size);
+
+  if (chunk_size == 0) {
+    return 0;
+  }
  
   MAP_CS_MAIN_PRIV
   uint8_t num_pages = (chunk_size + 255) / 256;
@@ -170,7 +180,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   return allocated_page;
 }
 
-void res_provide_music(uint8_t id)
+/*void res_provide_music(uint8_t id)
 {
   if (music_res_loaded == id) {
     return;
@@ -180,7 +190,7 @@ void res_provide_music(uint8_t id)
   uint16_t chunk_size = diskio_start_resource_loading(RES_TYPE_SOUND, id);
   diskio_continue_resource_loading(HUGE_U8_PTR(MUSIC_DATA));
   music_res_loaded = id;
-}
+}*/
 
 /**
   * @brief Deactivates all resources in memory

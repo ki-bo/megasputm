@@ -108,8 +108,10 @@ static struct {
   uint8_t script_room[NUM_SCRIPTS];
   uint16_t script_offset[NUM_SCRIPTS];
 
-  uint8_t sound_room[NUM_SOUNDS];
-  uint16_t sound_offset[NUM_SOUNDS];
+  //uint8_t sound_room[NUM_SOUNDS];
+  //uint16_t sound_offset[NUM_SOUNDS];
+
+  uint16_t c64sound_offset[70];
 } lfl_index;
 
 struct bam_entry {
@@ -135,6 +137,10 @@ static uint8_t enable_prompt_for_disk_change;
 static uint8_t room_list_disk_num;
 static uint8_t room_track_list[54];
 static uint8_t room_block_list[54];
+
+static uint8_t room90_track_list[2];
+static uint8_t room90_block_list[2];
+
 static uint8_t current_track;
 static uint8_t last_disk;
 static uint8_t last_physical_track;
@@ -163,7 +169,7 @@ static dmalist_two_options_t   dmalist_copy_to_cache;
 // Private init functions
 static void init_dma_lists(void);
 static uint8_t read_next_directory_block(uint8_t disk_num);
-static uint8_t read_lfl_file_entry(void);
+static uint8_t read_lfl_file_entry(uint8_t disk_num);
 static void invalidate_disk_cache(void);
 
 // Private disk I/O functions
@@ -233,6 +239,9 @@ void diskio_init(void)
   memset(room_track_list, 0, sizeof(room_track_list));
   memset(room_block_list, 0, sizeof(room_block_list));
 
+  memset(room90_track_list, 0, sizeof(room90_track_list));
+  memset(room90_block_list, 0, sizeof(room90_block_list));
+
   prepare_drive();
   while (!(FDC.status & FDC_TK0_MASK)) {
     // not yet on track 0, so step outwards
@@ -282,9 +291,68 @@ uint8_t diskio_load_index(void)
       *address = FDC.data ^ 0xff;
       ++address;
       --num_bytes_expected;
+
+      //if (num_bytes_expected == 0) {
+        //break;
+      //}
+
       if (num_bytes_expected == 0 && (next_track != 0 || bytes_left_in_block != 0)) {
           release_drive();
           return 0;
+      }
+    }
+  }
+
+  if (num_bytes_expected != 0) {
+    release_drive();
+    return 0;
+  }
+
+  next_track = room90_track_list[0];
+  next_block = room90_block_list[0];
+  num_bytes_expected = 70 * 2;
+  uint8_t soundNo = 0;
+  uint16_t offset = 0;
+
+  if (next_track != 0) {
+    load_block(0, next_track, next_block);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    if (next_track == 0) {
+      bytes_left_in_block = next_block - 1;
+    }
+    else {
+      bytes_left_in_block = 254;
+    }
+
+    FDC.data;
+    FDC.data;
+    FDC.data;
+    FDC.data;
+    
+    bytes_left_in_block -= 4;
+
+    while (next_track != 0 && num_bytes_expected != 0) {
+      if (bytes_left_in_block == 0) {
+        load_block(0, next_track, next_block);
+        next_track = FDC.data;
+        next_block = FDC.data;
+        if (next_track == 0) {
+          bytes_left_in_block = next_block - 1;
+        }
+        else {
+          bytes_left_in_block = 254;
+        }
+      }
+
+      while (bytes_left_in_block-- != 0) {
+        offset = (FDC.data ^ 0xff) | ((FDC.data ^ 0xff) << 8);
+        lfl_index.c64sound_offset[soundNo++] = offset;
+        num_bytes_expected -= 2; 
+
+        if (num_bytes_expected == 0) {
+          break;
+        }
       }
     }
   }
@@ -326,10 +394,10 @@ uint8_t diskio_load_index(void)
     lfl_index.script_room[i] = lfl_index_file_contents.script_room[i];
     lfl_index.script_offset[i] = lfl_index_file_contents.script_offset[i];
   }
-  for (uint8_t i = 0; i < sizeof(lfl_index.sound_room); ++i) {
+  /*for (uint8_t i = 0; i < sizeof(lfl_index.sound_room); ++i) {
     lfl_index.sound_room[i] = lfl_index_file_contents.sound_room[i];
     lfl_index.sound_offset[i] = lfl_index_file_contents.sound_offset[i];
-  }
+  }*/
 
   release_drive();
   return 1;
@@ -595,8 +663,19 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
       offset = lfl_index.script_offset[id];
       break;
     case RES_TYPE_SOUND:
-      room_id = lfl_index.sound_room[id];
-      offset = lfl_index.sound_offset[id];
+      //room_id = lfl_index.sound_room[id];
+      //offset = lfl_index.sound_offset[id];
+      return 0;
+
+      break;
+    case RES_TYPE_C64SOUND:
+      room_id = 90;
+      offset = lfl_index.c64sound_offset[id];
+
+      if (offset == 0) {
+        return 0;
+      }
+
       break;
   }
 
@@ -605,22 +684,71 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   }
 
   // debug_out("res t%d i%d r%d t%d b%d", type, id, room_id, room_track_list[room_id], room_block_list[room_id]);
+  
+  uint8_t trackNo, blockNo;
+
+  if  (room_id == 90) {
+    if (room_list_disk_num > 1) {
+      check_and_prompt_for_disk(0);
+
+      read_directory(0);
+      if (room90_track_list[0] == 0) {
+        disk_error(ERR_LFL_FILE_NOT_FOUND);
+      }
+    }
+
+    // the requested file is on the current disk
+    /*load_block(current_disk, room90_track_list[current_disk], room90_block_list[current_disk]);
+    next_track = FDC.data;
+    next_block = FDC.data;
+    cur_block_read_ptr = 0;
+
+    seek_to(offset);
+    uint8_t chunksize_low = FDC.data ^ 0xff;
+    ++cur_block_read_ptr;
+    if (cur_block_read_ptr == 254) {
+      load_block(current_disk, next_track, next_block);
+      next_track = FDC.data;
+      next_block = FDC.data;
+      cur_block_read_ptr = 0;
+    }
+    uint8_t chunksize_high = FDC.data ^ 0xff;
+    cur_chunk_size = make16(chunksize_low, chunksize_high);
+    ++cur_block_read_ptr;
+
+    return cur_chunk_size;*/
+
+    trackNo = room90_track_list[room_list_disk_num];
+    blockNo = room90_block_list[room_list_disk_num];
+
+    if (offset == 0 || trackNo == 0 || blockNo == 0 || room_list_disk_num > 1) {
+      while(1) {
+        *(volatile uint8_t *)0xd020 = *(volatile uint8_t *)0xd020 + 1;
+      }
+    }
+
+  } else {
 
   // check whether requested file is on current disk
-  if (room_track_list[room_id] == 0) {
-    // it is not available, determine needed disk number and prompt for disk
-    uint8_t disk_num = lfl_index.room_disk_num[room_id] - 0x31;
-    if (disk_num >= MAX_DISKS) {
-      disk_error(ERR_DISK_NUM_OUT_OF_RANGE);
-    }
-    read_directory(disk_num);
     if (room_track_list[room_id] == 0) {
-      disk_error(ERR_LFL_FILE_NOT_FOUND);
+      // it is not available, determine needed disk number and prompt for disk
+      uint8_t disk_num = lfl_index.room_disk_num[room_id] - 0x31;
+      if (disk_num >= MAX_DISKS) {
+        disk_error(ERR_DISK_NUM_OUT_OF_RANGE);
+      }
+      read_directory(disk_num);
+      if (room_track_list[room_id] == 0) {
+        disk_error(ERR_LFL_FILE_NOT_FOUND);
+      }
     }
+
+    trackNo = room_track_list[room_id];
+    blockNo = room_block_list[room_id];
   }
 
   // the requested file is on the current disk
-  load_block(room_list_disk_num, room_track_list[room_id], room_block_list[room_id]);
+  //load_block(room_list_disk_num, room_track_list[room_id], room_block_list[room_id]);
+  load_block(room_list_disk_num, trackNo, blockNo);
   next_track = FDC.data;
   next_block = FDC.data;
   cur_block_read_ptr = 0;
@@ -637,6 +765,8 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   uint8_t chunksize_high = FDC.data ^ 0xff;
   cur_chunk_size = make16(chunksize_low, chunksize_high);
   ++cur_block_read_ptr;
+
+  
 
   return cur_chunk_size;
 }
@@ -1092,7 +1222,7 @@ static uint8_t read_next_directory_block(uint8_t disk_num)
   uint8_t next_track = FDC.data;
   uint8_t next_block = FDC.data;
   for (uint8_t i = 0; i < 8; ++i) {
-    uint8_t skip = 32 - read_lfl_file_entry();
+    uint8_t skip = 32 - read_lfl_file_entry(disk_num);
     for (uint8_t j = 0; j < skip; ++j) {
       FDC.data;
     }
@@ -1121,7 +1251,7 @@ static uint8_t read_next_directory_block(uint8_t disk_num)
   *
   * @return The number of bytes actually read from the sector buffer
   */
-static uint8_t read_lfl_file_entry()
+static uint8_t read_lfl_file_entry(uint8_t disk_num)
 {
   uint8_t i = 1;
   uint8_t tmp;
@@ -1166,9 +1296,17 @@ static uint8_t read_lfl_file_entry()
     }
   }
 
+  //dengland We should ensure that the room_number is not greater than the number of rooms
+  //except for 90.
+
   // all checks passed, we found a valid xx.lfl file with xx being the room number
-  room_track_list[room_number] = file_track;
-  room_block_list[room_number] = file_block;
+  if (room_number == 90) {
+    room90_track_list[disk_num] = file_track;
+    room90_block_list[disk_num] = file_block;
+  } else {
+    room_track_list[room_number] = file_track;
+    room_block_list[room_number] = file_block;
+  }
 
   return i;
 }

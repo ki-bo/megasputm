@@ -17,6 +17,8 @@
  *
  */
 
+#if 0
+
 #include "sound.h"
 #include "dma.h"
 #include "index.h"
@@ -1372,3 +1374,5 @@ static void update_pitchbend_loop(struct sound_slot *slot)
 
 
 /// @} // sound_private
+
+#endif

@@ -25,6 +25,7 @@ enum res_type_t {
     RES_TYPE_COSTUME,
     RES_TYPE_SCRIPT,
     RES_TYPE_SOUND,
+    RES_TYPE_C64SOUND,
     RES_TYPE_HEAP
 };
 

@@ -28,7 +28,7 @@
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
-#include "sound.h"
+#include "c64sound.h"
 #include "vm.h"
 #include <string.h>
 #include <stdint.h>
@@ -634,7 +634,8 @@ static void raster_irq ()
         :
         : "a", "x", "y", "z");
 
-  sound_process();
+  //sound_process();
+  c64_sound_update();
 
   VICIV.irr = VICIV.irr; // ack interrupt
 

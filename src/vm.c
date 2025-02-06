@@ -30,7 +30,8 @@
 #include "memory.h"
 #include "resource.h"
 #include "script.h"
-#include "sound.h"
+//#include "sound.h"
+#include "c64sound.h"
 #include "ui_strings.h"
 #include "util.h"
 #include "walk_box.h"
@@ -272,7 +273,9 @@ __task void vm_mainloop(void)
       reset_game = 0;
       UNMAP_ALL
       MAP_CS_SOUND
-      sound_reset();
+      //sound_reset();
+      c64_stopAllSounds();
+
       MAP_CS_GFX
       gfx_fade_out();
       gfx_clear_bg_image();
@@ -304,8 +307,14 @@ __task void vm_mainloop(void)
 
     MAP_CS_DISKIO
     diskio_check_motor_off(elapsed_jiffies);
-    MAP_CS_SOUND
-    sound_stop_finished_slots();
+    
+
+    
+    //MAP_CS_SOUND
+    //sound_stop_finished_slots();
+    
+    
+    
     UNMAP_CS
 
     proc_table_cleanup_needed = 0;
@@ -359,7 +368,11 @@ __task void vm_mainloop(void)
     MAP_CS_MAIN_PRIV
     update_camera();
     UNMAP_CS
-    sound_handle_play_triggers();
+
+
+    //sound_handle_play_triggers();
+    c64_sound_handle_play_triggers();
+
 
     if (last_selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
       if (last_selected_actor != 0xff) { // makes sure inventory pos is kept when loading a savegame
@@ -1284,7 +1297,8 @@ uint8_t vm_load_game(uint8_t slot)
   res_free_heap(heap_slot);
 
   MAP_CS_SOUND
-  sound_reset();
+  //sound_reset();
+  c64_stopAllSounds();
 
   load_room(vm_read_var8(VAR_SELECTED_ROOM));
 

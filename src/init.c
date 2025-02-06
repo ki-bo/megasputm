@@ -26,7 +26,8 @@
 #include "input.h"
 #include "inventory.h"
 #include "map.h"
-#include "sound.h"
+//#include "sound.h"
+#include "c64sound.h"
 #include "util.h"
 #include "resource.h"
 #include "script.h"
@@ -63,7 +64,12 @@ void global_init(void)
   // load and init sound module
   MAP_CS_DISKIO
   diskio_load_file(0, "M13", (uint8_t __far *)(0x16000)); // load sound code
-  sound_init();
+  
+  
+  //sound_init();
+  c64_sound_init();
+
+
 
   // init input module
   input_init();

@@ -6,15 +6,15 @@ LN = ln6502
 
 CONFIG ?= default
 
-SAVE_FILES = $(wildcard mm.sav.*)
+SAVE_FILES = $(wildcard savegames/mm.sav.*)
 
 CC_FLAGS  = --target=mega65 --code-model=plain -O2 -Werror --no-cross-call --strong-inline --inline-on-matching-custom-text-section --no-interprocedural-cross-jump --list-file=$(@:%.o=%.lst)
 DEP_FLAGS = -MMD -MP
 ASM_FLAGS = --target=mega65 --list-file=$(@:%.o=%.lst)
 LN_FLAGS  = --target=mega65 mega65-mm.scm --verbose --raw-multiple-memories --cstartup=mm --rtattr exit=simplified --rtattr printf=nofloat --output-format=raw --list-file=mm-mega65.lst
 
-ETHLOAD   = etherload.osx
-M65FTP    = mega65_ftp.osx
+ETHLOAD   = etherload
+M65FTP    = mega65_ftp
 C1541     = c1541
 XMEGA65   = /Applications/Xemu/xmega65.app/Contents/MacOS/xmega65
 
