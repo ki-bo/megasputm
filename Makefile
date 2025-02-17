@@ -63,7 +63,7 @@ runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS) -o $@ $(filter-out mega65-mm.scm,$^)
 
 mm1.d81: runtime.raw $(SAVE_FILES)
-	echo "creating  mm2.d81 disk image"; \
+	echo "creating  mm1.d81 disk image"; \
 	$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
 	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0; \
 	for file in gamedata/disk1/*; do \
@@ -101,4 +101,4 @@ doxygen:
 
 clean:
 	-rm -rf obj
-	-rm *.raw *.d mm-mega65.lst mm1.d81 mm2.d81
+	-rm *.raw mm-mega65.lst mm1.d81 mm2.d81

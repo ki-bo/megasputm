@@ -644,6 +644,9 @@ void actor_stop_talking(uint8_t actor_id)
 {
   if (actor_id != 0xff) {
     uint8_t local_id = actors.local_id[actor_id];
+    if (local_id == 0xff) {
+      return;
+    }
     actor_start_animation(local_id, ANIM_MOUTH_SHUT + actors.dir[actor_id]);
   }
   else {
