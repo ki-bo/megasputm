@@ -27,6 +27,7 @@ void updateCheckGlyph(void) {
     0b00000000
   };
 
+
   uint16_t offnrm = 0x7A * 8;
   uint16_t offrev = (0x7A + 128) * 8;
 
