@@ -258,7 +258,7 @@ judePage_t pge_mmsetup_welcome = {
 		0x0000,
 		0x0a,
 		NEARTOEVENTPTR(judeDefPgePresent),
-		EVENTPTRNULLREC,
+		NEARTOEVENTPTR(mmsetupWelcPgeKeypress),
 		NEARTOFARPTRREC(&vew_mmsetup_main),
 		CLR_INSET,
 		0,

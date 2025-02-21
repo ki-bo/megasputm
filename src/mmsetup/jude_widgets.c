@@ -282,23 +282,23 @@ void judeLBxChange(void) {
 		}
 
 		if  (self->_control._element._object.state & STATE_DOWN) {
-      uint8_t btns = (self->linesoff > self->_control._element.height) ?
-          (self->linescnt > self->_control._element.height + 1) ? 2 : 1 : 0;
+      uint8_t btns = (self->linesoff >= self->_control._element.height) ?
+          (self->linescnt > (self->_control._element.height * 2) - 2) ? 2 : 1 : 0;
 
 			h = (self->_control._element.height - btns);
 
 			if  ((self->linesoff > 0) && (self->hotline == 0)) {
-				if  ((self->linesoff - h) < 0)
+				if  ((self->linesoff - h) <= 0)
 					self->linesoff = 0;
 				else 
-					self->linesoff-= h;
+					self->linesoff-= h + 1;
 				flg = 0;
 			} else if ((self->hotline == (self->_control._element.height - 1)) && 
                  ((self->linescnt - self->linesoff) > h)) {
 				if ((self->linesoff + h) > self->linescnt)
-					self->linesoff = self->linescnt - h;
+					self->linesoff = self->linescnt - h - 1;
 				else
-					self->linesoff+= h;
+					self->linesoff+= h - 1;
 
 				flg = 0;
 			}

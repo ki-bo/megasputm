@@ -7,6 +7,7 @@
 
 #include "mmsetup_core.h"
 #include "hdos.h"
+#include <stdint.h>
 
 
 
@@ -385,5 +386,21 @@ void mmsetupWelcExitChg(void) {
     *(uint8_t *)(0xd07a) = *(uint8_t *)(0xd07a) & (!0x10);
 
     hdos_restart();
+  }
+}
+
+void mmsetupWelcPgeKeypress(void) {
+  uint32_t keypress = _zkarljr2.valkey;
+
+  uint8_t mod = (keypress & 0xff00) >> 8;
+  uint8_t key = (keypress & 0x00ff);
+
+  //while(1) {
+    //__asm(" inc 0xd020 ");
+  //}
+
+
+  if ((mod == 5) && (key == 87)) {
+    judeSetTheme(7);
   }
 }
