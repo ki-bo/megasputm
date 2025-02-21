@@ -401,7 +401,14 @@ void mmsetupWelcPgeKeypress(void) {
   uint8_t mod = (keypress & 0xff00) >> 8;
   uint8_t key = (keypress & 0x00ff);
 
-  if ((mod == 5) && (key == 87)) {
+  if ((mod == 5) && (key == 75)) {
+    kernal_get_status();
+
+    while(1) {
+      __asm(" inc 0xd020 ");
+    }
+  }
+  else if ((mod == 5) && (key == 87)) {
     judeSetTheme(7);
 
     ctl_mmsetup_welc_1_2.text_p = (karlFarPtr_t)judeGetThemeDesc();

@@ -25,6 +25,8 @@ procstate_t procstate = PROCST_IDLE;
 
 uint8_t procAbort = 0;
 uint8_t procContinue = 0;
+uint8_t procError = 0;
+
 uint8_t outputDisk;
 uint8_t newDisk = 0;
 uint8_t roomidx;
@@ -83,9 +85,9 @@ procbehaviour_t proc_behaviours[] = {
 }; 
 
 char adfFileName[65];
-char lflfilename[] = "@:00.LFL,S,W";
+char lflfilename[] = "00.LFL,S,W";
 char lflfileadf[] = "00.LFL";
-char __huge str_filesize[] = "                    ";
+char str_filesize[] = "                    ";
 
 struct Device *dev;
 struct Volume *vol;
@@ -104,6 +106,9 @@ uint8_t __huge *procOutput;
 extern uint16_t mouseXPos;
 extern uint16_t mouseYPos;
 extern uint8_t kernal_get_last_error(void);
+extern void _prepareKernalWrite(void);
+extern void _performKernalWrite(void);
+extern void _finishKernalWrite(void);
 
 
 int16_t new_x;
@@ -255,52 +260,36 @@ void writetwodecimalstr(char *buf, uint8_t pos, uint8_t value) {
   buf[pos+1] = ones;
 }
 
-void writesixdecimalstr(char __huge *buf, uint8_t pos, uint32_t value) {
-  uint32_t residual = (value > 999999) ? 0 : value;
+uint32_t places[] = {
+  100000,
+   10000,
+    1000,
+     100,
+      10,
+       1
+};
 
-  uint8_t hunthou = residual / 100000;
-  residual -= hunthou * 100000;
-  hunthou += 0x30;
+void writesixdecimalstr(char *buf, uint8_t pos, uint32_t value) {
+  uint32_t residual = (value > 999999L) ? 0 : value;
+  uint8_t  values[6];
 
-  uint8_t tenthou = residual / 10000;
-  residual -= tenthou * 10000;
-  tenthou += 0x30;
+  for (uint8_t i = 0; i < 6; i++) {
+    values[i] = (uint8_t)(residual / places[i]);
+    residual -= (uint32_t)values[i] * places[i];
+  }
 
-  uint8_t onethou = residual / 1000;
-  residual -= onethou * 1000;
-  onethou += 0x30;
-
-  uint8_t onehun = residual / 100;
-  residual -= onehun * 100;
-  onehun += 0x30;
-
-  uint8_t tens = (residual / 10);
-  residual -= tens * 10;
-  tens += 0x30;
-
-  uint8_t ones = residual;
-  ones += 0x30;
-
-  uint8_t out = pos;
-
-  uint8_t haveout = (hunthou != 0x30) ? 1 : 0;
-  buf[out++] = (haveout) ? hunthou : 0x20;
-
-  haveout = (haveout || tenthou != 0x30) ? 1 : 0;
-  buf[out++] = (haveout) ? tenthou : 0x20;
-
-  haveout = (haveout || onethou != 0x30) ? 1 : 0;
-  buf[out++] = (haveout) ? onethou : 0x20;
-
-  haveout = (haveout || onehun != 0x30) ? 1 : 0;
-  buf[out++] = (haveout) ? onehun : 0x20;
-
-  haveout = (haveout || tens != 0x30) ? 1 : 0;
-  buf[out++] = (haveout) ? tens : 0x20;
-
-  buf[out] = ones;
+  uint8_t doout = 0;
+  uint8_t idx = pos;
+  for (uint8_t i = 0; i < 6; i++) {
+    doout = doout || (values[i] > 0) || (i == 5);
+    if (doout) {
+      buf[idx] = values[i] + 0x30;
+    } else {
+      buf[idx] = 0x20;
+    }
+    idx++;
+  }
 }
-
 
 void prepareLFLFileName(uint8_t roomno) {
   //uint8_t tens = (roomno / 10);
@@ -309,7 +298,7 @@ void prepareLFLFileName(uint8_t roomno) {
 
   //lflfilename[2] = tens;
   //lflfilename[3] = ones;
-  writetwodecimalstr(lflfilename, 2, roomno);
+  writetwodecimalstr(lflfilename, 0, roomno);
   
   //lflfileadf[0] = tens;
   //lflfileadf[1] = ones;
@@ -339,15 +328,28 @@ void performKernalScatchAllRooms(void) {
   );
 };
 
+void performKernalValidate(void) {
+  __asm(
+    " .extern _performKernalValidate \n"
+    //"   lda %[dn] \n"
+    "   jsr _performKernalValidate \n"
+    :
+    : 
+    : __REGA, __REGX, __REGY, __REGZ
+  );
+};
 
-void prepareKernalWrite(char *filename) {
+
+
+void prepareKernalWrite(char *filename, uint8_t len) {
   __asm(
     " .extern _prepareKernalWrite \n"
-    "   lda %[fn] \n"
-    "   ldx %[fn] + 1 \n"
+    "   lda %[ln] \n"
+    "   ldx %[fn] \n"
+    "   ldy %[fn] + 1 \n"
     "   jsr _prepareKernalWrite \n"
     :
-    : [fn] __KZ16 (filename)
+    : [fn] __KZ16 (filename), [ln] __KZ08 (len)
     : __REGA, __REGX, __REGY, __REGZ
   );
 }
@@ -539,6 +541,15 @@ void initiateProcess(void) {
 
   writeToProcOutput("PROCESSING...");
 
+  ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)0;
+  zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_6);
+  karlObjIncludeState(STATE_DIRTY);
+
+  ctl_mmsetup_proc_0_10.text_p = (karlFarPtr_t)0;
+  ctl_mmsetup_proc_0_10._element.colour = CLR_TEXT;
+  zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_10);
+  karlObjIncludeState(STATE_DIRTY);
+
   zptrself = (uint32_t)((karlObject_t __huge *)&lbx_mmsetup_proc_0_11);
   karlObjExcludeState(STATE_ENABLED);
   karlObjIncludeState(STATE_CHANGED);
@@ -562,6 +573,7 @@ void initiateProcess(void) {
 
   procAbort = 0;
   procContinue = 0;
+  procError = 0;
   process = PROC_CONFIGURE;
   procstate = PROCST_IDLE;
 
@@ -613,6 +625,17 @@ void updateProcess(void) {
   if (process ==  PROC_COMPLETE) {
     writeToProcOutput("COMPLETE");
 
+    if (procError) {
+      ctl_mmsetup_proc_0_10.text_p = (karlFarPtr_t)str_mmsetup_proc_9;
+      ctl_mmsetup_proc_0_10._element.colour = CLR_SYSS_TEXT | 0x0A;
+    } else {
+      ctl_mmsetup_proc_0_10.text_p = (karlFarPtr_t)str_mmsetup_proc_10;
+      ctl_mmsetup_proc_0_10._element.colour = CLR_TEXT;
+    }
+
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_10);
+    karlObjIncludeState(STATE_DIRTY);
+
     zptrself = (uint32_t)((karlObject_t __huge *)&lbx_mmsetup_proc_0_11);
     karlObjIncludeState(STATE_ENABLED);
 
@@ -635,6 +658,8 @@ void updateProcess(void) {
 
     judeActivateCtrl();
 
+    judeSetPointer(MPTR_NORMAL);
+
     process = PROC_NONE;
   } else if (process != PROC_NONE) {
     void (* behaviour)(void) = proc_behaviours[process][procstate];
@@ -646,6 +671,15 @@ void updateProcess(void) {
       process = PROC_NONE;
     }
   }
+}
+
+void processError(char *reason) {
+  process = PROC_COMPLETE;
+  procstate = PROCST_IDLE;
+
+  procError = 1;
+
+  writeToProcOutput(reason);
 }
 
 
@@ -712,17 +746,18 @@ void behaviourConfigWait(void) {
 
     if (hdos_set_filename(adfFileName)) {
       writeToProcOutput(adfFileName);
-      writeToProcOutput("SETNAME D81 ERROR");
-      //outputDisk++;
-      process = PROC_COMPLETE;
-      procstate = PROCST_IDLE;
+      
+      processError("SETNAME D81 ERROR");
+      //writeToProcOutput("SETNAME D81 ERROR");
+      //process = PROC_COMPLETE;
+      //procstate = PROCST_IDLE;
       return;
     } else if (hdos_attachD810()) {
       writeToProcOutput(adfFileName);
-      writeToProcOutput("MOUNT D81 ERROR");
-      //outputDisk++;
-      process = PROC_COMPLETE;
-      procstate = PROCST_IDLE;
+      processError("MOUNT D81 ERROR");
+      //writeToProcOutput("MOUNT D81 ERROR");
+      //process = PROC_COMPLETE;
+      //procstate = PROCST_IDLE;
       return;
     } else {    
       performKernalHeaderChange(outputDisk + 1);
@@ -730,6 +765,9 @@ void behaviourConfigWait(void) {
       if (configProcFlags & PROCFL_EXTRACT) {
         performKernalScatchAllRooms();
       }
+
+      performKernalValidate();
+
       procstate = PROCST_INIT;
       newDisk = 0;
       return;
@@ -751,6 +789,8 @@ void behaviourConfigWait(void) {
       performKernalScatchAllRooms();
     }
 
+    performKernalValidate();
+
     newDisk = 0;
     procstate = PROCST_INIT;
     procContinue = 0;
@@ -766,7 +806,7 @@ void behaviourBuildIdle(void) {
 
 void behaviourBuildInit(void) {
   if (!haveRoom90) {
-    writeToProcOutput("BUILD READ D64 IMAGES");
+    writeToProcOutput("BUILD   READ  D64 IMAGES");
     judeSetPointer(MPTR_WAIT);
 
     procstate = PROCST_READ;
@@ -782,13 +822,13 @@ void behaviourBuildInit(void) {
     zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
     karlObjIncludeState(STATE_DIRTY);
   
-    writeToProcOutput("BUILD WRITE 90.LFL");
+    writeToProcOutput("BUILD   WRITE 90.LFL");
 
     zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
     progressResetMax(file_size);
   
     prepareLFLFileName(90);
-    prepareKernalWrite(lflfilename);
+    prepareKernalWrite(lflfilename, 10);
 
     procstate = PROCST_WRITE;
   }
@@ -802,7 +842,8 @@ void behaviourBuildRead(void) {
       //__asm(" inc 0xd020 ");
     //}
     //error and finish
-    procstate = PROCST_FINISH;
+    processError("HDOS SETFN FAIL");
+    //procstate = PROCST_FINISH;
     return;
   };
   hdos_load_file_attic(0);
@@ -812,7 +853,8 @@ void behaviourBuildRead(void) {
     //while(1) {
       //__asm(" inc 0xd020 ");
     //}
-    procstate = PROCST_FINISH;
+    //procstate = PROCST_FINISH;
+    processError("HDOS SETFN FAIL");
     return;
   };
   hdos_load_file_attic(0x32000);
@@ -840,19 +882,18 @@ void behaviourBuildWrite(void) {
   judeSetPointer(MPTR_WAIT);
 
   if (!procAbort) {
+  //if (0) {
     performKernalWrite((uint32_t)file_pos, next_size);
 
     uint8_t error = kernal_get_last_error();
 
     if (error) {
-      writeToProcOutput("D81 WRITE ERROR");
-      *(uint8_t *)(0x0882) = error;
-      //while(1) {
-        //__asm(" inc 0xd020 ");
-      //}
+      //writeToProcOutput("D81 WRITE ERROR");
+      processError("D81 WRITE ERROR");
       finishKernalWrite();
-      procstate = PROCST_FINISH;
-      judeSetPointer(MPTR_NORMAL);
+      
+      //procstate = PROCST_FINISH;
+      //judeSetPointer(MPTR_NORMAL);
       return;
     }
   }
@@ -864,6 +905,14 @@ void behaviourBuildWrite(void) {
 
   if (file_size == 0) {
     finishKernalWrite();
+
+    if (kernal_get_status()) {
+      processError("FILE CLOSE ERROR");
+      //writeToProcOutput("FILE WRITE ERROR");
+      //process = PROC_COMPLETE;
+      //procstate = PROCST_IDLE;
+      return;
+    }
 
     zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_4);
     progressIncValue(1);
@@ -903,38 +952,23 @@ void behaviourExtractInit(void) {
   roomidx = 0;
   
   copyFileName(outputDisk + 2, adfFileName);
-  hdos_set_filename(adfFileName);
-  //if (hdos_open_file()) {
-    //procstate = PROCST_FINISH;
-    //return;
-  //}
-
+  if (hdos_set_filename(adfFileName) ) {
+    processError("HDOS SETFN FAIL");
+    return;
+  };
   hdos_load_file_attic(0);
 
-  //while (!hdos_read_byte(&data)) {
-    //*out = data;
-    //++out;
-  //}
-
-  //hdos_close_file();
-
   if (adf_init(ADF_MEMORY) != ADF_OK) {
-    *(volatile uint8_t *)(0xd020) = 2;
-    
-    //while(1) {
-      //__asm(" inc 0xd020 ");
-    //}
-    
-    writeToProcOutput("ADF INIT ERROR");
-
-    procstate = PROCST_FINISH;
+    processError("ADF INIT ERROR");
+    //writeToProcOutput("ADF INIT ERROR");
+    //procstate = PROCST_FINISH;
     return;
   }
   
   if (adf_chdir("rooms") != ADF_OK) {
-    *(volatile uint8_t *)(0xd020) = 2;
-    writeToProcOutput("ADF CHDIR ERROR");
-    procstate = PROCST_FINISH;
+    processError("ADF CHDIR ERROR");
+    //writeToProcOutput("ADF CHDIR ERROR");
+    //procstate = PROCST_FINISH;
     return;
   }
 
@@ -950,9 +984,9 @@ void behaviourExtractInit(void) {
     prepareLFLFileName(rooms[roompreprep]);
 
     if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
-      *(volatile uint8_t *)(0xd020) = 2;
-      writeToProcOutput("ADF READ ERROR");
-      procstate = PROCST_FINISH;
+      processError("ADF READ ERROR");
+      //writeToProcOutput("ADF READ ERROR");
+      //procstate = PROCST_FINISH;
       return;
     }
 
@@ -980,7 +1014,7 @@ void behaviourExtractRead(void) {
     return;
   }
 
-  char text[20] = "EXTRACT READ  00";
+  char text[] = "EXTRACT READ  00.LFL";
   //sprintf(text, "EXTRACT READ  %2.2d", rooms[roomidx]);
   writetwodecimalstr(text, 14, rooms[roomidx]);
   writeToProcOutput(text);
@@ -988,11 +1022,9 @@ void behaviourExtractRead(void) {
   prepareLFLFileName(rooms[roomidx]);
 
   if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
-    *(volatile uint8_t *)(0xd020) = 2;
-    writeToProcOutput("ADF READ ERROR");
-
-    procstate = PROCST_FINISH;
-
+    processError("ADF READ ERROR");
+    //writeToProcOutput("ADF READ ERROR");
+    //procstate = PROCST_FINISH;
     return;
   }
 
@@ -1002,15 +1034,11 @@ void behaviourExtractRead(void) {
   zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
   karlObjIncludeState(STATE_DIRTY);
   
-  prepareKernalWrite(lflfilename);
+  prepareKernalWrite(lflfilename, 10);
   if (kernal_get_last_error()) {
-    writeToProcOutput("D81 PREPARE ERROR");
-
-    while(1) {
-      __asm(" inc 0xd020 ");
-    }
-
-    procstate = PROCST_FINISH;
+    processError("D81 PREPARE ERROR");
+    //writeToProcOutput("D81 PREPARE ERROR");
+    //procstate = PROCST_FINISH;
     return;
   }
 
@@ -1021,7 +1049,7 @@ void behaviourExtractRead(void) {
 
   //sprintf(text, "EXTRACT WRITE %2.2d", rooms[roomidx]);
 
-  char text2[20] = "EXTRACT WRITE 00";
+  char text2[] = "EXTRACT WRITE 00.LFL";
   writetwodecimalstr(text2, 14, rooms[roomidx]);
   writeToProcOutput(text2);
 
@@ -1043,14 +1071,11 @@ void behaviourExtractWrite(void) {
     uint8_t error = kernal_get_last_error();
 
     if (error) {
-      writeToProcOutput("D81 WRITE ERROR");
-      *(uint8_t *)(0x0882) = error;
-      //while(1) {
-        //__asm(" inc 0xd020 ");
-      //}
+      processError("D81 WRITE ERROR");
+      //writeToProcOutput("D81 WRITE ERROR");
       finishKernalWrite();
-      procstate = PROCST_FINISH;
-      judeSetPointer(MPTR_NORMAL);
+      //procstate = PROCST_FINISH;
+      //judeSetPointer(MPTR_NORMAL);
       return;
     }
   }
@@ -1063,7 +1088,13 @@ void behaviourExtractWrite(void) {
   if (file_size == 0) {
     finishKernalWrite();
 
-    //procstate = PROCST_FINISH;
+    if (kernal_get_status()) {
+      processError("FILE CLOSE ERROR");
+      //writeToProcOutput("FILE CLOSE ERROR");
+      //process = PROC_COMPLETE;
+      //procstate = PROCST_IDLE;
+      return;
+    }
 
     if (!procAbort) {
       roomidx++;

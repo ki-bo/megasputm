@@ -18,6 +18,9 @@
   .public _finishKernalWrite
   .public _performKernalHeaderChange
   .public _performKernalScatchAllRooms
+  .public _performKernalValidate
+
+  .public kernal_get_status
 
   .extern kernal_get_last_error
   .extern kernal_close_all
@@ -230,6 +233,7 @@ error$:
 
 
 _prepareKernalWrite:
+    phy
     phx
     pha
 
@@ -251,7 +255,8 @@ _prepareKernalWrite:
     jsr kernal_set_logical_file
     ;jsr 0xffba
 
-    lda #14
+    ;lda #12
+    pla
     ;ldx #.byte0 filename
     plx
     ;ldy #.byte1 filename
@@ -591,6 +596,68 @@ done$:
 
 
 
+_performKernalValidate:
+    sei
+
+    jsr _judeBackupOwnZP
+    jsr _judeRestoreKernalZP
+
+    cli
+
+    lda #0
+    ldx #0
+    ldy #0
+    jsr kernal_set_name
+
+    lda #1
+    ldx #8
+    ldy #15
+    jsr kernal_set_logical_file
+
+    jsr kernal_open
+
+    jsr 0xffb7
+    sta 0x0800
+    cmp #0x00
+    lbne done$
+
+
+    jsr kernal_reset_channels
+
+    ldx #0x01
+    jsr kernal_set_logical_output
+    
+    ldy #0x00
+loop3$:
+    lda validate, Y
+    jsr kernal_write_byte
+
+    iny
+    cpy #3
+    bne loop3$
+
+    jsr kernal_reset_channels
+
+    lda #0x01
+    jsr kernal_close_logical_file
+
+    lda kernal_error
+    sta 0x0803
+
+    jsr kernal_get_status
+
+
+done$:
+    sei
+
+    jsr _judeBackupKernalZP
+    jsr _judeRestoreOwnZP
+
+    cli
+
+    rts
+
+
 
   .section data, data
 
@@ -608,6 +675,10 @@ kernalDriveStatus:
 
 scratchall:
   .ascii "S0:??.LFL"
+
+validate:
+  .ascii "V0:"
+
 
 filename:
   .asciz "@:TEST.DAT,S,W"

@@ -237,3 +237,5 @@ extern char str_mmsetup_proc_5[];
 extern char str_mmsetup_proc_6[];
 extern char str_mmsetup_proc_7[];
 extern char str_mmsetup_proc_8[];
+extern char str_mmsetup_proc_9[];
+extern char str_mmsetup_proc_10[];

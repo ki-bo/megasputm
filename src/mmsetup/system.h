@@ -7,6 +7,7 @@
 #define __REGY "y"
 #define __REGZ "z"
 #define __KZ16 "Kzp16"
+#define __KZ08 "Kzp8"
 
 #else
 
@@ -15,5 +16,6 @@
 #define __REGY "rcx"
 #define __REGZ "rdx"
 #define __KZ16 "Krm"
+#define __KZ08 "Krm"
 
 #endif

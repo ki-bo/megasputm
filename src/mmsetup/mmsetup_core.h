@@ -77,20 +77,15 @@ void cancelProcess(void);
 void continueProcess(void);
 void updateProcess(void);
 
-void prepareKernalWrite(char *filename);
-extern void _prepareKernalWrite(void);
-
+void prepareKernalWrite(char *filename, uint8_t len);
 void performKernalWrite(uint32_t source, uint32_t size);
-extern void _performKernalWrite(void);
-
 void finishKernalWrite(void);
-extern void _finishKernalWrite(void);
 
+uint8_t kernal_get_status(void);
 
-extern void processTest(void);
+//extern void processTest(void);
 
 void core_init(void);
-
 
 void behaviourConfigIdle(void);
 void behaviourConfigInit(void);

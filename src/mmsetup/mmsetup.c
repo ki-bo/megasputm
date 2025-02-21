@@ -2000,6 +2000,8 @@ char str_mmsetup_proc_5[] = "Progress:";
 char str_mmsetup_proc_6[] = "Reading:";
 char str_mmsetup_proc_7[] = "Writing:";
 char str_mmsetup_proc_8[] = "Errors:";
+char str_mmsetup_proc_9[] = "  -   F O U N D   - ";
+char str_mmsetup_proc_10[] ="  -    N O N E    - ";
 
 
 karlFarPtr_t config_desc_controls[] = {
