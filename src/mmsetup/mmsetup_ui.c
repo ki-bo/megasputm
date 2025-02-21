@@ -344,7 +344,12 @@ void mmsetupProcCancelChg(void) {
   judeDefCtlChange();
 
   if (state & STATE_DOWN) {
-    cancelProcess();
+    if (((karlObject_t __huge *)zptrself)->tag) {
+      cancelProcess();
+    } else {
+      zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_welcome);
+      judeActivatePage();
+    }
   }
 }
 

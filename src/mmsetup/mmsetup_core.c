@@ -476,8 +476,10 @@ void initiateProcess(void) {
   zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_0);
   karlObjExcludeState(STATE_ENABLED);
 
+  ctl_mmsetup_proc_1_2._element._object.tag = 1;
+  ctl_mmsetup_proc_1_2.text_p = (karlFarPtr_t)str_mmsetup_buttons_1;
   zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_2);
-  karlObjIncludeState(STATE_ENABLED);
+  karlObjIncludeState(STATE_CHANGED);
 
   judeActivateCtrl();
 
@@ -547,8 +549,10 @@ void updateProcess(void) {
     zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
     karlObjExcludeState(STATE_VISIBLE);
     
+    ctl_mmsetup_proc_1_2._element._object.tag = 0;
+    ctl_mmsetup_proc_1_2.text_p = (karlFarPtr_t)str_mmsetup_buttons_6;
     zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_2);
-    karlObjExcludeState(STATE_ENABLED);
+    karlObjIncludeState(STATE_CHANGED);
 
     zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);
     karlObjExcludeState(STATE_ENABLED);
