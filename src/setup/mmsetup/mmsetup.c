@@ -18,7 +18,7 @@ judeControl_t ctl_mmsetup_config_0_5 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		11,
@@ -27,7 +27,7 @@ judeControl_t ctl_mmsetup_config_0_5 = {
 		NEARTOFARPTRREC(str_mmsetup_config_5),
 		0,
 		0x0,
-		0};
+	  0};
 
 karlFarPtr_t pnl_mmsetup_welc_1_controls[] = {
 		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_0)};
@@ -60,7 +60,7 @@ judeControl_t ctl_mmsetup_config_0_6 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		13,
@@ -103,7 +103,7 @@ judePanel_t pnl_mmsetup_welc_0 = {
 		0x0003,
 		0x0000,
 		0x0000,
-		0,
+		0x0a,
 		NEARTOEVENTPTR(judeDefPnlPresent),
 		EVENTPTRNULLREC,
 		NEARTOFARPTRREC(&pge_mmsetup_welcome),
@@ -131,7 +131,7 @@ judeControl_t ctl_mmsetup_config_0_15 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		9,
@@ -155,7 +155,7 @@ judeControl_t ctl_mmsetup_config_0_8 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		17,
@@ -183,7 +183,7 @@ judeControl_t ctl_mmsetup_config_0_19 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		17,
@@ -207,7 +207,7 @@ judeControl_t ctl_mmsetup_welc_0_3 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_0),
 		CLR_FACE,
 		20,
 		7,
@@ -216,7 +216,7 @@ judeControl_t ctl_mmsetup_welc_0_3 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_3),
 		0,
 		0x2,
-		0};
+		'E'};
 
 judeControl_t ctl_mmsetup_config_0_12 = {
 		sizeof(judeControl_t),
@@ -231,7 +231,7 @@ judeControl_t ctl_mmsetup_config_0_12 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_EMPTY,
 		0,
 		17,
@@ -252,10 +252,10 @@ judePage_t pge_mmsetup_welcome = {
 		0x0003,
 		0x0000,
 		0x0000,
-		0,
+		0x0a,
 		NEARTOEVENTPTR(judeDefPgePresent),
 		EVENTPTRNULLREC,
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&vew_mmsetup_main),
 		CLR_EMPTY,
 		0,
 		0,
@@ -329,7 +329,7 @@ judeControl_t ctl_mmsetup_config_0_16 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		11,
@@ -353,7 +353,7 @@ judePanel_t pnl_mmsetup_config_1 = {
 		0,
 		NEARTOEVENTPTR(judeDefPnlPresent),
 		EVENTPTRNULLREC,
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pge_mmsetup_configure),
 		CLR_INSET,
 		0,
 		23,
@@ -376,7 +376,7 @@ judeControl_t ctl_mmsetup_config_1_1 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_1),
 		CLR_ABORT,
 		0,
 		24,
@@ -400,7 +400,7 @@ judeControl_t ctl_mmsetup_welc_0_5 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_0),
 		CLR_FACE,
 		20,
 		11,
@@ -409,7 +409,7 @@ judeControl_t ctl_mmsetup_welc_0_5 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_5),
 		0,
 		0x2,
-		0};
+		'V'};
 
 judeControl_t ctl_mmsetup_welc_0_6 = {
 		sizeof(judeControl_t),
@@ -424,7 +424,7 @@ judeControl_t ctl_mmsetup_welc_0_6 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_0),
 		CLR_SYSS_TEXT | 0x0A,
 		0,
 		3,
@@ -449,7 +449,7 @@ judeControl_t ctl_mmsetup_config_0_10 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_EMPTY,
 		0,
 		5,
@@ -496,7 +496,7 @@ judeControl_t ctl_mmsetup_config_0_2 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		5,
@@ -550,6 +550,7 @@ char str_mmsetup_welc_2[] = "  Configure";
 char str_mmsetup_buttons_0[] = "Next >";
 
 char str_mmsetup_welc_6[] = "You must perform configuration at this time.";
+char str_mmsetup_welc_7[] = "You must perform at least one data operation.";
 
 judePanel_t pnl_mmsetup_config_0 = {
 		sizeof(judePanel_t),
@@ -564,7 +565,7 @@ judePanel_t pnl_mmsetup_config_0 = {
 		0,
 		NEARTOEVENTPTR(judeDefPnlPresent),
 		EVENTPTRNULLREC,
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pge_mmsetup_configure),
 		CLR_INSET,
 		0,
 		0,
@@ -574,7 +575,7 @@ judePanel_t pnl_mmsetup_config_0 = {
 		NEARTOFARPTRREC(pnl_mmsetup_config_0_controls),
 		21};
 
-char str_mmsetup_config_8[] = "7  DISK #1 rooms...";
+char str_mmsetup_config_8[] = "7  Disk #1 rooms...";
 
 char str_mmsetup_config_4[] = "3  ADF disk #1...";
 
@@ -621,7 +622,7 @@ judeControl_t ctl_mmsetup_config_1_0 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_1),
 		CLR_ACCEPT,
 		70,
 		24,
@@ -645,7 +646,7 @@ judeControl_t ctl_mmsetup_welc_0_2 = {
 		1,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_0),
 		CLR_FACE,
 		20,
 		5,
@@ -654,7 +655,7 @@ judeControl_t ctl_mmsetup_welc_0_2 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_2),
 		0,
 		0x2,
-		0};
+		'C'};
 
 char str_mmsetup_config_5[] = "4  ADF disk #2...";
 
@@ -671,7 +672,7 @@ judeControl_t ctl_mmsetup_config_0_7 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		15,
@@ -695,7 +696,7 @@ judeControl_t ctl_mmsetup_config_0_20 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		19,
@@ -728,7 +729,7 @@ judeControl_t ctl_mmsetup_config_0_3 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		7,
@@ -754,7 +755,7 @@ judeControl_t ctl_mmsetup_config_0_11 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_EMPTY,
 		0,
 		9,
@@ -782,7 +783,7 @@ judeControl_t ctl_mmsetup_config_0_0 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FOCUS,
 		0,
 		0,
@@ -808,7 +809,7 @@ judeControl_t ctl_mmsetup_config_0_14 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		7,
@@ -832,7 +833,7 @@ judeControl_t ctl_mmsetup_config_0_17 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		13,
@@ -856,7 +857,7 @@ judeControl_t ctl_mmsetup_config_0_18 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		15,
@@ -880,7 +881,7 @@ judeControl_t ctl_mmsetup_config_0_1 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_PAPER,
 		0,
 		1,
@@ -909,7 +910,7 @@ judeControl_t ctl_mmsetup_welc_0_4 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_0),
 		CLR_FACE,
 		20,
 		9,
@@ -918,9 +919,9 @@ judeControl_t ctl_mmsetup_welc_0_4 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_4),
 		0,
 		0x2,
-		0};
+		'B'};
 
-char str_mmsetup_config_9[] = "8  DISK #2 rooms...";
+char str_mmsetup_config_9[] = "8  Disk #2 rooms...";
 
 karlFarPtr_t vew_mmsetup_main_bars[] = {
 		0};
@@ -943,7 +944,7 @@ judeControl_t ctl_mmsetup_welc_1_0 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_1),
 		CLR_ACCEPT,
 		70,
 		24,
@@ -967,7 +968,7 @@ judeControl_t ctl_mmsetup_config_0_9 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		19,
@@ -991,7 +992,7 @@ judeControl_t ctl_mmsetup_config_0_4 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_FACE,
 		20,
 		9,
@@ -1018,7 +1019,7 @@ judePage_t pge_mmsetup_configure = {
 		0,
 		NEARTOEVENTPTR(judeDefPgePresent),
 		EVENTPTRNULLREC,
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&vew_mmsetup_main),
 		CLR_EMPTY,
 		0,
 		0,
@@ -1044,7 +1045,7 @@ judePanel_t pnl_mmsetup_welc_1 = {
 		0,
 		NEARTOEVENTPTR(judeDefPnlPresent),
 		EVENTPTRNULLREC,
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pge_mmsetup_welcome),
 		CLR_INSET,
 		0,
 		23,
@@ -1067,7 +1068,7 @@ judeControl_t ctl_mmsetup_config_0_13 = {
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
-		FARPTRNULLREC,
+		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
 		CLR_TEXT,
 		42,
 		5,

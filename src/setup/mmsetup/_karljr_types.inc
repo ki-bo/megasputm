@@ -313,6 +313,7 @@
 
 	KEY_M65_ESC: .equ 		0x1B
 	KEY_M65_TAB: .equ 		0x09
+  KEY_M65_SHTAB: .equ   0x0F
 
 	KEY_M65_NONE: .equ 	0x00
 

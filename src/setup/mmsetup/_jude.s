@@ -2816,7 +2816,7 @@ input$:
 		and	#KEY_MOD_SYS
 		beq	tstfkeys$
 
-		JMP	findaccel$
+		jmp	findaccel$
 
 tstfkeys$:
 		lda	zp:zvalkey
@@ -2824,13 +2824,13 @@ tstfkeys$:
 		bcs	fkey0$
 	
 		cmp	#KEY_M65_ESC
-		LBEQ	findaccel$
+		lbeq findaccel$
 
-		JMP	isdownctrl$
+		bra	isdownctrl$
 
 fkey0$:
 		cmp	#(KEY_M65_F14 + 1)	
-		LBCS	isdownctrl$
+		lbcs	isdownctrl$
 
 		lda	zp:zvalkey + 1
 		and	#KEY_MOD_SHIFT
@@ -2839,7 +2839,7 @@ fkey0$:
 		inc	zp:zvalkey
 
 fkeycont$:
-		JMP	findaccel$
+		jmp	findaccel$
 
 isdownctrl$:
 		lda	judeDownElem
@@ -2865,21 +2865,33 @@ actvctrl$:
 		ldz	#OBJECT__options + 1
 		;nop
 		lda	[zp:zptrself], z
-		and	#.byte0 OPT_AUTOTRACK
+		and	#.byte1 OPT_AUTOTRACK
 		beq	chkmv$
 
 		bra	send$
 
 chkmv$:
+    ;inc 0xd020
+    ;bra chkmv$
+
 		lda	zp:zvalkey
 		cmp	#KEY_C64_CDOWN
+		beq	moveactv$
+
+		cmp	#KEY_C64_CDOWN | 0x80
 		beq	moveactv$
 
 		cmp	#KEY_C64_CRIGHT
 		beq	moveactv$
 
+		cmp	#KEY_C64_CRIGHT | 0x80
+		beq	moveactv$
+
 		cmp	#KEY_M65_TAB
 		beq	moveactv$
+
+    cmp #KEY_M65_SHTAB
+    beq mungetab$
 
 		lda	zp:zvalkey
 		cmp	#KEY_ASC_CR
@@ -2888,6 +2900,9 @@ chkmv$:
 		jsr	judeDownCtrl
 		jmp	_judeSendKeys
 
+mungetab$:
+    lda #KEY_M65_TAB
+    sta zp:zvalkey
 
 moveactv$:
 		jsr	_judeMoveActiveControl
@@ -2962,19 +2977,39 @@ _judeProcVwElemsAccel:
 		lda	#ERROR_NONE
 		sta	karl_errorno
 
+    lda zp:zptrtemp2 + 1
+    beq elem$
+
 		ldz	#OBJECT__state
 		;nop
 		lda	[zp:zreg0], z
 
 		and	zp:zptrtemp2 + 1
-		beq	exit$
+    cmp zp:zptrtemp2 + 1
+		bne	exit$
+
+elem$:
+    ;lda 0xd020
+    ;inc a
+    ;and #0x0f
+    ;sta 0xd020
 
 		ldz	#CONTROL__accelchar
 		;nop
 		lda	[zp:zreg0], z
 
+    beq exit$
+
+;halt$:
+;    inc 0xd020
+;    bra halt$
+;
+;cont$:
 		cmp	zp:zvalkey
 		bne	exit$
+
+    ;lda #01
+    ;sta 0xd020
 
 		MvDWMem	zp:zptrself, zp:zreg0
 		jsr	judeDownCtrl 
@@ -2989,6 +3024,10 @@ exit$:
 ;-----------------------------------------------------------
 _judeProcessAccelerators:
 ;-----------------------------------------------------------
+    lda zvalkey
+    and #0x7f
+    sta zvalkey
+
 ;		MvDWMem	zp:zreg4, jude_actvvw
 		lda	#.byte0 _judeProcVwElemsAccel
 		sta	zp:zreg6wl
@@ -3000,6 +3039,9 @@ _judeProcessAccelerators:
 
 		lda	#STATE_VISIBLE | STATE_ENABLED
 		sta	zp:zptrtemp2 + 1
+
+    ;lda #01
+    ;sta zp:zptrtemp1
 
 		jsr	_judeProcViewElements
 
@@ -3021,6 +3063,9 @@ _judeUpdateChanged:
 		lda	#STATE_CHANGED
 		sta	zp:zptrtemp2 + 1
 
+    ;lda #00
+    ;sta zp:zptrtemp1
+
 		jsr	_judeProcViewElements
 
 		rts
@@ -3029,13 +3074,33 @@ _judeUpdateChanged:
 ;-----------------------------------------------------------
 _judeProcVwElemsPanels:
 ;-----------------------------------------------------------
-		ldz	#OBJECT__state
+		;lda zp:zptrtemp1
+    ;bne controls$
+    
+    lda zp:zptrtemp2 + 1
+    beq panel$
+    
+    ldz	#OBJECT__state
 		;nop
 		lda	[zp:zreg0], z
 
 		and	zp:zptrtemp2 + 1
-		beq	controls$
+    cmp zp:zptrtemp2 + 1
+		bne	controls$
 
+panel$:
+    ;ldz #OBJECT__tag
+    ;lda [zp:zreg0], z
+    ;cmp #0x0a
+    ;bne cont$
+
+;    bra cont$
+;
+;halt$:
+;    inc 0xd020
+;    bra halt$
+
+;cont$:
 		lda	zp:zreg3wh
 		sta	jude_proxyptr
 		lda	zp:zreg3wh + 1
@@ -3049,6 +3114,11 @@ controls$:
 
 		lda	#PANEL__controlscnt
 		sta	zp:zreg5b0
+
+    ;ldz #PANEL__controlscnt
+    ;lda [zp:zreg0], z
+    ;cmp #07
+    ;beq halt$
 
 		lda	#PANEL__controls_p
 		sta	zp:zreg5b2
@@ -3070,13 +3140,31 @@ exit$:
 ;-----------------------------------------------------------
 _judeProcVwElemsPages:
 ;-----------------------------------------------------------
-		ldz	#OBJECT__state
+;    ldz #OBJECT__tag
+;    lda [zp:zreg0], Z
+;    cmp #0xa
+;    bne cont$
+;
+;halt$:
+;    inc 0xd020
+;    bra halt$
+;
+;cont$:
+    ;lda zp:zptrtemp1
+    ;bne panels$
+
+		lda zp:zptrtemp2 + 1
+    beq page$
+    
+    ldz	#OBJECT__state
 		;nop
 		lda	[zp:zreg0], z
 
 		and	zp:zptrtemp2 + 1
-		beq	panels$
+    cmp zp:zptrtemp2 + 1
+		bne	panels$
 
+page$:
 		lda	zp:zreg3wh
 		sta	jude_proxyptr
 		lda	zp:zreg3wh + 1
@@ -3131,6 +3219,8 @@ begin$:
 
 		lda	#VIEW__barscnt
 		sta	zp:zreg5b0
+
+    lbeq  present$
 
 		lda	#VIEW__bars_p
 		sta	zp:zreg5b2
@@ -3190,13 +3280,31 @@ present$:
 cont0$:
 		MvDWMem	zp:zreg0, jude_actvpg
 
+;    ldz #OBJECT__tag
+;    lda [zp:zreg0], Z
+;    cmp #0x0a
+;    beq skip$
+;
+;halt$:
+;    inc 0xd020
+;    bra halt$
+;
+;skip$:
+    ;lda zp:zptrtemp1
+    ;bne panels$
+
+    lda zp:zptrtemp2 + 1
+    beq page$
+
 		ldz	#OBJECT__state
 		;nop
 		lda	[zp:zreg0], z
 
 		and	zp:zptrtemp2 + 1
-		beq	panels$
+    cmp zp:zptrtemp2 + 1
+		bne	panels$
 
+page$:
 		lda	zp:zreg3wh
 		sta	jude_proxyptr
 		lda	zp:zreg3wh + 1
@@ -3230,18 +3338,24 @@ panels$:
 
 		jsr	_karlProcObjLst
 
+exit$:
 		rts
 
 ;-----------------------------------------------------------
 _judeProcVwElemsUpdate:
 ;-----------------------------------------------------------
-		ldz	#OBJECT__state
+		lda zp:zptrtemp2 + 1
+    beq elems$
+    
+    ldz	#OBJECT__state
 		;nop
 		lda	[zp:zreg0], z
 
 		and	zp:zptrtemp2 + 1
-		beq	exit$
+    cmp zp:zptrtemp2 + 1
+		bne	exit$
 
+elems$:
 		MvDWMem	zp:zptrself, zp:zreg0
 
 		;ldz	zp:zptrtemp2
@@ -3277,6 +3391,9 @@ _judePresentDirty:
 
 		lda	#STATE_DIRTY
 		sta	zp:zptrtemp2 + 1
+
+    ;lda #00
+    ;sta zp:zptrtemp1
 
 		jsr	_judeProcViewElements
 

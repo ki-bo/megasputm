@@ -155,3 +155,4 @@ extern char str_mmsetup_buttons_1[];
 extern judeControl_t ctl_mmsetup_welc_0_6;
 
 extern char str_mmsetup_welc_6[];
+extern char str_mmsetup_welc_7[];

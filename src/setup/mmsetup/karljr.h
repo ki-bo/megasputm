@@ -301,6 +301,7 @@ extern uint8_t _zkarljr[SIZ_ZP_KARLJR];
 
 #define KEY_M65_ESC		0x1B
 #define KEY_M65_TAB		0x09
+#define KEY_M65_SHTAB	0x0F
 
 #define KEY_M65_NONE	0x00
 
