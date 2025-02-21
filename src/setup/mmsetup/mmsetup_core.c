@@ -1,19 +1,20 @@
 #include <stdint.h>
 
 #include "mega65.h"
-
 #include "hdos.h"
+//#include "_kernal.h"
+
 #include "adf.h"
 #include "room90.h"
 
 #include "jude.h"
 #include "karljr.h"
 #include "mmsetup.h"
-
 #include "mmsetup_core.h"
 
+
+uint8_t config_select = 0;
 uint8_t config_required = 1;
-uint8_t config_select = 0xff;
 
 process_t process = PROC_NONE;
 procstate_t procstate = PROCST_IDLE;
@@ -84,6 +85,8 @@ uint8_t __huge *procOutput;
 
 extern uint16_t mouseXPos;
 extern uint16_t mouseYPos;
+extern uint8_t kernal_get_last_error(void);
+
 
 int16_t new_x;
 int16_t new_y;
@@ -234,6 +237,29 @@ void prepareLFLFileName(uint8_t roomno) {
   lflfileadf[0] = tens;
   lflfileadf[1] = ones;
 }
+
+
+void performKernalHeaderChange(uint8_t diskNo) {
+  __asm(
+    " .extern _performKernalHeaderChange \n"
+    //"   lda %[dn] \n"
+    "   jsr _performKernalHeaderChange \n"
+    :
+    : "Ka" (diskNo)
+    : "a", "x", "y", "z"
+  );
+};
+
+void performKernalScatchAllRooms(void) {
+  __asm(
+    " .extern _performKernalScatchAllRooms \n"
+    //"   lda %[dn] \n"
+    "   jsr _performKernalScatchAllRooms \n"
+    :
+    : 
+    : "a", "x", "y", "z"
+  );
+};
 
 
 void prepareKernalWrite(char *filename) {
@@ -427,7 +453,7 @@ uint8_t disk1Rooms[] =
 uint8_t disk2Rooms[] =
     {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
     11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-    21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 
+    21, 22, 23, 24, 25, 26, 27, 28, 29,  
     31, 32, 34, 35, 36, 37, 38, 39, 41, 
     42, 43, 44, 46, 47, 48, 52, 53, 0xff};
 
@@ -656,6 +682,8 @@ void behaviourExtractInit(void) {
       //outputDisk++;
       procstate = PROCST_FINISH;
     } else {
+      performKernalHeaderChange(outputDisk + 1);
+      performKernalScatchAllRooms();
       procstate = PROCST_READ;
     }
   }
@@ -674,6 +702,8 @@ void behaviourExtractWait(void) {
     zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
     karlObjExcludeState(STATE_VISIBLE);
 
+    performKernalHeaderChange(outputDisk + 1);
+    performKernalScatchAllRooms();
     procstate = PROCST_READ;
 
     procContinue = 0;
@@ -708,13 +738,22 @@ void behaviourExtractRead(void) {
     *(volatile uint8_t *)(0xd020) = 2;
     writeToProcOutput("ADF READ ERROR");
 
-    roomidx++;
-    procstate = PROCST_READ;
+    procstate = PROCST_FINISH;
 
     return;
   }
   
   prepareKernalWrite(lflfilename);
+  if (kernal_get_last_error()) {
+    writeToProcOutput("D81 PREPARE ERROR");
+
+    while(1) {
+      __asm(" inc 0xd020 ");
+    }
+
+    procstate = PROCST_FINISH;
+    return;
+  }
 
   procstate = PROCST_WRITE;
 }
@@ -726,8 +765,25 @@ void behaviourExtractWrite(void) {
 
   if (!procAbort) {
     performKernalWrite((uint32_t)FILE_MEMORY, file_size);
-    finishKernalWrite();
+
+    uint8_t error = kernal_get_last_error();
+
+    if (error) {
+      writeToProcOutput("D81 WRITE ERROR");
+
+      *(uint8_t *)(0x0882) = error;
+
+      while(1) {
+        __asm(" inc 0xd020 ");
+      }
+  
+      finishKernalWrite();
+      procstate = PROCST_FINISH;
+      return;
+    }
   }
+  finishKernalWrite();
+
   //procstate = PROCST_FINISH;
 
   if (!procAbort) {

@@ -100,6 +100,9 @@ void attemptLoadFont(void) {
   }*/
 }
 
+
+//extern void performKernalScatchAllRooms(void);
+//extern void performKernalHeaderChange(uint8_t diskno);
 //extern uint16_t *jude_kernirq;
 
 int main(void) {
@@ -108,6 +111,11 @@ int main(void) {
   hdos_init(0x0800, 0x0800);
   _judeBackupKernalZP();
 
+  //performKernalHeaderChange(3);
+  //performKernalScatchAllRooms();
+  //while(1) {
+    //__asm(" inc 0xd020 ");
+  //}
   //hdos_set_filename("MANIAC1.D64");
   //hdos_load_file_attic(0);
   //hdos_set_filename("MANIAC2.D64");

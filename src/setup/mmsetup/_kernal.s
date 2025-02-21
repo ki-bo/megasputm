@@ -11,6 +11,8 @@
       .public kernal_close_logical_file
       .public kernal_reset_channels
 
+      .public kernal_error
+
 
 kernal_get_last_error:
   lda kernal_error
@@ -30,9 +32,13 @@ kernal_close_all:
 kernal_set_banks:
 ;   .A = memory, .X = file
     jsr 0xff6b
+    bcc noerror$
     sta kernal_error
+    lda #1
+    rts
+noerror$:
     lda #0x00
-    rol a
+    sta kernal_error
     rts
 
 kernal_set_banks_long:
@@ -50,7 +56,7 @@ kernal_set_logical_file:
 ; .A = logical, .X = device, .Y = secondary
 
     jsr 0xffba
-    lda #0
+    lda #0x00
     sta kernal_error
     rts
 
@@ -64,28 +70,39 @@ kernal_set_name:
 
 kernal_open:
     jsr 0xffc0
+    bcc noerror$
     sta kernal_error
-    lda #0
-    rol a
+    lda #1
+    rts
+noerror$:
+    lda #0x00
+    sta kernal_error
     rts
 
 kernal_set_logical_output:
 ; .X = logical
     
     jsr 0xffc9
+    bcc noerror$
     sta kernal_error
-    lda #0
-    rol a
+    lda #1
     rts
-
+noerror$:
+    lda #0x00
+    sta kernal_error
+    rts
 
 kernal_write_byte:
 ; .A = data
 
     jsr 0xffd2
+    bcc noerror$
     sta kernal_error
+    lda #0x01
+    rts
+noerror$:
     lda #0x00
-    rol a
+    sta kernal_error
     rts
 
 
@@ -94,15 +111,19 @@ kernal_close_logical_file:
 
     clc
     jsr 0xffc3
+    bcc noerror$
     sta kernal_error
-    lda 0x00
-    rol a
+    lda #1
+    rts
+noerror$:
+    lda #0x00
+    sta kernal_error
     rts
 
 
 kernal_reset_channels:
     jsr 0xffcc
-
+    rts
 
 
   .section data, data
