@@ -26,8 +26,9 @@
 #define ADF_ERR_NOTDOS              -2
 #define ADF_ERR_FSUNSUPPORTED       -3
 #define ADF_ERR_NOTFOUND            -4
+#define ADF_ERR_FILETOOLARGE        -5
 
 int8_t adf_init(uint8_t __huge *image);
 void adf_chroot(void);
 int8_t adf_chdir(const char *dir);
-int8_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t *size);
+int32_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t max_size);

@@ -368,7 +368,7 @@ uint8_t diskio_load_index(void)
   for (uint16_t i = 0; i < num_words; ++i) {
     index_chks += *ptr++;
   }
-  
+
   uint8_t lang_idx = 0;
   for (; lang_idx < LANG_COUNT; ++lang_idx) {
     if (index_chks == index_lang_chks[lang_idx]) {
@@ -1256,8 +1256,9 @@ static uint8_t read_lfl_file_entry(uint8_t disk_num)
   uint8_t i = 1;
   uint8_t tmp;
 
-  if (FDC.data != 0x82) {
-    // not a PRG file
+  uint8_t file_type = FDC.data;
+  if (file_type != 0x82 && file_type != 0x81) {
+    // not a PRG or SEQ file
     return i;   
   }
   ++i;

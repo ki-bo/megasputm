@@ -20,6 +20,18 @@ void outputFile(uint8_t roomNo)
 
   printf("%s\r", fileName);
 
+  // read complete adf file into memory (max. 128kb files supported)
+  int32_t file_size = adf_read_file(fileName, FILE_MEMORY, 0x20000);
+  if (file_size <= 0) {
+    *(volatile uint8_t *)(0xd020) = 2;
+    kernal_close_all(8);
+    kernal_reset_channels();
+
+    printf("FAILED TO READ FILE %s\r", fileName);
+    return;
+  }
+
+  // open DOS file for writing
   kernal_close_all(8);
   kernal_set_banks(0, 0);
   kernal_set_logical_file(1, 8, 2);
@@ -41,19 +53,10 @@ void outputFile(uint8_t roomNo)
     return;
   }
 
-  uint32_t file_size;
-  if (adf_read_file(fileName, FILE_MEMORY, &file_size) != ADF_OK) {
-    *(volatile uint8_t *)(0xd020) = 2;
-    kernal_close_all(8);
-    kernal_reset_channels();
-
-    printf("FAILED TO READ FILE %s\r", fileName);
-    return;
-  }
-
+  // write bytes to DOS file
   __auto_type data = FILE_MEMORY;
   while(file_size) {
-    if (kernal_write_byte(65)) {
+    if (kernal_write_byte(*data)) {
       *(volatile uint8_t *)(0xd020) = 2;
       kernal_close_all(8);
       kernal_reset_channels();
@@ -67,6 +70,7 @@ void outputFile(uint8_t roomNo)
     --file_size;
   }
 
+  // close DOS file
   kernal_close_logical_file(1);
   kernal_close_all(8);
   kernal_reset_channels();

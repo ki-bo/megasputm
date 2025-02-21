@@ -96,7 +96,7 @@ int8_t adf_chdir(const char *dir)
   return ADF_OK;
 }
 
-int8_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t *size)
+int32_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t max_size)
 {
   read_block(current_dir_block);
   if (find_entry_block(filename) < 0) {
@@ -104,12 +104,13 @@ int8_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t *size)
   }
 
   // file header block is currently loaded in sector buffer
-  uint32_t bytes_left = read_u32(0x144);
-  if (size) {
-    *size = bytes_left;
+  uint32_t file_size = read_u32(0x144);
+  if (file_size > max_size) {
+    return ADF_ERR_FILETOOLARGE;
   }
-  printf("BYTES LEFT: %ld\r", bytes_left);
 
+  // printf("FILE SIZE: %ld\r", file_size);
+  uint32_t bytes_left = file_size;
   while (bytes_left)
   {
     // get next data block
@@ -124,7 +125,7 @@ int8_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t *size)
     bytes_left -= bytes_in_block;
   }
 
-  return ADF_OK;
+  return (int32_t)file_size;
 }
 
 void read_block(uint16_t block_num)
@@ -159,22 +160,20 @@ int16_t find_entry_block(const char *name)
   }
   uint8_t hash_table_entry = hash % HASH_TABLE_SIZE;
 
-  printf("FILENAME: %s, HASH: %d\r", name_buffer, hash_table_entry);
-
   // find block number in hash table
   uint16_t block_num  = read_u32(0x18 + hash_table_entry * 4);
 
   if (block_num == 0)
   {
     // no file matching that hash
-    printf("NO FILE FOUND\r");
+    // printf("NO FILE FOUND\r");
     return -1;
   }
 
   // iterate over blocks and match real strings
   do {
     read_block(block_num);
-    printf("BLOCK_NUM: %d, LEN: %d\r", block_num, (uint16_t)ENTRY_NAME_LEN);
+    // printf("BLOCK_NUM: %d, LEN: %d\r", block_num, (uint16_t)ENTRY_NAME_LEN);
     if (ENTRY_NAME_LEN == len) {
       uint8_t i;
       for (i = 0; i < len; ++i) {
@@ -184,7 +183,7 @@ int16_t find_entry_block(const char *name)
       }
       if (i == len) {
         // found entry block
-        printf("FOUND: %d\r", block_num);
+        // printf("FOUND: %d\r", block_num);
         return block_num;
       }
     }
@@ -194,7 +193,7 @@ int16_t find_entry_block(const char *name)
   }
   while (block_num != 0);
 
-  printf("NOTHING FOUND\r");
+  // printf("NOTHING FOUND\r");
   return -1;
 }
 
