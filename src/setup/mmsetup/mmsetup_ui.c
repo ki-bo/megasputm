@@ -39,8 +39,12 @@ void mmsetupWelcNextChg(void) {
         karlObjIncludeState(STATE_CHANGED);
 
       } else {
+        zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
+        karlObjExcludeState(STATE_VISIBLE);
+
         zptrself = (uint32_t)&ctl_mmsetup_welc_0_6;
         karlObjExcludeState(STATE_VISIBLE);
+
         if (ctl_mmsetup_welc_0_2._element._object.tag) {
           zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_configure);
         } else {

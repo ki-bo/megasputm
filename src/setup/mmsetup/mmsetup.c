@@ -580,8 +580,8 @@ char str_mmsetup_welc_2[] = "  Configure";
 
 char str_mmsetup_buttons_0[] = "[Next >  ]";
 
-char str_mmsetup_welc_6[] = "You must perform configuration at this time.";
-char str_mmsetup_welc_7[] = "You must perform at least one data operation.";
+char str_mmsetup_welc_6[] = "You must perform Configuration at this time.";
+char str_mmsetup_welc_7[] = "You must perform at least one Data Operation.";
 
 judePanel_t pnl_mmsetup_config_0 = {
 		sizeof(judePanel_t),
@@ -1970,8 +1970,8 @@ char str_mmsetup_buttons_6[] = "[Exit    ]";
 char str_mmsetup_config_15[] = "<Real Disk>";
 char str_mmsetup_config_16[] = "<No Selection>";
 
-char str_mmsetup_config_17[] = "You must provide the D81/ADF Extraction details";
-char str_mmsetup_config_18[] = "You must provide the D64 Build details";
+char str_mmsetup_config_17[] = "You must provide the D81/ADF Extraction details.";
+char str_mmsetup_config_18[] = "You must provide the D64 Build details.";
 
 
 char str_mmsetup_proc_0[] = "Performing processing tasks";
