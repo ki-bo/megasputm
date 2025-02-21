@@ -17,10 +17,10 @@ ifeq ($(CONFIG),debug_scripts)
 	CC_FLAGS += -DDEBUG -DDEBUG_SCRIPTS
 endif
 CC_FLAGS_MM    = $(CC_FLAGS) --no-cross-call --strong-inline --inline-on-matching-custom-text-section --no-interprocedural-cross-jump
-DEP_FLAGS      = -MMD -MP
+DEP_FLAGS      = -MMD -MP -MF$(@:%.o=%.d)
 ASM_FLAGS      = --target=mega65 --list-file=$(@:%.o=%.lst)
 LN_FLAGS       = --target=mega65 --verbose --rtattr printf=nofloat
-LN_FLAGS_SETUP = $(LN_FLAGS) mega65-plain.scm --output-format=prg --list-file=setup-mega65.lst
+LN_FLAGS_SETUP = $(LN_FLAGS) mega65-mmsetup.scm --output-format=prg --list-file=mmsetup-mega65.lst
 LN_FLAGS_MM    = $(LN_FLAGS) mega65-mm.scm --no-tree-shaking --raw-multiple-memories --cstartup=mm --rtattr exit=simplified --output-format=raw --list-file=mm-mega65.lst
 
 ETHLOAD   = etherload
@@ -28,16 +28,17 @@ M65FTP    = mega65_ftp
 C1541     = c1541
 XMEGA65   = /Applications/Xemu/xmega65.app/Contents/MacOS/xmega65
 
+# megasputm engine sources and objects
 C_SRCS    = $(wildcard src/*.c)
 ASM_SRCS  = $(wildcard src/*.s)
 OBJS      = $(ASM_SRCS:src/%.s=obj/%_s.o) $(C_SRCS:src/%.c=obj/%.o)
 DEPS      = $(OBJS:%.o=%.d)
 
 # Setup tool sources and objects
-SETUP_C_SRCS = $(wildcard src/setup/*.c)
-SETUP_ASM_SRCS = $(wildcard src/setup/*.s)
-SETUP_OBJS = $(SETUP_ASM_SRCS:src/setup/%.s=obj/setup/%_s.o) $(SETUP_C_SRCS:src/setup/%.c=obj/setup/%.o)
-SETUP_DEPS = $(SETUP_OBJS:obj/setup/%.o=obj/setup/%.d)
+SETUP_C_SRCS = $(wildcard src/mmsetup/*.c)
+SETUP_ASM_SRCS = $(wildcard src/mmsetup/*.s)
+SETUP_OBJS = $(SETUP_ASM_SRCS:src/mmsetup/%.s=obj/mmsetup/%_s.o) $(SETUP_C_SRCS:src/mmsetup/%.c=obj/mmsetup/%.o)
+SETUP_DEPS = $(SETUP_OBJS:obj/mmsetup/%.o=obj/mmsetup/%.d)
 
 export ETHLOAD_IP_PARAM
 
@@ -46,7 +47,7 @@ export ETHLOAD_IP_PARAM
 
 .PHONY: all clean run debug_xemu doxygen
 
-all: mm1.d81 mm2.d81 setup.prg
+all: mm1.d81 mm2.d81 mmsetup.prg
 
 run: mm1.d81 mm2.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm1.d81"
@@ -61,35 +62,34 @@ debug_xemu: mm1.d81 mm2.d81
 	tmux send-keys -t mmxemu "$(XMEGA65) -uartmon :4510 -8 mm1.d81 -besure -curskeyjoy -videostd 0" C-m
 
 # Rules for compiling C and assembly files
-obj/setup/%_s.o: src/setup/%.s
+obj/mmsetup/%_s.o: src/mmsetup/%.s
 	@mkdir -p $(dir $@)
 	$(AS) $(ASM_FLAGS) -o $@ $<
 
-obj/setup/%.o: src/setup/%.c
+obj/mmsetup/%.o: src/mmsetup/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CC_FLAGS) $(DEP_FLAGS) -c $< -o $@ -MFobj/$*.d
-
+	$(CC) $(CC_FLAGS) $(DEP_FLAGS) -c $< -o $@
 obj/%_s.o: src/%.s
 	@mkdir -p $(dir $@)
 	$(AS) $(ASM_FLAGS) -o $@ $<
 
 obj/%.o: src/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CC_FLAGS_MM) $(DEP_FLAGS) -c $< -o $@ -MFobj/$*.d
+	$(CC) $(CC_FLAGS_MM) $(DEP_FLAGS) -c $< -o $@
 
-# Rule for building the setup target
-setup.prg: $(SETUP_OBJS)
-	$(LN) $(LN_FLAGS_SETUP) -o setup.prg $(SETUP_OBJS)
+# Rule for building the mmsetup target
+mmsetup.prg: $(SETUP_OBJS)
+	$(LN) $(LN_FLAGS_SETUP) -o mmsetup.prg $(SETUP_OBJS)
 
 # Rule for building the runtime.raw target
 runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS_MM) -o $@ $(filter-out mega65-mm.scm,$^)
 
 # Rule for creating the mm1.d81 disk image
-mm1.d81: runtime.raw setup.prg $(SAVE_FILES)
+mm1.d81: runtime.raw mmsetup.prg $(SAVE_FILES)
 	echo "creating  mm1.d81 disk image"; \
 	$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
-	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write setup.prg setup -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0; \
+	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write mmsetup.prg mmsetup -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0; \
 	for file in gamedata/disk1/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \
@@ -125,7 +125,4 @@ doxygen:
 
 clean:
 	-rm -rf obj
-	-rm *.raw *.d mm-mega65.lst mm1.d81 mm2.d81
-	rm -f obj/*.o obj/*.lst obj/*.d
-	rm -f obj/setup/*.o obj/setup/*.lst obj/setup/*.d
-	rm -f mm1.d81 mm2.d81 setup.prg
+	-rm *.prg *.raw *.d mm-mega65.lst mm1.d81 mm2.d81

@@ -1173,7 +1173,14 @@ static uint8_t check_disk(uint8_t disk_num)
   for (uint8_t i = 0; i < sizeof(disk_header); ++i) {
     uint8_t read_byte = FDC.data;
     if (i == 23) {
+      // disk number is stored as ASCII value in disk index
       if (read_byte != 0x30 + disk_num + 1) {
+        return 0;
+      }
+    }
+    else if (i == 25) {
+      // DOS version can be either '1' or '3'
+      if (read_byte != 0x31 && read_byte != 0x33) {
         return 0;
       }
     }
