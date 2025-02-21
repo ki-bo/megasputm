@@ -2,6 +2,81 @@
 #include "_hdos.h"
 
 
+//uint8_t read = 0;
+
+
+void hdos_getcurrdrive(uint8_t *drive) {
+  uint8_t data;
+
+  __asm(
+//  lets assume this always succeeds, no doc
+//  to say otherwise.  What if no SDC?      
+      " .extern _hdos_getcurrdrive \n"
+      "   jsr _hdos_getcurrdrive \n"
+//  return the drive here
+      //"sta drive \n"
+      : "=Ka" (data)
+      : 
+      :"a", "x", "y"
+  );
+  *drive = data;
+}
+
+void hdos_getdefdrive(uint8_t *drive) {
+  uint8_t data;
+
+  __asm(
+//  lets assume this always succeeds, no doc
+//  to say otherwise.  What if no SDC?      
+      " .extern _hdos_getdefdrive \n"
+      "   jsr _hdos_getdefdrive \n"
+//  return the drive here
+      //"sta drive \n"
+      : "=Ka" (data)
+      : 
+      :"a", "x", "y"
+  );
+  *drive = data;
+}
+
+
+err_t hdos_selectdrive(uint8_t drive) {
+  uint8_t result = 1;
+  
+  //  selectdrive call requires in .X
+  __asm (
+      //"  tax \n"
+      " .extern _hdos_selectdrive \n"
+      "   jsr _hdos_selectdrive \n"
+      "  lda #0x00 \n"
+      "  rol a \n"
+      : "=Ka" (result)
+      : "Kx" (drive)
+      : "a", "x", "y"
+  );
+
+  return !result;
+}
+
+err_t hdos_cdrootdir(uint8_t drive) {
+  uint8_t result = 1;
+  
+  //  cdrootdir call requires in .X
+  __asm(
+      //"  tax \n"
+      " .extern _hdos_cdrootdir \n"
+      "  jsr _hdos_cdrootdir \n"
+      "  lda #0x00 \n"
+      "  rol a \n"
+      : "=Ka" (result)
+      : "Kx" (drive)
+      : "a", "x", "y"
+  );
+
+  return !result;
+}
+
+
 void hdos_init(uint16_t dataBuf, uint16_t xferBuf) {
   ptrhdosBufHi = (dataBuf & 0xFF00) >> 8;
   ptrhdosXfrHi = (xferBuf & 0xFF00) >> 8;
@@ -20,6 +95,10 @@ void hdos_init(uint16_t dataBuf, uint16_t xferBuf) {
 }*/
 
 //extern void _hdosSetFileName(void);
+
+void hdos_closeall(void) {
+  _hdos_closeall();
+}
 
 err_t hdos_set_filename(const char *fileName) {
   err_t result = 0;
@@ -57,8 +136,8 @@ err_t hdos_open_file(void) {
 //    "   sta result \n"
       : "=Ka" (result)
       :
-      : "a"
-  );
+      : "a", "x", "y"
+    );
 
   return result;
 }
@@ -71,7 +150,7 @@ void hdos_close_file(void) {
   __asm(
     " .extern _hdosCloseFile \n"
     "   jsr _hdosCloseFile \n"
-    ::: "a"
+    ::: "a", "x", "y"
   );
 }
 
@@ -86,17 +165,19 @@ err_t hdos_read_byte(uint8_t *data) {
    __asm(
     " .extern _hdosReadByte \n"
     "   jsr _hdosReadByte \n"
-    "   sta %1 \n"
+    "   sta %[read] \n"
     "   lda #0x00 \n"
     "   rol a \n"
 //  "   sta result \n"
     : "=Ka" (result)
-    : "Kzp8" (read)
-    : "a"
+    : [read] "Kzp8" (read)
+    : "a", "x", "y"
   );
 
-  if (!result) 
+  if (!result) {
+    *(uint8_t *)(0xd020) = read & 0x0f;
     *data = read;
+  }
 
   return result;
 }
@@ -112,7 +193,7 @@ void hdos_close_dir(uint8_t desc) {
     "   jsr _hdosCloseDir \n"
     : "=Ka" (desc)
     :
-    : "a"
+    : "a", "x", "y"
   );
 }
 
@@ -121,19 +202,19 @@ void hdos_close_dir(uint8_t desc) {
 }*/
 
 err_t hdos_open_dir(uint8_t *desc) {
-  err_t result = 0;
+  err_t result = 1;
   uint8_t read = 0;
 
   __asm(
     " .extern _hdosOpenDir \n"
     "   jsr _hdosOpenDir \n"
-    "   sta %1 \n"
+    "   sta %[read] \n"
     "   lda #0x00 \n"
     "   rol a \n"
 //  "   sta result \n"
     : "=Ka" (result)
-    : "Kzp8" (read)
-    : "a"
+    : [read] "Kzp8" (read)
+    : "a", "x", "y"
   );
 
   if (!result) 
@@ -147,7 +228,7 @@ err_t hdos_open_dir(uint8_t *desc) {
 }*/
 
 err_t hdos_read_dir(uint8_t desc) {
-  err_t result = 0;
+  err_t result = 1;
 
   __asm(
 //  "   lda desc \n"
@@ -158,7 +239,7 @@ err_t hdos_read_dir(uint8_t desc) {
 //  "   sta result \n"
     : "=Ka" (result)
     : "Ka" (desc)
-    : "a"
+    : "a", "x", "y"
   );
 
   return result;
@@ -179,7 +260,7 @@ err_t hdos_change_dir(void) {
 //  "   sta result \n"
     : "=Ka" (result)
     :
-    : "a"
+    : "a", "x", "y"
   );
 
   return result;

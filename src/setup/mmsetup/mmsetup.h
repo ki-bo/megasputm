@@ -1,5 +1,6 @@
 #pragma once
 
+#include "jude_widgets.h"
 #include "karljr.h"
 #include "jude.h"
 
@@ -169,7 +170,7 @@ extern judeControl_t ctl_mmsetup_select_0_1;
 extern judeControl_t ctl_mmsetup_select_0_2;
 extern judeControl_t ctl_mmsetup_select_0_3;
 extern judeControl_t ctl_mmsetup_select_0_4;
-extern judeControl_t ctl_mmsetup_select_0_5;
+extern judeListBox_t lbx_mmsetup_select_0_5;
 
 extern judePanel_t pnl_mmsetup_select_1;
 extern karlFarPtr_t pnl_mmsetup_select_1_controls[];

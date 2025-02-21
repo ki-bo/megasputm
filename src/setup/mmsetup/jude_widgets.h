@@ -63,3 +63,24 @@ void	judeDefPBtPresent(void);
 void	judeDefRGpChange(void);
 void	judeDefRBtChange(void);
 void	judeRGroupReset(uint8_t index);
+
+
+//LISTBOX
+
+typedef	struct	LISTBOX {
+  judeControl_t	_control;
+
+  EVENTPTR		select;
+
+  karlFarPtr_t	lines_p;
+  uint8_t			linescnt;
+  uint8_t			linewidth;
+  uint8_t			currline;
+  uint8_t			linesoff;
+  uint8_t			hotline;
+  uint8_t			selline;
+} judeListBox_t;
+
+void judeLBxPresent(void);
+void judeLBxPressed(void);
+void judeLBxChange(void);

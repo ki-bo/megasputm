@@ -1142,7 +1142,7 @@ karlFarPtr_t pnl_mmsetup_select_0_controls[] = {
   NEARTOFARPTRREC(&ctl_mmsetup_select_0_2),
   NEARTOFARPTRREC(&ctl_mmsetup_select_0_3),
   NEARTOFARPTRREC(&ctl_mmsetup_select_0_4),
-  NEARTOFARPTRREC(&ctl_mmsetup_select_0_5)
+  NEARTOFARPTRREC(&lbx_mmsetup_select_0_5)
 };
 
 judeControl_t ctl_mmsetup_select_0_0 = {
@@ -1267,19 +1267,19 @@ judeControl_t ctl_mmsetup_select_0_4 = {
 		0};
 
 
-judeControl_t ctl_mmsetup_select_0_5 = {
+judeListBox_t lbx_mmsetup_select_0_5 = {
 		sizeof(judeControl_t),
 		FARPTRNULLREC,
 		NEARTOEVENTPTR(judeDefCtlPrepare),
 		NEARTOEVENTPTR(judeDefCtlInit),
-		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(judeLBxChange),
 		NEARTOEVENTPTR(judeDefCtlRelease),
 		0x0003,
 		0x0000,
-		OPT_NONAVIGATE,
+		OPT_AUTOTRACK,
 		0,
-		NEARTOEVENTPTR(judeDefCtlPresent),
-		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOEVENTPTR(judeLBxPresent),
+		NEARTOEVENTPTR(judeLBxPressed),
 		NEARTOFARPTRREC(&pnl_mmsetup_select_0),
 		CLR_TEXT,
 		42,
@@ -1289,7 +1289,16 @@ judeControl_t ctl_mmsetup_select_0_5 = {
 		FARPTRNULLREC,
 		0,
 		0x0,
-		0};
+		0,
+		EVENTPTRNULLREC,
+		DWRDTOFARPTRREC(LISTBOXLINESMEM),
+		0x00,
+		65,
+		0x00,
+		0x00,
+		0x00,
+		0xFF
+  };
 
 
 judePanel_t pnl_mmsetup_select_1 = {

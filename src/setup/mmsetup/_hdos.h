@@ -15,3 +15,4 @@ void _hdosOpenDir(void);
 void _hdosReadDir(void);
 void _hdosChangeDir(void);
 void _hdosLoadFileAttic(void);
+void _hdos_closeall();

@@ -1,6 +1,9 @@
+#include "jude.h"
 #include "mmsetup.h"
 #include "mmsetup_ui.h"
 #include "karljr.h"
+
+#include "mmsetup_core.h"
 
 uint8_t config_required = 1;
 
@@ -60,12 +63,31 @@ void mmsetupWelcConfigChg(void){
   }
 }
 
+const char blah[] = "BLAH BLAH BLAH     0123456789012345678901234567890123456789123"; 
+
 void mmsetupConfigItemChg(void) {
   uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
   
   judeDefCtlChange();
 
   if (state & STATE_DOWN) {
+      /*uint8_t __huge *out = (uint8_t __huge *)(0x016000);
+
+      for (uint8_t i = 0; i < 10; ++i) {
+        for (uint8_t j = 0; j < 64; ++j) {
+          *out = blah[j];
+          ++out;
+        }
+      }*/
+
+      judeSetPointer(MPTR_WAIT);
+
+      lbx_mmsetup_select_0_5.linescnt = readDirectoryFiles("D81");
+		  zptrself = (uint32_t)((void __huge *)&lbx_mmsetup_select_0_5);
+      karlObjIncludeState(STATE_CHANGED);
+
+      judeSetPointer(MPTR_NORMAL);
+
 		  zptrself = (uint32_t)((__attribute__ ((huge))karlObject_t *)&pge_mmsetup_select);
 		  judeActivatePage();
   }

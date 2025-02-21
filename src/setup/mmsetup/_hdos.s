@@ -102,7 +102,52 @@ adrhdosDest:
     .public _hdosReadDir
     .public _hdosChangeDir
     .public _hdosLoadFileAttic
+    .public _hdos_selectdrive
+    .public _hdos_getcurrdrive
+    .public _hdos_cdrootdir
+    .public _hdos_closeall
+    .public _hdos_getdefdrive
 ;===========================================================
+
+_hdos_closeall:
+    lda #0x22
+    sta 0xD640
+    clv
+
+    rts
+
+_hdos_getdefdrive:
+		lda	#0x02
+		sta	0xD640
+		clv
+
+    rts
+
+_hdos_getcurrdrive:
+      lda #0x04
+      sta 0xD640
+      clv
+      rts
+
+_hdos_cdrootdir:
+      lda #0x3c
+      sta 0xD640
+      clv
+
+      rts
+
+
+_hdos_selectdrive:
+      lda #0x06
+      sta 0xD640
+      clv
+; do not use this .X value it is invalid
+; you must restore prior value before 
+; calling cdrootdir (be sure not to optimise this away)
+      ldx #0x00
+
+      rts
+
 
 ;-----------------------------------------------------------
 _hdosSetFileName:
@@ -295,6 +340,14 @@ _hdosReadDir:
 		rts
 
 readDirSuccess$:
+		plz
+		ply
+		plx
+
+    clc
+    rts
+
+
 		lda	#0x00
 		sta	zp:ptrhdosBufDir
 		lda	zp:ptrhdosXfrHi
