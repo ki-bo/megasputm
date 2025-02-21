@@ -9,6 +9,7 @@
 /*.dbg
 /ByteDump.txt
 /asminfo.txt
+/*.prg
 /*.raw
 /*.lst
 /*.d81
