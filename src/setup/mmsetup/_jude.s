@@ -95,6 +95,11 @@
   .public   _judeUserIRQ
   ;.public   jude_kernirq
 
+  .public   mouseXPos
+  .public   mouseYPos
+
+  .extern   input_update
+
   .extern		karlASCIIToScreen
 	.extern		karlGetLastError
 	.extern		karlPanic
@@ -4790,7 +4795,10 @@ keys$:
 		jsr	_keysInputKeys
 
 mouse$:
-		jsr	_mouseInputMouse
+//	jsr	_mouseInputMouse
+    jsr input_update
+    jsr _mouseButtonCheck
+
 		jsr	_mouseProcessMouse
 		jsr	_mouseProcessClick
 
