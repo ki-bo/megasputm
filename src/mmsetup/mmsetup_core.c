@@ -919,20 +919,6 @@ void behaviourExtractFinish(void) {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #define UART_E_PRA  (*(volatile uint8_t *)              0xd607)
 #define UART_E_DDR  (*(volatile uint8_t *)              0xd608)
 

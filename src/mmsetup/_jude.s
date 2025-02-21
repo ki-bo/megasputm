@@ -15,7 +15,7 @@
 	#include	"_karljr_types.inc"
 	#include	"_jude_types.inc"
 
-  #define	DEBUG_RASTERTIME 1
+  //#define	DEBUG_RASTERTIME 1
 
  .section code
 

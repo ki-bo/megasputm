@@ -7,8 +7,6 @@
 
 #include "hdos.h"
 
-//#include "room90.h"
-
 
 void updateCheckGlyph(void) {
   static const uint8_t glyphlo[] = {
@@ -66,94 +64,33 @@ void attemptLoadFont(void) {
 
     *(uint8_t *)(0xd07a) = *(uint8_t *)(0xd07a) | 0x10;
   };
-
-  /*if (!hdos_set_filename("MANIACM1.ADF") && !hdos_open_file()) {
-    uint8_t __huge *ptr = (uint8_t __huge *)0x030000;
-    uint32_t out = 0x08000000;
-    uint8_t data;
-
-    while (!hdos_read_byte(&data)) {
-      *ptr = data;
-      ++ptr;
-
-      *(uint8_t __huge *)out = data;
-      out++;
-    }
-
-    hdos_close_file();
-  };*/
-
-  /*if (!hdos_set_filename("MANIACM1.ADF")) {
-    //hdos_load_file_attic(0);
-
-    __asm(
-    " .extern _hdosLoadFileAttic \n"
-    "   ldx #0 \n"
-    "   ldy #0 \n"
-    "   ldz #0 \n"
-    "   jsr _hdosLoadFileAttic \n"
-    //"   lda #0x3e \n"
-    //"   sta 0xd640 \n"
-    //"   clv \n" 
-      :::"a", "x", "y", "z"
-  );
-  }*/
 }
 
 
-//extern void performKernalScatchAllRooms(void);
-//extern void performKernalHeaderChange(uint8_t diskno);
-//extern uint16_t *jude_kernirq;
-
 int main(void) {
-  //*jude_kernirq = *(uint16_t *)(0xfffe);
+  //hide our shinanegans....
+  *(uint8_t *)0xd011 &= 0xEF;
 
+  //*jude_kernirq = *(uint16_t *)(0xfffe);
   hdos_init(0x0800, 0x0800);
   _judeBackupKernalZP();
 
-  //performKernalHeaderChange(3);
-  //performKernalScatchAllRooms();
-  //while(1) {
-    //__asm(" inc 0xd020 ");
-  //}
-  //hdos_set_filename("MANIAC1.D64");
-  //hdos_load_file_attic(0);
-  //hdos_set_filename("MANIAC2.D64");
-  //hdos_load_file_attic(0x32000);
-  //readIndexFile((uint8_t __huge *)(0x08000000));
-  //uint8_t __huge *image1 = (uint8_t __huge *)(0x08000000);
-  //uint8_t __huge *image2 = (uint8_t __huge *)(0x08032000);
-  //uint8_t __huge *dest = (uint8_t __huge *)(0x0005B000);
-  //makeRoom90(image1,image2, dest);
-
   attemptLoadFont();
-
   core_init();
 
   jude_initflags = INIT_PRESERVEKERNAL;
-
   karlInit();
-
-  //processTest();
-  //return -1;
-
   judeInit();
-
-  //processTest();
-
 
   karlModAttach((karlFarPtr_t)&mod_mmsetup_app);
 
   //does and sei but we should be fine by now
   judeInstallIdle((void *)&updateProcess);
 
-  //processTest();
+  //Bring the screen back
+  *(uint8_t *)0xd011 = *(uint8_t *)0xd011 | 0x10;
 
   judeViewInit((karlFarPtr_t)&vew_mmsetup_main);
-
-  //return -1;
-
-
   judeMain();
 
   return -1;

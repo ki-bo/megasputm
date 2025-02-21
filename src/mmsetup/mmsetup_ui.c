@@ -89,6 +89,7 @@ void mmsetupWelcConfigChg(void){
   }
 }
 
+//There is some bug copying the string...
 //const char blah[] = "BLAH BLAH BLAH     0123456789012345678901234567890123456789123"; 
 
 void mmsetupConfigItemChg(void) {
@@ -395,12 +396,11 @@ void mmsetupWelcPgeKeypress(void) {
   uint8_t mod = (keypress & 0xff00) >> 8;
   uint8_t key = (keypress & 0x00ff);
 
-  //while(1) {
-    //__asm(" inc 0xd020 ");
-  //}
-
-
   if ((mod == 5) && (key == 87)) {
     judeSetTheme(7);
+
+    ctl_mmsetup_welc_1_2.text_p = (karlFarPtr_t)judeGetThemeDesc();
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_welc_1_2);
+    karlObjIncludeState(STATE_CHANGED);
   }
 }
