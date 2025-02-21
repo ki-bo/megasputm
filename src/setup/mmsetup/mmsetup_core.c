@@ -685,6 +685,27 @@ void behaviourExtractInit(void) {
     return;
   }
 
+  uint8_t roompreprep = roomidx;
+  uint8_t *rooms;
+  if (outputDisk == 0) {
+    rooms = disk1Rooms;
+  } else {
+    rooms = disk2Rooms;
+  }
+  
+  while (rooms[roompreprep] != 0xff) {
+    prepareLFLFileName(rooms[roompreprep]);
+
+    if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
+      *(volatile uint8_t *)(0xd020) = 2;
+      writeToProcOutput("ADF READ ERROR");
+      procstate = PROCST_FINISH;
+      return;
+    }
+
+    roompreprep++;
+  }
+
   if (dest_details[outputDisk].type == SETTINGT_DISK) {
     procstate = PROCST_WAIT;
     procContinue = 0;
