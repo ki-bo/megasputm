@@ -15,6 +15,8 @@
 	#include	"_karljr_types.inc"
 	#include	"_jude_types.inc"
 
+  #define	DEBUG_RASTERTIME 1
+
  .section code
 
 	.public		judeInit
@@ -72,11 +74,26 @@
 	.public		jude_actvpg
 	.public		judeDownElem
 
+  .public   theme0
+
 	.public		mouseXCol
 	.public		mouseYRow
 
   .public   themeCnt;
   .public   actvtheme;
+
+  .public   jude_onidle
+  .public   jude_initflags
+
+  .public   _judeBackupKernalZP
+  .public   _judeBackupOwnZP
+  .public   _judeRestoreKernalZP
+  .public   _judeRestoreOwnZP
+  .public   _judeBankKernal
+  .public   _judeUnbankKernal
+
+  .public   _judeUserIRQ
+  .public   jude_kernirq
 
   .extern		karlASCIIToScreen
 	.extern		karlGetLastError
@@ -145,7 +162,7 @@ _judeViewInit:
 		lbeq	exit$
 
 	#ifdef	DEBUG_RASTERTIME
-		lda	#0x05
+		lda	#0x07
 		sta	VIC_BRDRCLR
 	#endif
 
@@ -258,6 +275,18 @@ judeMain:
 ;		JMP	halt$
 
 main$:
+    ;lda process
+    ;cmp #0x04
+    ;beq skip$
+
+    ;lda process
+    ;beq skip$
+
+    ;jsr processTest
+
+    ;lda #04
+    ;sta process
+skip$:
 		cli
 
 ;	Check not locked
@@ -265,6 +294,7 @@ main$:
 		sei
 		lda	karl_lock
 		bne	main$
+
 
 ;	Set processed this frame
 		lda	#0x01
@@ -284,29 +314,37 @@ main$:
 
 ;	Check Changed
 		lda	karl_changed
-		beq	keys$
+		beq	dirty$
 
 		jsr	_judeUpdateChanged
 
 		lda	#0x00
 		sta	karl_changed
-		JMP	finish$
+		JMP	done$
 
 ;	Check Keys
 keys$:
 		jsr	_judeSendKeys
+    bra finish$
 
 ;	Check Dirty
 dirty$:
 		lda	karl_dirty
-		beq	finish$
+		beq	keys$
 
 		jsr	_judePresentDirty
 
 		lda	#0x00
 		sta	karl_dirty
 
+    bra done$
+
 finish$:
+    lda jude_onidle
+    ora jude_onidle + 1
+    beq done$
+
+    jsr _judeOnIdleProxy
 
 done$:
 ;	Release IRQ
@@ -880,7 +918,8 @@ _judeDrawTextDirect:
 ;-----------------------------------------------------------
 
 		clc
-		lda	zp:zregCb0
+		;lda	zp:zregCb0
+    lda zp:zregAb2
 		adc	zp:zregBb1
 
 		ldx	jude_cellsize
@@ -932,8 +971,9 @@ cont1$:
 		dec	zp:zregAb3
 
 cont2$:
-		lda	zp:zregAb2		;text indent
-		sta	zp:zregCb1
+		;lda	zp:zregAb2		;text indent
+		lda zp:zregCb0
+    sta	zp:zregCb1
 
 		ldx	#0x00
 	
@@ -4603,8 +4643,18 @@ _judeUserIRQ:
 
 		cld
 
+    ;lda process
+    ;cmp #0x04
+    ;beq start$
+;
+    ;lda process
+    ;bne terminate$
+
+start$:
 		lda	#0x01
 		sta	karl_lock
+
+		jsr	_judeVolatileStore
 
 	#ifdef	DEBUG_RASTERTIME
 		lda	#0x00
@@ -4612,7 +4662,6 @@ _judeUserIRQ:
     inc   0xd020
 	#endif
 
-		jsr	_judeVolatileStore
 
 ;	Is the VIC-II needing service?
 		lda	VIC_IRQFLGS
@@ -4620,10 +4669,23 @@ _judeUserIRQ:
 		bne	proc$
 
 ;	Some other interrupt source
+    lda 0xd080
+    and #0x80
+    beq nextirq$
+
 		jsr	karlPanic
+    
+
+nextirq$:
+
     ;bra done$
 
+; just in case
+		lda	CIA1_IRQCTL
+    lda CIA2_IRQCTL
+
 proc$:
+; Seem to need to reguardless
 		asl VIC_IRQFLGS
 
 		MvDWMem	zp:zptrtemp1, zp:zptrself
@@ -4633,8 +4695,13 @@ proc$:
 		MvDWMem	zp:zptrself, zp:zptrtemp1
 
 done$:
-		jsr	_judeVolatileLoad
+    ;lda jude_irqthread
+    ;ora jude_irqthread + 1
+    ;beq complete$
 
+    ;jsr _judeThread
+
+complete$:
 	#ifdef	DEBUG_RASTERTIME
 		lda	#.byte0 CLR_EMPTY
 		ldx	#.byte1 CLR_EMPTY
@@ -4642,10 +4709,44 @@ done$:
 		sta	VIC_BRDRCLR
 	#endif
 
+		jsr	_judeVolatileLoad
+
 		lda	#0x00
 		sta	karl_lock
 
 		plz
+		ply
+		plx
+		pla
+		plp
+
+		rti
+
+
+terminate$:
+    inc 0xd020
+
+		lda	#0x7F			;disable standard CIA irqs
+		;sta	CIA1_IRQCTL
+    ;sta CIA2_IRQCTL
+
+		lda	CIA1_IRQCTL
+    lda CIA2_IRQCTL
+
+		lda	VIC_IRQFLGS
+		and	#0x01
+		beq	closure$
+		asl VIC_IRQFLGS
+
+closure$:
+    ;lda jude_irqthread
+    ;ora jude_irqthread + 1
+    ;beq none$
+
+    ;jsr _judeThread
+		
+none$:
+    plz
 		ply
 		plx
 		pla
@@ -4672,31 +4773,120 @@ exit$:
 
 
 ;-----------------------------------------------------------
+_judeBackupKernalZP:
+;-----------------------------------------------------------
+    ldx #0
+loop$:
+    lda zp:00, X
+    sta jude_kernal, X
+
+    inx
+    bne loop$
+
+    rts
+
+
+;-----------------------------------------------------------
+_judeBackupOwnZP:
+;-----------------------------------------------------------
+    ldx #0
+loop$:
+    lda zp:00, X
+    sta jude_runtime, X
+
+    inx
+    bne loop$
+
+    rts
+
+;-----------------------------------------------------------
+_judeRestoreKernalZP:
+;-----------------------------------------------------------
+    ldx #2
+loop$:
+    lda jude_kernal, X
+    sta zp:00, X
+
+    inx
+    bne loop$
+
+    rts
+
+
+;-----------------------------------------------------------
+_judeRestoreOwnZP:
+;-----------------------------------------------------------
+    ldx #2
+loop$:
+    lda jude_runtime, X
+    sta zp:00, X
+
+    inx
+    bne loop$
+
+    rts
+
+_judeBankKernal:
+;		lda	#0x1E
+;		sta	0x01
+
+    lda #0x80
+    tsb 0xd030
+
+    lda #0x00 ; MAPLO
+    ldx #0x00
+    ldy #0x00  ; MAPHI
+    ldz #0x83
+    map
+    eom
+
+    rts
+
+
+_judeUnbankKernal:
+;		lda	#0x1D
+;		sta	0x01
+    lda #0x80
+    trb 0xd030
+
+    lda #0x00 ; MAPLO = select $2 offset $45200
+    ldx #0x00
+    ldy #0x00  ; MAPHI = select $B offset $30000
+    ldz #0x00
+    map
+    eom
+
+
+    rts
+
+
+
+;-----------------------------------------------------------
 _judeDefCorePrepare:
 ;-----------------------------------------------------------
-    lda #0x04
+    lda #0x07
     sta 0xd020
 
 		sei
 
-		lda	#0x7F			;disable standard CIA irqs
-		sta	CIA1_IRQCTL
-    sta CIA2_IRQCTL
+		;lda	#0x7F			;disable standard CIA irqs
+		;sta	CIA1_IRQCTL
+    ;sta CIA2_IRQCTL
+		;lda	CIA1_IRQCTL
+		;lda	CIA2_IRQCTL
 
 ;	Bank out BASIC+Kernal, keep IO
 ;	First, make sure that the IO port line are set to output
-		lda	0x00
-		ora	#0x07
-		sta	0x00
+		;lda	0x00
+		;ora	#0x07
+		;sta	0x00
 
 ;	Now, exclude BASIC+KERNAL from the memory map (keep IO)
-		lda	#0x1D
-		sta	0x01
-
-		;lda	#0x00
-		;sta	0x00
-		;lda	#0x37
+		;lda	#0x1D
 		;sta	0x01
+
+    lda #0x18
+    trb 0xd030
 
 		;lda	#0x00
 		;ldx	#0x0f
@@ -4704,12 +4894,19 @@ _judeDefCorePrepare:
 		;ldz	#0x0f
 		;map
 
-		lda	#0
-		tax
-		tay
-		taz
-		map
-		eom
+;		lda	#0
+;		tax
+;		tay
+;		taz
+;		map
+;		eom
+
+    ;lda #0x00 ; MAPLO
+    ;ldx #0x00
+    ;ldy #0x00  ; MAPHI
+    ;ldz #0xE3
+    ;map
+    ;eom
 
 		;lda	#0x00
 		;sta	0xd02f
@@ -4729,6 +4926,12 @@ _judeDefCoreInit:
 ;-----------------------------------------------------------
     ;lda #0x07
     ;sta 0xd020
+
+
+    ;lda CPU_IRQ
+    ;sta jude_kernirq
+    ;lda CPU_IRQ + 1
+    ;sta jude_kernirq + 1
 
 		lda	#.byte0 _judeUserIRQ		;install our handler
 		sta	CPU_IRQ
@@ -4758,6 +4961,7 @@ _judeDefCoreInit:
 		sta	VIC_IRQMASK
 
     ;asl VIC_IRQFLGS
+
 
 		lda	#0x00
 		sta	karl_errorno
@@ -4789,10 +4993,14 @@ _judeProxy:
 		jmp	(jude_proxyptr)
 
 
+;-----------------------------------------------------------
+_judeOnIdleProxy:
+;-----------------------------------------------------------
+		jmp	(jude_onidle)
+
+
 
  .section rodata, rodata
-actvtheme:
-    .byte 0x00
 
 themeCnt:
 		.byte	0x06
@@ -4817,7 +5025,7 @@ theme0:
 		.byte		0x0F, 0x03, 0x0C, 0x0E, 0x0D, 0x07, 0x0A
 
 		.asciz		"DARK            "
-		.byte		0x01, 0x00, 0x04, 0x0F, 0x0E, 0x00, 0x0F, 0x0B
+		.byte		0x01, 0x00, 0x04, 0x0C, 0x0E, 0x00, 0x0F, 0x0B
 		.byte		0x0F, 0x03, 0x0C, 0x0E, 0x0D, 0x07, 0x0A
 
 		.asciz		"FAMILIAR        "
@@ -4886,6 +5094,8 @@ pointer1:
 
 
     .section data, data
+actvtheme:
+    .byte 0x00
 
 
 mod_jude_core:
@@ -5102,6 +5312,23 @@ judePBlinkDelay:
 judePBlinkState:
 		.byte	0x00
 
+jude_irqthread:
+    .word   0x0000;
+jude_onidle:
+    .word   0x0000;
+
+
+jude_initflags:
+    .byte 0x00
 
 jude_volstr:
 		.space	0xff, 0
+
+jude_kernal:
+		.space	0xff, 0
+
+jude_runtime:
+		.space	0xff, 0
+
+jude_kernirq:
+    .word   0x0000

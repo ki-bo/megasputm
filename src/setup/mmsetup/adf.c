@@ -19,7 +19,7 @@
 
 #include "adf.h"
 #include <ctype.h>
-#include <stdio.h>
+//#include <stdio.h>
 #include <string.h>
 
 #define ROOT_BLOCK (40 * 2 * 11)
@@ -108,7 +108,7 @@ int8_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t *size)
   if (size) {
     *size = bytes_left;
   }
-  printf("BYTES LEFT: %ld\r", bytes_left);
+  //printf("BYTES LEFT: %ld\r", bytes_left);
 
   while (bytes_left)
   {
@@ -159,7 +159,7 @@ int16_t find_entry_block(const char *name)
   }
   uint8_t hash_table_entry = hash % HASH_TABLE_SIZE;
 
-  printf("FILENAME: %s, HASH: %d\r", name_buffer, hash_table_entry);
+  //printf("FILENAME: %s, HASH: %d\r", name_buffer, hash_table_entry);
 
   // find block number in hash table
   uint16_t block_num  = read_u32(0x18 + hash_table_entry * 4);
@@ -167,14 +167,14 @@ int16_t find_entry_block(const char *name)
   if (block_num == 0)
   {
     // no file matching that hash
-    printf("NO FILE FOUND\r");
+    //printf("NO FILE FOUND\r");
     return -1;
   }
 
   // iterate over blocks and match real strings
   do {
     read_block(block_num);
-    printf("BLOCK_NUM: %d, LEN: %d\r", block_num, (uint16_t)ENTRY_NAME_LEN);
+    //printf("BLOCK_NUM: %d, LEN: %d\r", block_num, (uint16_t)ENTRY_NAME_LEN);
     if (ENTRY_NAME_LEN == len) {
       uint8_t i;
       for (i = 0; i < len; ++i) {
@@ -184,7 +184,7 @@ int16_t find_entry_block(const char *name)
       }
       if (i == len) {
         // found entry block
-        printf("FOUND: %d\r", block_num);
+        //printf("FOUND: %d\r", block_num);
         return block_num;
       }
     }
@@ -194,7 +194,7 @@ int16_t find_entry_block(const char *name)
   }
   while (block_num != 0);
 
-  printf("NOTHING FOUND\r");
+  //printf("NOTHING FOUND\r");
   return -1;
 }
 

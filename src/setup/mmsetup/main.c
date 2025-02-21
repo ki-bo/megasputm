@@ -1,6 +1,9 @@
+//#pragma require __preserve_zp
+
 #include "karljr.h"
 #include "jude.h"
 #include "mmsetup.h"
+#include "mmsetup_core.h"
 
 #include "hdos.h"
 
@@ -63,18 +66,39 @@ void attemptLoadFont(void) {
   };
 }
 
+extern uint16_t *jude_kernirq;
+
 int main(void) {
+  *jude_kernirq = *(uint16_t *)(0xfffe);
+
   hdos_init(0x0800, 0x0800);
+  _judeBackupKernalZP();
 
   attemptLoadFont();
 
+  jude_initflags = INIT_PRESERVEKERNAL;
 
   karlInit();
-	judeInit();
+
+  //processTest();
+  //return -1;
+
+  judeInit();
+
+  //processTest();
+
 
   karlModAttach((karlFarPtr_t)&mod_mmsetup_app);
 
+  //does and sei but we should be fine by now
+  judeInstallIdle((void *)&updateProcess);
+
+  //processTest();
+
   judeViewInit((karlFarPtr_t)&vew_mmsetup_main);
+
+  //return -1;
+
 
   judeMain();
 

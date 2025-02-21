@@ -261,5 +261,58 @@ void mmsetupWelcThemeChg(void) {
     }
 
     judeSetTheme(theme);
+    ctl_mmsetup_welc_1_2.text_p = (karlFarPtr_t)judeGetThemeDesc();
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_welc_1_2);
+    karlObjIncludeState(STATE_CHANGED);
   }
+}
+
+void mmsetupConfigNextChg(void) {
+  uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_process);
+    judeActivatePage();
+
+    initiateProcess();
+  }
+}
+
+void mmsetupProcCancelChg(void) {
+  uint8_t state = ((karlObject_t __huge *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    cancelProcess();
+  }
+}
+
+void mmsetupProcDoneChg(void) {
+  uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_welcome);
+    judeActivatePage();
+  }
+}
+
+void mmsetupProcContChg(void) {
+  uint8_t state = ((karlObject_t __huge *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    continueProcess();
+  }
+}
+
+void mmsetupWelcThemeLblPrep(void) {
+  judeDefCtlPrepare();
+
+  ctl_mmsetup_welc_1_2.text_p = (karlFarPtr_t)judeGetThemeDesc();
 }

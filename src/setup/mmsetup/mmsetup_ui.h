@@ -23,3 +23,13 @@ void mmsetupListSelect(void);
 void mmsetupSelAcceptChg(void);
 
 void mmsetupWelcThemeChg(void);
+
+void mmsetupConfigNextChg(void);
+
+void mmsetupProcCancelChg(void);
+
+void mmsetupProcDoneChg(void);
+
+void mmsetupProcContChg(void);
+
+void mmsetupWelcThemeLblPrep(void);

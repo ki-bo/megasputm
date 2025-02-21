@@ -272,8 +272,8 @@ err_t hdos_load_file_attic(uint32_t offset) {
   __asm(
     " .extern _hdosLoadFileAttic \n"
     "   ldx %[offs] \n"
-    "   ldy %[offs] + 1 \n"
-//  "   ldz %[offs] + 2 \n"
+    "   ldy %[offs] + 1\n"
+//  "   lda %[offs] + 2 \n"
     "   lda %[offs] + 2 \n"
     "   taz \n"
     "   jsr _hdosLoadFileAttic \n"

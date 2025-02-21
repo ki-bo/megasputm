@@ -1,4 +1,5 @@
 #include	"jude.h"
+#include <stdint.h>
 //#include "calypsi/intrinsics6502.h"
 
 
@@ -94,4 +95,34 @@ void judeSetTheme(uint8_t theme) {
       : "Ka" (theme)
       : "a"
   );
+}
+
+
+void *judeInstallIdle(void *routine) {
+  void *result = (void *)jude_onidle;
+
+  __asm(
+    "   cli \n"
+  );
+
+  jude_onidle = (uint16_t)(routine);
+
+  __asm(
+    "   sei \n"
+  );
+
+
+  return result;
+}
+
+extern judeTheme_t *theme0;
+
+char *judeGetThemeDesc(void) {
+  char *result = theme0[actvtheme]._name;
+
+  for (uint8_t i = 0; i < 17; i++) {
+    ((uint8_t *)(0x0800))[i] = (uint8_t)result[i];
+  };
+
+  return result;
 }

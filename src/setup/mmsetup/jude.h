@@ -87,6 +87,8 @@
 #define	MPTR_WAIT		0x01
 
 
+#define INIT_PRESERVEKERNAL 0x01
+
 
 typedef	struct	THEME {
 		karlName_t		_name;
@@ -260,10 +262,19 @@ void	_judeDrawTextDirect(void);
 
 void _judeProcessAccelerators(void);
 void _judeMoveActiveControl(void);
+void _judeBackupKernalZP(void);
 
 
+void *judeInstallIdle(void *routine);
+
+char *judeGetThemeDesc(void);
 
 extern uint8_t mouseXCol;
 extern uint8_t mouseYRow;
 extern uint8_t themeCnt;
 extern uint8_t actvtheme;
+extern judeTheme_t *theme0;
+
+
+extern uint16_t jude_onidle;
+extern int8_t jude_initflags;

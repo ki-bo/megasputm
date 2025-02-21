@@ -28,11 +28,12 @@ judeControl_t ctl_mmsetup_config_0_5 = {
 		NEARTOFARPTRREC(str_mmsetup_config_5),
 		0,
 		0x0,
-	  0};
+	  '4'};
 
 karlFarPtr_t pnl_mmsetup_welc_1_controls[] = {
 		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_0),
-		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_1)};
+		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_1),
+		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_2)};
 
 karlModule_t mod_mmsetup_app = {
 		sizeof(karlModule_t),
@@ -71,7 +72,7 @@ judeControl_t ctl_mmsetup_config_0_6 = {
 		NEARTOFARPTRREC(str_mmsetup_config_6),
 		0,
 		0x0,
-		0};
+		'5'};
 
 char str_mmsetup_config_7[] = "6  D64 disk #2...";
 
@@ -141,7 +142,7 @@ judeControl_t ctl_mmsetup_config_0_15 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_13),
 		0,
-		0x0,
+		0xff,
 		0};
 
 judeControl_t ctl_mmsetup_config_0_8 = {
@@ -166,7 +167,7 @@ judeControl_t ctl_mmsetup_config_0_8 = {
 		NEARTOFARPTRREC(str_mmsetup_config_8),
 		0,
 		0x0,
-		0};
+		'7'};
 
 char str_mmsetup_config_2[] = "1  D81 disk #1...";
 
@@ -193,7 +194,7 @@ judeControl_t ctl_mmsetup_config_0_19 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_14),
 		0,
-		0x0,
+		0xff,
 		0};
 
 judeControl_t ctl_mmsetup_welc_0_3 = {
@@ -258,7 +259,7 @@ judePage_t pge_mmsetup_welcome = {
 		NEARTOEVENTPTR(judeDefPgePresent),
 		EVENTPTRNULLREC,
 		NEARTOFARPTRREC(&vew_mmsetup_main),
-		CLR_PAPER,
+		CLR_INSET,
 		0,
 		0,
 		80,
@@ -273,7 +274,8 @@ judePage_t pge_mmsetup_welcome = {
 karlFarPtr_t vew_mmsetup_main_pages[] = {
 		NEARTOFARPTRREC(&pge_mmsetup_welcome),
 		NEARTOFARPTRREC(&pge_mmsetup_configure),
-    NEARTOFARPTRREC(&pge_mmsetup_select)};
+    NEARTOFARPTRREC(&pge_mmsetup_select),
+    NEARTOFARPTRREC(&pge_mmsetup_process)};
 
 judeUInterface_t uni_mmsetup_ui = {
 		sizeof(judeUInterface_t),
@@ -314,7 +316,7 @@ judeView_t vew_mmsetup_main = {
 		0,
 		NEARTOFARPTRREC(&pge_mmsetup_welcome),
 		NEARTOFARPTRREC(vew_mmsetup_main_pages),
-		3,
+		4,
 		0};
 
 char str_mmsetup_welc_1[] = "Select the operations you wish to perform.";
@@ -340,7 +342,7 @@ judeControl_t ctl_mmsetup_config_0_16 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_13),
 		0,
-		0x0,
+		0xff,
 		0};
 
 judePanel_t pnl_mmsetup_config_1 = {
@@ -508,7 +510,7 @@ judeControl_t ctl_mmsetup_config_0_2 = {
 		NEARTOFARPTRREC(str_mmsetup_config_2),
 		0,
 		0x0,
-		0};
+		'1'};
 
 char str_mmsetup_config_14[] = "<All>";
 
@@ -617,7 +619,7 @@ judeControl_t ctl_mmsetup_config_1_0 = {
 		FARPTRNULLREC,
 		NEARTOEVENTPTR(judeDefCtlPrepare),
 		NEARTOEVENTPTR(judeDefCtlInit),
-		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(mmsetupConfigNextChg),
 		NEARTOEVENTPTR(judeDefCtlRelease),
 		0x0003,
 		0x0000,
@@ -633,8 +635,8 @@ judeControl_t ctl_mmsetup_config_1_0 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_buttons_0),
 		0,
-		0x0,
-		0};
+		0x1,
+		'N'};
 
 judeControl_t ctl_mmsetup_welc_0_2 = {
 		sizeof(judeControl_t),
@@ -684,7 +686,7 @@ judeControl_t ctl_mmsetup_config_0_7 = {
 		NEARTOFARPTRREC(str_mmsetup_config_7),
 		0,
 		0x0,
-		0};
+		'6'};
 
 judeControl_t ctl_mmsetup_config_0_20 = {
 		sizeof(judeControl_t),
@@ -707,7 +709,7 @@ judeControl_t ctl_mmsetup_config_0_20 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_14),
 		0,
-		0x0,
+		0xff,
 		0};
 
 karlFarPtr_t pnl_mmsetup_welc_0_controls[] = {
@@ -741,7 +743,7 @@ judeControl_t ctl_mmsetup_config_0_3 = {
 		NEARTOFARPTRREC(str_mmsetup_config_3),
 		0,
 		0x0,
-		0};
+		'2'};
 
 char str_mmsetup_config_6[] = "5  D64 disk #1...";
 
@@ -820,7 +822,7 @@ judeControl_t ctl_mmsetup_config_0_14 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_13),
 		0,
-		0x0,
+		0xff,
 		0};
 
 judeControl_t ctl_mmsetup_config_0_17 = {
@@ -844,7 +846,7 @@ judeControl_t ctl_mmsetup_config_0_17 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_13),
 		0,
-		0x0,
+		0xff,
 		0};
 
 judeControl_t ctl_mmsetup_config_0_18 = {
@@ -868,7 +870,7 @@ judeControl_t ctl_mmsetup_config_0_18 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_13),
 		0,
-		0x0,
+		0xff,
 		0};
 
 judeControl_t ctl_mmsetup_config_0_1 = {
@@ -982,6 +984,30 @@ judeControl_t ctl_mmsetup_welc_1_1 = {
 		0x1,
 		'T'};
 
+judeControl_t ctl_mmsetup_welc_1_2 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(mmsetupWelcThemeLblPrep),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		STATE_VISIBLE | STATE_ENABLED,
+		0x0000,
+		OPT_NONAVIGATE,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_1),
+		CLR_TEXT,
+		24,
+		24,
+		16,
+		1,
+		FARPTRNULLREC,
+		0,
+		0xff,
+		0x0};
+    
 
 judeControl_t ctl_mmsetup_config_0_9 = {
 		sizeof(judeControl_t),
@@ -1005,7 +1031,7 @@ judeControl_t ctl_mmsetup_config_0_9 = {
 		NEARTOFARPTRREC(str_mmsetup_config_9),
 		0,
 		0x0,
-		0};
+		'8'};
 
 judeControl_t ctl_mmsetup_config_0_4 = {
 		sizeof(judeControl_t),
@@ -1029,7 +1055,7 @@ judeControl_t ctl_mmsetup_config_0_4 = {
 		NEARTOFARPTRREC(str_mmsetup_config_4),
 		0,
 		0x0,
-		0};
+		'3'};
 
 karlFarPtr_t mod_mmsetup_app_units[] = {
 		NEARTOFARPTRREC(&uni_mmsetup_ui)};
@@ -1081,7 +1107,7 @@ judePanel_t pnl_mmsetup_welc_1 = {
 		2,
 		NEARTOFARPTRREC(&lay_mmsetup_bkg),
 		NEARTOFARPTRREC(pnl_mmsetup_welc_1_controls),
-		2};
+		3};
 
 judeControl_t ctl_mmsetup_config_0_13 = {
 		sizeof(judeControl_t),
@@ -1104,7 +1130,7 @@ judeControl_t ctl_mmsetup_config_0_13 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_config_13),
 		0,
-		0x0,
+		0xff,
 		0};
 
 
@@ -1242,8 +1268,8 @@ judeControl_t ctl_mmsetup_select_0_2 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_select_2),
 		0,
-		0x0,
-		0};
+		0x6,
+		'R'};
 
 judeControl_t ctl_mmsetup_select_0_3 = {
 		sizeof(judeControl_t),
@@ -1266,8 +1292,8 @@ judeControl_t ctl_mmsetup_select_0_3 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_select_3),
 		0,
-		0x0,
-		0};
+		0x9,
+		'N'};
 
 judeControl_t ctl_mmsetup_select_0_4 = {
 		sizeof(judeControl_t),
@@ -1290,8 +1316,8 @@ judeControl_t ctl_mmsetup_select_0_4 = {
 		1,
 		NEARTOFARPTRREC(str_mmsetup_select_4),
 		0,
-		0x0,
-		0};
+		0x9,
+		'A'};
 
 
 judeListBox_t lbx_mmsetup_select_0_5 = {
@@ -1406,6 +1432,478 @@ judeControl_t ctl_mmsetup_select_1_1 = {
 		0xff,
 		KEY_M65_ESC};
 
+
+judePage_t pge_mmsetup_process = {
+		sizeof(judePage_t),
+		NEARTOFARPTRREC(&uni_mmsetup_ui),
+		NEARTOEVENTPTR(judeDefPgePrepare),
+		NEARTOEVENTPTR(judeDefPgeInit),
+		NEARTOEVENTPTR(judeDefPgeChange),
+		NEARTOEVENTPTR(judeDefPgeRelease),
+		0x0003,
+		0x0000,
+		0x0000,
+		0x0a,
+		NEARTOEVENTPTR(judeDefPgePresent),
+		EVENTPTRNULLREC,
+		NEARTOFARPTRREC(&vew_mmsetup_main),
+		CLR_INSET,
+		0,
+		0,
+		80,
+		25,
+		FARPTRNULLREC,
+		FARPTRNULLREC,
+		FARPTRNULLREC,
+		0,
+		NEARTOFARPTRREC(pge_mmsetup_proc_panels),
+		2};
+
+karlFarPtr_t pge_mmsetup_proc_panels[] = {
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_1)};
+
+
+judePanel_t pnl_mmsetup_proc_0 = {
+		sizeof(judePanel_t),
+		NEARTOFARPTRREC(&uni_mmsetup_ui),
+		NEARTOEVENTPTR(judeDefPnlPrepare),
+		NEARTOEVENTPTR(judeDefPnlInit),
+		NEARTOEVENTPTR(judeDefPnlChange),
+		NEARTOEVENTPTR(judeDefPnlRelease),
+		0x0003,
+		0x0000,
+		0x0000,
+		0,
+		NEARTOEVENTPTR(judeDefPnlPresent),
+		EVENTPTRNULLREC,
+		NEARTOFARPTRREC(&pge_mmsetup_process),
+		CLR_INSET,
+		0,
+		0,
+		80,
+		23,
+		NEARTOFARPTRREC(&lay_mmsetup_bkg),
+		NEARTOFARPTRREC(pnl_mmsetup_proc_0_controls),
+		12};
+
+judeControl_t ctl_mmsetup_proc_0_0 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		0x0003,
+		0x0000,
+		0x0002,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+		CLR_FOCUS,
+		0,
+		0,
+		80,
+		1,
+		NEARTOFARPTRREC(str_mmsetup_proc_0),
+		0,
+		0xff,
+		0};
+
+
+judeControl_t ctl_mmsetup_proc_0_1 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		0x0003,
+		0x0000,
+		0x0002,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+		CLR_PAPER,
+		0,
+		1,
+		80,
+		1,
+		NEARTOFARPTRREC(str_mmsetup_proc_1),
+		0,
+		0xff,
+		0};
+
+judeControl_t ctl_mmsetup_proc_0_2 = {    //Prompt
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  STATE_ENABLED,
+  0x0000,
+  OPT_NONAVIGATE,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_SYSS_TEXT | 0x0A,
+  0,
+  3,
+  80,
+  1,
+  NEARTOFARPTRREC(str_mmsetup_proc_4),
+  0,
+  0xff,
+  0};
+
+judeControl_t ctl_mmsetup_proc_0_3 = {
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  0x0003,
+  0x0000,
+  0x0002,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_PAPER,
+  0,
+  5,
+  18,
+  1,
+  NEARTOFARPTRREC(str_mmsetup_proc_5),
+  0,
+  0xff,
+  0};
+
+judeControl_t ctl_mmsetup_proc_0_4 = {    //Process progress bar
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  0x0003,
+  0x0000,
+  0x0002,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_SHADOW,
+  20,
+  5,
+  20,
+  1,
+  FARPTRNULLREC,
+  0,
+  0xff,
+  0};
+  
+judeControl_t ctl_mmsetup_proc_0_5 = {
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  0x0003,
+  0x0000,
+  0x0002,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_PAPER,
+  0,
+  7,
+  18,
+  1,
+  NEARTOFARPTRREC(str_mmsetup_proc_6),
+  0,
+  0xff,
+  0};
+
+judeControl_t ctl_mmsetup_proc_0_6 = {    //Read counter
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  0x0003,
+  0x0000,
+  0x0002,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_TEXT,
+  20,
+  7,
+  20,
+  1,
+  FARPTRNULLREC,
+  0,
+  0xff,
+  0};
+
+judeControl_t ctl_mmsetup_proc_0_7 = {
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  0x0003,
+  0x0000,
+  0x0002,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_PAPER,
+  0,
+  9,
+  18,
+  1,
+  NEARTOFARPTRREC(str_mmsetup_proc_7),
+  0,
+  0xff,
+  0};
+
+judeControl_t ctl_mmsetup_proc_0_8 = {    //write progress
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  0x0003,
+  0x0000,
+  0x0002,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_SHADOW,
+  20,
+  9,
+  20,
+  1,
+  FARPTRNULLREC,
+  0,
+  0xff,
+  0};
+
+judeControl_t ctl_mmsetup_proc_0_9 = {
+    sizeof(judeControl_t),
+    FARPTRNULLREC,
+    NEARTOEVENTPTR(judeDefCtlPrepare),
+    NEARTOEVENTPTR(judeDefCtlInit),
+    NEARTOEVENTPTR(judeDefCtlChange),
+    NEARTOEVENTPTR(judeDefCtlRelease),
+    0x0003,
+    0x0000,
+    0x0002,
+    0,
+    NEARTOEVENTPTR(judeDefCtlPresent),
+    NEARTOEVENTPTR(judeDefCtlKeypress),
+    NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+    CLR_PAPER,
+    0,
+    11,
+    18,
+    1,
+    NEARTOFARPTRREC(str_mmsetup_proc_8),
+    0,
+    0xff,
+    0};
+  
+judeControl_t ctl_mmsetup_proc_0_10 = {    //error count
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  0x0003,
+  0x0000,
+  0x0002,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+  CLR_SYSS_TEXT | 0x0A,
+  20,
+  11,
+  20,
+  1,
+  FARPTRNULLREC,
+  0,
+  0xff,
+  0};
+
+judeListBox_t lbx_mmsetup_proc_0_11 = {   //output list
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(judeLBxChange),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		0x0003,
+		0x0000,
+		OPT_AUTOTRACK,
+		0,
+		NEARTOEVENTPTR(judeLBxPresent),
+		NEARTOEVENTPTR(judeLBxPressed),
+		NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
+		CLR_TEXT,
+		42,
+		5,
+		38,
+		15,
+		FARPTRNULLREC,
+		0,
+		0x0,
+		0,
+		EVENTPTRNULLREC,
+		DWRDTOFARPTRREC(LISTBOXLINESMEM),
+		0x00,
+		65,
+		0x00,
+		0x00,
+		0x00,
+		0xFF
+  };
+
+
+karlFarPtr_t pnl_mmsetup_proc_0_controls[] = {
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_0),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_1),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_2),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_3),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_4),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_5),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_6),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_7),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_8),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_9),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_10),
+  NEARTOFARPTRREC(&lbx_mmsetup_proc_0_11)
+};
+
+
+judePanel_t pnl_mmsetup_proc_1 = {
+		sizeof(judePanel_t),
+		NEARTOFARPTRREC(&uni_mmsetup_ui),
+		NEARTOEVENTPTR(judeDefPnlPrepare),
+		NEARTOEVENTPTR(judeDefPnlInit),
+		NEARTOEVENTPTR(judeDefPnlChange),
+		NEARTOEVENTPTR(judeDefPnlRelease),
+		0x0003,
+		0x0000,
+		0x0000,
+		0,
+		NEARTOEVENTPTR(judeDefPnlPresent),
+		EVENTPTRNULLREC,
+		NEARTOFARPTRREC(&pge_mmsetup_welcome),
+		CLR_INSET,
+		0,
+		23,
+		80,
+		2,
+		NEARTOFARPTRREC(&lay_mmsetup_bkg),
+		NEARTOFARPTRREC(pnl_mmsetup_proc_1_controls),
+		3};
+
+judeControl_t ctl_mmsetup_proc_1_0 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(mmsetupProcDoneChg),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		STATE_VISIBLE,
+		0x0000,
+		0x0000,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_proc_1),
+		CLR_ACCEPT,
+		70,
+		24,
+		10,
+		1,
+		NEARTOFARPTRREC(str_mmsetup_buttons_4),
+		0,
+		0x1,
+		'D'};
+
+judeControl_t ctl_mmsetup_proc_1_1 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(mmsetupProcContChg),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		STATE_VISIBLE,
+		0x0000,
+		0x0000,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_proc_1),
+		CLR_INFORM,
+		58,
+		24,
+		10,
+		1,
+		NEARTOFARPTRREC(str_mmsetup_buttons_5),
+		0,
+		0x1,
+		'C'};
+
+judeControl_t ctl_mmsetup_proc_1_2 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(mmsetupProcCancelChg),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		0x0003,
+		0x0000,
+		0x0000,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_proc_1),
+		CLR_ABORT,
+		0,
+		24,
+		10,
+		1,
+		NEARTOFARPTRREC(str_mmsetup_buttons_1),
+		0,
+		0xff,
+		KEY_M65_ESC};
+
+
+karlFarPtr_t pnl_mmsetup_proc_1_controls[] = {
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_1_0),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_1_1),
+  NEARTOFARPTRREC(&ctl_mmsetup_proc_1_2)};
+
+
 char str_mmsetup_select_0[] = "Make selection";
 char str_mmsetup_select_1[] = "Browse for files and make selections.";
 char str_mmsetup_select_2[] = "  Use real disk";
@@ -1414,9 +1912,22 @@ char str_mmsetup_select_4[] = "  Select All";
 
 char str_mmsetup_buttons_2[] = "[Accept  ]";
 char str_mmsetup_buttons_3[] = "[Theme   ]";
+char str_mmsetup_buttons_4[] = "[Done    ]";
+char str_mmsetup_buttons_5[] = "[Continue]";
 
 char str_mmsetup_config_15[] = "<Real Disk>";
 char str_mmsetup_config_16[] = "<No Selection>";
+
+
+char str_mmsetup_proc_0[] = "Performing processing tasks";
+char str_mmsetup_proc_1[] = "Extracting room files from ADFs...";
+char str_mmsetup_proc_2[] = "Building SID sounds from D64s...";
+char str_mmsetup_proc_3[] = "Validating D81 disk images...";
+char str_mmsetup_proc_4[] = "Please insert the required disk and select Continue.";
+char str_mmsetup_proc_5[] = "Progress:";
+char str_mmsetup_proc_6[] = "Reading:";
+char str_mmsetup_proc_7[] = "Writing:";
+char str_mmsetup_proc_8[] = "Errors:";
 
 
 karlFarPtr_t config_desc_controls[] = {

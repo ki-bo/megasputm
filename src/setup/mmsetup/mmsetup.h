@@ -41,6 +41,7 @@ extern karlFarPtr_t pnl_mmsetup_welc_1_controls[];
 
 extern judeControl_t ctl_mmsetup_welc_1_0;
 extern judeControl_t ctl_mmsetup_welc_1_1;
+extern judeControl_t ctl_mmsetup_welc_1_2;
 
 extern char str_mmsetup_buttons_0[];
 extern char str_mmsetup_buttons_3[];
@@ -192,3 +193,41 @@ extern char str_mmsetup_config_15[];
 extern char str_mmsetup_config_16[];
 
 extern karlFarPtr_t config_desc_controls[];
+
+
+extern judePage_t pge_mmsetup_process;
+extern judePanel_t pnl_mmsetup_proc_0;
+extern judePanel_t pnl_mmsetup_proc_1;
+extern judeControl_t ctl_mmsetup_proc_0_0;
+extern judeControl_t ctl_mmsetup_proc_0_1;    //Process desc
+extern judeControl_t ctl_mmsetup_proc_0_2;    //Prompt
+extern judeControl_t ctl_mmsetup_proc_0_3;    
+extern judeControl_t ctl_mmsetup_proc_0_4;    //proc progress
+extern judeControl_t ctl_mmsetup_proc_0_5;    
+extern judeControl_t ctl_mmsetup_proc_0_6;    //read data
+extern judeControl_t ctl_mmsetup_proc_0_7;    
+extern judeControl_t ctl_mmsetup_proc_0_8;    //write progress
+extern judeControl_t ctl_mmsetup_proc_0_9;    
+extern judeControl_t ctl_mmsetup_proc_0_10;   //error count
+extern judeListBox_t lbx_mmsetup_proc_0_11;   //output info
+
+extern judeControl_t ctl_mmsetup_proc_1_0;
+extern judeControl_t ctl_mmsetup_proc_1_1;
+extern judeControl_t ctl_mmsetup_proc_1_2;
+
+extern karlFarPtr_t pge_mmsetup_proc_panels[];
+extern karlFarPtr_t pnl_mmsetup_proc_0_controls[];
+extern karlFarPtr_t pnl_mmsetup_proc_1_controls[];
+
+extern char str_mmsetup_buttons_4[];
+extern char str_mmsetup_buttons_5[];
+
+extern char str_mmsetup_proc_0[];
+extern char str_mmsetup_proc_1[];
+extern char str_mmsetup_proc_2[];
+extern char str_mmsetup_proc_3[];
+extern char str_mmsetup_proc_4[];
+extern char str_mmsetup_proc_5[];
+extern char str_mmsetup_proc_6[];
+extern char str_mmsetup_proc_7[];
+extern char str_mmsetup_proc_8[];
