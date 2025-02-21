@@ -17,6 +17,7 @@ typedef struct SETTINGDETAIL {
 
 typedef enum PROCESS {
   PROC_NONE,
+  PROC_CONFIGURE,
   PROC_EXTRACT,
   PROC_BUILD,
   PROC_VERIFY,
@@ -32,8 +33,28 @@ typedef enum PROCSTATE {
   PROCST_FINISH
 } procstate_t;
 
+typedef enum PROCFLAGS {
+  PROCFL_CONFIGURE = 1,
+  PROCFL_EXTRACT = 2,
+  PROCFL_BUILD = 4,
+  PROCFL_VERIFY = 8,
+} procflags_t;
+
+/*typedef struct PROCBEHAVIOUR {
+  void (* onIdle)(void);
+  void (* onInit)(void);
+  void (* onWait)(void);
+  void (* onRead)(void);
+  void (* onWrite)(void);
+  void (* onFinish)(void);
+} procbehaviour_t;*/
+
+typedef void (* procbehaviour_t[6])(void);
+
 extern process_t process;
 extern procstate_t procstate;
+
+extern procbehaviour_t proc_behaviours[]; 
 
 
 extern uint8_t config_required;
@@ -43,7 +64,7 @@ extern char file_extensions[3][4];
 extern uint32_t kernalWriteSrc;
 extern uint32_t kernalWriteSiz;
 
-extern settingDetail_t dest_details[6];
+extern settingDetail_t dest_details[];
 
 uint8_t readDirectoryFiles(const char *ext);
 
@@ -66,3 +87,16 @@ extern void _finishKernalWrite(void);
 extern void processTest(void);
 
 void core_init(void);
+
+
+void behaviourConfigIdle(void);
+void behaviourConfigInit(void);
+void behaviourBuildIdle(void);
+void behaviourBuildInit(void);
+void behaviourBuildFinish(void);
+void behaviourExtractIdle(void);
+void behaviourExtractInit(void);
+void behaviourExtractWait(void);
+void behaviourExtractRead(void);
+void behaviourExtractWrite(void);
+void behaviourExtractFinish(void);

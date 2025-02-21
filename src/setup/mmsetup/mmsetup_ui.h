@@ -33,3 +33,5 @@ void mmsetupProcDoneChg(void);
 void mmsetupProcContChg(void);
 
 void mmsetupWelcThemeLblPrep(void);
+
+void mmsetupWelcExitChg(void);

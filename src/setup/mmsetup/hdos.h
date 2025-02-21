@@ -48,3 +48,5 @@ err_t hdos_selectdrive(uint8_t drive);
 err_t hdos_cdrootdir(uint8_t drive);
 
 err_t hdos_attachD810(void);
+
+void hdos_restart(void);

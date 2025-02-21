@@ -4,6 +4,7 @@
 
 #include "hdos.h"
 #include "adf.h"
+#include "room90.h"
 
 #include "jude.h"
 #include "karljr.h"
@@ -21,11 +22,18 @@ uint8_t procAbort = 0;
 uint8_t procContinue = 0;
 uint8_t outputDisk;
 uint8_t roomidx;
+uint8_t haveRoom90 = 0;
+uint16_t room90size = 0;
+
+uint8_t configProcFlags = 0;
+uint8_t doneProcFlags = 0;
 
 
 char file_extensions[3][4] = {"D81", "ADF", "D64"};
 
-settingDetail_t dest_details[6] = {
+settingDetail_t dest_details[8] = {
+  {SETTINGT_NONE, 0xff, ""}, 
+  {SETTINGT_NONE, 0xff, ""}, 
   {SETTINGT_NONE, 0xff, ""}, 
   {SETTINGT_NONE, 0xff, ""}, 
   {SETTINGT_NONE, 0xff, ""}, 
@@ -33,6 +41,31 @@ settingDetail_t dest_details[6] = {
   {SETTINGT_NONE, 0, ""}, 
   {SETTINGT_NONE, 0, ""}
 };
+
+//PROC_NONE,
+//PROC_CONFIGURE,
+//PROC_EXTRACT,
+//PROC_BUILD,
+//PROC_VERIFY,
+//PROC_COMPLETE
+
+
+//void (* onIdle)(void);
+//void (* onInit)(void);
+//void (* onWait)(void);
+//void (* onRead)(void);
+//void (* onWrite)(void);
+//void (* onFinish)(void);
+
+
+procbehaviour_t proc_behaviours[] = {
+  {0, 0, 0, 0, 0, 0},
+  {&behaviourConfigIdle, &behaviourConfigInit, 0, 0, 0, 0},
+  {&behaviourExtractIdle, &behaviourExtractInit, &behaviourExtractWait, &behaviourExtractRead, &behaviourExtractWrite, &behaviourExtractFinish},
+  {&behaviourBuildIdle, &behaviourBuildInit, 0, 0, 0, &behaviourBuildFinish},
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0}
+}; 
 
 char adfFileName[65];
 char lflfilename[] = "@:00.LFL,S,W";
@@ -84,10 +117,10 @@ static int8_t apply_acceleration(int8_t value)
         : "a", "x");
 
   if (abs_diff > 10) {
-    return value << 2;
+    return (value << 2) + value;
   }
   if (abs_diff > 5) {
-    return value << 1;
+    return (value << 1) + value;
   }
   return value;
 }
@@ -311,6 +344,7 @@ uint8_t readDirectoryFiles(const char *ext) {
 void initiateProcess(void) {
   outputDisk = 0;
   roomidx = 0;
+  haveRoom90 = 0;
 
   procOutput = (uint8_t __huge *)LISTBOXLINESMEM;
 
@@ -341,8 +375,11 @@ void initiateProcess(void) {
 
   procAbort = 0;
   procContinue = 0;
-  process = PROC_EXTRACT;
+  process = PROC_CONFIGURE;
   procstate = PROCST_IDLE;
+
+  configProcFlags = PROCFL_CONFIGURE | PROCFL_BUILD | PROCFL_EXTRACT;
+  doneProcFlags = 0;
 
   __asm(
     "   cli \n"
@@ -378,6 +415,8 @@ void continueProcess(void) {
 void copyFileName(uint8_t detail, char *fileName) {
   for (uint8_t i = 0; i < dest_details[detail].namelen; ++i) {
     fileName[i] = dest_details[detail].fileName[i];
+
+    *(uint8_t *)(0x0800 + i) = dest_details[detail].fileName[i];
   }
   fileName[dest_details[detail].namelen] = 0;
 }
@@ -421,222 +460,319 @@ void writeToProcOutput(char *text) {
 
 
 void updateProcess(void) {
-  //uint8_t __huge *out;
-  //uint8_t data;
-  
-  uint8_t *rooms;
+  if (process ==  PROC_COMPLETE) {
+    writeToProcOutput("COMPLETE");
 
-  switch(process) {
-    case PROC_BUILD:
-    case PROC_VERIFY: 
-      break;  
-    case PROC_EXTRACT: {
-      //*(uint8_t *)(0xd020) = *(uint8_t *)(0xd020) + 1;
-      switch(procstate) {
-        case PROCST_IDLE:
-          procstate = PROCST_INIT;
-          break;
-        case PROCST_INIT: {
-          writeToProcOutput("EXTRACT INIT");
+    zptrself = (uint32_t)((karlObject_t __huge *)&lbx_mmsetup_proc_0_11);
+    karlObjIncludeState(STATE_ENABLED);
 
-          if (outputDisk > 1) {
-            process = PROC_COMPLETE;
-            procstate = PROCST_IDLE;
-            return;
-          } else if  (dest_details[outputDisk].type == SETTINGT_NONE) {
-            outputDisk++;
-            procstate = PROCST_IDLE;
-            return;
-          }
-                    
-          judeSetPointer(MPTR_WAIT);
-          roomidx = 0;
-          
-          copyFileName(outputDisk + 2, adfFileName);
-          hdos_set_filename(adfFileName);
-          //if (hdos_open_file()) {
-            //procstate = PROCST_FINISH;
-            //return;
-          //}
+        zptrself = (uint32_t)((karlObject_t __huge *)&pnl_mmsetup_proc_0);
+    karlObjIncludeState(STATE_DIRTY);
 
-          hdos_load_file_attic(0);
-      
-          //while (!hdos_read_byte(&data)) {
-            //*out = data;
-            //++out;
-          //}
-      
-          //hdos_close_file();
-      
-          if (adf_init(ADF_MEMORY) != ADF_OK) {
-            *(volatile uint8_t *)(0xd020) = 2;
-            
-            //while(1) {
-              //__asm(" inc 0xd020 ");
-            //}
-            
-            writeToProcOutput("ADF INIT ERROR");
-
-            procstate = PROCST_FINISH;
-            return;
-          }
-          
-          if (adf_chdir("rooms") != ADF_OK) {
-            *(volatile uint8_t *)(0xd020) = 2;
-            writeToProcOutput("ADF CHDIR ERROR");
-            procstate = PROCST_FINISH;
-            return;
-          }
-
-          if (dest_details[outputDisk].type == SETTINGT_DISK) {
-            procstate = PROCST_WAIT;
-            procContinue = 0;
-
-            zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
-            karlObjIncludeState(STATE_VISIBLE);
-
-            zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);
-            karlObjIncludeState(STATE_ENABLED);
-          } else if (dest_details[outputDisk].type == SETTINGT_IMGE) {
-            copyFileName(outputDisk, adfFileName);
-            
-            
-            if (hdos_set_filename(adfFileName)) {
-              writeToProcOutput(adfFileName);
-              writeToProcOutput("SETNAME D81 ERROR");
-              outputDisk++;
-              procstate = PROCST_IDLE;
-            } else if (hdos_attachD810()) {
-              writeToProcOutput(adfFileName);
-              writeToProcOutput("MOUNT D81 ERROR");
-              outputDisk++;
-              procstate = PROCST_IDLE;
-            } else {
-              procstate = PROCST_READ;
-            }
-          }
-
-          judeSetPointer(MPTR_NORMAL);
-          break;
-        }
-        case PROCST_WAIT: {
-          if (procContinue) {
-            zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);
-            karlObjExcludeState(STATE_ENABLED);
-            
-            zptrself = (uint32_t)((karlObject_t __huge *)&pnl_mmsetup_proc_0);
-            karlObjIncludeState(STATE_DIRTY);
-
-            zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
-            karlObjExcludeState(STATE_VISIBLE);
-
-            procstate = PROCST_READ;
-
-            procContinue = 0;
-           } else if (procAbort) {
-            procstate = PROCST_FINISH;
-           }
-          break;
-        }
-        case PROCST_READ: {
-          char text[] = "EXTRACT READ   ";
-          text[14] = roomidx + 0x30;
-          writeToProcOutput(text);
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
+    karlObjExcludeState(STATE_VISIBLE);
     
-          if (outputDisk == 0) {
-            rooms = disk1Rooms;
-          } else {
-            rooms = disk2Rooms;
-          }
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_2);
+    karlObjExcludeState(STATE_ENABLED);
 
-          if (rooms[roomidx] == 0xff) {
-            roomidx = 0;
-            outputDisk++;
-            procstate = PROCST_IDLE;
-            return;
-          }
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);
+    karlObjExcludeState(STATE_ENABLED);
 
-          prepareLFLFileName(rooms[roomidx]);
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_0);
+    karlObjIncludeState(STATE_ENABLED);
 
-          if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
-            *(volatile uint8_t *)(0xd020) = 2;
-            
-            //while(1) {
-              //__asm(" inc 0xd020 ");
-            //}
-            writeToProcOutput("ADF READ ERROR");
-            
-            
-            procstate = PROCST_FINISH;
-            return;
-          }
-          
-          prepareKernalWrite(lflfilename);
+    judeActivateCtrl();
 
-          procstate = PROCST_WRITE;
-          break;
-        }
-        case PROCST_WRITE: {
-          writeToProcOutput("EXTRACT WRITE");
+    process = PROC_NONE;
+  } else if (process != PROC_NONE) {
+    void (* behaviour)(void) = proc_behaviours[process][procstate];
 
-          judeSetPointer(MPTR_WAIT);
-
-          if (!procAbort) {
-            performKernalWrite((uint32_t)FILE_MEMORY, file_size);
-            finishKernalWrite();
-          }
-          //procstate = PROCST_FINISH;
-
-          if (!procAbort) {
-            roomidx++;
-            procstate = PROCST_READ;
-          } else {
-            process = PROC_COMPLETE;
-          }
-          judeSetPointer(MPTR_NORMAL);
-
-          break;
-        }
-        case PROCST_FINISH:
-          writeToProcOutput("EXTRACT FINISH");
-          process = PROC_COMPLETE;
-          judeSetPointer(MPTR_NORMAL);
-          break;
-        default:
-          ;
-      }
-      break;
-    }
-    case PROC_COMPLETE:
-      writeToProcOutput("COMPLETE");
-
-      zptrself = (uint32_t)((karlObject_t __huge *)&lbx_mmsetup_proc_0_11);
-      karlObjIncludeState(STATE_ENABLED);
-
-          zptrself = (uint32_t)((karlObject_t __huge *)&pnl_mmsetup_proc_0);
-      karlObjIncludeState(STATE_DIRTY);
-
-      zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
-      karlObjExcludeState(STATE_VISIBLE);
-      
-      zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_2);
-      karlObjExcludeState(STATE_ENABLED);
-
-      zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);
-      karlObjExcludeState(STATE_ENABLED);
-
-      zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_0);
-      karlObjIncludeState(STATE_ENABLED);
-
-      judeActivateCtrl();
-
+    if (behaviour) {
+      behaviour();
+    } else {
+      writeToProcOutput("INTERNAL ERROR");
       process = PROC_NONE;
-      break;
-    case PROC_NONE:
-    default:
-      break;
+    }
   }
 }
+
+
+void behaviourConfigIdle(void) {
+  procstate = PROCST_INIT;
+}
+
+void behaviourConfigInit(void) {
+  //find next job or disk
+  writeToProcOutput("CONFIGURE");
+
+  if (outputDisk > 1) {
+    process = PROC_COMPLETE;
+    procstate = PROCST_IDLE;
+  } else {
+    if (configProcFlags & PROCFL_BUILD && !(doneProcFlags & PROCFL_BUILD)) {
+      process = PROC_BUILD;
+      procstate = PROCST_IDLE;
+    } else if (configProcFlags & PROCFL_EXTRACT && !(doneProcFlags & PROCFL_EXTRACT)) {
+      process = PROC_EXTRACT;
+      procstate = PROCST_IDLE;
+    } else {
+      //try next disk      
+      outputDisk++;
+      doneProcFlags = 0;
+      procstate = PROCST_IDLE;
+    }
+  }
+}
+
+
+void behaviourBuildIdle(void) {
+  procstate = PROCST_INIT;
+}
+
+void behaviourBuildInit(void) {
+  writeToProcOutput("BUILD INIT");
+  if (!haveRoom90) {
+    judeSetPointer(MPTR_WAIT);
+
+    copyFileName(4, adfFileName);
+
+    if (hdos_set_filename(adfFileName)) {
+      while(1) {
+        __asm(" inc 0xd020 ");
+      }
+    };
+    hdos_load_file_attic(0);
+
+    copyFileName(5, adfFileName);
+    if (hdos_set_filename(adfFileName)) {
+      while(1) {
+        __asm(" inc 0xd020 ");
+      }
+    };
+    hdos_load_file_attic(0x32000);
+    
+    readIndexFile((uint8_t __huge *)(0x08000000));
+    
+    uint8_t __huge *image1 = (uint8_t __huge *)(0x08000000);
+    uint8_t __huge *image2 = (uint8_t __huge *)(0x08032000);
+    uint8_t __huge *dest = (uint8_t __huge *)(0x0001B000);
+    
+    room90size = makeRoom90(image1,image2, dest);
+
+    haveRoom90 = 1;
+
+    judeSetPointer(MPTR_WAIT);
+  }
+
+  procstate = PROCST_FINISH;
+}
+
+void behaviourBuildFinish(void) {
+  writeToProcOutput("BUILD FINISH");
+  
+  doneProcFlags |= PROCFL_BUILD;
+  process = PROC_CONFIGURE;
+  procstate = PROCST_IDLE;
+}
+
+
+void behaviourExtractIdle(void) {
+    procstate = PROCST_INIT;
+}
+
+void behaviourExtractInit(void) {
+  writeToProcOutput("EXTRACT INIT");
+
+  if (outputDisk > 1) {
+    process = PROC_COMPLETE;
+    procstate = PROCST_IDLE;
+    return;
+  } else if  (dest_details[outputDisk].type == SETTINGT_NONE) {
+    //outputDisk++;
+    procstate = PROCST_FINISH;
+    return;
+  }
+            
+  judeSetPointer(MPTR_WAIT);
+  roomidx = 0;
+  
+  copyFileName(outputDisk + 2, adfFileName);
+  hdos_set_filename(adfFileName);
+  //if (hdos_open_file()) {
+    //procstate = PROCST_FINISH;
+    //return;
+  //}
+
+  hdos_load_file_attic(0);
+
+  //while (!hdos_read_byte(&data)) {
+    //*out = data;
+    //++out;
+  //}
+
+  //hdos_close_file();
+
+  if (adf_init(ADF_MEMORY) != ADF_OK) {
+    *(volatile uint8_t *)(0xd020) = 2;
+    
+    //while(1) {
+      //__asm(" inc 0xd020 ");
+    //}
+    
+    writeToProcOutput("ADF INIT ERROR");
+
+    procstate = PROCST_FINISH;
+    return;
+  }
+  
+  if (adf_chdir("rooms") != ADF_OK) {
+    *(volatile uint8_t *)(0xd020) = 2;
+    writeToProcOutput("ADF CHDIR ERROR");
+    procstate = PROCST_FINISH;
+    return;
+  }
+
+  if (dest_details[outputDisk].type == SETTINGT_DISK) {
+    procstate = PROCST_WAIT;
+    procContinue = 0;
+
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
+    karlObjIncludeState(STATE_VISIBLE);
+
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);
+    karlObjIncludeState(STATE_ENABLED);
+  } else if (dest_details[outputDisk].type == SETTINGT_IMGE) {
+    copyFileName(outputDisk, adfFileName);
+    
+    
+    if (hdos_set_filename(adfFileName)) {
+      writeToProcOutput(adfFileName);
+      writeToProcOutput("SETNAME D81 ERROR");
+      //outputDisk++;
+      procstate = PROCST_FINISH;
+    } else if (hdos_attachD810()) {
+      writeToProcOutput(adfFileName);
+      writeToProcOutput("MOUNT D81 ERROR");
+      //outputDisk++;
+      procstate = PROCST_FINISH;
+    } else {
+      procstate = PROCST_READ;
+    }
+  }
+
+  judeSetPointer(MPTR_NORMAL);
+}
+
+void behaviourExtractWait(void) {
+  if (procContinue) {
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);
+    karlObjExcludeState(STATE_ENABLED);
+    
+    zptrself = (uint32_t)((karlObject_t __huge *)&pnl_mmsetup_proc_0);
+    karlObjIncludeState(STATE_DIRTY);
+
+    zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_0_2);
+    karlObjExcludeState(STATE_VISIBLE);
+
+    procstate = PROCST_READ;
+
+    procContinue = 0;
+  } else if (procAbort) {
+  procstate = PROCST_FINISH;
+  }
+}
+
+void behaviourExtractRead(void) {
+  uint8_t *rooms;
+  
+  char text[] = "EXTRACT READ   ";
+  text[14] = roomidx + 0x30;
+  writeToProcOutput(text);
+
+  if (outputDisk == 0) {
+    rooms = disk1Rooms;
+  } else {
+    rooms = disk2Rooms;
+  }
+
+  if (rooms[roomidx] == 0xff) {
+    roomidx = 0;
+    //outputDisk++;
+    procstate = PROCST_FINISH;
+    return;
+  }
+
+  prepareLFLFileName(rooms[roomidx]);
+
+  if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
+    *(volatile uint8_t *)(0xd020) = 2;
+    writeToProcOutput("ADF READ ERROR");
+
+    roomidx++;
+    procstate = PROCST_READ;
+
+    return;
+  }
+  
+  prepareKernalWrite(lflfilename);
+
+  procstate = PROCST_WRITE;
+}
+
+void behaviourExtractWrite(void) {
+  writeToProcOutput("EXTRACT WRITE");
+
+  judeSetPointer(MPTR_WAIT);
+
+  if (!procAbort) {
+    performKernalWrite((uint32_t)FILE_MEMORY, file_size);
+    finishKernalWrite();
+  }
+  //procstate = PROCST_FINISH;
+
+  if (!procAbort) {
+    roomidx++;
+    procstate = PROCST_READ;
+  } else {
+    procstate = PROCST_FINISH;
+  }
+  judeSetPointer(MPTR_NORMAL);
+}
+
+
+void behaviourExtractFinish(void) {
+  if (haveRoom90 && !procAbort) {
+    writeToProcOutput("WRITE ROOM 90");
+
+    prepareLFLFileName(90);
+    prepareKernalWrite(lflfilename);
+    performKernalWrite((uint32_t)((uint8_t __huge *)0x01B000), room90size);
+    finishKernalWrite();
+  }
+
+  writeToProcOutput("EXTRACT FINISH");
+  judeSetPointer(MPTR_NORMAL);
+  
+  doneProcFlags |= PROCFL_EXTRACT;
+ 
+  process = PROC_CONFIGURE;
+  procstate = PROCST_IDLE;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #define UART_E_PRA  (*(volatile uint8_t *)              0xd607)
 #define UART_E_DDR  (*(volatile uint8_t *)              0xd608)

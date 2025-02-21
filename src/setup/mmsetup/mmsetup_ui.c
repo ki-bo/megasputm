@@ -1,3 +1,4 @@
+#include "hdos.h"
 #include "jude.h"
 #include "jude_widgets.h"
 #include "mmsetup.h"
@@ -5,6 +6,7 @@
 #include "karljr.h"
 
 #include "mmsetup_core.h"
+#include "hdos.h"
 
 
 void mmsetupWelcNextChg(void) {
@@ -265,7 +267,7 @@ void mmsetupWelcThemeChg(void) {
 
   if (state & STATE_DOWN) {
     uint8_t theme = actvtheme + 1;
-    if (theme >= (themeCnt - ((bonusTheme) ? 2 : 0)))  {
+    if (theme >= (themeCnt - ((bonusTheme) ? 3 : 0)))  {
       theme = 0;
       bonusTheme -= (bonusTheme) ? 1 : 0;
     }
@@ -327,4 +329,17 @@ void mmsetupWelcThemeLblPrep(void) {
   ctl_mmsetup_welc_1_2.text_p = (karlFarPtr_t)judeGetThemeDesc();
   zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_welc_1_2);
   karlObjIncludeState(STATE_CHANGED);
+}
+
+
+void mmsetupWelcExitChg(void) {
+  uint8_t state = ((karlObject_t __huge *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    *(uint8_t *)(0xd07a) = *(uint8_t *)(0xd07a) & (!0x10);
+
+    hdos_restart();
+  }
 }

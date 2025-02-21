@@ -42,6 +42,7 @@ extern karlFarPtr_t pnl_mmsetup_welc_1_controls[];
 extern judeControl_t ctl_mmsetup_welc_1_0;
 extern judeControl_t ctl_mmsetup_welc_1_1;
 extern judeControl_t ctl_mmsetup_welc_1_2;
+extern judeControl_t ctl_mmsetup_welc_1_3;
 
 extern char str_mmsetup_buttons_0[];
 extern char str_mmsetup_buttons_3[];
@@ -221,6 +222,7 @@ extern karlFarPtr_t pnl_mmsetup_proc_1_controls[];
 
 extern char str_mmsetup_buttons_4[];
 extern char str_mmsetup_buttons_5[];
+extern char str_mmsetup_buttons_6[];
 
 extern char str_mmsetup_proc_0[];
 extern char str_mmsetup_proc_1[];

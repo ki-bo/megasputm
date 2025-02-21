@@ -33,7 +33,8 @@ judeControl_t ctl_mmsetup_config_0_5 = {
 karlFarPtr_t pnl_mmsetup_welc_1_controls[] = {
 		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_0),
 		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_1),
-		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_2)};
+		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_2),
+		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_3)};
 
 karlModule_t mod_mmsetup_app = {
 		sizeof(karlModule_t),
@@ -984,6 +985,31 @@ judeControl_t ctl_mmsetup_welc_1_1 = {
 		0x1,
 		'T'};
 
+judeControl_t ctl_mmsetup_welc_1_3 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(mmsetupWelcExitChg),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		0x0003,
+		0x0000,
+		0x0000,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_1),
+		CLR_ABORT,
+		0,
+		24,
+		10,
+		1,
+		NEARTOFARPTRREC(str_mmsetup_buttons_6),
+		0,
+		0xff,
+		KEY_M65_ESC
+};
+
 judeControl_t ctl_mmsetup_welc_1_2 = {
 		sizeof(judeControl_t),
 		FARPTRNULLREC,
@@ -1107,7 +1133,7 @@ judePanel_t pnl_mmsetup_welc_1 = {
 		2,
 		NEARTOFARPTRREC(&lay_mmsetup_bkg),
 		NEARTOFARPTRREC(pnl_mmsetup_welc_1_controls),
-		3};
+		4};
 
 judeControl_t ctl_mmsetup_config_0_13 = {
 		sizeof(judeControl_t),
@@ -1914,6 +1940,7 @@ char str_mmsetup_buttons_2[] = "[Accept  ]";
 char str_mmsetup_buttons_3[] = "[Theme   ]";
 char str_mmsetup_buttons_4[] = "[Done    ]";
 char str_mmsetup_buttons_5[] = "[Continue]";
+char str_mmsetup_buttons_6[] = "[Exit    ]";
 
 char str_mmsetup_config_15[] = "<Real Disk>";
 char str_mmsetup_config_16[] = "<No Selection>";
