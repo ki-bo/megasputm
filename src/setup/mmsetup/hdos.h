@@ -19,9 +19,12 @@ typedef uint8_t filetype_t;  //set of FILETYPE
 
 typedef struct DIRENT {
     char filename[64];   //no null?
-    uint8_t namelen;
-    char fileshort[8];  //no null
-    char fileext[3];    //no period
+    uint8_t namelen;                    //$40
+    char fileshort[8];  //no null       //$41
+    char fileext[3];    //no period     //$49
+    
+    uint8_t unknown[2];
+
     uint32_t cluster;
     uint32_t filelen;
     filetype_t filetype;

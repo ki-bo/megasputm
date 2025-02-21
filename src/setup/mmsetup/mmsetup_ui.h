@@ -4,7 +4,6 @@
 #include "jude.h"
 #include "jude_widgets.h"
 
-#define LISTBOXLINESMEM 0x00016000
 
 void mmsetupWelcConfigChg(void);
 
@@ -14,3 +13,11 @@ void mmsetupConfigCancelChg(void);
 void mmsetupConfigItemChg(void);
 
 void mmsetupSelectCancelChg(void);
+
+void mmsetupRealDiskChg(void);
+
+void mmsetupSelNoneChg(void);
+
+void mmsetupListSelect(void);
+
+void mmsetupSelAcceptChg(void);

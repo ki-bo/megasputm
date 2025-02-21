@@ -172,7 +172,10 @@ void judeLBxChange(void) {
 		}
 
 		if  (self->_control._element._object.state & STATE_DOWN) {
-			h = (self->_control._element.height - 2);
+      uint8_t btns = (self->linesoff > self->_control._element.height) ?
+          (self->linescnt > self->_control._element.height + 1) ? 2 : 1 : 0;
+
+			h = (self->_control._element.height - btns);
 
 			if  ((self->linesoff > 0) && (self->hotline == 0)) {
 				if  ((self->linesoff - h) < 0)

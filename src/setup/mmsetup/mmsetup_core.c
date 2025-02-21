@@ -1,6 +1,23 @@
 #include <stdint.h>
 #include "hdos.h"
 
+#include "mmsetup_core.h"
+
+uint8_t config_required = 1;
+uint8_t config_select = 0xff;
+
+char file_extensions[3][4] = {"D81", "ADF", "D64"};
+
+settingDetail_t dest_details[6] = {
+  {SETTINGT_NONE, 0xff, ""}, 
+  {SETTINGT_NONE, 0xff, ""}, 
+  {SETTINGT_NONE, 0xff, ""}, 
+  {SETTINGT_NONE, 0xff, ""}, 
+  {SETTINGT_NONE, 0, ""}, 
+  {SETTINGT_NONE, 0, ""}
+};
+
+
 
 char toUpperCase(char data) {
   if ((data >= 97) && (data <= 122)) {
@@ -10,7 +27,7 @@ char toUpperCase(char data) {
   }
 }
 
-const char defstr[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+_[]!@#$%^&*()              ";
+//const char defstr[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+_[]!@#$%^&*()              ";
 
 uint8_t readDirectoryFiles(const char *ext) {
   uint8_t result = 0;
@@ -44,14 +61,21 @@ uint8_t readDirectoryFiles(const char *ext) {
   while (!hdos_read_dir(desc)) {
     uint8_t found = 0;
 
-    if (!(entry->filetype & (FT_SUBDIR | FT_HIDDEN | FT_SYSTEM /* | FT_VOLLABEL*/))) {
+    if (!(entry->filetype & (FT_SUBDIR | FT_HIDDEN | FT_SYSTEM  | FT_VOLLABEL))) {
       found = 1;
-      /*for (uint8_t i = 0; i < 3; ++i) {
+
+      //if (entry->filetype & FT_SYSTEM) {
+        //while(1) {
+          //*(uint8_t *)(0xd020) = *(uint8_t *)(0xd020) + 1;
+        //}
+      //}
+
+      for (uint8_t i = 0; i < 3; ++i) {
         if (toUpperCase(entry->fileext[i]) != ext[i]) {
           found = 0;
           break;
         }
-      }*/
+      }
 
       if (found && (result < 255)) {
         result++;
@@ -74,9 +98,9 @@ uint8_t readDirectoryFiles(const char *ext) {
   }
   hdos_close_dir(desc);
   
-  if (!result) {
-    *(uint8_t *)(0xd020) = 10;
-  }
+  //if (!result) {
+    //*(uint8_t *)(0xd020) = 10;
+  //}
 
   return result;
 }

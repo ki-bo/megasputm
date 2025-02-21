@@ -3,6 +3,7 @@
 #include "jude_widgets.h"
 #include "mmsetup.h"
 #include "mmsetup_ui.h"
+#include "mmsetup_core.h"
 
 
 judeControl_t ctl_mmsetup_config_0_5 = {
@@ -149,7 +150,7 @@ judeControl_t ctl_mmsetup_config_0_8 = {
 		NEARTOEVENTPTR(judeDefCtlInit),
 		NEARTOEVENTPTR(mmsetupConfigItemChg),
 		NEARTOEVENTPTR(judeDefCtlRelease),
-		0x0003,
+		STATE_VISIBLE,
 		0x0000,
 		0x0000,
 		6,
@@ -963,7 +964,7 @@ judeControl_t ctl_mmsetup_config_0_9 = {
 		NEARTOEVENTPTR(judeDefCtlInit),
 		NEARTOEVENTPTR(mmsetupConfigItemChg),
 		NEARTOEVENTPTR(judeDefCtlRelease),
-		0x0003,
+		STATE_VISIBLE,
 		0x0000,
 		0x0000,
 		7,
@@ -1199,11 +1200,11 @@ judeControl_t ctl_mmsetup_select_0_2 = {
 		FARPTRNULLREC,
 		NEARTOEVENTPTR(judeDefCtlPrepare),
 		NEARTOEVENTPTR(judeDefCtlInit),
-		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(mmsetupRealDiskChg),
 		NEARTOEVENTPTR(judeDefCtlRelease),
 		0x0003,
 		0x0000,
-		0x0000,
+		OPT_AUTOCHECK,
 		0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
@@ -1223,12 +1224,12 @@ judeControl_t ctl_mmsetup_select_0_3 = {
 		FARPTRNULLREC,
 		NEARTOEVENTPTR(judeDefCtlPrepare),
 		NEARTOEVENTPTR(judeDefCtlInit),
-		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(mmsetupSelNoneChg),
 		NEARTOEVENTPTR(judeDefCtlRelease),
-		0x0003,
+		STATE_VISIBLE | STATE_ENABLED,
 		0x0000,
-		0x0000,
-		0,
+		OPT_AUTOCHECK,
+    0,
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
 		NEARTOFARPTRREC(&pnl_mmsetup_select_0),
@@ -1249,7 +1250,7 @@ judeControl_t ctl_mmsetup_select_0_4 = {
 		NEARTOEVENTPTR(judeDefCtlInit),
 		NEARTOEVENTPTR(judeDefCtlChange),
 		NEARTOEVENTPTR(judeDefCtlRelease),
-		0x0003,
+		STATE_VISIBLE,
 		0x0000,
 		0x0000,
 		0,
@@ -1290,7 +1291,7 @@ judeListBox_t lbx_mmsetup_select_0_5 = {
 		0,
 		0x0,
 		0,
-		EVENTPTRNULLREC,
+		NEARTOEVENTPTR(mmsetupListSelect),
 		DWRDTOFARPTRREC(LISTBOXLINESMEM),
 		0x00,
 		65,
@@ -1335,7 +1336,7 @@ judeControl_t ctl_mmsetup_select_1_0 = {
 		FARPTRNULLREC,
 		NEARTOEVENTPTR(judeDefCtlPrepare),
 		NEARTOEVENTPTR(judeDefCtlInit),
-		NEARTOEVENTPTR(judeDefCtlChange),
+		NEARTOEVENTPTR(mmsetupSelAcceptChg),
 		NEARTOEVENTPTR(judeDefCtlRelease),
 		0x0003,
 		0x0000,
@@ -1381,8 +1382,23 @@ judeControl_t ctl_mmsetup_select_1_1 = {
 
 char str_mmsetup_select_0[] = "Make selection";
 char str_mmsetup_select_1[] = "Browse for files and make selections.";
-char str_mmsetup_select_2[] = "Use real disk";
-char str_mmsetup_select_3[] = "Select All";
-char str_mmsetup_select_4[] = "Select None";
+char str_mmsetup_select_2[] = "  Use real disk";
+char str_mmsetup_select_3[] = "  Select None";
+char str_mmsetup_select_4[] = "  Select All";
 
 char str_mmsetup_buttons_2[] = "[Accept  ]";
+
+char str_mmsetup_config_15[] = "<Real Disk>";
+char str_mmsetup_config_16[] = "<No Selection>";
+
+
+karlFarPtr_t config_desc_controls[] = {
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_13),
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_14),
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_15),
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_16),
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_17),
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_18),
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_19),
+  NEARTOFARPTRREC(&ctl_mmsetup_config_0_20)};
+

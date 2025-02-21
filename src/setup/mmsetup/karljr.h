@@ -378,7 +378,7 @@ extern uint8_t _zkarljr[SIZ_ZP_KARLJR];
 //	} karlFarPtr_t;
 
 typedef uint8_t *karlPtr_t;
-typedef __attribute((huge)) uint8_t *karlFarPtr_t;
+typedef uint8_t __huge *karlFarPtr_t;
 
 typedef union WFARPTR_U {
     uint16_t data[2];

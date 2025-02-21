@@ -185,3 +185,8 @@ extern char str_mmsetup_select_4[];
 
 extern char str_mmsetup_select_1[];
 extern char str_mmsetup_buttons_2[];
+
+extern char str_mmsetup_config_15[];
+extern char str_mmsetup_config_16[];
+
+extern karlFarPtr_t config_desc_controls[];
