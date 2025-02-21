@@ -896,8 +896,8 @@ uint8_t vm_get_object_position(uint16_t global_object_id, uint8_t *x, uint8_t *y
   if (!obj_hdr) {
     return 0;
   }
-  *x = obj_hdr->pos_x;
-  *y = obj_hdr->pos_y_and_parent_state & 0x7f;
+  *x = obj_hdr->walk_to_x;
+  *y = obj_hdr->walk_to_y_and_preposition & 0x7f;
   return 2;
 }
 
