@@ -116,7 +116,7 @@ uint8_t readDirectoryFiles(const char *ext) {
         }
       }
 
-      if (found && (result < 255)) {
+      if (found && (result < 254)) {
         result++;
 
         /*for (uint8_t i = 0; i < 65; ++i) {
@@ -161,6 +161,7 @@ void initiateProcess(void) {
   );
 
   procAbort = 0;
+  procContinue = 0;
   process = PROC_EXTRACT;
   procstate = PROCST_IDLE;
 
@@ -203,6 +204,9 @@ uint32_t file_size;
 #define FILE_MEMORY ((uint8_t __huge *)0x40000)
 
 void updateProcess(void) {
+  uint8_t __huge *out = ADF_MEMORY;
+  uint8_t data;
+  
   switch(process) {
     case PROC_BUILD:
     case PROC_VERIFY: 
@@ -213,24 +217,31 @@ void updateProcess(void) {
         case PROCST_IDLE:
           procstate = PROCST_INIT;
           break;
-        case PROCST_INIT:
+        case PROCST_INIT: {
           judeSetPointer(MPTR_WAIT);
           
-          //hdos_set_filename(adfFileName);
-          //hdos_load_file_attic(0);
+          hdos_set_filename(adfFileName);
+          //if (hdos_open_file()) {
+            //procstate = PROCST_FINISH;
+            //return;
+          //}
 
-          uint8_t __huge *out = ADF_MEMORY;
-          uint8_t data;
+          hdos_load_file_attic(0);
       
-          while (!hdos_read_byte(&data)) {
-            *out = data;
-            ++out;
-          }
+          //while (!hdos_read_byte(&data)) {
+            //*out = data;
+            //++out;
+          //}
       
-          hdos_close_file();
+          //hdos_close_file();
       
           if (adf_init(ADF_MEMORY) != ADF_OK) {
             *(volatile uint8_t *)(0xd020) = 2;
+            
+            while(1) {
+              __asm(" inc 0xd020 ");
+            }
+            
             procstate = PROCST_FINISH;
             return;
           }
@@ -252,6 +263,7 @@ void updateProcess(void) {
           
           judeSetPointer(MPTR_NORMAL);
           break;
+        }
         case PROCST_WAIT:
           if (procContinue) {
             zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_proc_1_1);

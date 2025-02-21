@@ -64,6 +64,38 @@ void attemptLoadFont(void) {
 
     *(uint8_t *)(0xd07a) = *(uint8_t *)(0xd07a) | 0x10;
   };
+
+  /*if (!hdos_set_filename("MANIACM1.ADF") && !hdos_open_file()) {
+    uint8_t __huge *ptr = (uint8_t __huge *)0x030000;
+    uint32_t out = 0x08000000;
+    uint8_t data;
+
+    while (!hdos_read_byte(&data)) {
+      *ptr = data;
+      ++ptr;
+
+      *(uint8_t __huge *)out = data;
+      out++;
+    }
+
+    hdos_close_file();
+  };*/
+
+  /*if (!hdos_set_filename("MANIACM1.ADF")) {
+    //hdos_load_file_attic(0);
+
+    __asm(
+    " .extern _hdosLoadFileAttic \n"
+    "   ldx #0 \n"
+    "   ldy #0 \n"
+    "   ldz #0 \n"
+    "   jsr _hdosLoadFileAttic \n"
+    //"   lda #0x3e \n"
+    //"   sta 0xd640 \n"
+    //"   clv \n" 
+      :::"a", "x", "y", "z"
+  );
+  }*/
 }
 
 extern uint16_t *jude_kernirq;
