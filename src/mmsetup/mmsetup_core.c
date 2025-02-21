@@ -1,10 +1,13 @@
+#include <stdio.h>
 #include <stdint.h>
 
+#include "jude_widgets.h"
 #include "mega65.h"
 #include "hdos.h"
 //#include "_kernal.h"
 
 #include "adf.h"
+#include "mmsetup_ui.h"
 #include "room90.h"
 
 #include "jude.h"
@@ -57,6 +60,15 @@ settingDetail_t dest_details[8] = {
 //void (* onWrite)(void);
 //void (* onFinish)(void);
 
+uint8_t disk1Rooms[] = 
+    {0, 30, 33, 40, 44, 45, 49, 50,
+    51, 53, 0xff};
+uint8_t disk2Rooms[] =
+    {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
+    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+    21, 22, 23, 24, 25, 26, 27, 28, 29,  
+    31, 32, 34, 35, 36, 37, 38, 39, 41, 
+    42, 43, 44, 46, 47, 48, 52, 53, 0xff};
 
 procbehaviour_t proc_behaviours[] = {
   {0, 0, 0, 0, 0, 0},
@@ -74,7 +86,10 @@ char lflfileadf[] = "00.LFL";
 struct Device *dev;
 struct Volume *vol;
 struct List *list, *cell;
+
+uint8_t __huge *file_pos;
 uint32_t file_size;
+
 uint8_t __huge *procOutput;
 
 
@@ -394,6 +409,33 @@ uint8_t configurationInvalid(void) {
   return result;
 }
 
+void writeToProcOutput(char *text) {
+  uint8_t i = 0;
+  while (i < 40) {
+    uint8_t data = text[i];
+    *procOutput = data;
+    ++procOutput;
+    ++i;
+    if (!data) {
+      break;
+    }
+  }
+
+  while (i < 40) {
+    ++procOutput;
+    ++i;
+  }
+
+  lbx_mmsetup_proc_0_11.linescnt = lbx_mmsetup_proc_0_11.linescnt + 1;
+
+  if (lbx_mmsetup_proc_0_11.linescnt > lbx_mmsetup_proc_0_11._control._element.height) {
+    lbx_mmsetup_proc_0_11.linesoff = lbx_mmsetup_proc_0_11.linescnt - lbx_mmsetup_proc_0_11._control._element.height + 1;
+  }
+
+  zptrself = (uint32_t)((karlObject_t __huge *)&lbx_mmsetup_proc_0_11);
+  karlObjIncludeState(STATE_CHANGED);
+}
+
 void initiateProcess(void) {
   outputDisk = 0;
   roomidx = 0;
@@ -406,6 +448,23 @@ void initiateProcess(void) {
   lbx_mmsetup_proc_0_11.linesoff = 0;
   lbx_mmsetup_proc_0_11.hotline = 0;
   lbx_mmsetup_proc_0_11.selline = 0xff;
+
+  if (configProcFlags && PROCFL_EXTRACT) {
+    uint16_t max = 0;
+
+    if (dest_details[0].type != SETTINGT_NONE) {
+      max += sizeof(disk1Rooms) - 1;
+    }
+
+    if (dest_details[1].type != SETTINGT_NONE) {
+      max += sizeof(disk2Rooms) - 1;
+    }
+
+    zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_4);
+    progressResetMax(max);
+  }
+
+  writeToProcOutput("PROCESSING...");
 
   zptrself = (uint32_t)((karlObject_t __huge *)&lbx_mmsetup_proc_0_11);
   karlObjExcludeState(STATE_ENABLED);
@@ -474,43 +533,6 @@ void copyFileName(uint8_t detail, char *fileName) {
   fileName[dest_details[detail].namelen] = 0;
 }
 
-uint8_t disk1Rooms[] = 
-    {0, 30, 33, 40, 44, 45, 49, 50,
-    51, 53, 0xff};
-uint8_t disk2Rooms[] =
-    {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
-    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-    21, 22, 23, 24, 25, 26, 27, 28, 29,  
-    31, 32, 34, 35, 36, 37, 38, 39, 41, 
-    42, 43, 44, 46, 47, 48, 52, 53, 0xff};
-
-void writeToProcOutput(char *text) {
-  uint8_t i = 0;
-  while (i < 40) {
-    uint8_t data = text[i];
-    *procOutput = data;
-    ++procOutput;
-    ++i;
-    if (!data) {
-      break;
-    }
-  }
-
-  while (i < 40) {
-    ++procOutput;
-    ++i;
-  }
-
-  lbx_mmsetup_proc_0_11.linescnt = lbx_mmsetup_proc_0_11.linescnt + 1;
-
-  if (lbx_mmsetup_proc_0_11.linescnt > lbx_mmsetup_proc_0_11._control._element.height) {
-    lbx_mmsetup_proc_0_11.linesoff = lbx_mmsetup_proc_0_11.linescnt - lbx_mmsetup_proc_0_11._control._element.height + 1;
-  }
-
-  zptrself = (uint32_t)((karlObject_t __huge *)&lbx_mmsetup_proc_0_11);
-  karlObjIncludeState(STATE_CHANGED);
-}
-
 
 void updateProcess(void) {
   if (process ==  PROC_COMPLETE) {
@@ -556,8 +578,6 @@ void behaviourConfigIdle(void) {
 
 void behaviourConfigInit(void) {
   //find next job or disk
-  writeToProcOutput("CONFIGURE");
-
   if (outputDisk > 1) {
     process = PROC_COMPLETE;
     procstate = PROCST_IDLE;
@@ -634,8 +654,6 @@ void behaviourExtractIdle(void) {
 }
 
 void behaviourExtractInit(void) {
-  writeToProcOutput("EXTRACT INIT");
-
   if (outputDisk > 1) {
     process = PROC_COMPLETE;
     procstate = PROCST_IDLE;
@@ -645,6 +663,8 @@ void behaviourExtractInit(void) {
     procstate = PROCST_FINISH;
     return;
   }
+
+  writeToProcOutput("EXTRACT INIT");
             
   judeSetPointer(MPTR_WAIT);
   roomidx = 0;
@@ -707,6 +727,11 @@ void behaviourExtractInit(void) {
   }
 
   if (dest_details[outputDisk].type == SETTINGT_DISK) {
+    char text[20];
+
+    sprintf(text, "REQUIRE DISK #%d", outputDisk + 1);
+    writeToProcOutput(text);
+
     procstate = PROCST_WAIT;
     procContinue = 0;
 
@@ -760,13 +785,12 @@ void behaviourExtractWait(void) {
   }
 }
 
+char str_filesize[] = "                    ";
+
+
 void behaviourExtractRead(void) {
   uint8_t *rooms;
   
-  char text[] = "EXTRACT READ   ";
-  text[14] = roomidx + 0x30;
-  writeToProcOutput(text);
-
   if (outputDisk == 0) {
     rooms = disk1Rooms;
   } else {
@@ -780,6 +804,10 @@ void behaviourExtractRead(void) {
     return;
   }
 
+  char text[20];
+  sprintf(text, "EXTRACT READ  %2.2d", rooms[roomidx]);
+  writeToProcOutput(text);
+
   prepareLFLFileName(rooms[roomidx]);
 
   if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
@@ -790,6 +818,11 @@ void behaviourExtractRead(void) {
 
     return;
   }
+
+  sprintf(str_filesize, "%20lu", file_size);
+  ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)((char __huge *)str_filesize);
+  zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
+  karlObjIncludeState(STATE_DIRTY);
   
   prepareKernalWrite(lflfilename);
   if (kernal_get_last_error()) {
@@ -803,43 +836,65 @@ void behaviourExtractRead(void) {
     return;
   }
 
+  file_pos = FILE_MEMORY;
+
+  zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
+  progressResetMax(file_size);
+
+  sprintf(text, "EXTRACT WRITE %2.2d", rooms[roomidx]);
+  writeToProcOutput(text);
+
   procstate = PROCST_WRITE;
 }
 
 void behaviourExtractWrite(void) {
-  writeToProcOutput("EXTRACT WRITE");
+  uint32_t next_size = 254;
+
+  if (next_size > file_size) {
+    next_size = file_size;
+  }
 
   judeSetPointer(MPTR_WAIT);
 
   if (!procAbort) {
-    performKernalWrite((uint32_t)FILE_MEMORY, file_size);
+    performKernalWrite((uint32_t)file_pos, next_size);
 
     uint8_t error = kernal_get_last_error();
 
     if (error) {
       writeToProcOutput("D81 WRITE ERROR");
-
       *(uint8_t *)(0x0882) = error;
-
-      while(1) {
-        __asm(" inc 0xd020 ");
-      }
-  
+      //while(1) {
+        //__asm(" inc 0xd020 ");
+      //}
       finishKernalWrite();
       procstate = PROCST_FINISH;
+      judeSetPointer(MPTR_NORMAL);
       return;
     }
   }
-  finishKernalWrite();
+  
+  file_size -= next_size;
+  file_pos += next_size;
+  zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
+  progressIncValue(next_size);
 
-  //procstate = PROCST_FINISH;
+  if (file_size == 0) {
+    finishKernalWrite();
 
-  if (!procAbort) {
-    roomidx++;
-    procstate = PROCST_READ;
-  } else {
-    procstate = PROCST_FINISH;
+    //procstate = PROCST_FINISH;
+
+    if (!procAbort) {
+      roomidx++;
+      procstate = PROCST_READ;
+
+      zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_4);
+      progressIncValue(1);
+    } else {
+      procstate = PROCST_FINISH;
+    }
   }
+
   judeSetPointer(MPTR_NORMAL);
 }
 

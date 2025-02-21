@@ -207,11 +207,11 @@ extern judeControl_t ctl_mmsetup_proc_0_0;
 extern judeControl_t ctl_mmsetup_proc_0_1;    //Process desc
 extern judeControl_t ctl_mmsetup_proc_0_2;    //Prompt
 extern judeControl_t ctl_mmsetup_proc_0_3;    
-extern judeControl_t ctl_mmsetup_proc_0_4;    //proc progress
+extern judeProgressBar_t pgb_mmsetup_proc_0_4;    //proc progress
 extern judeControl_t ctl_mmsetup_proc_0_5;    
 extern judeControl_t ctl_mmsetup_proc_0_6;    //read data
 extern judeControl_t ctl_mmsetup_proc_0_7;    
-extern judeControl_t ctl_mmsetup_proc_0_8;    //write progress
+extern judeProgressBar_t pgb_mmsetup_proc_0_8;    //write progress
 extern judeControl_t ctl_mmsetup_proc_0_9;    
 extern judeControl_t ctl_mmsetup_proc_0_10;   //error count
 extern judeListBox_t lbx_mmsetup_proc_0_11;   //output info

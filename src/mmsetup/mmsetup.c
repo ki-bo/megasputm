@@ -1635,7 +1635,7 @@ judeControl_t ctl_mmsetup_proc_0_3 = {
   0xff,
   0};
 
-judeControl_t ctl_mmsetup_proc_0_4 = {    //Process progress bar
+judeProgressBar_t pgb_mmsetup_proc_0_4 = {    //Process progress bar
   sizeof(judeControl_t),
   FARPTRNULLREC,
   NEARTOEVENTPTR(judeDefCtlPrepare),
@@ -1646,7 +1646,7 @@ judeControl_t ctl_mmsetup_proc_0_4 = {    //Process progress bar
   0x0000,
   0x0002,
   0,
-  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judePrgBarPresent),
   NEARTOEVENTPTR(judeDefCtlKeypress),
   NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
   CLR_SHADOW,
@@ -1657,8 +1657,17 @@ judeControl_t ctl_mmsetup_proc_0_4 = {    //Process progress bar
   FARPTRNULLREC,
   0,
   0xff,
-  0};
-  
+  0,
+
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+};
+
+
 judeControl_t ctl_mmsetup_proc_0_5 = {
   sizeof(judeControl_t),
   FARPTRNULLREC,
@@ -1731,7 +1740,7 @@ judeControl_t ctl_mmsetup_proc_0_7 = {
   0xff,
   0};
 
-judeControl_t ctl_mmsetup_proc_0_8 = {    //write progress
+judeProgressBar_t pgb_mmsetup_proc_0_8 = {    //write progress
   sizeof(judeControl_t),
   FARPTRNULLREC,
   NEARTOEVENTPTR(judeDefCtlPrepare),
@@ -1742,7 +1751,7 @@ judeControl_t ctl_mmsetup_proc_0_8 = {    //write progress
   0x0000,
   0x0002,
   0,
-  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judePrgBarPresent),
   NEARTOEVENTPTR(judeDefCtlKeypress),
   NEARTOFARPTRREC(&pnl_mmsetup_proc_0),
   CLR_SHADOW,
@@ -1753,7 +1762,15 @@ judeControl_t ctl_mmsetup_proc_0_8 = {    //write progress
   FARPTRNULLREC,
   0,
   0xff,
-  0};
+  0,
+
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+};
 
 judeControl_t ctl_mmsetup_proc_0_9 = {
     sizeof(judeControl_t),
@@ -1842,11 +1859,11 @@ karlFarPtr_t pnl_mmsetup_proc_0_controls[] = {
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_1),
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_2),
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_3),
-  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_4),
+  NEARTOFARPTRREC(&pgb_mmsetup_proc_0_4),
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_5),
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_6),
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_7),
-  NEARTOFARPTRREC(&ctl_mmsetup_proc_0_8),
+  NEARTOFARPTRREC(&pgb_mmsetup_proc_0_8),
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_9),
   NEARTOFARPTRREC(&ctl_mmsetup_proc_0_10),
   NEARTOFARPTRREC(&lbx_mmsetup_proc_0_11)
@@ -1974,8 +1991,8 @@ char str_mmsetup_config_17[] = "You must provide the D81/ADF Extraction details.
 char str_mmsetup_config_18[] = "You must provide the D64 Build details.";
 
 
-char str_mmsetup_proc_0[] = "Performing processing tasks";
-char str_mmsetup_proc_1[] = "Extracting room files from ADFs...";
+char str_mmsetup_proc_0[] = "Performing Data Operations";
+char str_mmsetup_proc_1[] = "Extracting/Building room files for destination disks...";
 char str_mmsetup_proc_2[] = "Building SID sounds from D64s...";
 char str_mmsetup_proc_3[] = "Validating D81 disk images...";
 char str_mmsetup_proc_4[] = "Please insert the required disk and select Continue.";

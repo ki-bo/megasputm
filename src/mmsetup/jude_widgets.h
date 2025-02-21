@@ -65,6 +65,25 @@ void	judeDefRBtChange(void);
 void	judeRGroupReset(uint8_t index);
 
 
+//PROGRESSBAR
+
+typedef struct PROGRESSBAR {
+  judeControl_t	_control;
+
+  uint8_t  alloc;
+  uint8_t  last;
+  uint32_t max;
+  uint32_t value;
+  uint32_t next;
+  uint16_t step;
+} judeProgressBar_t;
+
+void progressResetMax(uint32_t max);
+void progressIncValue(uint32_t delta);
+
+void judePrgBarPresent(void);
+
+
 //LISTBOX
 
 typedef	struct	LISTBOX {

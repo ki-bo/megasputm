@@ -9,6 +9,7 @@
 #include "hdos.h"
 
 
+
 void mmsetupWelcNextChg(void) {
     uint8_t state = ((karlObject_t __huge *)zptrself)->state;
 		    

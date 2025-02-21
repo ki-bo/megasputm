@@ -3,6 +3,107 @@
 #include "karljr.h"
 
 
+
+//PROGRESSBAR
+
+void progressResetMax(uint32_t max) {
+  judeProgressBar_t __huge *self = ((judeProgressBar_t __huge *)zptrself);
+  uint8_t width = self->_control._element.width;
+  
+  if (max) {
+    self->alloc = 0;
+    self->last = 0;
+    self->max = max;
+    self->value = 0;
+    self->step = (max * 100) / width;
+    if (!self->step)
+      self->step = 1;
+    self->next = self->step;
+  } else {
+    self->alloc = 0;
+    self->last = 0;
+    self->max = 0;
+    self->value = 0;
+    self->next = 0;
+    self->step = 0;
+  }
+
+  karlObjIncludeState(STATE_DIRTY);
+};
+
+void progressIncValue(uint32_t delta) {
+  judeProgressBar_t __huge *self = ((judeProgressBar_t __huge *)zptrself);
+  uint8_t width = self->_control._element.width;
+
+
+  if (self->alloc == width) {
+    return;
+  }
+
+  self->value += delta;
+
+  uint32_t valadj = self->value * 100;
+
+  while (valadj >= self->next) {
+    self->alloc += 1;//prog_step;
+    self->next += self->step;
+    if (self->alloc == width) {
+      break;
+    }
+  }
+
+  karlObjIncludeState(STATE_DIRTY);
+};
+
+//char space[] = "-";
+
+void progressRealise(void) {
+  judeProgressBar_t __huge *self = ((judeProgressBar_t __huge *)zptrself);
+  //uint32_t data = (uint32_t)((char __huge *)(space));
+
+  uint8_t delta = self->alloc - self->last;
+
+  uint8_t w = ((judeElement_t __huge *)zptrself)->width;
+  uint8_t x = ((judeElement_t __huge *)zptrself)->posx;
+  uint8_t y = ((judeElement_t __huge *)zptrself)->posy;
+
+  if (self->max == 0 || (self->last == 0 && self->value == 0)) {
+    //while(1) {
+      //__asm(" inc 0xd020 ");
+      //if (*(uint8_t *)(0xd610)) {
+        //*(uint8_t *)(0xd610) = 0;
+        //break;
+      //}
+    //}
+    judeEraseLine(w, x, y, CLR_SHADOW);
+  } else if (self->alloc == w)  {
+    judeEraseLine(w, x, y, CLR_FOCUS);
+  } else {
+    x+= self->last;
+
+    while (delta > 0) {
+      judeEraseLine(1, x, y, CLR_FOCUS);
+      //judeDrawTextDirect(CLR_FOCUS, 0, w, 0x00, x, y, 0, data);
+      --delta;
+      ++x;
+    }
+  
+    self->last = self->alloc;
+  }
+    
+  karlObjExcludeState(STATE_DIRTY);
+}
+
+
+void judePrgBarPresent(void) {
+  progressRealise();
+}
+
+
+
+
+
+
 const char str_lbx_prior[] = "[UP]";
 const char str_lbx_next[]  = "[DOWN]";
 
