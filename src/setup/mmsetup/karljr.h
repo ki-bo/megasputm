@@ -41,6 +41,29 @@
 
 #define	SIZ_ZP_KARLJR (0x68)
 
+union karl_zreg {
+  uint32_t q;
+  uint16_t wl;
+  uint16_t wh;
+  uint8_t b[4];
+};
+
+struct karl_zp {
+  uint32_t unused;
+  uint32_t self;
+  uint32_t owner;
+  uint32_t screen;
+  uint32_t colour;
+  uint32_t temp0;
+  uint32_t temp1;
+  uint32_t temp2;
+  union karl_zreg reg[16];
+  uint32_t valtemp0;
+  uint32_t valkey;
+};
+
+extern struct karl_zp __zpage _zkarljr2;
+#define kzp _zkarljr2
 
 extern uint8_t _zkarljr[SIZ_ZP_KARLJR];
 

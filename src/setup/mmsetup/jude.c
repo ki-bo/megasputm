@@ -56,24 +56,15 @@ void 	judeDrawText(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t doco
 
 void  judeDrawTextDirect(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t docont,
   uint8_t x, uint8_t y, uint8_t offs, uint32_t text) {
-	zregAwl = colour;
-	zregAb2 = indent;
-	zregAb3 = mwidth;
-	zregBb0 = docont;
-	
-  //zregBb1 = x;
-	_zkarljr[0x4D] = x;
-
-  //if (x == 0) {
-    //while(1) {
-      //__asm(" inc 0xd020 ");
-    //}
-  //}
-
-  zregBb2 = y;
-	zregCb0 = offs;
-
-	zregD = text;
+  kzp.reg[0xa].wl = colour;
+  kzp.reg[0xa].b[2] = indent;
+  kzp.reg[0xa].b[3] = mwidth;
+  kzp.reg[0xb].b[0] = docont;
+  kzp.reg[0xb].b[1] = x;
+  kzp.reg[0xb].b[2] = y;
+  kzp.reg[0xc].b[0] = offs;
+  
+  kzp.reg[0xd].q = text;
 
 	_judeDrawTextDirect();
 }

@@ -3,8 +3,8 @@
 #include "karljr.h"
 
 
-char str_lbx_prior[] = "[UP]";
-char str_lbx_next[]  = "[DOWN]";
+const char str_lbx_prior[] = "[UP]";
+const char str_lbx_next[]  = "[DOWN]";
 
 
 //LISTBOX
@@ -22,7 +22,7 @@ void judeLBxPresent(void) {
 	uint8_t y, x, w, f, f2, n, pgh, pgl, pgm, cl;
 
 	//zptrself = zptrself;
-  self = zptrself;
+  self = kzp.self;
 	karlObjExcludeState(STATE_DIRTY);
 
 	f = RECAST_T(karlObject_t, self)->state & STATE_ENABLED;
@@ -83,8 +83,9 @@ void judeLBxPresent(void) {
         clrtmp = CLR_FOCUS;
 
       judeEraseLine(w, x, y, clrtmp);
-      judeDrawTextDirect(clrtmp, (w - 4) / 2, w, 0x00, x, y, 0, data);
-      //judeDrawTextDirectStr(clrtmp, (w - 4) / 2,  0x00, y, 0, str_lbx_prior);
+      
+      uint8_t indent = (uint8_t)(w - sizeof(str_lbx_prior) - 1) >> 1;
+      judeDrawTextDirect(clrtmp, indent, w, 0x00, x, y, 0, data);
       y++;
       n++;
     }
@@ -129,8 +130,9 @@ void judeLBxPresent(void) {
       data = (uint32_t)((char __huge *)(str_lbx_next));
 
       judeEraseLine(w, x, y, clrtmp);
-      //judeDrawTextDirectStr(clrtmp, (w - 6) / 2, 0x00, y, 0, str_lbx_next);
-      judeDrawTextDirect(clrtmp, (w - 6) / 2, w, 0x00, x, y, 0, data);
+
+      uint8_t indent = (uint8_t)(w - sizeof(str_lbx_next) - 1) >> 1;
+      judeDrawTextDirect(clrtmp, indent, w, 0x00, x, y, 0, data);
 
       //while(1) {
         //__asm(" inc 0xd020 ");

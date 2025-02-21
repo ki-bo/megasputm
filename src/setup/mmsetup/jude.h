@@ -275,7 +275,7 @@ extern uint8_t mouseXCol;
 extern uint8_t mouseYRow;
 extern uint8_t themeCnt;
 extern uint8_t actvtheme;
-extern judeTheme_t *theme0;
+extern judeTheme_t theme0[6];
 
 
 extern uint16_t jude_onidle;
