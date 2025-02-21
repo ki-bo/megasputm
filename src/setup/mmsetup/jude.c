@@ -54,20 +54,58 @@ void 	judeDrawText(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t doco
 	_judeDrawText();
 }
 
-void	judeDrawTextDirect(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t docont,
-			uint8_t x, uint8_t y, uint8_t offs, unsigned long text) {
+void  judeDrawTextDirect(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t docont,
+  uint8_t x, uint8_t y, uint8_t offs, uint32_t text) {
 	zregAwl = colour;
 	zregAb2 = indent;
 	zregAb3 = mwidth;
 	zregBb0 = docont;
-	zregBb1 = x;
-	zregBb2 = y;
+	
+  //zregBb1 = x;
+	_zkarljr[0x4D] = x;
+
+  //if (x == 0) {
+    //while(1) {
+      //__asm(" inc 0xd020 ");
+    //}
+  //}
+
+  zregBb2 = y;
 	zregCb0 = offs;
 
 	zregD = text;
 
 	_judeDrawTextDirect();
 }
+
+void	judeDrawTextDirectStr(uint16_t colour, uint8_t indent, uint8_t docont,
+  uint8_t y, uint8_t offs, char *text/*uint32_t text*/) {
+
+    
+  zregAwl = colour;
+  zregAb2 = indent;
+
+  zregAb3 = ((judeElement_t *)(zptrself))->width;
+
+  zregBb0 = docont;
+
+  //zregBb1 = x;
+  _zkarljr[0x4D] = ((judeElement_t *)(zptrself))->posx;
+
+  //if (x == 0) {
+  //while(1) {
+    //__asm(" inc 0xd020 ");
+  //}
+  //}
+
+  zregBb2 = y;//((judeElement_t *)(zptrself))->posy;
+
+  zregCb0 = offs;
+  zregD = (uint32_t)text;
+
+  _judeDrawTextDirect();
+}
+
 
 
 uint8_t	judeLogClrIsReverse(uint16_t colour) {
@@ -114,8 +152,6 @@ void *judeInstallIdle(void *routine) {
 
   return result;
 }
-
-extern judeTheme_t *theme0;
 
 char *judeGetThemeDesc(void) {
   char *result = theme0[actvtheme]._name;

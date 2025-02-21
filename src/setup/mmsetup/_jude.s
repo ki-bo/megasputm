@@ -918,9 +918,11 @@ _judeDrawTextDirect:
 ;-----------------------------------------------------------
 
 		clc
-		;lda	zp:zregCb0
-    lda zp:zregAb2
-		adc	zp:zregBb1
+		;;lda	zp:zregCb0
+    lda zp:zregBb1
+    sta 0x0800
+
+		adc	zp:zregAb2
 
 		ldx	jude_cellsize
 		cpx	#0x02
@@ -944,6 +946,12 @@ text$:
 		
 cont1$:
 		sta	zp:zregCb2		;char or for norm/rev
+
+    sec
+    lda zregAb3
+    sbc zregAb2
+    sta zregAb3
+
 
 		lda	zp:zregBb2
 		asl a

@@ -3,8 +3,8 @@
 #include "karljr.h"
 
 
-const char str_lbx_prior[] = "[UP]";
-const char str_lbx_next[]  = "[DOWN]";
+char str_lbx_prior[] = "[UP]";
+char str_lbx_next[]  = "[DOWN]";
 
 
 //LISTBOX
@@ -56,9 +56,9 @@ void judeLBxPresent(void) {
 
 	judeEraseBkg(colour);
 
-  if (self != zptrself) {
-    *(uint8_t *)0xd020 = 2;
-  }
+  //if (self != zptrself) {
+    //*(uint8_t *)0xd020 = 2;
+  //}
 
 //POKE(0xD020U, 0);
 
@@ -72,7 +72,7 @@ void judeLBxPresent(void) {
 
     n = 0;
     if 	(RECAST_T(judeListBox_t, self)->linesoff) {
-      data = (uint32_t)(str_lbx_prior);
+      data = (uint32_t)((char __huge *)(str_lbx_prior));
 
       if  (cl == n)
         clrtmp = (f) ? (RECAST_T(karlObject_t, self)->state & STATE_ACTIVE) ? CLR_MONEY : CLR_PAPER  :  colour;
@@ -83,14 +83,15 @@ void judeLBxPresent(void) {
         clrtmp = CLR_FOCUS;
 
       judeEraseLine(w, x, y, clrtmp);
-      judeDrawTextDirect(clrtmp, 0, w, 0x00, x, y, (w - 4) / 2, data);
+      judeDrawTextDirect(clrtmp, (w - 4) / 2, w, 0x00, x, y, 0, data);
+      //judeDrawTextDirectStr(clrtmp, (w - 4) / 2,  0x00, y, 0, str_lbx_prior);
       y++;
       n++;
     }
 
-    if (self != zptrself) {
-      *(uint8_t *)0xd020 = 2;
-    }
+    //if (self != zptrself) {
+      //*(uint8_t *)0xd020 = 2;
+    //}
   
     while (lines) {
       if  (RECAST_T(judeListBox_t, self)->selline == (n + RECAST_T(judeListBox_t, self)->linesoff - pgl))
@@ -112,9 +113,9 @@ void judeLBxPresent(void) {
       lines--;
     }
 
-    if (self != zptrself) {
-      *(uint8_t *)0xd020 = 2;
-    }
+    //if (self != zptrself) {
+      //*(uint8_t *)0xd020 = 2;
+    //}
   
     if 	((RECAST_T(judeListBox_t, self)->linescnt - RECAST_T(judeListBox_t, self)->linesoff) > pgh) {
       if  (cl == n)
@@ -125,18 +126,24 @@ void judeLBxPresent(void) {
       if  ((RECAST_T(judeListBox_t, self)->hotline == n) && f && f2)
         clrtmp = CLR_FOCUS;
 
-        data = (uint32_t)(str_lbx_next);
+      data = (uint32_t)((char __huge *)(str_lbx_next));
 
       judeEraseLine(w, x, y, clrtmp);
-      judeDrawTextDirect(clrtmp, 0, w, 0x00, x, y, (w - 6) / 2, data);
+      //judeDrawTextDirectStr(clrtmp, (w - 6) / 2, 0x00, y, 0, str_lbx_next);
+      judeDrawTextDirect(clrtmp, (w - 6) / 2, w, 0x00, x, y, 0, data);
+
+      //while(1) {
+        //__asm(" inc 0xd020 ");
+      //}
+
       y++;
       n++;
       lines--;
     }
 
-    if (self != zptrself) {
-      *(uint8_t *)0xd020 = 2;
-    }
+    //if (self != zptrself) {
+      //*(uint8_t *)0xd020 = 2;
+    //}
   }
 }
 
