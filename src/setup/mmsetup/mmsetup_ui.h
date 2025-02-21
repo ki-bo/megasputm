@@ -9,3 +9,7 @@ void mmsetupWelcConfigChg(void);
 
 void mmsetupWelcNextChg(void);
 void mmsetupConfigCancelChg(void);
+
+void mmsetupConfigItemChg(void);
+
+void mmsetupSelectCancelChg(void);

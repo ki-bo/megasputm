@@ -58,4 +58,26 @@ void mmsetupWelcConfigChg(void){
     karlObjIncludeState(STATE_VISIBLE);
     karlObjIncludeState(STATE_CHANGED);
   }
-};
+}
+
+void mmsetupConfigItemChg(void) {
+  uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+  
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+		  zptrself = (uint32_t)((__attribute__ ((huge))karlObject_t *)&pge_mmsetup_select);
+		  judeActivatePage();
+  }
+}
+
+void mmsetupSelectCancelChg(void) {
+    uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+		    
+    judeDefCtlChange();
+
+		if (state & STATE_DOWN) {
+		  zptrself = (uint32_t)((__attribute__ ((huge))karlObject_t *)&pge_mmsetup_configure);
+		  judeActivatePage();
+    }
+}

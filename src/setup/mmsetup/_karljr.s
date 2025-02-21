@@ -97,17 +97,27 @@ regular$:
     cmp  #0x40
     bcc  exit$
   
-    cmp  #0x60
-    bcc  upper$
-  
-    sec
-    sbc  #0x60
-    
+    cmp  #0x61
+    bcs  lower$
+
+    cmp  #0x5b
+    bcs  symbol$
+
+    cmp  #0x40
+    bcs  upper$
+
     rts
 
+lower$:
+    sec
+    sbc  #0x60
+    rts
+
+symbol$:
+    sec
+    sbc  #0x40
+
 upper$:
-;    sec
-;    sbc  #0x40
     
 exit$:
     rts
