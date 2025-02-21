@@ -7,6 +7,8 @@
 
 #include "hdos.h"
 
+//#include "room90.h"
+
 
 void updateCheckGlyph(void) {
   static const uint8_t glyphlo[] = {
@@ -105,6 +107,16 @@ int main(void) {
 
   hdos_init(0x0800, 0x0800);
   _judeBackupKernalZP();
+
+  //hdos_set_filename("MANIAC1.D64");
+  //hdos_load_file_attic(0);
+  //hdos_set_filename("MANIAC2.D64");
+  //hdos_load_file_attic(0x32000);
+  //readIndexFile((uint8_t __huge *)(0x08000000));
+  //uint8_t __huge *image1 = (uint8_t __huge *)(0x08000000);
+  //uint8_t __huge *image2 = (uint8_t __huge *)(0x08032000);
+  //uint8_t __huge *dest = (uint8_t __huge *)(0x0005B000);
+  //makeRoom90(image1,image2, dest);
 
   attemptLoadFont();
 

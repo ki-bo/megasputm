@@ -69,10 +69,10 @@ judeDefCtlPrepare:
 		lda	#STATE_PREPARED
 		jsr	karlObjIncludeState
 
-		lda	#.byte0 STATE_EXPRESENT
-		ldx	#.byte1 STATE_EXPRESENT
-		ldy	#0x00
-		jsr	_karlObjIncStateEx
+		;lda	#.byte0 STATE_EXPRESENT
+		;ldx	#.byte1 STATE_EXPRESENT
+		;ldy	#0x00
+		;jsr	_karlObjIncStateEx
 
 		lda	#0x00
 		sta	karl_errorno

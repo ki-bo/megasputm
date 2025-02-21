@@ -1,4 +1,5 @@
 #include "jude.h"
+#include "jude_widgets.h"
 #include "mmsetup.h"
 #include "mmsetup_ui.h"
 #include "karljr.h"
@@ -255,6 +256,8 @@ void mmsetupSelAcceptChg(void) {
   }
 }
 
+uint8_t bonusTheme = 2;
+
 void mmsetupWelcThemeChg(void) {
   uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
 		    
@@ -262,8 +265,9 @@ void mmsetupWelcThemeChg(void) {
 
   if (state & STATE_DOWN) {
     uint8_t theme = actvtheme + 1;
-    if (theme >= themeCnt)  {
+    if (theme >= (themeCnt - ((bonusTheme) ? 2 : 0)))  {
       theme = 0;
+      bonusTheme -= (bonusTheme) ? 1 : 0;
     }
 
     judeSetTheme(theme);
@@ -321,4 +325,6 @@ void mmsetupWelcThemeLblPrep(void) {
   judeDefCtlPrepare();
 
   ctl_mmsetup_welc_1_2.text_p = (karlFarPtr_t)judeGetThemeDesc();
+  zptrself = (uint32_t)((karlObject_t __huge *)&ctl_mmsetup_welc_1_2);
+  karlObjIncludeState(STATE_CHANGED);
 }

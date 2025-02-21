@@ -147,9 +147,10 @@ void *judeInstallIdle(void *routine) {
 char *judeGetThemeDesc(void) {
   char *result = theme0[actvtheme]._name;
 
-  for (uint8_t i = 0; i < 17; i++) {
-    ((uint8_t *)(0x0800))[i] = (uint8_t)result[i];
-  };
+  //*(uint8_t *)(0x0800) = actvtheme;
+  //for (uint8_t i = 0; i < 17; i++) {
+    //((uint8_t *)(0x0801))[i] = (uint8_t)result[i];
+  //};
 
   return result;
 }
