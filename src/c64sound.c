@@ -239,7 +239,7 @@ int8_t getSoundStatus(int8_t nr);
 
 void initMusic(int8_t songResIndex, uint8_t __far *data); // $7de6
 int8_t initSound(int8_t soundResID, uint8_t __far *data); // $4D0A
-void stopSound_intern(int8_t soundResID); // $5093
+void stopSound_intern(int8_t soundResID, uint8_t flags); // $5093
 void stopMusic_intern(); // $4CAA
 
 void resetSID(); // $48D8
@@ -260,7 +260,7 @@ int8_t setupSongPtr(uint8_t channel); // $4C1C
 void countFreeChannels(); // $4f26
 void func_4F45(uint8_t channel); // $4F45
 //void safeUnlockResource(int8_t resIndex); // $4FEA
-void releaseResource(int8_t resIndex); // $5031
+void releaseResource(int8_t resIndex, uint8_t flags); // $5031
 void releaseResChannels(int8_t resIndex); // $5070
 void releaseResourceUnk(int8_t resIndex); // $50A4
 void releaseChannel(uint8_t channel);
@@ -1010,7 +1010,7 @@ void func_4F45(uint8_t channel) { // $4F45
 	}
 }*/
 
-void releaseResource(int8_t resIndex) { // $5031
+void releaseResource(int8_t resIndex, uint8_t flags) { // $5031
   releaseResChannels(resIndex);
 	if (resIndex == bgSoundResID && var481A == -1) {
 		//safeUnlockResource(resIndex);
@@ -1023,8 +1023,10 @@ void releaseResource(int8_t resIndex) { // $5031
 		resetSwapVars();
 	}
 
-	res_unlock(RES_TYPE_C64SOUND, resIndex, 0);
-  res_deactivate(RES_TYPE_C64SOUND, resIndex, 0);
+  if (flags) {
+	  res_unlock(RES_TYPE_C64SOUND, resIndex, 0);
+    res_deactivate(RES_TYPE_C64SOUND, resIndex, 0);
+  }
 }
 
 void releaseResChannels(int8_t resIndex) { // $5070
@@ -1035,14 +1037,14 @@ void releaseResChannels(int8_t resIndex) { // $5070
 	}
 }
 
-void stopSound_intern(int8_t soundResID) { // $5093
+void stopSound_intern(int8_t soundResID, uint8_t flags) { // $5093
 	for (uint8_t i = 0; i < 7; ++i) {
 		if (soundResID == _soundQueue[i]) {
 			_soundQueue[i] = -1;
 		}
 	}
 	var481A = -1;
-	//releaseResource(soundResID);
+	releaseResource(soundResID, flags);
 }
 
 void stopMusic_intern() { // $4CAA
@@ -1065,7 +1067,7 @@ void stopMusic_intern() { // $4CAA
 
 void releaseResourceUnk(int8_t resIndex) { // $50A4
 	var481A = -1;
-	releaseResource(resIndex);
+	releaseResource(resIndex, 1);
 }
 
 // a: 0..6
@@ -1371,7 +1373,7 @@ void findLessPrioChannels(uint8_t soundPrio) { // $4ED8
 
 void releaseResourceBySound(int8_t resID) { // $5088
 	var481A = 1;
-	releaseResource(resID);
+	releaseResource(resID, 1);
 }
 
 void readVec6Data(int8_t x, int8_t *offset, uint8_t __far *songFilePtr, int8_t chanResID) { // $4E99
@@ -1584,7 +1586,7 @@ void startSound(int8_t nr) {
 	if (isMusic) {
 		initMusic(nr, data);
 	} else {
-		stopSound_intern(nr);
+		stopSound_intern(nr, 0);
 		initSound(nr, data);
 	}
 
@@ -1599,8 +1601,8 @@ void stopSound(int8_t nr) {
 		return;
 
 	//Common::StackLock lock(_mutex);
-	stopSound_intern(nr);
-	releaseResource(nr);
+	stopSound_intern(nr, 1);
+	//releaseResource(nr, 1);
 }
 
 int8_t getSoundStatus(int8_t nr) {
