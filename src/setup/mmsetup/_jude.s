@@ -4795,9 +4795,16 @@ keys$:
 		jsr	_keysInputKeys
 
 mouse$:
-//	jsr	_mouseInputMouse
+    ;jsr	_mouseInputMouse
     jsr input_update
-    jsr _mouseButtonCheck
+    ;jsr _mouseButtonCheck
+
+    ;CIA1.pra = 0x40; // prepare CIA1 alredy for sampling mouse, as this takes some time
+    lda #0x40
+    sta 0xdc00
+
+    jsr _mouseMoveSprX
+    jsr _mouseMoveSprY
 
 		jsr	_mouseProcessMouse
 		jsr	_mouseProcessClick

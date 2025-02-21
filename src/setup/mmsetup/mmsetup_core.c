@@ -52,8 +52,8 @@ uint8_t __huge *procOutput;
 extern uint16_t mouseXPos;
 extern uint16_t mouseYPos;
 
-uint16_t new_x;
-uint16_t new_y;
+int16_t new_x;
+int16_t new_y;
 
 
 static int8_t check_mouse_movement(uint8_t pot, uint8_t old_pot) 
@@ -83,10 +83,10 @@ static int8_t apply_acceleration(int8_t value)
         : "Ka"(value)
         : "a", "x");
 
-  if (abs_diff > 15) {
+  if (abs_diff > 10) {
     return value << 2;
   }
-  if (abs_diff > 10) {
+  if (abs_diff > 5) {
     return value << 1;
   }
   return value;
@@ -152,6 +152,10 @@ static void handle_mouse(void)
 void input_update(void) {
   new_x = mouseXPos;
   new_y = mouseYPos;
+
+  //while (1) {
+    //__asm(" inc 0xd020 ");
+  //}
 
   handle_mouse();
   //handle_keyboard();
@@ -632,4 +636,17 @@ void updateProcess(void) {
     default:
       break;
   }
+}
+
+#define UART_E_PRA  (*(volatile uint8_t *)              0xd607)
+#define UART_E_DDR  (*(volatile uint8_t *)              0xd608)
+
+
+void core_init(void) {
+  CIA1.ddra   = 0xff; // set CIA1 port A as output
+  CIA1.ddrb   = 0xff; // set CIA1 port B as output
+  CIA1.pra    = 0xff; // connect mouse port 1 to SID1
+  CIA1.prb    = 0xff; // pull all pins of port B high
+  UART_E_DDR |= 0x02; // set UART_E pin as output
+  UART_E_PRA |= 0x02; // set UART_E pin to high (controlling keyboard column C8 on the C65/MEGA65)
 }

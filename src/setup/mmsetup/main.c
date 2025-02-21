@@ -108,6 +108,8 @@ int main(void) {
 
   attemptLoadFont();
 
+  core_init();
+
   jude_initflags = INIT_PRESERVEKERNAL;
 
   karlInit();

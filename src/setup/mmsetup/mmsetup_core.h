@@ -65,3 +65,4 @@ extern void _finishKernalWrite(void);
 
 extern void processTest(void);
 
+void core_init(void);
