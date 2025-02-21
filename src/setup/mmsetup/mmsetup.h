@@ -151,6 +151,8 @@ extern judeControl_t ctl_mmsetup_config_0_19;
 
 extern judeControl_t ctl_mmsetup_config_0_20;
 
+extern judeControl_t ctl_mmsetup_config_0_21;
+
 extern char str_mmsetup_config_14[];
 
 extern judeControl_t ctl_mmsetup_config_1_1;
@@ -192,6 +194,8 @@ extern char str_mmsetup_buttons_2[];
 
 extern char str_mmsetup_config_15[];
 extern char str_mmsetup_config_16[];
+extern char str_mmsetup_config_17[];
+extern char str_mmsetup_config_18[];
 
 extern karlFarPtr_t config_desc_controls[];
 

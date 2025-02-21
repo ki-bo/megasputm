@@ -487,7 +487,32 @@ karlFarPtr_t pnl_mmsetup_config_0_controls[] = {
 		NEARTOFARPTRREC(&ctl_mmsetup_config_0_17),
 		NEARTOFARPTRREC(&ctl_mmsetup_config_0_18),
 		NEARTOFARPTRREC(&ctl_mmsetup_config_0_19),
-		NEARTOFARPTRREC(&ctl_mmsetup_config_0_20)};
+		NEARTOFARPTRREC(&ctl_mmsetup_config_0_20),
+		NEARTOFARPTRREC(&ctl_mmsetup_config_0_21)};
+
+judeControl_t ctl_mmsetup_config_0_21 = {
+  sizeof(judeControl_t),
+  FARPTRNULLREC,
+  NEARTOEVENTPTR(judeDefCtlPrepare),
+  NEARTOEVENTPTR(judeDefCtlInit),
+  NEARTOEVENTPTR(judeDefCtlChange),
+  NEARTOEVENTPTR(judeDefCtlRelease),
+  STATE_ENABLED,
+  0x0000,
+  OPT_NONAVIGATE,
+  0,
+  NEARTOEVENTPTR(judeDefCtlPresent),
+  NEARTOEVENTPTR(judeDefCtlKeypress),
+  NEARTOFARPTRREC(&pnl_mmsetup_welc_0),
+  CLR_SYSS_TEXT | 0x0A,
+  0,
+  3,
+  80,
+  1,
+  NEARTOFARPTRREC(str_mmsetup_welc_6),
+  0,
+  0xff,
+  0};
 
 judeControl_t ctl_mmsetup_config_0_2 = {
 		sizeof(judeControl_t),
@@ -579,7 +604,7 @@ judePanel_t pnl_mmsetup_config_0 = {
 		23,
 		NEARTOFARPTRREC(&lay_mmsetup_bkg),
 		NEARTOFARPTRREC(pnl_mmsetup_config_0_controls),
-		21};
+		22};
 
 char str_mmsetup_config_8[] = "7  Disk #1 rooms...";
 
@@ -1944,6 +1969,9 @@ char str_mmsetup_buttons_6[] = "[Exit    ]";
 
 char str_mmsetup_config_15[] = "<Real Disk>";
 char str_mmsetup_config_16[] = "<No Selection>";
+
+char str_mmsetup_config_17[] = "You must provide the D81/ADF Extraction details";
+char str_mmsetup_config_18[] = "You must provide the D64 Build details";
 
 
 char str_mmsetup_proc_0[] = "Performing processing tasks";

@@ -14,7 +14,6 @@
 
 
 uint8_t config_select = 0;
-uint8_t config_required = 1;
 
 process_t process = PROC_NONE;
 procstate_t procstate = PROCST_IDLE;
@@ -367,6 +366,34 @@ uint8_t readDirectoryFiles(const char *ext) {
   return result;
 }
 
+
+uint8_t configurationInvalid(void) {
+  uint8_t result = 0;
+
+  if (ctl_mmsetup_welc_0_3._element._object.tag) {
+    //configProcFlags |= PROCFL_EXTRACT;
+    if (dest_details[0].type == SETTINGT_NONE && dest_details[1].type == SETTINGT_NONE) {
+      result = 1;
+    } else {
+      if (dest_details[0].type != SETTINGT_NONE && dest_details[2].type == SETTINGT_NONE) {
+        result = 1;
+      }
+      if (dest_details[1].type != SETTINGT_NONE && dest_details[3].type == SETTINGT_NONE) {
+        result = 1;
+      }
+    }
+  }
+
+  if (ctl_mmsetup_welc_0_4._element._object.tag) {
+    //configProcFlags |= PROCFL_BUILD;
+    if (dest_details[4].type == SETTINGT_NONE || dest_details[5].type == SETTINGT_NONE) {
+      result = 2;
+    }
+  }
+
+  return result;
+}
+
 void initiateProcess(void) {
   outputDisk = 0;
   roomidx = 0;
@@ -404,7 +431,7 @@ void initiateProcess(void) {
   process = PROC_CONFIGURE;
   procstate = PROCST_IDLE;
 
-  configProcFlags = PROCFL_CONFIGURE | PROCFL_BUILD | PROCFL_EXTRACT;
+  //configProcFlags = PROCFL_CONFIGURE | PROCFL_BUILD | PROCFL_EXTRACT;
   doneProcFlags = 0;
 
   __asm(

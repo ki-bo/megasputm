@@ -10,16 +10,29 @@
 
 
 void mmsetupWelcNextChg(void) {
-    uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+    uint8_t state = ((karlObject_t __huge *)zptrself)->state;
 		    
     judeDefCtlChange();
 
 		if (state & STATE_DOWN) {
-      if ((ctl_mmsetup_welc_0_3._element._object.tag == 0) &&
-          (ctl_mmsetup_welc_0_4._element._object.tag == 0) &&
-          (ctl_mmsetup_welc_0_5._element._object.tag == 0)) {
+      configProcFlags = 0;
+      
+      if (ctl_mmsetup_welc_0_2._element._object.tag) 
+        configProcFlags |= PROCFL_CONFIGURE;
+      if (ctl_mmsetup_welc_0_3._element._object.tag) 
+        configProcFlags |= PROCFL_EXTRACT;
+      if (ctl_mmsetup_welc_0_4._element._object.tag) 
+        configProcFlags |= PROCFL_BUILD;
 
+      if (!(configProcFlags & ~PROCFL_CONFIGURE)) {
         ctl_mmsetup_welc_0_6.text_p = (karlFarPtr_t)str_mmsetup_welc_7;
+
+        zptrself = (uint32_t)&ctl_mmsetup_welc_0_6;
+        karlObjIncludeState(STATE_VISIBLE);
+        karlObjIncludeState(STATE_CHANGED);
+
+      } else if (configurationInvalid() && !ctl_mmsetup_welc_0_2._element._object.tag) {
+        ctl_mmsetup_welc_0_6.text_p = (karlFarPtr_t)str_mmsetup_welc_6;
 
         zptrself = (uint32_t)&ctl_mmsetup_welc_0_6;
         karlObjIncludeState(STATE_VISIBLE);
@@ -28,9 +41,16 @@ void mmsetupWelcNextChg(void) {
       } else {
         zptrself = (uint32_t)&ctl_mmsetup_welc_0_6;
         karlObjExcludeState(STATE_VISIBLE);
-
-        zptrself = (uint32_t)((__attribute__ ((huge))karlObject_t *)&pge_mmsetup_configure);
+        if (ctl_mmsetup_welc_0_2._element._object.tag) {
+          zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_configure);
+        } else {
+          zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_process);
+        }
         judeActivatePage();
+
+        if (!ctl_mmsetup_welc_0_2._element._object.tag) {
+          initiateProcess();
+        }
       }
     }
 }
@@ -47,12 +67,12 @@ void mmsetupConfigCancelChg(void) {
 }
 
 void mmsetupWelcConfigChg(void){
-  uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+  uint8_t state = ((karlObject_t __huge *)zptrself)->state;
   
   judeDefCtlChange();
 
-  if (state & STATE_DOWN && config_required) {
-    ((__attribute__ ((huge))karlObject_t *)zptrself)->tag = 1;
+  if ((state & STATE_DOWN) && configurationInvalid()) {
+    ((karlObject_t __huge *)zptrself)->tag = 1;
     karlObjIncludeState(STATE_CHANGED);
 
     ctl_mmsetup_welc_0_6.text_p = (karlFarPtr_t)str_mmsetup_welc_6;
@@ -280,15 +300,34 @@ void mmsetupWelcThemeChg(void) {
 }
 
 void mmsetupConfigNextChg(void) {
-  uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+  uint8_t state = ((karlObject_t __huge *)zptrself)->state;
 		    
   judeDefCtlChange();
 
   if (state & STATE_DOWN) {
-    zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_process);
-    judeActivatePage();
+    uint8_t invalid = configurationInvalid();
+    if (invalid == 1) {
+      ctl_mmsetup_config_0_21.text_p = (karlFarPtr_t)str_mmsetup_config_17;
 
-    initiateProcess();
+      zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
+      karlObjIncludeState(STATE_VISIBLE);
+      karlObjIncludeState(STATE_CHANGED);
+
+    } else if (invalid == 2) {
+      ctl_mmsetup_config_0_21.text_p = (karlFarPtr_t)str_mmsetup_config_18;
+
+      zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
+      karlObjIncludeState(STATE_VISIBLE);
+      karlObjIncludeState(STATE_CHANGED);
+    } else {
+      zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
+      karlObjExcludeState(STATE_VISIBLE);
+
+      zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_process);
+      judeActivatePage();
+
+      initiateProcess();
+    }
   }
 }
 

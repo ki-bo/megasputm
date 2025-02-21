@@ -57,8 +57,10 @@ extern procstate_t procstate;
 extern procbehaviour_t proc_behaviours[]; 
 
 
-extern uint8_t config_required;
 extern uint8_t config_select;
+extern uint8_t configProcFlags;
+
+
 extern char file_extensions[3][4];
 
 extern uint32_t kernalWriteSrc;
@@ -66,9 +68,10 @@ extern uint32_t kernalWriteSiz;
 
 extern settingDetail_t dest_details[];
 
+
 uint8_t readDirectoryFiles(const char *ext);
 
-
+uint8_t configurationInvalid(void);
 void initiateProcess(void);
 void cancelProcess(void);
 void continueProcess(void);
