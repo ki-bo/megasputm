@@ -269,7 +269,7 @@ void judeLBxChange(void) {
       (mouseYRow >= self->_control._element.posy) &&   
       (mouseYRow < (self->_control._element.posy + self->_control._element.height))) {
 //  flg = 1;
-		if  (self->_control._element._object.state & STATE_PICKED) {
+		//if  (self->_control._element._object.state & STATE_PICKED) {
 			self->hotline = mouseYRow - self->_control._element.posy;
 			if  (self->hotline >= self->linescnt) 
 				self->hotline = self->linescnt - 1;
@@ -279,11 +279,11 @@ void judeLBxChange(void) {
 			self->_control._element._object.tag = 0;
 
 			karlObjIncludeState(STATE_DIRTY);
-		}
+		//}
 
 		if  (self->_control._element._object.state & STATE_DOWN) {
-      uint8_t btns = (self->linesoff >= self->_control._element.height) ?
-          (self->linescnt > (self->_control._element.height * 2) - 2) ? 2 : 1 : 0;
+      uint8_t btns = (self->linesoff >= (self->_control._element.height - 1)) ?
+          (self->linescnt >= (self->linesoff + self->_control._element.height - 2)) ? 2 : 1 : 0;
 
 			h = (self->_control._element.height - btns);
 
