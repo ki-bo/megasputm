@@ -84,3 +84,14 @@ uint8_t	judeLogClrIsReverse(uint16_t colour) {
 
   return result;   
 }
+
+
+void judeSetTheme(uint8_t theme) {
+  __asm(
+      " .extern _judeSetTheme \n"
+      "   jsr _judeSetTheme \n"
+      : 
+      : "Ka" (theme)
+      : "a"
+  );
+}

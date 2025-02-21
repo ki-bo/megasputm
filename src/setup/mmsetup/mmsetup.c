@@ -31,7 +31,8 @@ judeControl_t ctl_mmsetup_config_0_5 = {
 	  0};
 
 karlFarPtr_t pnl_mmsetup_welc_1_controls[] = {
-		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_0)};
+		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_0),
+		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_1)};
 
 karlModule_t mod_mmsetup_app = {
 		sizeof(karlModule_t),
@@ -233,7 +234,7 @@ judeControl_t ctl_mmsetup_config_0_12 = {
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
 		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
-		CLR_EMPTY,
+		CLR_PAPER,
 		0,
 		17,
 		18,
@@ -257,7 +258,7 @@ judePage_t pge_mmsetup_welcome = {
 		NEARTOEVENTPTR(judeDefPgePresent),
 		EVENTPTRNULLREC,
 		NEARTOFARPTRREC(&vew_mmsetup_main),
-		CLR_EMPTY,
+		CLR_PAPER,
 		0,
 		0,
 		80,
@@ -452,7 +453,7 @@ judeControl_t ctl_mmsetup_config_0_10 = {
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
 		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
-		CLR_EMPTY,
+		CLR_PAPER,
 		0,
 		5,
 		18,
@@ -758,7 +759,7 @@ judeControl_t ctl_mmsetup_config_0_11 = {
 		NEARTOEVENTPTR(judeDefCtlPresent),
 		NEARTOEVENTPTR(judeDefCtlKeypress),
 		NEARTOFARPTRREC(&pnl_mmsetup_config_0),
-		CLR_EMPTY,
+		CLR_PAPER,
 		0,
 		9,
 		18,
@@ -957,6 +958,31 @@ judeControl_t ctl_mmsetup_welc_1_0 = {
 		0x1,
 		'N'};
 
+judeControl_t ctl_mmsetup_welc_1_1 = {
+		sizeof(judeControl_t),
+		FARPTRNULLREC,
+		NEARTOEVENTPTR(judeDefCtlPrepare),
+		NEARTOEVENTPTR(judeDefCtlInit),
+		NEARTOEVENTPTR(mmsetupWelcThemeChg),
+		NEARTOEVENTPTR(judeDefCtlRelease),
+		0x0003,
+		0x0000,
+		0x0000,
+		0,
+		NEARTOEVENTPTR(judeDefCtlPresent),
+		NEARTOEVENTPTR(judeDefCtlKeypress),
+		NEARTOFARPTRREC(&pnl_mmsetup_welc_1),
+		CLR_INFORM,
+		12,
+		24,
+		10,
+		1,
+		NEARTOFARPTRREC(str_mmsetup_buttons_3),
+		0,
+		0x1,
+		'T'};
+
+
 judeControl_t ctl_mmsetup_config_0_9 = {
 		sizeof(judeControl_t),
 		FARPTRNULLREC,
@@ -1055,7 +1081,7 @@ judePanel_t pnl_mmsetup_welc_1 = {
 		2,
 		NEARTOFARPTRREC(&lay_mmsetup_bkg),
 		NEARTOFARPTRREC(pnl_mmsetup_welc_1_controls),
-		1};
+		2};
 
 judeControl_t ctl_mmsetup_config_0_13 = {
 		sizeof(judeControl_t),
@@ -1387,6 +1413,7 @@ char str_mmsetup_select_3[] = "  Select None";
 char str_mmsetup_select_4[] = "  Select All";
 
 char str_mmsetup_buttons_2[] = "[Accept  ]";
+char str_mmsetup_buttons_3[] = "[Theme   ]";
 
 char str_mmsetup_config_15[] = "<Real Disk>";
 char str_mmsetup_config_16[] = "<No Selection>";

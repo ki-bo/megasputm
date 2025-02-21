@@ -248,3 +248,18 @@ void mmsetupSelAcceptChg(void) {
     judeActivatePage();
   }
 }
+
+void mmsetupWelcThemeChg(void) {
+  uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    uint8_t theme = actvtheme + 1;
+    if (theme >= themeCnt)  {
+      theme = 0;
+    }
+
+    judeSetTheme(theme);
+  }
+}

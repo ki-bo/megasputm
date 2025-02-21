@@ -28,6 +28,7 @@
 	.public		judeDeActivateCtrl
 	.public		judeActivateCtrl
 	.public		judeSetPointer
+  .public   _judeSetTheme
 
 	.public		_judeEraseLine
 	.public		judeEraseBkg
@@ -74,6 +75,8 @@
 	.public		mouseXCol
 	.public		mouseYRow
 
+  .public   themeCnt;
+  .public   actvtheme;
 
   .extern		karlASCIIToScreen
 	.extern		karlGetLastError
@@ -106,6 +109,9 @@ judeInit:
 ;-----------------------------------------------------------
 		MvDWImmW zp:zreg0, mod_jude_core
 		jsr	_karlModAttach
+
+    lda #0x00
+    sta actvtheme
 
 		ldx	#sizeof_NAME
 loop0$:
@@ -513,6 +519,65 @@ move$:
 exit$:
 		rts
 
+
+;-----------------------------------------------------------
+_judeSetTheme:
+;-----------------------------------------------------------
+    cmp themeCnt
+    bcs exit$
+
+    sta actvtheme
+
+    tax
+    lda #.byte0 theme0
+    sta zp:zreg4wl
+    lda #.byte1 theme0
+    sta zp:zreg4wl + 1
+
+loop$:
+    cpx #0x00
+    beq update$
+
+    clc
+    lda #32
+    adc zp:zreg4wl
+    sta zp:zreg4wl
+    lda #0
+    adc zp:zreg4wl + 1
+    sta zp:zreg4wl + 1
+
+    dex
+    bra loop$
+
+update$:
+		ldy	#sizeof_NAME
+loop0$:
+		lda	(zp:zreg4wl), y
+		sta	jude_theme - sizeof_NAME, y
+
+		iny
+		cpy	#sizeof_NAME + 0x0F
+		bne	loop0$
+
+		lda	#.byte0 CLR_EMPTY
+		ldx	#.byte1 CLR_EMPTY
+		jsr	_judeLogClrToSys
+		sta	0xD020
+
+		lda	#.byte0 CLR_BACK
+		ldx	#.byte1 CLR_BACK
+		jsr	_judeLogClrToSys
+		sta	0xD021
+
+    jsr _judeThemeSetMouse
+
+    MvDWMem zp:zptrself, jude_actvpg
+
+		lda	#STATE_DIRTY
+		jsr	karlObjIncludeState
+
+exit$:
+    rts
 
 
 ;-----------------------------------------------------------
@@ -4726,9 +4791,11 @@ _judeProxy:
 
 
  .section rodata, rodata
+actvtheme:
+    .byte 0x00
 
-themecnt:
-		.byte	0x03
+themeCnt:
+		.byte	0x06
 
 
 ;	.define	CLR_BACK		0x00FD		;Background on C64
@@ -4750,7 +4817,7 @@ theme0:
 		.byte		0x0F, 0x03, 0x0C, 0x0E, 0x0D, 0x07, 0x0A
 
 		.asciz		"DARK            "
-		.byte		0x00, 0x00, 0x04, 0x0F, 0x01, 0x00, 0x0F, 0x0B
+		.byte		0x01, 0x00, 0x04, 0x0F, 0x0E, 0x00, 0x0F, 0x0B
 		.byte		0x0F, 0x03, 0x0C, 0x0E, 0x0D, 0x07, 0x0A
 
 		.asciz		"FAMILIAR        "

@@ -21,3 +21,5 @@ void mmsetupSelNoneChg(void);
 void mmsetupListSelect(void);
 
 void mmsetupSelAcceptChg(void);
+
+void mmsetupWelcThemeChg(void);

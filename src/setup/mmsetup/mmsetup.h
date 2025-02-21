@@ -40,8 +40,10 @@ extern judePanel_t pnl_mmsetup_welc_1;
 extern karlFarPtr_t pnl_mmsetup_welc_1_controls[];
 
 extern judeControl_t ctl_mmsetup_welc_1_0;
+extern judeControl_t ctl_mmsetup_welc_1_1;
 
 extern char str_mmsetup_buttons_0[];
+extern char str_mmsetup_buttons_3[];
 
 extern judeControl_t ctl_mmsetup_welc_0_1;
 
