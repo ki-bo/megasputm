@@ -94,12 +94,14 @@ void core_init(void);
 
 void behaviourConfigIdle(void);
 void behaviourConfigInit(void);
+void behaviourConfigWait(void);
 void behaviourBuildIdle(void);
 void behaviourBuildInit(void);
+void behaviourBuildRead(void);
+void behaviourBuildWrite(void);
 void behaviourBuildFinish(void);
 void behaviourExtractIdle(void);
 void behaviourExtractInit(void);
-void behaviourExtractWait(void);
 void behaviourExtractRead(void);
 void behaviourExtractWrite(void);
 void behaviourExtractFinish(void);
