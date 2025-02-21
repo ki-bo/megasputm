@@ -21,7 +21,7 @@ DEP_FLAGS      = -MMD -MP -MF$(@:%.o=%.d)
 ASM_FLAGS      = --target=mega65 --list-file=$(@:%.o=%.lst)
 LN_FLAGS       = --target=mega65 --verbose --rtattr printf=nofloat
 LN_FLAGS_SETUP = $(LN_FLAGS) mega65-mmsetup.scm --output-format=prg --list-file=mmsetup-mega65.lst
-LN_FLAGS_MM    = $(LN_FLAGS) mega65-mm.scm --no-tree-shaking --raw-multiple-memories --cstartup=mm --rtattr exit=simplified --output-format=raw --list-file=mm-mega65.lst
+LN_FLAGS_MM    = $(LN_FLAGS) mega65-mm.scm --raw-multiple-memories --cstartup=mm --rtattr exit=simplified --output-format=raw --list-file=mm-mega65.lst
 
 ETHLOAD   = etherload
 M65FTP    = mega65_ftp

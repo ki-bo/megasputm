@@ -37,7 +37,7 @@
 		.extern _Zp, _Vsp
 
 ;;; *** Need to manually provide start address as we use raw binary output format and not prg.
-		.section autoboot_load_address
+		.section autoboot_load_address, root
 		.word   0x2001
 
 		.pubweak __program_root_section, __program_start
@@ -198,6 +198,7 @@ __call_heap_initialize:
 		lda #.byte1(nmi_handler)
 		sta 0xfffb
 
+		.section startup, root, noreorder
 ;;; Jump into C main function.
 		jmp main
 

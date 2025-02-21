@@ -66,20 +66,12 @@
                         (startup               #x200e)
                         data_init_table
                         (runtime_copy          #x2200)
-                        (init_copy             #x4000)
+                        (section
+                                code_init
+                                cdata_init
+                                data_init
+                                               #x4000)
                         (diskio_copy           #x6000)
-                )
-        )
-
-        ; memory for init program (will be discarded once executed)
-        (memory init (address (#x4000 . #x5fff))
-                ; we use scatter-to but not to relocate to another memory location
-                ; but just to group those three sections together in one block
-                (scatter-to init_copy)
-                (section 
-                        code_init
-                        cdata_init
-                        data_init
                 )
         )
 
