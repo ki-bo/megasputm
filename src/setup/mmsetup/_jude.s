@@ -4194,7 +4194,11 @@ begin$:
 
 L0$:    
 		jsr	_mouseButtonCheck
-		
+
+    rts
+
+
+
 		lda	SID_ADCONV1		   ;Get mouse X movement
 
 		ldy	mouseOldPotX
@@ -4795,8 +4799,8 @@ keys$:
 		jsr	_keysInputKeys
 
 mouse$:
-    ;jsr	_mouseInputMouse
     jsr input_update
+    jsr	_mouseInputMouse
     ;jsr _mouseButtonCheck
 
     ;CIA1.pra = 0x40; // prepare CIA1 alredy for sampling mouse, as this takes some time
