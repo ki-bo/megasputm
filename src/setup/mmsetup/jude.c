@@ -1,0 +1,86 @@
+#include	"jude.h"
+//#include "calypsi/intrinsics6502.h"
+
+
+uint8_t	judeLogClrToSys(uint16_t colour){
+  uint8_t result;
+  
+  __asm(
+    " .extern _judeLogClrToSys \n"
+    "   jsr _judeLogClrToSys \n"
+    : "=Ka" (result)
+    : "Ka" ((uint8_t)(colour & 0xff)), "Kx" ((uint8_t)(colour >> 8))
+    );
+
+  return result;
+};
+
+
+void	judeViewInit(karlFarPtr_t view) {
+	//zreg0wl = view->louint16_t;
+	//zreg0wh = view->hiuint16_t;
+  zreg0 = (uint32_t)view;
+
+	_judeViewInit();
+}
+
+void	judeEraseLine(uint8_t w, uint8_t x, uint8_t y, uint16_t colour) {
+//	IN	.A,.X		colour
+//	IN	zregAb3		Max width
+//	IN	zregBb1		x pos
+//	IN	zregBb2		y pos
+
+	zregAwl = colour;
+	zregBb1 = x;
+	zregBb2 = y;
+	zregAb3 = w;
+
+	_judeEraseLine();
+}
+
+
+void 	judeDrawText(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t docont) {
+//	IN	zregAwl		Colour
+//	IN	zregAb2		Indent
+//	IN	zregAb3		Max width
+//	IN	zregBb0		Do cont char if opt
+
+	zregAwl = colour;
+	zregAb2 = indent;
+	zregAb3 = mwidth;
+	zregBb0 = docont;
+
+	_judeDrawText();
+}
+
+void	judeDrawTextDirect(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t docont,
+			uint8_t x, uint8_t y, uint8_t offs, unsigned long text) {
+	zregAwl = colour;
+	zregAb2 = indent;
+	zregAb3 = mwidth;
+	zregBb0 = docont;
+	zregBb1 = x;
+	zregBb2 = y;
+	zregCb0 = offs;
+
+	zregD = text;
+
+	_judeDrawTextDirect();
+}
+
+
+uint8_t	judeLogClrIsReverse(uint16_t colour) {
+  uint8_t result;
+
+	 _judeLogClrIsReverse();
+
+   __asm(
+      " lda #0x00 \n"
+      " rol a \n"
+    :"=Ka" (result)
+    :
+    :
+    );
+
+  return result;   
+}

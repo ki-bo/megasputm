@@ -1,0 +1,65 @@
+#pragma once
+
+#include	"jude.h"
+
+typedef	struct	TABBAR {
+		judeBar_t		_bar;
+	} judeTabBar_t;
+
+typedef	struct	BUTTONBAR {
+		judeBar_t		_bar;
+	} judeButtonBar_t;
+
+typedef	struct	BROWSEBAR {
+		judeBar_t		_bar;
+	} judeBrowseBar_t;
+
+typedef	struct	BUTTONCTRL {
+		judeControl_t	_control;
+	} judeButtonCtrl_t;
+
+typedef	struct	LABELCTRL {
+		judeControl_t	_control;
+		karlFarPtr_t	actvctrl_p;
+	} judeLabelCtrl_t;
+
+typedef	struct	PAGEBTNCTRL {
+		judeControl_t	_control;
+		karlFarPtr_t	actvpage_p;
+	} judePageBtnCtrl_t;
+
+typedef	struct	EDITCTRL {
+		judeControl_t	_control;
+		uint8_t			textsz;
+		uint8_t			textmaxsz;
+	} judeEditCtrl_t;
+
+typedef	struct	RADIOGRPCTRL {
+		judeControl_t	_control;
+
+		karlFarPtr_t	controls_p;
+		uint8_t			controlscnt;
+
+		karlFarPtr_t	labelctrl;
+	} judeRadioGrpCtrl_t;
+
+typedef	struct	RADIOBTNCTRL {
+		judeControl_t	_control;
+
+		karlFarPtr_t	groupctrl_p;
+	} judeRadioBtnCtrl_t;
+
+void	judeDefCtlPrepare(void);
+void	judeDefCtlInit(void);
+void	judeDefCtlChange(void);
+void	judeDefCtlRelease(void);
+void	judeDefCtlPresent(void);
+void	judeDefCtlKeypress(void);
+void	judeDefEdtPresent(void);
+void	judeDefEdtKeypress(void);
+void	judeDefLblChange(void);
+void	judeDefPBtChange(void);
+void	judeDefPBtPresent(void);
+void	judeDefRGpChange(void);
+void	judeDefRBtChange(void);
+void	judeRGroupReset(uint8_t index);
