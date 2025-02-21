@@ -33,7 +33,7 @@ typedef struct DIRENT {
 void hdos_init(uint16_t dataBuf, uint16_t xferBuf);
 
 void hdos_closeall(void);
-err_t hdos_set_filename(const char *fileName);
+err_t hdos_set_filename(char *fileName);
 err_t hdos_open_file(void);
 void hdos_close_file(void);
 err_t hdos_read_byte(uint8_t *data);
@@ -46,3 +46,5 @@ void hdos_getcurrdrive(uint8_t *drive);
 void hdos_getdefdrive(uint8_t *drive);
 err_t hdos_selectdrive(uint8_t drive);
 err_t hdos_cdrootdir(uint8_t drive);
+
+err_t hdos_attachD810(void);

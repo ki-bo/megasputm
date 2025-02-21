@@ -107,7 +107,23 @@ adrhdosDest:
     .public _hdos_cdrootdir
     .public _hdos_closeall
     .public _hdos_getdefdrive
+    .public _hdos_attachD810
 ;===========================================================
+
+_hdos_attachD810:
+    lda #0x40
+    sta 0xD640
+    clv
+
+    bcc fail$
+
+    clc
+    rts
+
+fail$:
+    sec
+    rts
+
 
 _hdos_closeall:
     lda #0x22

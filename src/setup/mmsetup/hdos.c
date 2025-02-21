@@ -100,7 +100,7 @@ void hdos_closeall(void) {
   _hdos_closeall();
 }
 
-err_t hdos_set_filename(const char *fileName) {
+err_t hdos_set_filename(char *fileName) {
   err_t result = 0;
   uint8_t lo = (uint16_t)fileName & 0xff;
   uint8_t hi = ((uint16_t)fileName & 0xff00) >> 8;
@@ -282,6 +282,23 @@ err_t hdos_load_file_attic(uint32_t offset) {
 //  "   sta result \n"
     : "=Ka" (result)
     : [offs] "Kzp32" (offset)
+    : "a", "x", "y", "z"
+  );
+
+  return result;
+}
+
+err_t hdos_attachD810(void) {
+  err_t result = 0;
+
+  __asm(
+    " .extern _hdos_attachD810 \n"
+    "   jsr _hdos_attachD810 \n"
+    "   lda #0x00 \n"
+    "   rol a \n"
+//  "   sta result \n"
+    : "=Ka" (result)
+    : 
     : "a", "x", "y", "z"
   );
 

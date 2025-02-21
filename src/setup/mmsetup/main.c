@@ -98,10 +98,10 @@ void attemptLoadFont(void) {
   }*/
 }
 
-extern uint16_t *jude_kernirq;
+//extern uint16_t *jude_kernirq;
 
 int main(void) {
-  *jude_kernirq = *(uint16_t *)(0xfffe);
+  //*jude_kernirq = *(uint16_t *)(0xfffe);
 
   hdos_init(0x0800, 0x0800);
   _judeBackupKernalZP();

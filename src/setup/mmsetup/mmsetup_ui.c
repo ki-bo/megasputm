@@ -103,6 +103,10 @@ void mmsetupConfigItemChg(void) {
 
       lbx_mmsetup_select_0_5.linescnt = readDirectoryFiles(file_extensions[tag1]);
 
+      lbx_mmsetup_select_0_5.currline = 0;
+      lbx_mmsetup_select_0_5.linesoff = 0;
+      lbx_mmsetup_select_0_5.hotline = 0;
+
       //restore selection - we're assuming this works!
       if (dest_details[tag].type == SETTINGT_IMGE) {
         lbx_mmsetup_select_0_5.selline = dest_details[tag].index;
@@ -207,10 +211,12 @@ void mmsetupSelAcceptChg(void) {
       dest_details[config_select].type = SETTINGT_IMGE;
       dest_details[config_select].index = lbx_mmsetup_select_0_5.selline;
       
-      char __huge *lineptr = (char __huge *)(LISTBOXLINESMEM + (65 * lbx_mmsetup_select_0_5.selline));
+      char __huge *lineptr = (char __huge *)(LISTBOXLINESMEM + (66 * lbx_mmsetup_select_0_5.selline));
       for (uint8_t i = 0; i < 65; i++) {
         dest_details[config_select].fileName[i] = lineptr[i];
       }
+      dest_details[config_select].namelen = lineptr[65];
+      
       text = (karlFarPtr_t)(dest_details[config_select].fileName);
     }
 

@@ -93,7 +93,7 @@
   .public   _judeUnbankKernal
 
   .public   _judeUserIRQ
-  .public   jude_kernirq
+  ;.public   jude_kernirq
 
   .extern		karlASCIIToScreen
 	.extern		karlGetLastError
@@ -4234,8 +4234,11 @@ L1$:
 		ldx	mouseXMax+1
 L2$:    
 		sty	mouseXPosNew
+    sty mouseXPos
 	  stx	mouseXPosNew+1
-		jsr _mouseHistoresisCheck
+    stx mouseXPos + 1
+
+		;jsr _mouseHistoresisCheck
 
 ; Move the mouse pointer to the new X pos
 
@@ -4298,9 +4301,11 @@ L3$:
 		ldx	mouseYMax+1
 L4$:    	
 		sty	mouseYPosNew
-		stx	mouseYPosNew+1
+		sty mouseYPos
+    stx	mouseYPosNew+1
+    stx mouseYPos + 1
 
-		jsr _mouseHistoresisCheck
+		;jsr _mouseHistoresisCheck
 
 ; Move the mouse pointer to the new Y pos
 
@@ -4670,6 +4675,13 @@ start$:
     inc   0xd020
 	#endif
 
+    ;lda #0x01
+    ;tsb 0xdc0e
+    ;tsb 0xdc0f
+
+    ;lda #0x10
+    ;tsb 0xdc0f
+
 
 ;	Is the VIC-II needing service?
 		lda	VIC_IRQFLGS
@@ -4679,20 +4691,28 @@ start$:
 ;	Some other interrupt source
     lda 0xd080
     and #0x80
-    beq nextirq$
+    beq nextirq0$
 
 		jsr	karlPanic
     
 
-nextirq$:
+nextirq0$:
+    lda 0xdc0d
+    and #0x80
+    beq nextirq1$
+
+    jsr karlPanic
 
     ;bra done$
 
 ; just in case
-		lda	CIA1_IRQCTL
-    lda CIA2_IRQCTL
+		;lda CIA1_IRQCTL
+		;lda CIA2_IRQCTL
+
+nextirq1$:
 
 proc$:
+
 ; Seem to need to reguardless
 		asl VIC_IRQFLGS
 
@@ -4738,8 +4758,8 @@ terminate$:
 		;sta	CIA1_IRQCTL
     ;sta CIA2_IRQCTL
 
-		lda	CIA1_IRQCTL
-    lda CIA2_IRQCTL
+		;lda	CIA1_IRQCTL
+    ;lda CIA2_IRQCTL
 
 		lda	VIC_IRQFLGS
 		and	#0x01
@@ -4923,8 +4943,22 @@ _judeDefCorePrepare:
 		sta	0xD640
 		clv
 
+    ;lda #0x57
+    ;sta zptrtemp0
+    ;lda #0xcb
+    ;sta zptrtemp0 + 1
+    ;lda #0x02
+    ;sta zptrtemp0 + 2
+    ;lda #0x00
+    ;sta zptrtemp0 + 3
 
-		lda	#0x00
+    ;lda #0xea
+    ;ldz #0x00
+    ;sta [zptrtemp0], z
+    ;inz
+    ;sta [zptrtemp0], z
+
+ 		lda	#0x00
 		sta	karl_errorno
 
 		rts
@@ -4935,11 +4969,15 @@ _judeDefCoreInit:
     ;lda #0x07
     ;sta 0xd020
 
+;halt$:
+    ;inc 0xd020
+    ;bra halt$
 
     ;lda CPU_IRQ
     ;sta jude_kernirq
     ;lda CPU_IRQ + 1
     ;sta jude_kernirq + 1
+
 
 		lda	#.byte0 _judeUserIRQ		;install our handler
 		sta	CPU_IRQ
@@ -5338,5 +5376,5 @@ jude_kernal:
 jude_runtime:
 		.space	0xff, 0
 
-jude_kernirq:
-    .word   0x0000
+;jude_kernirq:
+;  .word   0x0000

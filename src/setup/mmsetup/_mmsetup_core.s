@@ -41,8 +41,21 @@
   .extern   _judeRestoreOwnZP
 
   .extern   _judeUserIRQ
-  .extern   jude_kernirq
+  ;.extern   jude_kernirq
 
+kernal_delay:
+
+    ldx #0x01
+loop0$:
+    ldy #0x0f
+loop1$:
+    dey 
+    bne loop1$
+
+    dex
+    bne loop0$
+
+    rts
 
 _finishKernalWrite:
     sei
@@ -54,10 +67,23 @@ _finishKernalWrite:
 
     lda #1
     jsr kernal_close_logical_file
+
+    jsr kernal_delay
+
+    ;lda #8
+    ;jsr kernal_close_all
+
+    ;sei
+    ;jsr kernal_reset_channels
     
-    lda #8
-    jsr kernal_close_all
-    jsr kernal_reset_channels
+    ;lda #.byte0 _judeUserIRQ
+    ;sta CPU_IRQ
+    ;lda #.byte1 _judeUserIRQ
+    ;sta CPU_IRQ + 1
+
+    ;cli
+
+    ;jsr kernal_delay
 
     sei
 
@@ -110,6 +136,9 @@ _performKernalWrite:
 
 
 loop$:
+    jsr kernal_delay
+
+
     ldz #0
     lda [0x08], Z
 
@@ -165,12 +194,19 @@ _prepareKernalWrite:
     jsr kernal_set_name
     ;jsr 0xffbd
 
+    jsr kernal_delay
+
+
     jsr kernal_open
     ;jsr 0xffc0
+
+    jsr kernal_delay
 
     ldx #1
     jsr kernal_set_logical_output
     ;jsr 0xffc9
+
+    jsr kernal_delay
 
     sei
 

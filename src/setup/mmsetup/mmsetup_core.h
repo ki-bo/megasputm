@@ -12,6 +12,7 @@ typedef struct SETTINGDETAIL {
   settingType_t type;
   uint8_t index;
   char fileName[65];
+  uint8_t namelen;
 } settingDetail_t;
 
 typedef enum PROCESS {
