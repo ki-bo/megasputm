@@ -826,24 +826,34 @@ void processError(char *reason) {
 }
 
 
+uint16_t chks = 0;
+
 uint8_t verifyMemory(uint8_t __huge *mem, uint32_t size, uint16_t check) {
-  uint16_t num_words = size >> 1;
+  uint32_t nw = size >> 1;
+  uint16_t num_words = (uint16_t)nw;
   
-  if (size % 2) {
+//if (size % 2) {
+  if (size & 0x00000001) {
     mem[size] = 0;
     num_words++;
   }
   
-  __auto_type ptr = mem;
-  uint16_t chks = 0;
+  uint8_t __huge *ptr = mem;
   
+  uint8_t b;
+  uint16_t word;
+
   for (uint16_t i = 0; i < num_words; i++) {
-    uint16_t word = *ptr ^ 0xffff;
-    chks += word;
-    ptr++;
+    b = *ptr++;
+    word = b ^ 0xff;
+    
+    b = *ptr++;
+    word |= (uint16_t)(b ^ 0xff) << 8;
+
+    chks += word ;//& 0x0000ffff;
   } 
   
-  return chks = check;
+  return chks == check;
 }
 
 
@@ -1144,13 +1154,18 @@ void behaviourExtractInit(void) {
       return;
     }
 
-    if (verifyMemory(FILE_MEMORY, file_size, disk1_en[0].check)) {
+    if (file_size == disk1_en[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_en[0].check)) {
       writeToProcOutput("ENGLISH LANGUAGE DETECTED");
       langidx = 0;
-    } else if (verifyMemory(FILE_MEMORY, file_size, disk1_de[0].check)) {
+    } else if (file_size == disk1_de[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_de[0].check)) {
       writeToProcOutput("GERMAN  LANGUAGE DETECTED");
       langidx = 1;
     } else {
+      writesixdecimalstr(str_filesize, 14, chks);
+      ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)((char __huge *)str_filesize);
+      zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
+      karlObjIncludeState(STATE_DIRTY);
+    
       processError("ADF INDEX UNKNOWN LANG");
       return;
     }
@@ -1177,6 +1192,11 @@ void behaviourExtractInit(void) {
     }
 
     if (!verifyMemory(FILE_MEMORY, file_size, rooms[roompreprep].check)) {
+      writesixdecimalstr(str_filesize, 14, roompreprep);
+      ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)((char __huge *)str_filesize);
+      zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
+      karlObjIncludeState(STATE_DIRTY);
+      
       processError("ADF CHECKSUM INVALID");
       return;
     }
