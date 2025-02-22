@@ -129,10 +129,12 @@ int8_t adf_read_file(const char *filename, uint8_t __huge *dest, uint32_t *size)
 
 void read_block(uint16_t block_num)
 {
-  uint32_t offs = (uint32_t)block_num * 512;
+  uint32_t bn = block_num;
+  uint32_t offs = bn * 512;
+
   // read block from disk
-  __auto_type src  = image_ptr + offs;
-  __auto_type dest = sector_buffer;
+  uint8_t __huge *src  = image_ptr + offs;
+  uint8_t __huge *dest = (uint8_t __huge *)sector_buffer;
 
   for (uint16_t i = 0; i < 512; i++)
   {

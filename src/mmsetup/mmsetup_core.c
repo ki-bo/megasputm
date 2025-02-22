@@ -878,7 +878,7 @@ void behaviourConfigInit(void) {
 
           return;
         } else {
-          writeToProcOutput("MOUNTING IMAGE");
+          writeToProcOutput("MOUNT   IMAGE...");
           
           procstate = PROCST_WAIT;
           return;
