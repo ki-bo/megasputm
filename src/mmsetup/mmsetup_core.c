@@ -29,10 +29,11 @@ uint8_t procError = 0;
 
 uint8_t outputDisk;
 uint8_t newDisk = 0;
-uint8_t roomidx;
+uint8_t roomidx = 0xff;
+uint8_t roompreprep = 0xff;
 uint8_t haveRoom90 = 0;
 uint16_t room90size = 0;
-
+uint8_t langidx = 0xff;
 uint8_t configProcFlags = 0;
 uint8_t doneProcFlags = 0;
 
@@ -65,15 +66,155 @@ settingDetail_t dest_details[8] = {
 //void (* onWrite)(void);
 //void (* onFinish)(void);
 
-uint8_t disk1Rooms[] = 
-    {0, 30, 33, 40, 44, 45, 49, 50,
-    51, 53, 0xff};
-uint8_t disk2Rooms[] =
-    {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
-    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-    21, 22, 23, 24, 25, 26, 27, 28, 29,  
-    31, 32, 34, 35, 36, 37, 38, 39, 41, 
-    42, 43, 44, 46, 47, 48, 52, 53, 0xff};
+typedef struct ROOMDATA {
+  uint8_t room;
+  uint32_t size;
+  uint16_t check;
+} roomdata_t;
+
+
+roomdata_t disk1_en[] = {
+  {0,  1988, 0xdd69},
+  {30, 24926, 0x5eab},
+  {33, 21257, 0x1ff8},
+  {40,  5177, 0xe4b1},
+  {44, 33250, 0x53c8},
+  {45, 16284, 0x7da1},
+  {49,  4710, 0xf024},
+  {50,  6248, 0x978a},
+  {51, 23349, 0x79f1},
+  {53, 71634, 0x3dec},
+  {0xFF, 0, 0}
+};
+
+roomdata_t disk2_en[] = {
+  { 1, 30581, 0x4b34},
+  { 2,  5103, 0x973a},
+  { 3, 11334, 0x3d4d},
+  { 4, 40861, 0x2b19},
+  { 5, 18561, 0xd0e0},
+  { 6, 13210, 0x253e},
+  { 7, 23597, 0x1bd9},
+  { 8, 12815, 0x1b1f},
+  { 9,  6871, 0xda29},
+  {10, 10289, 0xe716},
+  {11, 12199, 0xc3c3},
+  {12, 23914, 0x06d1},
+  {13, 16369, 0x330f},
+  {14,  4966, 0xfe87},
+  {15, 11551, 0x9ca0},
+  {16, 21756, 0x505c},
+  {17, 31241, 0x82c9},
+  {18, 11756, 0xca59},
+  {19, 11990, 0xdf3c},
+  {20,  9461, 0xde87},
+  {21, 20473, 0x9234},
+  {22,  7355, 0xa9fe},
+  {23, 16858, 0x35cb},
+  {24, 36731, 0x88e6},
+  {25, 14062, 0x07b7},
+  {26, 17456, 0x0302},
+  {27, 14657, 0x9cbb},
+  {28,  4672, 0xf5ad},
+  {29, 22821, 0x4bd0},
+  {31, 15006, 0xa243},
+  {32,  7656, 0x1b6a},
+  {34,  4994, 0xcf9f},
+  {35, 10849, 0xdb19},
+  {36,  9360, 0xf492},
+  {37, 17128, 0xab2b},
+  {38, 19278, 0xe06f},
+  {39,  2518, 0x3947},
+  {41,  5564, 0x5858},
+  {42,  6625, 0xd889},
+  {43,  3138, 0xc19b},
+  {44, 33250, 0x53c8},
+  {46,  6651, 0x6954},
+  {47, 20175, 0x8f94},
+  {48,  4050, 0x9067},
+  {52,  4014, 0x503e},
+  {53, 71634, 0x3dec},
+  {0xff, 0, 0}
+};
+
+
+roomdata_t disk1_de[] = {
+  { 0,  1988, 0xcfe5},
+  {30, 25087, 0x5d0b},
+  {33, 21315, 0xfa4d},
+  {40,  5255, 0xdd8b},
+  {44, 33261, 0x678c},
+  {45, 16376, 0x987a},
+  {49,  4710, 0xf024},
+  {50,  6703, 0x61d4},
+  {51, 23342, 0x7a93},
+  {53, 71641, 0x222f},
+  {0xff, 0, 0}
+};
+
+roomdata_t disk2_de[] = {
+  { 1, 30685, 0x7b2a},
+  { 2,  5107, 0x4df9},
+  { 3, 11366, 0x0bb4},
+  { 4, 41223, 0x0329},
+  { 5, 18602, 0xe067},
+  { 6, 13235, 0xed04},
+  { 7, 23680, 0x9288},
+  { 8, 12910, 0x36a1},
+  { 9,  6885, 0xecd0},
+  {10, 10270, 0x8f17},
+  {11, 12216, 0x9d90},
+  {12, 23956, 0x2782},
+  {13, 16374, 0x3edf},
+  {14,  4989, 0xb382},
+  {15, 11572, 0x2ab7},
+  {16, 21829, 0x7a65},
+  {17, 31300, 0x0991},
+  {18, 11899, 0xed3a},
+  {19, 12042, 0x6308},
+  {20,  9548, 0x476f},
+  {21, 20565, 0x8152},
+  {22,  7443, 0x84a8},
+  {23, 16939, 0xa7d3},
+  {24, 36748, 0xb6cb},
+  {25, 14082, 0x7790},
+  {26, 17687, 0x26b8},
+  {27, 14709, 0xf7bb},
+  {28,  4709, 0x6a08},
+  {29, 22830, 0xbada},
+  {31, 15054, 0x5529},
+  {32,  7656, 0x1b6a},
+  {34,  4994, 0xcf9f},
+  {35, 10849, 0xdb19},
+  {36,  9383, 0x7a22},
+  {37, 17132, 0x8102},
+  {38, 19297, 0x6873},
+  {39,  2518, 0x3947},
+  {41,  5632, 0xd734},
+  {42,  6670, 0x415d},
+  {43,  3151, 0xd240},
+  {44, 33261, 0x678c},
+  {46,  6653, 0xfdc8},
+  {47, 20186, 0xf8c1},
+  {48,  4050, 0x9067},
+  {52,  4022, 0x4bd2},
+  {53, 71641, 0x222f},
+  {0xff, 0, 0}
+};
+
+
+roomdata_t *langs_disk1[] = {
+  disk1_en,
+  disk1_de,
+  0
+};
+
+roomdata_t *langs_disk2[] = {
+  disk2_en,
+  disk2_de,
+  0
+};
+
 
 procbehaviour_t proc_behaviours[] = {
   {0, 0, 0, 0, 0, 0},
@@ -506,7 +647,9 @@ void initiateProcess(void) {
   outputDisk = 0;
   newDisk = 1;
   roomidx = 0;
+  roompreprep = 0;
   haveRoom90 = 0;
+  langidx = 0xff;
 
   procOutput = (uint8_t __huge *)LISTBOXLINESMEM;
 
@@ -520,10 +663,10 @@ void initiateProcess(void) {
 
   if (configProcFlags & PROCFL_EXTRACT) {
     if (dest_details[0].type != SETTINGT_NONE) {
-      max += sizeof(disk1Rooms) - 1;
+      max += (sizeof(disk1_en) / sizeof(roomdata_t)) - 1;
     }
     if (dest_details[1].type != SETTINGT_NONE) {
-      max += sizeof(disk2Rooms) - 1;
+      max += (sizeof(disk2_en) / sizeof(roomdata_t)) - 1;
     }
   }
 
@@ -680,6 +823,27 @@ void processError(char *reason) {
   procError = 1;
 
   writeToProcOutput(reason);
+}
+
+
+uint8_t verifyMemory(uint8_t __huge *mem, uint32_t size, uint16_t check) {
+  uint16_t num_words = size >> 1;
+  
+  if (size % 2) {
+    mem[size] = 0;
+    num_words++;
+  }
+  
+  __auto_type ptr = mem;
+  uint16_t chks = 0;
+  
+  for (uint16_t i = 0; i < num_words; i++) {
+    uint16_t word = *ptr ^ 0xffff;
+    chks += word;
+    ptr++;
+  } 
+  
+  return chks = check;
 }
 
 
@@ -842,7 +1006,7 @@ void behaviourBuildRead(void) {
       //__asm(" inc 0xd020 ");
     //}
     //error and finish
-    processError("HDOS SETFN FAIL");
+    processError("HDOS SETFN FAIL #1");
     //procstate = PROCST_FINISH;
     return;
   };
@@ -854,7 +1018,7 @@ void behaviourBuildRead(void) {
       //__asm(" inc 0xd020 ");
     //}
     //procstate = PROCST_FINISH;
-    processError("HDOS SETFN FAIL");
+    processError("HDOS SETFN FAIL #2");
     return;
   };
   hdos_load_file_attic(0x32000);
@@ -950,6 +1114,7 @@ void behaviourExtractInit(void) {
             
   judeSetPointer(MPTR_WAIT);
   roomidx = 0;
+  roompreprep = 0;
   
   copyFileName(outputDisk + 2, adfFileName);
   if (hdos_set_filename(adfFileName) ) {
@@ -972,21 +1137,47 @@ void behaviourExtractInit(void) {
     return;
   }
 
-  uint8_t roompreprep = roomidx;
-  uint8_t *rooms;
+  if (langidx == 0xff) {
+    prepareLFLFileName(0);
+    if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
+      processError("ADF READ INDEX ERROR");
+      return;
+    }
+
+    if (verifyMemory(FILE_MEMORY, file_size, disk1_en[0].check)) {
+      writeToProcOutput("ENGLISH LANGUAGE DETECTED");
+      langidx = 0;
+    } else if (verifyMemory(FILE_MEMORY, file_size, disk1_de[0].check)) {
+      writeToProcOutput("GERMAN  LANGUAGE DETECTED");
+      langidx = 1;
+    } else {
+      processError("ADF INDEX UNKNOWN LANG");
+      return;
+    }
+  }
+
+  roomdata_t *rooms;
   if (outputDisk == 0) {
-    rooms = disk1Rooms;
+    rooms = langs_disk1[langidx];
   } else {
-    rooms = disk2Rooms;
+    rooms = langs_disk2[langidx];
   }
   
-  while (rooms[roompreprep] != 0xff) {
-    prepareLFLFileName(rooms[roompreprep]);
+  while (rooms[roompreprep].room != 0xff) {
+    prepareLFLFileName(rooms[roompreprep].room);
 
     if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
-      processError("ADF READ ERROR");
-      //writeToProcOutput("ADF READ ERROR");
-      //procstate = PROCST_FINISH;
+      processError("ADF PREFETCH ERROR");
+      return;
+    }
+
+    if (file_size != rooms[roompreprep].size) {
+      processError("ADF SIZE CHECK INVALID");
+      return;
+    }
+
+    if (!verifyMemory(FILE_MEMORY, file_size, rooms[roompreprep].check)) {
+      processError("ADF CHECKSUM INVALID");
       return;
     }
 
@@ -994,20 +1185,19 @@ void behaviourExtractInit(void) {
   }
 
   procstate = PROCST_READ;
-
   judeSetPointer(MPTR_NORMAL);
 }
 
 void behaviourExtractRead(void) {
-  uint8_t *rooms;
+  roomdata_t *rooms;
   
   if (outputDisk == 0) {
-    rooms = disk1Rooms;
+    rooms = langs_disk1[langidx];
   } else {
-    rooms = disk2Rooms;
+    rooms = langs_disk2[langidx];
   }
 
-  if (rooms[roomidx] == 0xff) {
+  if (rooms[roomidx].room == 0xff) {
     roomidx = 0;
     //outputDisk++;
     procstate = PROCST_FINISH;
@@ -1016,10 +1206,10 @@ void behaviourExtractRead(void) {
 
   char text[] = "EXTRACT READ  00.LFL";
   //sprintf(text, "EXTRACT READ  %2.2d", rooms[roomidx]);
-  writetwodecimalstr(text, 14, rooms[roomidx]);
+  writetwodecimalstr(text, 14, rooms[roomidx].room);
   writeToProcOutput(text);
 
-  prepareLFLFileName(rooms[roomidx]);
+  prepareLFLFileName(rooms[roomidx].room);
 
   if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
     processError("ADF READ ERROR");
@@ -1050,7 +1240,7 @@ void behaviourExtractRead(void) {
   //sprintf(text, "EXTRACT WRITE %2.2d", rooms[roomidx]);
 
   char text2[] = "EXTRACT WRITE 00.LFL";
-  writetwodecimalstr(text2, 14, rooms[roomidx]);
+  writetwodecimalstr(text2, 14, rooms[roomidx].room);
   writeToProcOutput(text2);
 
   procstate = PROCST_WRITE;

@@ -400,7 +400,7 @@ judeControl_t ctl_mmsetup_welc_0_5 = {
 		NEARTOEVENTPTR(judeDefCtlInit),
 		NEARTOEVENTPTR(judeDefCtlChange),
 		NEARTOEVENTPTR(judeDefCtlRelease),
-		0x0003,
+		STATE_VISIBLE,
 		0x0000,
 		0x0020,
 		0,
