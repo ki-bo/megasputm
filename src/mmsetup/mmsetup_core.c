@@ -839,6 +839,8 @@ uint8_t verifyMemory(uint8_t __huge *mem, uint32_t size, uint16_t check) {
   }
   
   uint8_t __huge *ptr = mem;
+  chks = 0;
+
   
   uint8_t b;
   uint16_t word;
@@ -846,7 +848,7 @@ uint8_t verifyMemory(uint8_t __huge *mem, uint32_t size, uint16_t check) {
   for (uint16_t i = 0; i < num_words; i++) {
     b = *ptr++;
     word = b ^ 0xff;
-    
+  
     b = *ptr++;
     word |= (uint16_t)(b ^ 0xff) << 8;
 
@@ -1154,12 +1156,12 @@ void behaviourExtractInit(void) {
       return;
     }
 
-    if (file_size == disk1_en[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_en[0].check)) {
-      writeToProcOutput("ENGLISH LANGUAGE DETECTED");
-      langidx = 0;
-    } else if (file_size == disk1_de[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_de[0].check)) {
+    if (file_size == disk1_de[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_de[0].check)) {
       writeToProcOutput("GERMAN  LANGUAGE DETECTED");
       langidx = 1;
+    } else if (file_size == disk1_en[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_en[0].check)) {
+      writeToProcOutput("ENGLISH LANGUAGE DETECTED");
+      langidx = 0;
     } else {
       writesixdecimalstr(str_filesize, 14, chks);
       ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)((char __huge *)str_filesize);
