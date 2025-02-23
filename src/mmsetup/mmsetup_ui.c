@@ -89,23 +89,12 @@ void mmsetupWelcConfigChg(void){
   }
 }
 
-//There is some bug copying the string...
-//const char blah[] = "BLAH BLAH BLAH     0123456789012345678901234567890123456789123"; 
-
 void mmsetupConfigItemChg(void) {
   uint8_t state = ((__attribute__ ((huge))karlObject_t *)zptrself)->state;
   
   judeDefCtlChange();
 
   if (state & STATE_DOWN) {
-      /*uint8_t __huge *out = (uint8_t __huge *)(0x016000);
-
-      for (uint8_t i = 0; i < 10; ++i) {
-        for (uint8_t j = 0; j < 64; ++j) {
-          *out = blah[j];
-          ++out;
-        }
-      }*/
 
       judeSetPointer(MPTR_WAIT);
 

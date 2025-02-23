@@ -1,17 +1,3 @@
-;		.public __program_start
-;
-;		.section programStart
-;
- ; .extern   _judeBackupOwnZP
-  ;.extern  main
-;
-;__program_start:
- ; jsr _judeBackupKernalZP
-  ;jmp main
-
-
-	CPU_IRQ: .equ 	0xFFFE
-
  .section code
   .public _prepareKernalWrite
   .public _performKernalWrite
@@ -47,14 +33,9 @@
   .extern   _judeRestoreOwnZP
 
   .extern   _judeUserIRQ
-  ;.extern   jude_kernirq
 
 
 kernal_get_status:
-    ;lda #0
-    ;ldx #0
-    ;jsr 0xff6b        ;set_banks
-
     lda #0xff
     sta kernalDriveStatus
     lda #0xff
@@ -84,9 +65,9 @@ read_error$:
     bcs done$          ; If null terminator, we're done
     ;beq done$
     
-    ;jsr 0xFFD2        ; Print character to screen
+    ;jsr 0xFFD2        ; Print character to screen for debugging
     sta kernalDriveStatus, y
-    sta 0x0850, y
+    ;sta 0x0850, y	; just for debugging, put to unused memory area
 
     iny
     cpy #0x02
@@ -94,8 +75,6 @@ read_error$:
     bra read_error$    ; Always branches, loop until null
 
 done$:
-    ;jsr 0xFFCC        ; CLRCHN (Clear input channel)
-    
     clc
     lda #0x0F         ; File number (15)
     jsr 0xFFC3        ; CLOSE file
@@ -185,6 +164,7 @@ _performKernalWrite:
     ldx #1
     jsr kernal_set_logical_output
 
+    ; Use this for checking a number of byte reads for errors
     ;lda #0x01
     ;pha
 
@@ -194,6 +174,7 @@ loop$:
 
     jsr kernal_write_byte
 
+; Use this code to check errors for a number of reads
     ;pla
     ;;beq notest$
     ;bra notest$
@@ -202,6 +183,7 @@ loop$:
     ;bcs error$ 
 
 cont$:
+; As above
     ;pha
 
     clc
@@ -213,12 +195,13 @@ cont$:
     bne loop$
     bra done$
 
+; Here also
 ;notest$:
     ;lda #0x00
     ;bra cont$
-
 done$:
     ;pla
+
 
 error$:
     sei
@@ -247,25 +230,18 @@ _prepareKernalWrite:
     lda #0
     ldx #0
     jsr kernal_set_banks
-    ;jsr 0xff6b
 
     lda #1
     ldx #8
     ldy #2
     jsr kernal_set_logical_file
-    ;jsr 0xffba
 
-    ;lda #12
     pla
-    ;ldx #.byte0 filename
     plx
-    ;ldy #.byte1 filename
     ply
     jsr kernal_set_name
-    ;jsr 0xffbd
 
     jsr kernal_open
-    ;jsr 0xffc0
 
     ;jsr kernal_get_status
     ;sta kernal_error
@@ -275,7 +251,6 @@ _prepareKernalWrite:
 
     ldx #1
     jsr kernal_set_logical_output
-    ;jsr 0xffc9
 
 
 done$:
@@ -432,16 +407,6 @@ loop2$:
     bne loop2$
 
 
-;    ldy #0x00
-;loop2$:
-;    lda labeldata, Y
-;    jsr kernal_write_byte
-;    iny
-;    cpy #16
-;    bne loop2$
-
-
-
 ;-------------------------------------------------------------------------------------------
 
     ;print#1,"u2:";2;0;40;0
@@ -519,9 +484,6 @@ donecleanup0$
 
 
 done$:
-    ;lda #8
-    ;jsr kernal_close_all;
-
     sei
 
     jsr _judeBackupKernalZP
@@ -721,4 +683,3 @@ headerdiskid:
   .byte 0x31, 0x44                    ;2
 headerpadding2:
   .byte 0xa0, 0xa0                    ;2      - 29 bytes
-

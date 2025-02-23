@@ -177,7 +177,6 @@
 	MOUSE_RBTN: .equ 	0x01
 
 
-; KEY_ASC_BKSPC: .equ 		0x08
 	KEY_ASC_CR: .equ 	0x0D
 
 	KEY_ASC_SPACE: .equ 	0x20
@@ -378,70 +377,6 @@
 	ERROR_OBJECT: .equ 	0x40
 	ERROR_SYSTEM: .equ 	0x80
 
-
-  /*.typedef __attribute((huge)) unsigned char *FARPTR;
-
-  .typedef unsigned char *EVENTPTR;
-
-	.struct OBJECT {
-;  Type details
-		unsigned char size;
-		FARPTR parent;
-
-;  Function calls
-		EVENTPTR prepare;
-		EVENTPTR initialise;
-		EVENTPTR change;
-		EVENTPTR release;
-
-;  State information
-		unsigned short state;
-		unsigned short oldstate;
-		unsigned short options;
-
-;  Data items
-		unsigned short tag;
-  };
-
-	struct	NAME {
-		unsigned char _data + 17;
-	};
-
-	struct	NAMEDOBJECT {
-		struct OBJECT _object;
-		struct NAME name;
-  };
-
-	struct	MODULE {
-		struct NAMEDOBJECT _named;
-
-		FARPTR units_p;
-		unsigned char unitscnt;
-	};
-
-	struct	UNIT {
-		struct NAMEDOBJECT _named;
-	};
-
-
-	struct	CALLCONTEXT {
-		unsigned char methidx;
-		unsigned short proxy;
-	};
-
-	struct	PROCCONTEXT {
-		unsigned short  _return;
-
-		FARPTR    self;     ;0
-		unsigned char   listcnt;	;4
-		unsigned char   listidx;  ;5
-		FARPTR    object;   ;6
-		unsigned short  routine;  ;10
-		FARPTR    target;   ;12
-		unsigned char   direction;;16
-		unsigned short  proxy;    ;17
-	};*/
-
   sizeof_NAME: .equ  17
 
   sizeof__OBJECT: .equ  21
@@ -500,14 +435,8 @@ MvDWMem   .macro  dst, src
     phx
     phy
 
-    ;neg
-    ;neg
-    ;lda  \src
     ldq \src
 
-    ;neg
-    ;neg
-    ;sta  \dst
     stq \dst
 
     ply
@@ -518,19 +447,11 @@ MvDWObjMem  .macro dst, src, offset
     phx
     phy
 
-    ;ldz  \offset
     lda  \offset
     taz
 
-    ;neg
-    ;neg
-    ;nop
-    ;lda  (src), z
     ldq [\src], z
 
-    ;neg
-    ;neg
-    ;sta  dst
     stq \dst
 
     ply
@@ -542,15 +463,8 @@ MvDWObjImm .macro  dst, src, offset
     phy
 
     ldz  #\offset
-    ;neg
-    ;neg
-    ;nop
-    ;lda  (src), z
     ldq [\src], z
 
-    ;neg
-    ;neg
-    ;sta  dst
     stq \dst
 
     ply
@@ -578,65 +492,37 @@ LSRWMem .macro  src
       .endm
 
 LDQmem .macro src
-    ;neg
-    ;neg
-    ;lda  src
     ldq \src
       .endm
 
 LDQIndWZ .macro  src
-    ;neg
-    ;neg
-    ;lda  (src), z
     ldq (\src), z
       .endm
 
 LDQIndDWZ  .macro  dst
-    ;neg
-    ;neg
-    ;nop
-    ;lda  (dst), z
     ldq [\dst], z
       .endm
 
 STQIndW  .macro  dst
-    ;neg
-    ;neg
-    ;sta  (dst), z
     stq (\dst)
       .endm
 
 STQMem  .macro  dst
-    ;neg
-    ;neg
-    ;sta  dst
     stq \dst
       .endm
 
 ADQMem  .macro  src
-    ;neg
-    ;neg
-    ;adc  src
     adcq  \src
       .endm
 
 SBQMem .macro  src
-    ;neg
-    ;neg
-    ;sbc  src
     sbcq  \src
       .endm
 
 LSQMem .macro src
-    ;neg
-    ;neg
-    ;lsr  src
     lsrq \src
       .endm
 
 CPQMem  .macro  src
-    ;neg
-    ;neg
-    ;cmp  src
     cmpq \src
       .endm

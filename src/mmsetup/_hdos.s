@@ -38,18 +38,18 @@
 ;===========================================================
 
 ptrhdosBufHi:   
-    .space 1 //=	$DE
+    .space 1
 ptrhdosXfrHi:
-    .space 1 //=	$DF
-
-//ptrhdosFNmHi	=	$DF		;deprecated
+    .space 1
 
 ptrhdosBufOff:
-    .space 2 //=	$E2
+    .space 2
 ptrhdosBufDir:
-    .space 2 //=	$E4
+    .space 2
 ptrhdosBufFNm:
-    .space 2 //=	$E6
+    .space 2
+sizhdosBuf:
+    .space 2
 
 ;===========================================================
 
@@ -61,8 +61,6 @@ ptrhdosBufFNm:
 
 flghdosErr:
 		.byte	0x01
-sizhdosBuf:
-		.word	0x0000
 adrhdosFN:
 		.word	0x0000
 
@@ -137,7 +135,7 @@ _hdos_getdefdrive:
 		sta	0xD640
 		clv
 
-    rts
+		rts
 
 _hdos_getcurrdrive:
       lda #0x04
@@ -261,7 +259,6 @@ _hdosCloseDir:
 		sta	0xd640
 		clv
 
-;		ldx	#0x00
 		plx
 
 		rts
@@ -272,19 +269,9 @@ _hdosOpenDir:
 ;-----------------------------------------------------------
 ; Opendir takes no arguments and returns File descriptor in A
 ;-----------------------------------------------------------
-;		ldx	#0x00
-;		ldy	#0x00
-;		ldz	#0x00
-;
-;		ldy	ptrhdosBufHi
-;		ldx	#0x00
-
 		lda	#0x12
 		sta	0xd640
 		clv
-
-;		ldx	#0x00
-
 
 		bcc	error$
 
@@ -317,23 +304,8 @@ _hdosReadDir:
 
 		pha
 	
-;;	FIRST, CLEAR OUT THE DIRENT
-;		ldx	#0
-;		txa
-;l1$:
-;		sta	_readdir_dirent, X
-;		dex
-;		bne	l1$
-
-;@halt0:
-;		lda	#0x0e
-;		sta	0xd020
-;		jmp	halt0$
-;		lda	#0x00
-;		sta	0xd020
-
 ;	Third, call the hypervisor trap
-;	File descriptor gets passed in in X.
+;	File descriptor gets passed in X.
 ;	Result gets written to transfer area we setup 
 		plx
 		ldy	zp:ptrhdosXfrHi
@@ -342,10 +314,6 @@ _hdosReadDir:
 		clv
 
 		bcs	readDirSuccess$
-
-;	Return end of directory
-;		lda #0x00
-;		ldx #0x00
 
 		plz
 		ply
@@ -385,10 +353,9 @@ l2$:
 
 
 ;	make sure it is null terminated
-
-;   ldx 0x0400+64
-;   lda #0x00
-;   sta _readdir_dirent+4+2+4+2,x
+; the file length here is limited to 64 bytes in the read
+; but for the open, you are limited to 63 so we make this 
+; null
 
 		ldy	#64
 		lda	(zp:ptrhdosBufDir), y
@@ -397,37 +364,12 @@ l2$:
 		sta	(zp:ptrhdosBufFNm), y
 
 
-;	;; Inode = cluster from offset 64+1+12 = 77
-;	ldx #$03
-;@l3:	
-;	lda $0477,x
-;	sta _readdir_dirent+0,x
-;	dex
-;	bpl @l3
-;
-;	;; d_off stays zero as it is not meaningful here
-;	
-;	;; d_reclen we preload with the length of the file (this saves calling stat() on the MEGA65)
-;	ldx #3
-;@l4:	
-;	lda $0400+64+1+12+4,x
-;	sta _readdir_dirent+4+2,x
-;	dex
-;	bpl @l4
-
 ;	File type and attributes
-;	lda $0400+64+1+12+4+4
-;	sta _readdir_dirent+4+2+4
 
 		ldy	#64 + 1 + 12 + 4 + 4
 		lda	(zp:ptrhdosBufDir), y
 		sta	valhdosFType
 
-
-;	Return address of dirent structure
-;	lda #<_readdir_dirent
-;	ldx #>_readdir_dirent
-	
 		plz
 		ply
 		plx
@@ -510,12 +452,8 @@ fail$:
 ;-----------------------------------------------------------
 __hdosOpenFile:
 ;-----------------------------------------------------------
-;		jsr	__hdosCloseAll
 
-		ldx	adrhdosFN
-		ldy	adrhdosFN + 1
-
-;		jsr	__hdosSetFN
+;   Set file name must be called prior
 
 		lda	#0x34
 		sta	0xd640
@@ -532,8 +470,8 @@ __hdosOpenFile:
 
 		lda	#0x00
 		sta	flghdosErr
-		sta	sizhdosBuf
-		sta	sizhdosBuf + 1
+		sta	zp:sizhdosBuf
+		sta	zp:sizhdosBuf + 1
 
 		clc
 
@@ -557,15 +495,15 @@ __hdosReadByte:
 		rts
 
 begin$:
-		lda	sizhdosBuf
-		ora	sizhdosBuf + 1
+		lda	zp:sizhdosBuf
+		ora	zp:sizhdosBuf + 1
 
 		bne	cont0$
 
 		jsr	__hdosReadSect
 
-		lda	sizhdosBuf
-		ora	sizhdosBuf + 1
+		lda	zp:sizhdosBuf
+		ora	zp:sizhdosBuf + 1
 
 		bne	cont0$
 
@@ -581,26 +519,8 @@ cont0$:
 
 		pha
 
-
-;FIXME:  Can use INW??
-
-		clc
-		lda	zp:ptrhdosBufOff
-		adc	#0x01
-		sta	zp:ptrhdosBufOff
-		lda	zp:ptrhdosBufOff + 1
-		adc	#0x00
-		sta	zp:ptrhdosBufOff + 1
-
-;FIXME:  Can use DEW?
-
-		sec
-		lda	sizhdosBuf
-		sbc	#0x01
-		sta	sizhdosBuf
-		lda	sizhdosBuf + 1
-		sbc	#0x00
-		sta	sizhdosBuf + 1
+		inw	zp:ptrhdosBufOff
+		dew	zp:sizhdosBuf
 
 		pla
 
@@ -622,16 +542,11 @@ __hdosReadSect:
 		sta	0xD640
 		clv
 
-;halt$:
-;		inc	0xd020
-;		jmp	halt$
+		stx	zp:sizhdosBuf
+		sty	zp:sizhdosBuf + 1
 
-
-		stx	sizhdosBuf
-		sty	sizhdosBuf + 1
-
-		lda	sizhdosBuf
-		ora	sizhdosBuf + 1
+		lda	zp:sizhdosBuf
+		ora	zp:sizhdosBuf + 1
 
 		beq	exit$
 
@@ -641,11 +556,9 @@ __hdosReadSect:
 		lda	#0x00
 		sta	0xd702
 		sta	0xd704
-;		lda	#>lsthdosDMA
-    lda #.byte1 lsthdosDMA
+		lda	#.byte1 lsthdosDMA
 		sta	0xd701
-;		lda	#<lsthdosDMA
-    lda #.byte0 lsthdosDMA
+		lda	#.byte0 lsthdosDMA
 		sta	0xd705
 
 exit$:

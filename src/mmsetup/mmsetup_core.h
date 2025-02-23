@@ -40,15 +40,6 @@ typedef enum PROCFLAGS {
   PROCFL_VERIFY = 8,
 } procflags_t;
 
-/*typedef struct PROCBEHAVIOUR {
-  void (* onIdle)(void);
-  void (* onInit)(void);
-  void (* onWait)(void);
-  void (* onRead)(void);
-  void (* onWrite)(void);
-  void (* onFinish)(void);
-} procbehaviour_t;*/
-
 typedef void (* procbehaviour_t[6])(void);
 
 extern process_t process;
@@ -82,8 +73,6 @@ void performKernalWrite(uint32_t source, uint32_t size);
 void finishKernalWrite(void);
 
 uint8_t kernal_get_status(void);
-
-//extern void processTest(void);
 
 void core_init(void);
 

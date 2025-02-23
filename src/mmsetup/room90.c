@@ -49,8 +49,6 @@ void readIndexFile(uint8_t __huge *image) {
     rooms[i].offset = offs;
   }
 
-  //printf("\r");
-
   //costume room numbers
   f += NUM_COSTUMES;
 
@@ -79,11 +77,7 @@ void readIndexFile(uint8_t __huge *image) {
     uint16_t offs = (uint16_t)lo | (uint16_t)(hi << 8);
 
     sounds[i].offset = offs;
-
-    //printf("%lx ", sounds[i].offset);
   }
-
-  //printf("\r\r");
 }
 
 
@@ -106,8 +100,6 @@ uint8_t __huge *pushSound(uint8_t __huge *data, uint16_t *offs, uint8_t __huge *
     *q = data[i];
     q++;
   }
-
-  //printf("%x ", size);
 
   return q;
 }
@@ -134,8 +126,6 @@ uint16_t makeRoom90(uint8_t __huge *image1, uint8_t __huge *image2, uint8_t __hu
     if  (resoffs < 0xffff) {
       o = resoffs + rooms[room].offset;
 
-      //printf("%x:",rooms[room].diskno);
-
       if (rooms[room].diskno == 0x32) {
         data = &image2[o];
       } else {
@@ -146,11 +136,7 @@ uint16_t makeRoom90(uint8_t __huge *image1, uint8_t __huge *image2, uint8_t __hu
       o = 0;
     }
 
-    //uint16_t size = data[0] | (data[1] << 8);
     uint16_t size = *((uint16_t __huge *)data);
-
-    //printf("%lx:%x ", o, size);
-
 
     m = pushSound(data, &offs, &p, m);
   }

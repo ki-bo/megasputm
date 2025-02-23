@@ -59,7 +59,6 @@ void progressIncValue(uint32_t delta) {
 
 void progressRealise(void) {
   judeProgressBar_t __huge *self = ((judeProgressBar_t __huge *)zptrself);
-  //uint32_t data = (uint32_t)((char __huge *)(space));
 
   uint8_t delta = self->alloc - self->last;
 
@@ -68,13 +67,6 @@ void progressRealise(void) {
   uint8_t y = ((judeElement_t __huge *)zptrself)->posy;
 
   if (self->max == 0 || (self->last == 0 && self->value == 0)) {
-    //while(1) {
-      //__asm(" inc 0xd020 ");
-      //if (*(uint8_t *)(0xd610)) {
-        //*(uint8_t *)(0xd610) = 0;
-        //break;
-      //}
-    //}
     judeEraseLine(w, x, y, CLR_SHADOW);
   } else if (self->alloc == w)  {
     judeEraseLine(w, x, y, CLR_FOCUS);
@@ -83,7 +75,6 @@ void progressRealise(void) {
 
     while (delta > 0) {
       judeEraseLine(1, x, y, CLR_FOCUS);
-      //judeDrawTextDirect(CLR_FOCUS, 0, w, 0x00, x, y, 0, data);
       --delta;
       ++x;
     }
@@ -99,14 +90,8 @@ void judePrgBarPresent(void) {
   progressRealise();
 }
 
-
-
-
-
-
 const char str_lbx_prior[] = "[UP]";
 const char str_lbx_next[]  = "[DOWN]";
-
 
 //LISTBOX
 
@@ -122,7 +107,6 @@ void judeLBxPresent(void) {
 	uint32_t lineptr;
 	uint8_t y, x, w, f, f2, n, pgh, pgl, pgm, cl;
 
-	//zptrself = zptrself;
   self = kzp.self;
 	karlObjExcludeState(STATE_DIRTY);
 
@@ -157,17 +141,7 @@ void judeLBxPresent(void) {
 
 	judeEraseBkg(colour);
 
-  //if (self != zptrself) {
-    //*(uint8_t *)0xd020 = 2;
-  //}
-
-//POKE(0xD020U, 0);
-
 	if 	(lines) {
-//			if  (f2)
-//				POKE(0xD020U, 7);
-//			else
-//				POKE(0xD020U, 5);
 
     lineptr = data + (RECAST_T(judeListBox_t, self)->linewidth * RECAST_T(judeListBox_t, self)->linesoff);
 
@@ -185,16 +159,13 @@ void judeLBxPresent(void) {
 
       judeEraseLine(w, x, y, clrtmp);
       
+      // need to calculate indent outside of the parameter passing due to compiler bug in Calypsi 5.8.1
       uint8_t indent = (uint8_t)(w - sizeof(str_lbx_prior) - 1) >> 1;
       judeDrawTextDirect(clrtmp, indent, w, 0x00, x, y, 0, data);
       y++;
       n++;
     }
 
-    //if (self != zptrself) {
-      //*(uint8_t *)0xd020 = 2;
-    //}
-  
     while (lines) {
       if  (RECAST_T(judeListBox_t, self)->selline == (n + RECAST_T(judeListBox_t, self)->linesoff - pgl))
         clrtmp = (f) ? CLR_FOCUS : CLR_PAPER;
@@ -215,10 +186,7 @@ void judeLBxPresent(void) {
       lines--;
     }
 
-    //if (self != zptrself) {
-      //*(uint8_t *)0xd020 = 2;
-    //}
-  
+
     if 	((RECAST_T(judeListBox_t, self)->linescnt - RECAST_T(judeListBox_t, self)->linesoff) > pgh) {
       if  (cl == n)
         clrtmp = (f) ? (RECAST_T(judeListBox_t, self)->_control._element._object.state & STATE_ACTIVE) ? CLR_MONEY : CLR_PAPER : colour;
@@ -235,18 +203,10 @@ void judeLBxPresent(void) {
       uint8_t indent = (uint8_t)(w - sizeof(str_lbx_next) - 1) >> 1;
       judeDrawTextDirect(clrtmp, indent, w, 0x00, x, y, 0, data);
 
-      //while(1) {
-        //__asm(" inc 0xd020 ");
-      //}
-
       y++;
       n++;
       lines--;
     }
-
-    //if (self != zptrself) {
-      //*(uint8_t *)0xd020 = 2;
-    //}
   }
 }
 
@@ -268,18 +228,16 @@ void judeLBxChange(void) {
       (mouseXCol < (self->_control._element.posx + self->_control._element.width)) && 
       (mouseYRow >= self->_control._element.posy) &&   
       (mouseYRow < (self->_control._element.posy + self->_control._element.height))) {
-//  flg = 1;
-		//if  (self->_control._element._object.state & STATE_PICKED) {
-			self->hotline = mouseYRow - self->_control._element.posy;
-			if  (self->hotline >= self->linescnt) 
-				self->hotline = self->linescnt - 1;
-			if  (self->hotline > (self->linescnt - self->linesoff))
-				self->hotline = self->linescnt - self->linesoff;
 
-			self->_control._element._object.tag = 0;
+    self->hotline = mouseYRow - self->_control._element.posy;
+    if  (self->hotline >= self->linescnt) 
+      self->hotline = self->linescnt - 1;
+    if  (self->hotline > (self->linescnt - self->linesoff))
+      self->hotline = self->linescnt - self->linesoff;
 
-			karlObjIncludeState(STATE_DIRTY);
-		//}
+    self->_control._element._object.tag = 0;
+
+    karlObjIncludeState(STATE_DIRTY);
 
 		if  (self->_control._element._object.state & STATE_DOWN) {
       uint8_t btns = (self->linesoff >= (self->_control._element.height - 1)) ?
@@ -330,12 +288,7 @@ void	judeLBxPressed(void) {
 	uint8_t h, l;
 	void (*sel)(void);
 
-	//karlDWFarPtr_t data;
-	//data.data = zptrself;
 	judeListBox_t *self = (judeListBox_t*)(zptrself);
-
-//	flg = (self->_control._element._object.state &
-//			(STATE_ACTIVE| STATE_ENABLED | STATE_VISIBLE));
 
 	flg = 0;
 
@@ -349,12 +302,10 @@ void	judeLBxPressed(void) {
 			case KEY_C64_CRIGHT | 0x80:
 			case KEY_M65_TAB:
       case KEY_M65_SHTAB:
-  				//judeUnDownCtrl();
 					_judeMoveActiveControl();
           break;
 			case KEY_C64_CDOWN:
 			case KEY_C64_CDOWN | 0x80:
-					//if (!(mod & KEY_MOD_SHIFT)) 
           if (key & 0x80) {
             if (self->currline)
 						  self->currline--;
@@ -368,7 +319,6 @@ void	judeLBxPressed(void) {
 					self->_control._element._object.tag = 0;
 
 					karlObjIncludeState(STATE_DIRTY);
-//				judeUnDownCtrl();
 				break;
 			case KEY_ASC_CR:
 				h = (self->_control._element.height - 2);

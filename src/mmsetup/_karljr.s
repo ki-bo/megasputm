@@ -381,7 +381,7 @@ begin0$:
     ldz  #0x01
     stz  karl_changed
 
-    JMP  cont1$
+    bra  cont1$
 
 cont0$:
     pla
@@ -470,18 +470,15 @@ karlObjIncludeState:
 
     sta  karl_temp0
 
-;    and  #STATE_DIRTY
     bit  #STATE_DIRTY
     beq  test0$
 
     lda  #0x01
     sta  karl_dirty
 
-    JMP  cont0$
+    bra  cont0$
 
 test0$:
-;    lda  karl_temp0
-;    and  #STATE_CHANGED
     bit  #STATE_CHANGED
     beq  cont0$
 
@@ -496,12 +493,9 @@ cont0$:
     pha
 
     lda  karl_temp0
-;    and  #(STATE_DIRTY | STATE_PREPARED)
     bit  #(STATE_DIRTY | STATE_PREPARED)
     beq  cont1$
 
-;    lda  karl_temp0
-;    and  #STATE_CHANGED
     bit  #STATE_CHANGED
     beq  update$
 
@@ -531,7 +525,7 @@ changed$:
     lda  #0x01
     sta  karl_changed
 
-    JMP  finish$
+    bra  finish$
 
 update$:
     pla
@@ -555,10 +549,6 @@ exit$:
 ;-----------------------------------------------------------
 karlDefModPrepare:
 ;-----------------------------------------------------------
-;halt$:
-    ;inc  0xD020
-    ;jmp  halt$
-    
     lda  #MODULE__unitscnt
     sta  zp:zreg5b0
 
@@ -619,7 +609,7 @@ karlDefModRelease:
 ;-----------------------------------------------------------
 karlProxy:
 ;-----------------------------------------------------------
-    JMP  (karl_proxyptr)
+    jmp  (karl_proxyptr)
 
 
 ;-----------------------------------------------------------
@@ -772,10 +762,6 @@ exit$:
 ;-----------------------------------------------------------
 _karlProcObjLstStore:
 ;-----------------------------------------------------------
-;halt$:
-;    inc  0xD020
-;    JMP  halt$
-
     lda  karl_proccnt
     asl  a
     tax
@@ -819,7 +805,6 @@ _karlProcObjLstStore:
 
     lda  zp:zreg5b2
     sta  (zp:zreg3wl), Y
-;    iny
 
     inw  zp:zreg3wl
     inw  zp:zreg3wl
@@ -839,7 +824,6 @@ _karlProcObjLstStore:
     iny
     lda  zp:zreg6wh + 1
     sta  (zp:zreg3wl), Y
-;    iny
 
     inw  zp:zreg3wl
     inw  zp:zreg3wl
@@ -959,7 +943,6 @@ contrc$:
     lda  zp:zreg5b3
     sta  zp:zreg2b0
 
-    ;ldz  zp:zreg5b0
     lda  zp:zreg5b0
     taz
 
@@ -1019,7 +1002,7 @@ loop2$:
     sec
     SBQMem  zp:zvaltemp0
 
-    JMP  proc$
+    bra  proc$
 
 loop0$:
     LDQMem  zp:zreg7
@@ -1075,9 +1058,6 @@ exit$:
   .section rodata, rodata
 
 karl_callstackidx:
-    ;.repeat  FEATURE_CALLDEPTH, I
-    ;.word  karl_callstack + (I * .sizeof(CALLCONTEXT))
-    ;.endrepeat
     .word karl_callstack + (0 * sizeof_CALLCONTEXT)
     .word karl_callstack + (1 * sizeof_CALLCONTEXT)
     .word karl_callstack + (2 * sizeof_CALLCONTEXT)
@@ -1088,9 +1068,6 @@ karl_callstackidx:
     .word karl_callstack + (7 * sizeof_CALLCONTEXT)
 
 karl_procstackidx:
-    ;.repeat  FEATURE_CALLDEPTH, I
-    ;.word  karl_procstack + (I * .sizeof(PROCCONTEXT))
-    ;.endrepeat
     .word  karl_procstack + (0 * sizeof_PROCCONTEXT)
     .word  karl_procstack + (1 * sizeof_PROCCONTEXT)
     .word  karl_procstack + (2 * sizeof_PROCCONTEXT)

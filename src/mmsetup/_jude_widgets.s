@@ -69,11 +69,6 @@ judeDefCtlPrepare:
 		lda	#STATE_PREPARED
 		jsr	karlObjIncludeState
 
-		;lda	#.byte0 STATE_EXPRESENT
-		;ldx	#.byte1 STATE_EXPRESENT
-		;ldy	#0x00
-		;jsr	_karlObjIncStateEx
-
 		lda	#0x00
 		sta	karl_errorno
 
@@ -93,7 +88,6 @@ judeDefCtlInit:
 judeDefCtlChange:
 ;-----------------------------------------------------------
 		ldz	#OBJECT__state
-		;nop
 		lda	[zp:zptrself], z
 		and	#STATE_CHANGED
 		beq	exit$
@@ -101,12 +95,7 @@ judeDefCtlChange:
 		lda	#0x00
 		sta	zp:zregAb0
 
-		;nop
 		lda	[zp:zptrself], Z
-;		ldz	#OBJECT__oldstate + 1
-;		nop
-;		sta	[zp:zptrself], Z
-;		ldz	#OBJECT__state
 		and	#STATE_DOWN
 		beq	dirty$
 
@@ -114,17 +103,14 @@ judeDefCtlChange:
 		sta	zp:zregAb0
 		
 		ldz	#OBJECT__options
-		;nop
 		lda	[zp:zptrself], Z
 		and	#OPT_DOWNCAPTURE
 		bne	dirty$
 
 		ldz	#OBJECT__state
-		;nop
 		lda	[zp:zptrself], Z
 		and	#(0xFF ^ STATE_DOWN)
-		;nop
-    sta	[zp:zptrself], Z
+		sta	[zp:zptrself], Z
 
 		MvDWZ	judeDownElem
 
@@ -138,18 +124,15 @@ dirty$:
 		beq	cont1$
 
 auto$:
-		;nop
 		lda	[zp:zptrself], Z
 		and	#OPT_AUTOCHECK
 		beq	cont1$
 		
 		ldz	#OBJECT__tag
-		;nop
 		lda	[zp:zptrself], Z
 		beq	check$
 
 		ldz	#OBJECT__options + 1
-		;nop
 		lda	[zp:zptrself], Z
 
 		dez
@@ -159,18 +142,16 @@ auto$:
 
 		ldz	#OBJECT__tag
 		lda	#0x00
-		JMP	cont0$
+		bra	cont0$
 
 check$:
 		lda	#0x01
 		
 cont0$:
-		;nop
 		sta	[zp:zptrself], Z
 		
 		ldz	#OBJECT__options
 cont1$:
-		;nop
 		lda	[zp:zptrself], Z
 		and	#OPT_NOAUTOINVL
 		bne	exit$
@@ -200,7 +181,6 @@ judeDefCtlRelease:
 judeDefCtlPresent:
 ;-----------------------------------------------------------
 		ldz	#OBJECT__state
-		;nop
 		lda	[zp:zptrself], Z
 
 		sta	zp:zregAb0
@@ -208,7 +188,7 @@ judeDefCtlPresent:
 		and	#STATE_VISIBLE
 		bne	present$
 		
-		JMP	exit$
+		lbra	exit$
 
 present$:
 		lda	zp:zregAb0
@@ -217,34 +197,24 @@ present$:
 		
 		lda	#.byte0 CLR_SHADOW
 		ldx	#.byte1 CLR_SHADOW
-		JMP	draw$
+		bra	draw$
 		
 checkpick$:
-;		lda	zp:zregAb0				;Check if picked
-;		and	#STATE_PICKED
-;		beq	checkactv$
-;		lda	zp:zregAb0				;Check if its not active
-;		and	#STATE_ACTIVE
-;		bne	normal$
-
 		lda	zp:zregAb0				;Check if picked
 		bit	#STATE_PICKED
 		beq	checkactv$
-;		lda	zp:zregAb0				;Check if its not active
 		bit	#STATE_ACTIVE
 		bne	normal$
 
 
 picked$:
 		ldz	#ELEMENT__colour + 1;Check its not already FOCUS
-		;nop
 		lda	[zp:zptrself], Z
 
 		cmp	#.byte1 CLR_FOCUS
 		bne	pickednrm$
 
 		dez
-		;nop
 		lda	[zp:zptrself], Z
 
 		cmp	#.byte0 CLR_FOCUS
@@ -252,12 +222,12 @@ picked$:
 		
 		lda	#.byte0 CLR_FACE
 		ldx	#.byte1 CLR_FACE
-		JMP	draw$
+		bra	draw$
 
 pickednrm$:
 		lda	#.byte0 CLR_FOCUS
 		ldx	#.byte1 CLR_FOCUS
-		JMP	draw$
+		bra	draw$
 
 checkactv$:
 		lda	zp:zregAb0
@@ -266,11 +236,9 @@ checkactv$:
 		
 normal$:
 		ldz	#ELEMENT__colour + 1
-		;nop
 		lda	[zp:zptrself], Z
 		tax
 		dez
-		;nop
 		lda	[zp:zptrself], Z
 		
 draw$:
@@ -283,12 +251,10 @@ draw$:
 		sta	zp:zregAb2
 
 		ldz	#CONTROL__textoffx
-		;nop
 		lda	[zp:zptrself], Z
 		sta	zp:zregAb3
 
 		ldz	#ELEMENT__width
-		;nop
 		lda	[zp:zptrself], Z
 		
 		sec
@@ -333,20 +299,6 @@ xcont$:
 		;nop
 		lda	[zp:zptrself], Z
 		sta	zp:zregBb2
-;		inz
-;		;nop
-;		lda	[zp:zptrself], Z
-;		tax
-;		dex
-;		dex
-;		txa
-;		sta	zp:zregBb3
-;		
-;		lda	zp:zregBb1
-;		clc
-;		adc	zp:zregBb3
-;		sta	zp:zregBb3
-;		
 
 		lda	zp:zregBb2
 		asl a
@@ -377,12 +329,11 @@ xcont$:
 
 		pha
 
-		;ldz	zp:zregBb3
-    lda zp:zregBb3
-    taz
+		lda	zp:zregBb3
+		taz
 
-;		lda	#0x51
-    lda #0x7A
+;	Use 0x51 for uppercase
+		lda	#0x7A
 		;nop
 		sta	[zp:zptrscreen], Z
 
@@ -508,7 +459,7 @@ unset$:
 		sta	[zp:zptrself], Z
 
 default$:
-		JMP	judeDefCtlPresent
+		jmp	judeDefCtlPresent
 
 
 
@@ -557,7 +508,7 @@ judeDefEdtPresent:
 		sbc	zp:zregAb3
 		sta	zp:zregAb2
 	
-		JMP	text$
+		bra	text$
 
 noindent$:
 		lda	#0x00
@@ -576,7 +527,7 @@ text$:
 		rts
 
 normal$:
-		JMP	judeDefCtlPresent
+		jmp	judeDefCtlPresent
 
 
 ;-----------------------------------------------------------
@@ -652,9 +603,9 @@ exit$:
 
 delete$:
 
-		;ldz	zp:zregBb0
-    lda zp:zregBb0
-    taz
+
+		lda	zp:zregBb0
+		taz
 
 		beq	exit$
 
@@ -869,7 +820,7 @@ next$:
 		cmp	zp:zregDb2
 		bne	loop$
 
-		JMP	cont$
+		bra	cont$
 
 found$:
 		LDQMem	zp:zregC
@@ -881,7 +832,7 @@ found$:
 		lda	zp:zregDb0
 		sta	zp:zregDb1
 
-		JMP	next$
+		bra	next$
 
 cont$:
 		inc	zp:zregDb1

@@ -1,6 +1,5 @@
 #include	"jude.h"
 #include <stdint.h>
-//#include "calypsi/intrinsics6502.h"
 
 
 uint8_t	judeLogClrToSys(uint16_t colour){
@@ -69,34 +68,6 @@ void  judeDrawTextDirect(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_
 	_judeDrawTextDirect();
 }
 
-void	judeDrawTextDirectStr(uint16_t colour, uint8_t indent, uint8_t docont,
-  uint8_t y, uint8_t offs, char *text/*uint32_t text*/) {
-
-    
-  zregAwl = colour;
-  zregAb2 = indent;
-
-  zregAb3 = ((judeElement_t *)(zptrself))->width;
-
-  zregBb0 = docont;
-
-  //zregBb1 = x;
-  _zkarljr[0x4D] = ((judeElement_t *)(zptrself))->posx;
-
-  //if (x == 0) {
-  //while(1) {
-    //__asm(" inc 0xd020 ");
-  //}
-  //}
-
-  zregBb2 = y;//((judeElement_t *)(zptrself))->posy;
-
-  zregCb0 = offs;
-  zregD = (uint32_t)text;
-
-  _judeDrawTextDirect();
-}
-
 
 
 uint8_t	judeLogClrIsReverse(uint16_t colour) {
@@ -146,11 +117,6 @@ void *judeInstallIdle(void *routine) {
 
 char *judeGetThemeDesc(void) {
   char *result = theme0[actvtheme]._name;
-
-  //*(uint8_t *)(0x0800) = actvtheme;
-  //for (uint8_t i = 0; i < 17; i++) {
-    //((uint8_t *)(0x0801))[i] = (uint8_t)result[i];
-  //};
 
   return result;
 }

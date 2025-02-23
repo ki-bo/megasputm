@@ -71,7 +71,6 @@ int main(void) {
   //hide our shinanegans....
   *(uint8_t *)0xd011 &= 0xEF;
 
-  //*jude_kernirq = *(uint16_t *)(0xfffe);
   hdos_init(0x0800, 0x0800);
   _judeBackupKernalZP();
 

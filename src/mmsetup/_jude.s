@@ -89,11 +89,8 @@
   .public   _judeBackupOwnZP
   .public   _judeRestoreKernalZP
   .public   _judeRestoreOwnZP
-  .public   _judeBankKernal
-  .public   _judeUnbankKernal
 
   .public   _judeUserIRQ
-  ;.public   jude_kernirq
 
   .public   mouseXPos
   .public   mouseYPos
@@ -119,11 +116,6 @@
 	.extern		karlDefModInit
 	.extern		karlDefModChange
 	.extern		karlDefModRelease
-
-;		sei
-;halt$:
-;		inc	0xD020
-;		JMP	halt$
 
 
 ;-----------------------------------------------------------
@@ -185,7 +177,6 @@ _judeViewInit:
 		sta	zp:zreg5b3
 
 		MvDWMem	zp:zreg4, zp:zptrself
-;		MvDWMem	zp:zreg4, zp:zreg8
 
 		jsr	_karlCallObjLstMethod
 
@@ -205,7 +196,6 @@ _judeViewInit:
 		sta	zp:zreg5b3
 
 		MvDWMem	zp:zreg4, zp:zptrself
-;		MvDWMem	zp:zreg4, zp:zreg8
 
 		jsr	_karlCallObjLstMethod
 
@@ -219,12 +209,10 @@ _judeViewInit:
 		ldz	#OBJECT__initialise
 		;nop
 		lda	[zp:zptrself], z
-;		lda	(zp:zreg8), z
 		sta	jude_proxyptr
 		inz
 		;nop
 		lda	[zp:zptrself], z
-;		lda	(zp:zreg8), z
 		sta	jude_proxyptr + 1
 
 		beq	exit$
@@ -274,24 +262,7 @@ exit$:
 ;-----------------------------------------------------------
 judeMain:
 ;-----------------------------------------------------------
-;		sei
-;halt$:
-;		inc	0xD020
-;		JMP	halt$
-
 main$:
-    ;lda process
-    ;cmp #0x04
-    ;beq skip$
-
-    ;lda process
-    ;beq skip$
-
-    ;jsr processTest
-
-    ;lda #04
-    ;sta process
-skip$:
 		cli
 
 ;	Check not locked
@@ -307,10 +278,6 @@ skip$:
 
 		cli
 
-;	Check if have already processed this frame
-;		lda	jude_proc
-;		bne	done$
-
 		lda	jude_actvpg
 		ora	jude_actvpg + 1
 		ora	jude_actvpg + 2
@@ -325,7 +292,7 @@ skip$:
 
 		lda	#0x00
 		sta	karl_changed
-		JMP	done$
+		bra	done$
 
 ;	Check Keys
 keys$:
@@ -352,13 +319,11 @@ finish$:
     jsr _judeOnIdleProxy
 
 done$:
-;	Release IRQ
-;		cli
 		sei
 		lda	#0x00
 		sta	jude_proc
 
-		JMP	main$
+		bra	main$
 
 
 ;-----------------------------------------------------------
@@ -630,11 +595,6 @@ _judeEraseLine:
 ;	IN	zregBb1		x pos
 ;	IN	zregBb2		y pos
 ;-----------------------------------------------------------
-;		sei
-; halt$:
-;		inc	0xD020
-;		jmp	halt$
-
 		lda	zp:zregAwl
 		sta	zp:zreg9b0			;colour
 		ldx	zp:(zregAwl + 1)
@@ -648,7 +608,7 @@ _judeEraseLine:
 		bne	single$
 
 		lda	zp:zregBb1
-		asl a
+		asl	a
 		sta	zp:zregBb1
 
 single$:
@@ -662,7 +622,7 @@ single$:
 		jsr	karlASCIIToScreen
 		ora	#0x80
 
-		JMP	cont$
+		bra	cont$
 
 text$:
 		lda	#KEY_ASC_SPACE
@@ -701,7 +661,6 @@ cont$:
 		sta	zp:zptrcolour + 3
 
     lda zp:zregBb1
-		;ldz	zp:zregBb1
     taz
 		ldx	zp:zregBb3
 		dex
@@ -791,19 +750,6 @@ looph$:
 		asl a
 		tax
 
-;	Undocumented LDQ 0xaddr, x
-;		phx
-;
-;		neg
-;		neg
-;		lda	jude_screeny0, x
-;
-;		neg
-;		neg
-;		sta	zp:zptrscreen
-;
-;		plx
-
 		lda	jude_screeny0, x
 		sta	zp:zptrscreen		;screen ptr
 		lda	jude_screeny0 + 1, x
@@ -812,14 +758,6 @@ looph$:
 		sta	zp:zptrscreen + 2
 		lda	jude_screeny0 + 3, x
 		sta	zp:zptrscreen + 3
-
-;		neg
-;		neg
-;		lda	jude_coloury0, x
-;
-;		neg
-;		neg
-;		sta	zptrcolour
 
 		lda	jude_coloury0, x
 		sta	zp:zptrcolour		;colour ptr
@@ -830,7 +768,6 @@ looph$:
 		lda	jude_coloury0 + 3, x
 		sta	zp:zptrcolour + 3
 
-    ;ldz	zp:zreg8b0
 		lda zp:zreg8b0
     taz
 
@@ -923,7 +860,6 @@ _judeDrawTextDirect:
 ;-----------------------------------------------------------
 
 		clc
-		;;lda	zp:zregCb0
     lda zp:zregBb1
     sta 0x0800
 
@@ -944,7 +880,7 @@ xcont$:
 		bcc	text$
 		
 		lda	#0x80
-		JMP	cont1$
+		bra	cont1$
 		
 text$:
 		lda	#0x00
@@ -984,20 +920,12 @@ cont1$:
 		dec	zp:zregAb3
 
 cont2$:
-		;lda	zp:zregAb2		;text indent
 		lda zp:zregCb0
     sta	zp:zregCb1
 
 		ldx	#0x00
 	
 loopw$:
-
-;    sei
-;halt$:
-;    inc 0xD020
-;    JMP halt$
-
-		;ldz	zp:zregCb1
     lda zp:zregCb1
     taz
 
@@ -1009,7 +937,6 @@ loopw$:
 		jsr	karlASCIIToScreen
 		ora	zp:zregCb2
 		
-		;ldz	zp:zregBb1
     pha
     lda zp:zregBb1
     taz
@@ -1033,7 +960,7 @@ cellcont$:
 		cpx	zp:zregAb3
 		bcs	contchk$
 
-		JMP	loopw$
+		bra	loopw$
 
 contchk$:
 		lda	zp:zregBb0
@@ -1045,11 +972,11 @@ contchk$:
 		and	#OPT_TEXTCONTMRK
 		beq	exit$
 
-		lda	#0x68
+;	FIXME:  This is for the text continuation mark
+		lda	#0x68			; this is already screen code, not ascii
 ;		jsr	KarlASCIIToScreen
 		ora	zp:zregCb2
 		
-    ;ldz	zp:zregBb1
     pha
     lda zp:zregBb1
     taz
@@ -1238,7 +1165,7 @@ enqueue$:
 		inc	keysIdx
 		inc	keysIdx
 
-		JMP	finish$
+		bra	finish$
 
 
 ;-----------------------------------------------------------
@@ -1281,16 +1208,12 @@ loop$:
 		dec	keysIdx
 		dec	keysIdx
 
-		JMP	finish$
+		bra	finish$
 
 
 ;-----------------------------------------------------------
 judeDefUIPrepare:
 ;-----------------------------------------------------------
-;halt$:
-    ;inc 0xd020
-    ;bra halt$
-
 		lda	#UINTERFACE__viewscnt
 		sta	zp:zreg5b0
 
@@ -1312,9 +1235,6 @@ judeDefUIPrepare:
 
 		lda	karl_errorno
 		bne	exit$
-
-    lda #0x08
-    sta 0xd020
 
 ;		lda	#0x01
 ;		sta	zp:zreg2b3
@@ -1573,7 +1493,7 @@ judeDefViewInit:
 
 		lda	#0x28
 		sta	jude_screenw
-		JMP	cont0$
+		bra	cont0$
 
 dblw$:
 		lda	#0x50
@@ -1589,7 +1509,7 @@ cont0$:
 
 		lda	#0x19
 		sta	jude_screenh
-		JMP	cont1$
+		bra	cont1$
 
 dblh$:
 		lda	#0x32
@@ -1625,9 +1545,6 @@ cont2$:
 
 		MvDWMem	zp:zreg0, jude_screenram
 		MvDWImm	zp:zreg2, VIC_CLRRAMH
-;		lda	#0x00
-;		sta	jude_screensize
-;		sta	jude_screensize + 1
 		MvDWZ jude_screensize
 
 		lda	#.byte0 jude_screeny0
@@ -1644,7 +1561,6 @@ cont2$:
 		ldx	#0x00
 loop0$:
 		phx
-;		phz
 
 		LDQMem	zp:zreg0
 		STQIndW	zp:zreg1wl
@@ -1714,14 +1630,6 @@ next0$:
 		and	#0xF0
 		sta	0xD04D
 
-
-;	Set input to "raw" mode - 0x02 is required to 
-;	fix bug.
-;***FIXME
-;		lda	#0x82
-;		tsb	0xD611
-
-
 ;	Theme
 		lda	#.byte0 CLR_EMPTY
 		ldx	#.byte1 CLR_EMPTY
@@ -1755,7 +1663,6 @@ col80$:
 		lda	#0x80
 		tsb	0xD031
 
-;***FIXME
 ;	Also, 80 columns is FCM/16 bit chars
 		lda	#0x05
 		tsb	0xD054
@@ -1921,28 +1828,6 @@ clrplot2$:
 		lda	#.byte0 dma_view_clear
 		sta	0xD705
 
-;	Screen
-;			dma_view_clear:
-;				.byte	0x0B					; Request format is F018B
-;			dma_vw_smb:
-;				.byte	0x80,0x00				; Source MB 
-;			dma_vw_dmb:
-;				.byte	0x81,0x00				; Destination MB 
-;				.byte	0x00					; No more options
-;				.byte	0x03					;Command LSB
-;			dma_vw_siz:
-;				.word	0x0000				;Count LSB Count MSB
-;			dma_vw_sadr:
-;				.word	0x0000				;Source Address LSB Source Address MSB
-;			dma_vw_sbnk:
-;				.byte	0x00					;Source Address BANK and FLAGS
-;			dma_vw_dadr:
-;				.word	0x0000				;Destination Address LSB Destination Address MSB
-;			dma_vw_dbnk:
-;				.byte	0x00					;Destination Address BANK and FLAGS
-;				.byte	0x00					;Command MSB
-;				.word	0x0000				;Modulo LSB / Mode Modulo MSB / Mode
-;	Destination addr
 		MvDWMem	zp:zreg4, jude_screenram
 
 		inw	zp:zreg4wl
@@ -2026,7 +1911,7 @@ nohi1$:
 
 		pla
 		ora	#0x80
-		JMP	clrscr$
+		bra	clrscr$
 
 text$:
 		pla
@@ -2196,9 +2081,6 @@ cont6$:
 
 		jsr	_karlCallObjLstMethod
 
-;		lda	#0x00
-;		sta	karl_errorno
-
 exit$:
 		rts
 
@@ -2310,9 +2192,6 @@ judeDefPgeInit:
 		MvDWMem	zp:zreg4, zp:zptrself
 
 		jsr	_karlCallObjLstMethod
-
-;		lda	#0x00
-;		sta	karl_errorno
 
 		rts
 
@@ -2467,17 +2346,6 @@ judeDefPnlRelease:
 ;-----------------------------------------------------------
 judeDefPnlPresent:
 ;-----------------------------------------------------------
-;		ldz	#OBJECT__state
-;		lda	[zp:zptrself], z
-;		and	#STATE_PICKED
-;		beq	nopick$
-;
-;		lda	#.byte0 CLR_FOCUS
-;		ldx	#.byte1 CLR_FOCUS
-;
-;		bra	present$
-;
-;nopick$:
 		ldz	#ELEMENT__colour + 1
 		;nop
 		lda	[zp:zptrself], z
@@ -2684,14 +2552,9 @@ foundfap$:
 		lda	zp:zregDb1
 		sta	zp:zregBb2
 
-		JMP	nextelem$
+		lbra	nextelem$
 
 restart$:
-;		sei
-; halt$:
-;		inc	0xD020
-;		JMP	halt$
-		
 		lda	#0x00
 		sta	zp:zregBb1
 		sta	zp:zregBb2
@@ -2743,7 +2606,7 @@ rescont0$:
 		lda	zp:zregDb0
 		bne	rescont1$
 
-		JMP	nextpanel$
+		lbra	nextpanel$
 
 rescont1$:
 		ldz	#0x00
@@ -2910,7 +2773,7 @@ nxtpnlcont0$:
 		LDQIndDWZ	zp:zregE
 		STQMem	zp:zreg4
 
-		JMP	testelem$
+		lbra	testelem$
 
 
 ;					zp:zregA	:	pointer to page's panels
@@ -2988,9 +2851,6 @@ isdownctrl$:
 		ora	judeActvElem + 3
 		bne	actvctrl$
 
-;***FIXME!!! Shouldn't discard, should send to active page
-
-;		bra	_judeSendKeys		;discard key press
 		bra	page0$
 
 actvctrl$:
@@ -3005,9 +2865,6 @@ actvctrl$:
 		bra	send$
 
 chkmv$:
-    ;inc 0xd020
-    ;bra chkmv$
-
 		lda	zp:zvalkey
 		cmp	#KEY_C64_CDOWN
 		beq	moveactv$
@@ -3095,7 +2952,6 @@ discard0$:
 		jmp	_judeSendKeys
 
 def$:
-;		jsr	ctrlsControlDefKeyPress
 		jmp	_judeSendKeys
 
 
@@ -3123,27 +2979,15 @@ _judeProcVwElemsAccel:
 		bne	exit$
 
 elem$:
-    ;lda 0xd020
-    ;inc a
-    ;and #0x0f
-    ;sta 0xd020
-
 		ldz	#CONTROL__accelchar
 		;nop
 		lda	[zp:zreg0], z
 
     beq exit$
 
-;halt$:
-;    inc 0xd020
-;    bra halt$
-;
 ;cont$:
 		cmp	zp:zvalkey
 		bne	exit$
-
-    ;lda #01
-    ;sta 0xd020
 
 		MvDWMem	zp:zptrself, zp:zreg0
 		jsr	judeDownCtrl 
@@ -3162,20 +3006,13 @@ _judeProcessAccelerators:
     and #0x7f
     sta zvalkey
 
-;		MvDWMem	zp:zreg4, jude_actvvw
 		lda	#.byte0 _judeProcVwElemsAccel
 		sta	zp:zreg6wl
 		lda	#.byte1 _judeProcVwElemsAccel
 		sta	zp:zreg6wl + 1
 
-;		lda	#OBJECT__change
-;		sta	zp:zptrtemp2
-
 		lda	#STATE_VISIBLE | STATE_ENABLED
 		sta	zp:zptrtemp2 + 1
-
-    ;lda #01
-    ;sta zp:zptrtemp1
 
 		jsr	_judeProcViewElements
 
@@ -3185,7 +3022,6 @@ _judeProcessAccelerators:
 ;-----------------------------------------------------------
 _judeUpdateChanged:
 ;-----------------------------------------------------------
-;		MvDWMem	zp:zreg4, jude_actvvw
 		lda	#.byte0 _judeProcVwElemsUpdate
 		sta	zp:zreg6wl
 		lda	#.byte1 _judeProcVwElemsUpdate
@@ -3197,9 +3033,6 @@ _judeUpdateChanged:
 		lda	#STATE_CHANGED
 		sta	zp:zptrtemp2 + 1
 
-    ;lda #00
-    ;sta zp:zptrtemp1
-
 		jsr	_judeProcViewElements
 
 		rts
@@ -3208,9 +3041,6 @@ _judeUpdateChanged:
 ;-----------------------------------------------------------
 _judeProcVwElemsPanels:
 ;-----------------------------------------------------------
-		;lda zp:zptrtemp1
-    ;bne controls$
-    
     lda zp:zptrtemp2 + 1
     beq panel$
     
@@ -3223,18 +3053,6 @@ _judeProcVwElemsPanels:
 		bne	controls$
 
 panel$:
-    ;ldz #OBJECT__tag
-    ;lda [zp:zreg0], z
-    ;cmp #0x0a
-    ;bne cont$
-
-;    bra cont$
-;
-;halt$:
-;    inc 0xd020
-;    bra halt$
-
-;cont$:
 		lda	zp:zreg3wh
 		sta	jude_proxyptr
 		lda	zp:zreg3wh + 1
@@ -3248,11 +3066,6 @@ controls$:
 
 		lda	#PANEL__controlscnt
 		sta	zp:zreg5b0
-
-    ;ldz #PANEL__controlscnt
-    ;lda [zp:zreg0], z
-    ;cmp #07
-    ;beq halt$
 
 		lda	#PANEL__controls_p
 		sta	zp:zreg5b2
@@ -3274,19 +3087,6 @@ exit$:
 ;-----------------------------------------------------------
 _judeProcVwElemsPages:
 ;-----------------------------------------------------------
-;    ldz #OBJECT__tag
-;    lda [zp:zreg0], Z
-;    cmp #0xa
-;    bne cont$
-;
-;halt$:
-;    inc 0xd020
-;    bra halt$
-;
-;cont$:
-    ;lda zp:zptrtemp1
-    ;bne panels$
-
 		lda zp:zptrtemp2 + 1
     beq page$
     
@@ -3354,7 +3154,7 @@ begin$:
 		lda	#VIEW__barscnt
 		sta	zp:zreg5b0
 
-    lbeq  present$
+		beq  present$
 
 		lda	#VIEW__bars_p
 		sta	zp:zreg5b2
@@ -3369,40 +3169,8 @@ begin$:
 
 		jsr	_karlProcObjLst
 
-;		lda	zptrtemp2 + 1
-;		cmp	#STATE_DIRTY
-;		beq	present$
-
-
-		bra	present$
-
-;	This code, which I'm skipping, would process all pages in the 
-;	view which I've decided I never want (and esp for DIRTY/Present 
-;	calls).
-
-		MvDWMem	zp:zreg4, jude_actvvw
-
-		lda	#VIEW__pagescnt
-		sta	zp:zreg5b0
-
-		lda	#VIEW__pages_p
-		sta	zp:zreg5b2
-
-		lda	#0x00
-		sta	zp:zreg5b3
-
-		lda	#.byte0 _judeProcVwElemsPages
-		sta	zp:zreg6wl
-		lda	#.byte1 _judeProcVwElemsPages
-		sta	zp:zreg6wl + 1
-
-		jsr	_karlProcObjLst
-
-		rts
-
-present$:
 ;	Process the active page only
-
+present$:
 		lda	jude_actvpg
 		ora	jude_actvpg + 1
 		ora	jude_actvpg + 2
@@ -3413,19 +3181,6 @@ present$:
 
 cont0$:
 		MvDWMem	zp:zreg0, jude_actvpg
-
-;    ldz #OBJECT__tag
-;    lda [zp:zreg0], Z
-;    cmp #0x0a
-;    beq skip$
-;
-;halt$:
-;    inc 0xd020
-;    bra halt$
-;
-;skip$:
-    ;lda zp:zptrtemp1
-    ;bne panels$
 
     lda zp:zptrtemp2 + 1
     beq page$
@@ -3449,12 +3204,6 @@ page$:
 
 panels$:
 		MvDWMem	zp:zreg4, jude_actvpg
-
-;		sei
-;halt$:
-;		inc	0xD020
-;		JMP	halt$
-;		cli
 
 		lda	#PAGE__panelscnt
 		sta	zp:zreg5b0
@@ -3525,9 +3274,6 @@ _judePresentDirty:
 
 		lda	#STATE_DIRTY
 		sta	zp:zptrtemp2 + 1
-
-    ;lda #00
-    ;sta zp:zptrtemp1
 
 		jsr	_judeProcViewElements
 
@@ -3699,14 +3445,6 @@ update$:
 		lda	#STATE_PICKED
 		jsr	karlObjIncludeState
 
-;		ldz	#OBJECT__options + 1
-;		nop
-;		lda	[zp:zptrself], z
-;		and	#>OPT_AUTOTRACK
-;		beq	exit$
-;
-;		jsr	judeActivateCtrl
-
 exit$:
 		rts
 
@@ -3723,7 +3461,7 @@ _mouseInElement:
 		cmp	zp:zptrtemp0
 		bcs	testh$
 
-		JMP	nomatch$
+		bra	nomatch$
 
 testh$:
 		ldz	#ELEMENT__height
@@ -3780,7 +3518,6 @@ _mousePickBlink:
 		rts
 
 blink$:
-;		ldy	#0x29
 		ldy	#0x14
 		sty	judePBlinkDelay
 
@@ -3813,16 +3550,12 @@ _mouseProcessPickControls:
 		ldz	#OBJECT__state
 		;nop
 		lda	[zp:zptrself], z
-;		and	#STATE_VISIBLE
 		bit	#STATE_VISIBLE
 		bne	cont0$
 
 		rts
 
 cont0$:
-;		nop
-;		lda	[zp:zptrself], z
-;		and	#STATE_ENABLED
 		bit	#STATE_ENABLED
 		bne	cont1$
 
@@ -3859,15 +3592,12 @@ _mouseProcessPickPanels:
 		ldz	#OBJECT__state
 		;nop
 		lda	[zp:zptrself], z
-;		and	#STATE_VISIBLE
 		bit	#STATE_VISIBLE
 		bne	cont0$
 
 		rts
 
 cont0$:
-;		nop
-;		lda	[zp:zptrself], z
 		bit	#STATE_ENABLED
 		bne	cont1$
 
@@ -3889,8 +3619,6 @@ cont2$:
 		rts
 
 cont3$:
-;		MvDWMem	judeMsePElem, zp:zptrselfl
-
 		MvDWMem	zp:zreg4, zp:zreg0
 
 		lda	#PANEL__controlscnt
@@ -4028,14 +3756,6 @@ tstblink$:
 		cmp judeDownElem + 3
 		bne	blink$
 
-;		MvDWMem	zp:zreg4, judeDownElem
-;
-;		ldz	#OBJECT__options + 1
-;		nop
-;		lda	[zp:zreg4], z
-;		and	#>OPT_DOWNPICK
-;		bne	blink$
-
 		rts
 
 blink$:
@@ -4084,26 +3804,9 @@ cont1$:
 		beq	findctrl$
 		
 		jmp	(mouseCapMove)
-;		rts
 
 findctrl$:
 		MvDWZ	judeMsePElem
-
-;		lda	#VIEW__pagescnt
-;		sta	zp:zreg5b0
-;
-;		lda	#VIEW__pages_p
-;		sta	zp:zreg5b2
-;
-;		lda	#0x01
-;		sta	zp:zreg5b3
-;
-;		lda	#<_MouseProcessPickPages
-;		sta	zp:zreg6wl
-;		lda	#>_MouseProcessPickPages
-;		sta	zp:zreg6wl + 1
-;
-;		jsr	_karlProcObjLst
 
 		MvDWMem	zp:zreg4, jude_actvpg
 
@@ -4171,9 +3874,6 @@ dopick$:
 		rts
 
 newpick$:
-;		MvDWMem	zp:zptrself, judeMsePElem
-
-;		lda	#0x29
 		lda	#0x14
 		sta	judePBlinkDelay
 		lda	#0x01
@@ -4191,11 +3891,6 @@ unpick$:
 ;-----------------------------------------------------------
 _mouseInputMouse:
 ;-----------------------------------------------------------
-;		lda	mouseCheck
-;		beq	begin$
-;		
-;		inc	mouseCheck
-
 begin$:
 		ldy	#0b00000000		    ;Set ports A and B to input
 		sty	CIA1_DDRB
@@ -4263,19 +3958,11 @@ L2$:
 	  stx	mouseXPosNew+1
     stx mouseXPos + 1
 
-		;jsr _mouseHistoresisCheck
-
 ; Move the mouse pointer to the new X pos
 
 		tya
 		jsr	_mouseMoveSprX
 		
-;		lda	mouseCheck
-;		bne	SkipX$
-
-;		lda	#0x01
-;		sta	mouseCheck
-
 ; Calculate the Y movement vector
 
 SkipX$: 
@@ -4315,7 +4002,7 @@ SkipX$:
 		bpl	L3$
 		ldy	mouseYMin
 		ldx	mouseYMin+1
-		JMP	L4$
+		bra	L4$
 L3$:    
 		txa
 
@@ -4329,8 +4016,6 @@ L4$:
 		sty mouseYPos
     stx	mouseYPosNew+1
     stx mouseYPos + 1
-
-		;jsr _mouseHistoresisCheck
 
 ; Move the mouse pointer to the new Y pos
 
@@ -4346,94 +4031,7 @@ L4$:
 ; Done
 
 SkipY$: 
-;		jsr	CDRAW
-
-;dengland	What is this for???
-		clc					    ;Interrupt not "handled"
-
 		rts
-
-_mouseHistoresisCheck:
-	;; Dont actually update mouse unless it has moved more than 1 px in the same direction
-	
-	lda mouseXPosNew
-	cmp mouseXPosPending
-	bne XChanged$
-	lda mouseXPosNew+1
-	cmp mouseXPosPending+1
-	beq updatedmouseXDir$
-XChanged$:
-	;;  Get sign of difference between XPos and mouseXPosNew
-	lda mouseXPosNew
-	sec
-	sbc mouseXPosPending
-	lda mouseXPosNew+1
-	sbc mouseXPosPending+1
-
-	pha
-	lda mouseXPosNew
-	sta mouseXPosPending
-	lda mouseXPosNew+1
-	sta mouseXPosPending+1
-	pla	
-	
-	;; Is the direction different to last time?
-	and #0x80
-	sta mouseDirTemp
-	eor mouseXDir
-	bne UpdatemouseXDir$
-	;; Direction same, so update X position
-	lda mouseXPosNew+1
-	sta mouseXPos+1
-	lda mouseXPosNew
-	sta mouseXPos
-	jmp updatedmouseXDir$
-UpdatemouseXDir$:
-	;;  Don't update X, but do update the direction of last movement
-	lda mouseDirTemp
-	sta mouseXDir
-updatedmouseXDir$:
-
-	lda mouseYPosNew
-	cmp mouseYPosPending
-	bne YChanged$
-	lda mouseYPosNew+1
-	cmp mouseYPosPending+1
-	beq updatedmouseYDir$
-YChanged$:
-
-	;;  Get sign of difference between mouseYPos and mouseYPosNew
-	lda mouseYPosNew
-	sec
-	sbc mouseYPosPending
-	lda mouseYPosNew+1
-	sbc mouseYPosPending+1
-
-	pha
-	lda mouseYPosNew
-	sta mouseYPosPending
-	lda mouseYPosNew+1
-	sta mouseYPosPending+1
-	pla	
-	
-	;; Is the direction different to last time?
-	and #0x80
-	sta mouseDirTemp
-	eor mouseYDir
-	bne UpdatemouseYDir$
-	;; Direction same, so update Y position
-	lda mouseYPosNew+1
-	sta mouseYPos+1
-	lda mouseYPosNew
-	sta mouseYPos
-	jmp updatedmouseYDir$
-UpdatemouseYDir$:
-	;;  Don't update Y, but do update the direction of last movement
-	lda mouseDirTemp
-	sta mouseYDir
-updatedmouseYDir$:
-
-	rts
 
 ;-----------------------------------------------------------
 moveCheck:
@@ -4480,34 +4078,21 @@ _mouseButtonCheck:
 		cmp	mouseButtonsOld		;time?
 		beq	done$			;Yes - don't do anything here
 		
-;		pha
-;		lda	#0x01
-;		sta	MouseUsed
-;		pla
-;		inc	0xD020
-
-
 		and	#MOUSE_LBTN		;No - Is left button down?
-;		bit	#MOUSE_LBTN		;No - Is left button down?
 		bne	testRight$		;Yes - test right
 		
 		lda	mouseButtonsOld		;No, but was it last time?
 		and	#MOUSE_LBTN
-;		bit	#MOUSE_LBTN
 		beq	testRight$		;No - test right
 		
 		lda	#0x01			;Yes - flag have left click
 		sta	mouseBtnLClick
 		
 testRight$:
-;dengland Before adding BIT, this was probably bugged.
-
-;		and	#MOUSE_RBTN		;Is right button down?
 		bit	#MOUSE_RBTN		;Is right button down?
 		bne	done$			;Yes - don't do anything here
 		
 		lda	mouseButtonsOld		;No, but was it last time?
-;		and	#MOUSE_RBTN
 		bit	#MOUSE_RBTN
 		beq	done$			;No - don't do anything here
 		
@@ -4604,31 +4189,18 @@ loop$:
 		rts
 
 enqueue$:
-;		sta	0x0400
-
 		jsr	judeEnqueueKey
-		JMP	loop$
+		bra	loop$
 
 
 ;-----------------------------------------------------------
 _judeVolatileStore:
 ;-----------------------------------------------------------
-;		lda	#0x40
-;		sta	loop$ + 1
-;
-;		lda	#<jude_volstr
-;		sta	store$ + 1
-;		lda	#>jude_volstr
-;		sta	store$ + 2
-
 		ldx	#0xff
 loop$:
 		lda	0x00, x
 store$:
 		sta	jude_volstr, x
-
-;		inc	loop$ + 1
-;		inw	store$ + 1
 
     dex
 		cpx #0x01
@@ -4640,22 +4212,11 @@ store$:
 ;-----------------------------------------------------------
 _judeVolatileLoad:
 ;-----------------------------------------------------------
-;		lda	#0x40
-;		sta	store$ + 1
-;
-;		lda	#<jude_volstr
-;		sta	loop$ + 1
-;		lda	#>jude_volstr
-;		sta	loop$ + 2
-
 		ldx	#0xff
 loop$:
 		lda	jude_volstr, x
 store$:
 		sta	0x00, x
-
-;		inw	loop$ + 1
-;		inc	store$ + 1
 
 		dex
     cpx #0x01
@@ -4681,13 +4242,6 @@ _judeUserIRQ:
 
 		cld
 
-    ;lda process
-    ;cmp #0x04
-    ;beq start$
-;
-    ;lda process
-    ;bne terminate$
-
 start$:
 		lda	#0x01
 		sta	karl_lock
@@ -4699,14 +4253,6 @@ start$:
 		sta	VIC_BRDRCLR
     inc   0xd020
 	#endif
-
-    ;lda #0x01
-    ;tsb 0xdc0e
-    ;tsb 0xdc0f
-
-    ;lda #0x10
-    ;tsb 0xdc0f
-
 
 ;	Is the VIC-II needing service?
 		lda	VIC_IRQFLGS
@@ -4728,12 +4274,6 @@ nextirq0$:
 
     jsr karlPanic
 
-    ;bra done$
-
-; just in case
-		;lda CIA1_IRQCTL
-		;lda CIA2_IRQCTL
-
 nextirq1$:
 
 proc$:
@@ -4747,14 +4287,6 @@ proc$:
 
 		MvDWMem	zp:zptrself, zp:zptrtemp1
 
-done$:
-    ;lda jude_irqthread
-    ;ora jude_irqthread + 1
-    ;beq complete$
-
-    ;jsr _judeThread
-
-complete$:
 	#ifdef	DEBUG_RASTERTIME
 		lda	#.byte0 CLR_EMPTY
 		ldx	#.byte1 CLR_EMPTY
@@ -4776,38 +4308,6 @@ complete$:
 		rti
 
 
-terminate$:
-    inc 0xd020
-
-		lda	#0x7F			;disable standard CIA irqs
-		;sta	CIA1_IRQCTL
-    ;sta CIA2_IRQCTL
-
-		;lda	CIA1_IRQCTL
-    ;lda CIA2_IRQCTL
-
-		lda	VIC_IRQFLGS
-		and	#0x01
-		beq	closure$
-		asl VIC_IRQFLGS
-
-closure$:
-    ;lda jude_irqthread
-    ;ora jude_irqthread + 1
-    ;beq none$
-
-    ;jsr _judeThread
-		
-none$:
-    plz
-		ply
-		plx
-		pla
-		plp
-
-		rti
-
-
 ;-----------------------------------------------------------
 _judeUserIRQHandler:
 ;-----------------------------------------------------------
@@ -4819,7 +4319,7 @@ mouse$:
     jsr	_mouseInputMouse
     ;jsr _mouseButtonCheck
 
-    ;CIA1.pra = 0x40; // prepare CIA1 alredy for sampling mouse, as this takes some time
+    ; prepare CIA1 alredy for sampling mouse, as this takes some time
     lda #0x40
     sta 0xdc00
 
@@ -4889,47 +4389,10 @@ loop$:
 
     rts
 
-_judeBankKernal:
-;		lda	#0x1E
-;		sta	0x01
-
-    lda #0x80
-    tsb 0xd030
-
-    lda #0x00 ; MAPLO
-    ldx #0x00
-    ldy #0x00  ; MAPHI
-    ldz #0x83
-    map
-    eom
-
-    rts
-
-
-_judeUnbankKernal:
-;		lda	#0x1D
-;		sta	0x01
-    lda #0x80
-    trb 0xd030
-
-    lda #0x00 ; MAPLO = select $2 offset $45200
-    ldx #0x00
-    ldy #0x00  ; MAPHI = select $B offset $30000
-    ldz #0x00
-    map
-    eom
-
-
-    rts
-
-
 
 ;-----------------------------------------------------------
 _judeDefCorePrepare:
 ;-----------------------------------------------------------
-    lda #0x07
-    sta 0xd020
-
 		sei
 
 		;lda	#0x7F			;disable standard CIA irqs
@@ -5001,19 +4464,6 @@ _judeDefCorePrepare:
 ;-----------------------------------------------------------
 _judeDefCoreInit:
 ;-----------------------------------------------------------
-    ;lda #0x07
-    ;sta 0xd020
-
-;halt$:
-    ;inc 0xd020
-    ;bra halt$
-
-    ;lda CPU_IRQ
-    ;sta jude_kernirq
-    ;lda CPU_IRQ + 1
-    ;sta jude_kernirq + 1
-
-
 		lda	#.byte0 _judeUserIRQ		;install our handler
 		sta	CPU_IRQ
 		lda	#.byte1 _judeUserIRQ
@@ -5310,14 +4760,10 @@ jude_screensize:
 		.long	0x00000000
 
 jude_screeny0:
-		;.repeat	50, I
 		.space 50 * 4, 0
-		;.endrepeat
 
 jude_coloury0:
-		//.repeat	50, I
 		.space 50 * 4, 0
-		//.endrepeat
 
 jude_theme:
 		.space	15, 0
@@ -5435,6 +4881,3 @@ jude_kernal:
 
 jude_runtime:
 		.space	0xff, 0
-
-;jude_kernirq:
-;  .word   0x0000

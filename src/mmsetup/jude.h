@@ -247,8 +247,6 @@ void	judeEraseLine(uint8_t w, uint8_t x, uint8_t y, uint16_t colour);
 void  judeDrawText(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t docont);
 void  judeDrawTextDirect(uint16_t colour, uint8_t indent, uint8_t mwidth, uint8_t docont,
 			uint8_t x, uint8_t y, uint8_t offs, uint32_t text);
-void	judeDrawTextDirectStr(uint16_t colour, uint8_t indent, uint8_t docont,
-      uint8_t y, uint8_t offs, char *text/*uint32_t text*/);
     
 uint8_t	judeLogClrIsReverse(uint16_t colour);
 

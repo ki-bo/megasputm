@@ -1,15 +1,12 @@
 #include "system.h"
 
-//#include <stdio.h>
 #include <stdint.h>
 
 #include "jude_widgets.h"
 #include "mega65.h"
 #include "hdos.h"
-//#include "_kernal.h"
 
 #include "adf.h"
-//#include "mmsetup_ui.h"
 #include "room90.h"
 
 #include "jude.h"
@@ -51,20 +48,6 @@ settingDetail_t dest_details[8] = {
   {SETTINGT_NONE, 0, ""}
 };
 
-//PROC_NONE,
-//PROC_CONFIGURE,
-//PROC_EXTRACT,
-//PROC_BUILD,
-//PROC_VERIFY,
-//PROC_COMPLETE
-
-
-//void (* onIdle)(void);
-//void (* onInit)(void);
-//void (* onWait)(void);
-//void (* onRead)(void);
-//void (* onWrite)(void);
-//void (* onFinish)(void);
 
 typedef struct ROOMDATA {
   uint8_t room;
@@ -293,6 +276,7 @@ static int8_t apply_acceleration(int8_t value)
   return value;
 }
 
+// move this to common header to be used by the engine and mmsetup
 struct __pot {
   uint8_t x;
   uint8_t y;
@@ -354,12 +338,7 @@ void input_update(void) {
   new_x = mouseXPos;
   new_y = mouseYPos;
 
-  //while (1) {
-    //__asm(" inc 0xd020 ");
-  //}
-
   handle_mouse();
-  //handle_keyboard();
   //handle_joystick();
   CIA1.pra = 0x40; // prepare CIA1 alredy for sampling mouse, as this takes some time
 
@@ -433,16 +412,7 @@ void writesixdecimalstr(char *buf, uint8_t pos, uint32_t value) {
 }
 
 void prepareLFLFileName(uint8_t roomno) {
-  //uint8_t tens = (roomno / 10);
-  //uint8_t ones = (roomno - (tens * 10)) + 0x30;
-  //tens +=  0x30;
-
-  //lflfilename[2] = tens;
-  //lflfilename[3] = ones;
   writetwodecimalstr(lflfilename, 0, roomno);
-  
-  //lflfileadf[0] = tens;
-  //lflfileadf[1] = ones;
   writetwodecimalstr(lflfileadf, 0, roomno);
 }
 
@@ -450,7 +420,6 @@ void prepareLFLFileName(uint8_t roomno) {
 void performKernalHeaderChange(uint8_t diskNo) {
   __asm(
     " .extern _performKernalHeaderChange \n"
-    //"   lda %[dn] \n"
     "   jsr _performKernalHeaderChange \n"
     :
     : "Ka" (diskNo)
@@ -461,7 +430,6 @@ void performKernalHeaderChange(uint8_t diskNo) {
 void performKernalScatchAllRooms(void) {
   __asm(
     " .extern _performKernalScatchAllRooms \n"
-    //"   lda %[dn] \n"
     "   jsr _performKernalScatchAllRooms \n"
     :
     : 
@@ -472,7 +440,6 @@ void performKernalScatchAllRooms(void) {
 void performKernalValidate(void) {
   __asm(
     " .extern _performKernalValidate \n"
-    //"   lda %[dn] \n"
     "   jsr _performKernalValidate \n"
     :
     : 
@@ -508,8 +475,6 @@ void finishKernalWrite(void) {
 
 
 
-//const char defstr[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+_[]!@#$%^&*()              ";
-
 uint8_t readDirectoryFiles(const char *ext) {
   uint8_t result = 0;
   uint8_t drive, desc;
@@ -520,7 +485,6 @@ uint8_t readDirectoryFiles(const char *ext) {
   hdos_close_file();
 
   hdos_getdefdrive(&drive);
-  //hdos_getcurrdrive(&drive);
 
   if (hdos_selectdrive(drive)) {
     *(uint8_t *)(0xd020) = 3;
@@ -545,12 +509,6 @@ uint8_t readDirectoryFiles(const char *ext) {
     if (!(entry->filetype & (FT_SUBDIR | FT_HIDDEN | FT_SYSTEM  | FT_VOLLABEL))) {
       found = 1;
 
-      //if (entry->filetype & FT_SYSTEM) {
-        //while(1) {
-          //*(uint8_t *)(0xd020) = *(uint8_t *)(0xd020) + 1;
-        //}
-      //}
-
       for (uint8_t i = 0; i < 3; ++i) {
         if (toUpperCase(entry->fileext[i]) != ext[i]) {
           found = 0;
@@ -561,30 +519,19 @@ uint8_t readDirectoryFiles(const char *ext) {
       if (found && (result < 254)) {
         result++;
 
-        /*for (uint8_t i = 0; i < 65; ++i) {
-          *out = defstr[i];
-          ++out;
-        }*/
-
         for (uint8_t i = 0; i < 64; ++i) {
           *out = entry->filename[i];
           ++out;
         }
-        //for (uint8_t i = 0; i < 65 - entry->namelen; ++i) {
-          *out = 0;
-          ++out;
-        //}
-          *out = entry->namelen;
-          ++out;
+        *out = 0;
+        ++out;
+        *out = entry->namelen;
+        ++out;
       }
     }
   }
   hdos_close_dir(desc);
   
-  //if (!result) {
-    //*(uint8_t *)(0xd020) = 10;
-  //}
-
   return result;
 }
 
@@ -593,7 +540,6 @@ uint8_t configurationInvalid(void) {
   uint8_t result = 0;
 
   if (ctl_mmsetup_welc_0_3._element._object.tag) {
-    //configProcFlags |= PROCFL_EXTRACT;
     if (dest_details[0].type == SETTINGT_NONE && dest_details[1].type == SETTINGT_NONE) {
       result = 1;
     } else {
@@ -607,7 +553,6 @@ uint8_t configurationInvalid(void) {
   }
 
   if (ctl_mmsetup_welc_0_4._element._object.tag) {
-    //configProcFlags |= PROCFL_BUILD;
     if (dest_details[4].type == SETTINGT_NONE || dest_details[5].type == SETTINGT_NONE) {
       result = 2;
     }
@@ -710,10 +655,6 @@ void initiateProcess(void) {
 
   judeActivateCtrl();
 
-  __asm(
-    "   sei \n"
-  );
-
   procAbort = 0;
   procContinue = 0;
   procError = 0;
@@ -722,35 +663,15 @@ void initiateProcess(void) {
 
   //configProcFlags = PROCFL_CONFIGURE | PROCFL_BUILD | PROCFL_EXTRACT;
   doneProcFlags = 0;
-
-  __asm(
-    "   cli \n"
-  );
 }
 
 
 void cancelProcess(void) {
-  __asm(
-    "   sei \n"
-  );
-
   procAbort = 1;
-
-  __asm(
-    "   cli \n"
-  );
 }
 
 void continueProcess(void) {
-  __asm(
-    "   sei \n"
-  );
-
   procContinue = 1;
-
-  __asm(
-    "   cli \n"
-  );
 }
 
 
@@ -832,7 +753,6 @@ uint8_t verifyMemory(uint8_t __huge *mem, uint32_t size, uint16_t check) {
   uint32_t nw = size >> 1;
   uint16_t num_words = (uint16_t)nw;
   
-//if (size % 2) {
   if (size & 0x00000001) {
     mem[size] = 0;
     num_words++;
@@ -852,7 +772,7 @@ uint8_t verifyMemory(uint8_t __huge *mem, uint32_t size, uint16_t check) {
     b = *ptr++;
     word |= (uint16_t)(b ^ 0xff) << 8;
 
-    chks += word ;//& 0x0000ffff;
+    chks += word;
   } 
   
   return chks == check;
@@ -875,7 +795,6 @@ void behaviourConfigInit(void) {
 
           char text[20] = "REQUIRED DISK #00";
       
-          //sprintf(text, "REQUIRE DISK #%d", outputDisk + 1);
           writetwodecimalstr(text, 15, outputDisk + 1);
           writeToProcOutput(text);
       
@@ -924,16 +843,10 @@ void behaviourConfigWait(void) {
       writeToProcOutput(adfFileName);
       
       processError("SETNAME D81 ERROR");
-      //writeToProcOutput("SETNAME D81 ERROR");
-      //process = PROC_COMPLETE;
-      //procstate = PROCST_IDLE;
       return;
     } else if (hdos_attachD810()) {
       writeToProcOutput(adfFileName);
       processError("MOUNT D81 ERROR");
-      //writeToProcOutput("MOUNT D81 ERROR");
-      //process = PROC_COMPLETE;
-      //procstate = PROCST_IDLE;
       return;
     } else {    
       performKernalHeaderChange(outputDisk + 1);
@@ -1014,22 +927,14 @@ void behaviourBuildRead(void) {
   copyFileName(4, adfFileName);
 
   if (hdos_set_filename(adfFileName)) {
-    //while(1) {
-      //__asm(" inc 0xd020 ");
-    //}
     //error and finish
     processError("HDOS SETFN FAIL #1");
-    //procstate = PROCST_FINISH;
     return;
   };
   hdos_load_file_attic(0);
 
   copyFileName(5, adfFileName);
   if (hdos_set_filename(adfFileName)) {
-    //while(1) {
-      //__asm(" inc 0xd020 ");
-    //}
-    //procstate = PROCST_FINISH;
     processError("HDOS SETFN FAIL #2");
     return;
   };
@@ -1058,18 +963,14 @@ void behaviourBuildWrite(void) {
   judeSetPointer(MPTR_WAIT);
 
   if (!procAbort) {
-  //if (0) {
     performKernalWrite((uint32_t)file_pos, next_size);
 
     uint8_t error = kernal_get_last_error();
 
     if (error) {
-      //writeToProcOutput("D81 WRITE ERROR");
       processError("D81 WRITE ERROR");
       finishKernalWrite();
       
-      //procstate = PROCST_FINISH;
-      //judeSetPointer(MPTR_NORMAL);
       return;
     }
   }
@@ -1084,9 +985,6 @@ void behaviourBuildWrite(void) {
 
     if (kernal_get_status()) {
       processError("FILE CLOSE ERROR");
-      //writeToProcOutput("FILE WRITE ERROR");
-      //process = PROC_COMPLETE;
-      //procstate = PROCST_IDLE;
       return;
     }
 
@@ -1099,7 +997,6 @@ void behaviourBuildWrite(void) {
 }
 
 void behaviourBuildFinish(void) {
-  //writeToProcOutput("BUILD FINISH");
   
   doneProcFlags |= PROCFL_BUILD;
   process = PROC_CONFIGURE;
@@ -1117,7 +1014,6 @@ void behaviourExtractInit(void) {
     procstate = PROCST_IDLE;
     return;
   } else if  (dest_details[outputDisk].type == SETTINGT_NONE) {
-    //outputDisk++;
     procstate = PROCST_FINISH;
     return;
   }
@@ -1137,15 +1033,11 @@ void behaviourExtractInit(void) {
 
   if (adf_init(ADF_MEMORY) != ADF_OK) {
     processError("ADF INIT ERROR");
-    //writeToProcOutput("ADF INIT ERROR");
-    //procstate = PROCST_FINISH;
     return;
   }
   
   if (adf_chdir("rooms") != ADF_OK) {
     processError("ADF CHDIR ERROR");
-    //writeToProcOutput("ADF CHDIR ERROR");
-    //procstate = PROCST_FINISH;
     return;
   }
 
@@ -1221,13 +1113,11 @@ void behaviourExtractRead(void) {
 
   if (rooms[roomidx].room == 0xff) {
     roomidx = 0;
-    //outputDisk++;
     procstate = PROCST_FINISH;
     return;
   }
 
   char text[] = "EXTRACT READ  00.LFL";
-  //sprintf(text, "EXTRACT READ  %2.2d", rooms[roomidx]);
   writetwodecimalstr(text, 14, rooms[roomidx].room);
   writeToProcOutput(text);
 
@@ -1235,12 +1125,9 @@ void behaviourExtractRead(void) {
 
   if (adf_read_file(lflfileadf, FILE_MEMORY, &file_size) != ADF_OK) {
     processError("ADF READ ERROR");
-    //writeToProcOutput("ADF READ ERROR");
-    //procstate = PROCST_FINISH;
     return;
   }
 
-  //sprintf(str_filesize, "%20lu", file_size);
   writesixdecimalstr(str_filesize, 14, file_size);
   ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)((char __huge *)str_filesize);
   zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
@@ -1249,8 +1136,6 @@ void behaviourExtractRead(void) {
   prepareKernalWrite(lflfilename, 10);
   if (kernal_get_last_error()) {
     processError("D81 PREPARE ERROR");
-    //writeToProcOutput("D81 PREPARE ERROR");
-    //procstate = PROCST_FINISH;
     return;
   }
 
@@ -1258,8 +1143,6 @@ void behaviourExtractRead(void) {
 
   zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
   progressResetMax(file_size);
-
-  //sprintf(text, "EXTRACT WRITE %2.2d", rooms[roomidx]);
 
   char text2[] = "EXTRACT WRITE 00.LFL";
   writetwodecimalstr(text2, 14, rooms[roomidx].room);
@@ -1284,10 +1167,7 @@ void behaviourExtractWrite(void) {
 
     if (error) {
       processError("D81 WRITE ERROR");
-      //writeToProcOutput("D81 WRITE ERROR");
       finishKernalWrite();
-      //procstate = PROCST_FINISH;
-      //judeSetPointer(MPTR_NORMAL);
       return;
     }
   }
@@ -1302,9 +1182,6 @@ void behaviourExtractWrite(void) {
 
     if (kernal_get_status()) {
       processError("FILE CLOSE ERROR");
-      //writeToProcOutput("FILE CLOSE ERROR");
-      //process = PROC_COMPLETE;
-      //procstate = PROCST_IDLE;
       return;
     }
 
