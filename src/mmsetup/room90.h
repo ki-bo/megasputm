@@ -11,13 +11,13 @@
 
 
 typedef struct RESOURCE {
-  uint8_t diskno[NUM_ROOMS];
-  uint8_t roomno[NUM_ROOMS];
-  uint32_t offset[NUM_ROOMS];
+  uint8_t diskno;
+  uint8_t roomno;
+  uint32_t offset;
 } resource_t;
 
-extern resource_t rooms;
-extern resource_t sounds;
+extern resource_t rooms[NUM_ROOMS];
+extern resource_t sounds[NUM_SOUNDS];
 
 
 void readIndexFile(uint8_t __huge *image);
