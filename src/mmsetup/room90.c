@@ -3,8 +3,8 @@
 //#include <stdio.h>
 
 
-resource_t rooms[NUM_ROOMS];
-resource_t sounds[NUM_SOUNDS];
+resource_t rooms;
+resource_t sounds;
 
 
 uint16_t sectorOffsets[] = {
@@ -26,8 +26,8 @@ void readIndexFile(uint8_t __huge *image) {
 
   //disk numbers
   for (uint8_t i = 0; i < NUM_ROOMS; ++i) {
-    rooms[i].roomno = i;
-    rooms[i].diskno = *f;
+    rooms.roomno[i] = i;
+    rooms.diskno[i] = *f;
     f++;
   }
 
@@ -46,7 +46,7 @@ void readIndexFile(uint8_t __huge *image) {
       offs = (uint32_t)(sectorOffsets[t] + s) * 256;
     }
 
-    rooms[i].offset = offs;
+    rooms.offset[i] = offs;
   }
 
   //costume room numbers
@@ -63,7 +63,7 @@ void readIndexFile(uint8_t __huge *image) {
 
   //sound rooms
   for (uint8_t i = 0; i < NUM_SOUNDS; ++i) {
-    sounds[i].roomno = *f;
+    sounds.roomno[i] = *f;
     f++;
   }
 
@@ -76,7 +76,7 @@ void readIndexFile(uint8_t __huge *image) {
     
     uint16_t offs = (uint16_t)lo | (uint16_t)(hi << 8);
 
-    sounds[i].offset = offs;
+    sounds.offset[i] = offs;
   }
 }
 
@@ -118,15 +118,15 @@ uint16_t makeRoom90(uint8_t __huge *image1, uint8_t __huge *image2, uint8_t __hu
   for (uint8_t i = 6; i < NUM_SOUNDS; i++) {
     uint8_t __huge *data;
     
-    uint8_t room = sounds[i].roomno;
-    uint32_t resoffs = sounds[i].offset;
+    uint8_t room = sounds.roomno[i];
+    uint32_t resoffs = sounds.offset[i];
 
     uint32_t o;
     
     if  (resoffs < 0xffff) {
-      o = resoffs + rooms[room].offset;
+      o = resoffs + rooms.offset[room];
 
-      if (rooms[room].diskno == 0x32) {
+      if (rooms.diskno[room] == 0x32) {
         data = &image2[o];
       } else {
         data = &image1[o];
