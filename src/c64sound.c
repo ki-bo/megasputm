@@ -6,6 +6,8 @@
 #include "resource.h"
 #include "map.h"
 
+#include "util.h"
+
 
 #define ZEROMEM(a) memset(a, 0, sizeof(a))
 
@@ -122,19 +124,19 @@ uint16_t freqReg[7];
 // start offset[i] for songFileOrChanBufData to obtain songPosPtr[i]
 //	vec6[0..2] = 0x0008;
 //	vec6[4..6] = 0x0019;
-uint16_t vec6[7];
+int16_t vec6[7];
 
 // current offset[i] for songFileOrChanBufData to obtain songPosPtr[i] (starts with vec6[i], increased later)
-uint16_t songFileOrChanBufOffset[7];
+int16_t songFileOrChanBufOffset[7];
 
 uint16_t freqDelta[7];
-int freqDeltaCounter[7];
+int16_t freqDeltaCounter[7];
 uint8_t __far *swapSongPosPtr[3];
 uint8_t* swapVec5[3];
-uint16_t swapVec8[3];
+int16_t swapVec8[3];
 uint16_t swapVec10[3];
 uint16_t swapFreqReg[3];
-int swapVec11[3];
+int16_t swapVec11[3];
 
 // never read
 //uint8_t* vec5[7];
@@ -202,6 +204,7 @@ int8_t _soundQueue[7];
 // values: a resID or 0
 // resIDs: 3, 4, 5 or song-number
 int8_t channelMap[7];
+uint8_t chanloop[7];
 
 uint8_t songPosUpdateCounter[7];
 
@@ -501,8 +504,8 @@ void SWAP_16(uint16_t *a, uint16_t *b) {
   uint16_t tmp = *a; *a = *b; *b = tmp; 
 }
 
-void SWAP_int(int *a, int *b) { 
-  int tmp = *a; *a = *b; *b = tmp; 
+void SWAP_int(int16_t *a, int16_t *b) { 
+  int16_t tmp = *a; *a = *b; *b = tmp; 
 }
 
 uint16_t READ_UINT16(const void __far *ptr) {
@@ -681,8 +684,13 @@ void resetPlayerState() { // $48f7
 void processSongData(uint8_t channel) { // $4939
 	// always: _soundQueue[channel] != -1
 	// -> channelMap[channel] != -1
-	channelMap[channel] = _soundQueue[channel];
+	
+  //debug_out("spsd %d %d", channel, _soundQueue[channel]);
+  
+  channelMap[channel] = _soundQueue[channel];
 	_soundQueue[channel] = -1;
+
+
 	songPosUpdateCounter[channel] = 0;
 
 	isVoiceChannel = (channel < 3);
@@ -876,6 +884,10 @@ void readSongChunk(uint8_t channel) { // $4a6b
 
 		// song position
 		if (GETBIT(l_cmdByte, 7)) {
+      chanloop[channel] = 1;
+
+      debug_out("srsc 7.1 %d", channel);
+
 			if (songPosUpdateCounter[channel] == 1) {
 				y += 2;
 				--songPosUpdateCounter[channel];
@@ -883,8 +895,8 @@ void readSongChunk(uint8_t channel) { // $4a6b
 			} else {
 				// looping / skipping / ...
 				++y;
-				songPosPtr[channel] -= ptr1[y];
-				songFileOrChanBufOffset[channel] -= ptr1[y];
+				songPosPtr[channel] -= (int8_t)ptr1[y];
+				songFileOrChanBufOffset[channel] -= (int8_t)ptr1[y];
 
 				++y;
 				if (songPosUpdateCounter[channel] == 0) {
@@ -1000,7 +1012,10 @@ void func_4F45(uint8_t channel) { // $4F45
 
 	int8_t resIndex = channelMap[channel];
 	channelMap[channel] = 0;
-	//safeUnlockResource(resIndex);
+	
+  //debug_out("s4f45 %d %d", channel, resIndex);
+  
+  //safeUnlockResource(resIndex);
 }
 
 // chanResIndex: 3,4,5 or 58
@@ -1131,7 +1146,7 @@ void swapVars(uint8_t channel, int8_t swapIndex) { // $51a5
 	SWAP_int(&freqDeltaCounter[channel], &swapVec11[swapIndex]);
 	SWAP_16(&freqDelta[channel], &swapVec10[swapIndex]);
 	SWAP_ptr(&vec20[channel], &swapVec20[swapIndex]);
-	SWAP_16(&songFileOrChanBufOffset[channel],  &swapVec8[swapIndex]);
+	SWAP_int(&songFileOrChanBufOffset[channel],  &swapVec8[swapIndex]);
 }
 
 void resetSwapVars() { // $52d0
@@ -1486,6 +1501,9 @@ int8_t initSound(int8_t soundResID, uint8_t __far *data) { // $4D0A
 	vec6[var4CF3] = y;
 	_soundQueue[var4CF3] = soundResID;
 
+  chanloop[var4CF3] = 0;
+
+
 	initializing = 0;
 	_soundInQueue = 1;
 
@@ -1565,6 +1583,8 @@ void startSound(int8_t nr) {
     res_activate_slot(res_page);
     res_lock(RES_TYPE_C64SOUND, nr, 0);
 
+    //debug_out("ssnd: %d", nr);
+
     uint8_t __far *data = (uint8_t __far *)res_get_huge_ptr(res_page);
     resourceData = data;
 
@@ -1597,8 +1617,11 @@ void startSound(int8_t nr) {
 }
 
 void stopSound(int8_t nr) {
-	if (nr == -1)
+  //debug_out("sstp: %d", nr);
+
+  if (nr == -1) {
 		return;
+  }
 
 	//Common::StackLock lock(_mutex);
 	stopSound_intern(nr, 1);
@@ -1612,13 +1635,23 @@ int8_t getSoundStatus(int8_t nr) {
 
 	if (resID_song == nr && isMusicPlaying) {
 		result = 1;
+    return result;
 	}
 
-	for (int i = 0; (i < 4) && (result == 0); ++i) {
+	for (int i = 0; (i < 4) /*&& (result == 0)*/; ++i) {
 		if (nr == _soundQueue[i] || nr == channelMap[i]) {
-			result = 1;
+      debug_out("scl %d %d", i, chanloop[i]);
+
+			result |= 1;
+
+      if (chanloop[i]) {
+        result = 0;
+        break;
+      }
 		}
 	}
+
+  //debug_out("sgst %d %d", nr, result);
 
 	return result;
 }
