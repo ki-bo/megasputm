@@ -265,6 +265,18 @@ judeMain:
 main$:
 		cli
 
+; Check no need to panic
+    lda CPU_IRQ
+    cmp #.byte0 _judeUserIRQ
+    bne panic$
+    lda CPU_IRQ + 1
+    cmp #.byte1 _judeUserIRQ
+    beq cont0$
+
+panic$:
+    jmp karlPanic
+
+cont0$:
 ;	Check not locked
 ;	Suspend IRQ
 		sei
