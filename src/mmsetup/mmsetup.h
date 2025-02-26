@@ -23,12 +23,32 @@ extern karlFarPtr_t vew_mmsetup_main_bars[];
 
 extern karlFarPtr_t vew_mmsetup_main_pages[];
 
-extern judePage_t pge_mmsetup_welcome;
+extern judePage_t pge_mmsetup_start;
+extern karlFarPtr_t pge_mmsetup_start_panels[];
 
+extern judePanel_t pnl_mmsetup_start_0;
+extern karlFarPtr_t pnl_mmsetup_start_0_controls[];
+
+extern judeControl_t ctl_mmsetup_start_0_0;
+extern judeControl_t ctl_mmsetup_start_0_1;
+extern judeControl_t ctl_mmsetup_start_0_2;
+extern judeControl_t ctl_mmsetup_start_0_3;
+extern judeControl_t ctl_mmsetup_start_0_4;
+extern judeControl_t ctl_mmsetup_start_0_5;
+extern judeControl_t ctl_mmsetup_start_0_6;
+extern judeControl_t ctl_mmsetup_start_0_7;
+extern judeControl_t ctl_mmsetup_start_0_8;
+
+extern judePanel_t pnl_mmsetup_start_1;
+extern karlFarPtr_t pnl_mmsetup_start_1_controls[];
+
+extern judeControl_t ctl_mmsetup_start_1_0;
+extern judeControl_t ctl_mmsetup_start_1_1;
+
+extern judePage_t pge_mmsetup_welcome;
 extern karlFarPtr_t pge_mmsetup_welcome_panels[];
 
 extern judePanel_t pnl_mmsetup_welc_0;
-
 extern karlFarPtr_t pnl_mmsetup_welc_0_controls[];
 
 extern judeControl_t ctl_mmsetup_welc_0_0;
@@ -227,6 +247,7 @@ extern karlFarPtr_t pnl_mmsetup_proc_1_controls[];
 extern char str_mmsetup_buttons_4[];
 extern char str_mmsetup_buttons_5[];
 extern char str_mmsetup_buttons_6[];
+extern char str_mmsetup_buttons_7[];
 
 extern char str_mmsetup_proc_0[];
 extern char str_mmsetup_proc_1[];
@@ -239,3 +260,16 @@ extern char str_mmsetup_proc_7[];
 extern char str_mmsetup_proc_8[];
 extern char str_mmsetup_proc_9[];
 extern char str_mmsetup_proc_10[];
+
+extern char str_mmsetup_start_0[];
+extern char str_mmsetup_start_1[];
+
+extern char str_mmsetup_start_2[];
+extern char str_mmsetup_start_3[];
+extern char str_mmsetup_start_4[];
+extern char str_mmsetup_start_5[];
+
+extern char str_mmsetup_start_6[];
+extern char str_mmsetup_start_7[];
+
+extern char str_mmsetup_start_8[];

@@ -4,6 +4,12 @@
 #include "jude.h"
 #include "jude_widgets.h"
 
+void mmsetupVewPrepare(void);
+
+void mmsetupStartUnmPrep(void);
+void mmsetupStartUnmChg(void);
+
+void mmsetupStartStrtChg(void);
 
 void mmsetupWelcConfigChg(void);
 

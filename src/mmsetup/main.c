@@ -68,8 +68,16 @@ void attemptLoadFont(void) {
 
 
 int main(void) {
+  bootflags = (*(uint8_t *)0x0800);
+  bootflags&= 0x5F;
+
+  //while(1) {
+  //  __asm(" inc 0xd020 ");
+  //}
+
   //hide our shinanegans....
   *(uint8_t *)0xd011 &= 0xEF;
+  __asm("  sei ");
 
   hdos_init(0x0800, 0x0800);
   _judeBackupKernalZP();
@@ -83,7 +91,7 @@ int main(void) {
 
   karlModAttach((karlFarPtr_t)&mod_mmsetup_app);
 
-  //does and sei but we should be fine by now
+  //does and cli but we should be fine by now
   judeInstallIdle((void *)&updateProcess);
 
   //Bring the screen back

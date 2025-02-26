@@ -305,6 +305,16 @@ err_t hdos_attachD810(void) {
   return result;
 }
 
+void hdos_detachD81(void) {
+  __asm(
+    "   lda #0x42 \n"
+    "   sta 0xd640 \n"
+    "   clv \n"
+    ::: "a"
+  );
+};
+
+
 void hdos_restart(void) {
   __asm(
     "   lda #0x7e \n"

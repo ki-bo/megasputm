@@ -34,6 +34,7 @@ uint8_t langidx = 0xff;
 uint8_t configProcFlags = 0;
 uint8_t doneProcFlags = 0;
 
+uint8_t bootflags;
 
 char file_extensions[3][4] = {"D81", "ADF", "D64"};
 

@@ -11,6 +11,61 @@
 
 
 
+void mmsetupVewPrepare(void) {
+  if (bootflags) {
+    vew_mmsetup_main.actvpage = (karlFarPtr_t)(&pge_mmsetup_start);
+  }
+
+  judeDefViewPrepare();
+}
+
+void mmsetupStartUnmPrep(void) {
+//TODO:  Get proc list details and determine if a disk is mounted
+  
+  judeDefCtlPrepare();
+}
+
+void mmsetupStartUnmChg(void) {
+  uint8_t state = ((karlObject_t __huge *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    hdos_detachD81();
+    
+    *(uint8_t *)(0x11b1) = 0;
+
+    /*if (hdos_set_filename("MM3.D81")) {
+      while (1) {
+        __asm(
+          "   lda 0x02 \n"
+          "   sta 0xd020 ");
+      }
+    };
+    if (hdos_attachD810()) {
+      while (1) {
+        __asm(
+          "   lda 0x03 \n"
+          "   sta 0xd020 ");
+      }
+    };*/
+    
+    karlObjExcludeState(STATE_ENABLED);
+  }
+}
+
+
+void mmsetupStartStrtChg(void) {
+  uint8_t state = ((karlObject_t __huge *)zptrself)->state;
+		    
+  judeDefCtlChange();
+
+  if (state & STATE_DOWN) {
+    zptrself = (uint32_t)((karlObject_t __huge *)&pge_mmsetup_welcome);
+    judeActivatePage();
+  }
+}
+
 void mmsetupWelcNextChg(void) {
     uint8_t state = ((karlObject_t __huge *)zptrself)->state;
 		    

@@ -86,10 +86,10 @@ runtime.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS_MM) -o $@ $(filter-out mega65-mm.scm,$^)
 
 # Rule for creating the mm1.d81 disk image
-mm1.d81: runtime.raw mmsetup.prg $(SAVE_FILES)
+mm1.d81: runtime.raw mmsetup.prg autoboot.c65.bas $(SAVE_FILES)
 	echo "creating  mm1.d81 disk image"; \
 	$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
-	$(C1541) -attach mm1.d81 -write runtime.raw autoboot.c65 -write mmsetup.prg mmsetup -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0; \
+	$(C1541) -attach mm1.d81 -write autoboot.c65.bas autoboot.c65 -write runtime.raw boot -write mmsetup.prg mmsetup -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write mc-0.raw mc0; \
 	for file in gamedata/disk1/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \

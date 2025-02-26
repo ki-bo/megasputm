@@ -329,42 +329,41 @@ void c64_sound_fin() {
 	//delete _sid;
 }
 
+
 void initSID() {
-/*	_sid = new Resid::SID();
-	_sid->set_sampling_parameters(
-		timingProps[_videoSystem].clockFreq,
-		_sampleRate);
-	_sid->enable_filter(true);*/
-
-
-
-	//_sid->reset();
-
-	//Synchronize the waveform generators (must occur after reset)
-	SID_Write(4, 0x08);
-	SID_Write(11, 0x08);
-	SID_Write(18, 0x08);
-	SID_Write(4, 0x00);
-	SID_Write(11, 0x00);
-	SID_Write(18, 0x00);
-}
-
-void resetSID() { // $48D8
-	SIDReg24 = 0x0f;
-
-	SID_Write(4, 0);
-	SID_Write(11, 0);
-	SID_Write(18, 0);
-	SID_Write(23, 0);
-	SID_Write(21, 0);
-	SID_Write(22, 0);
-	SID_Write(24, SIDReg24);
-
-	resetPlayerState();
-}
-
-
-
+  /*	_sid = new Resid::SID();
+    _sid->set_sampling_parameters(
+      timingProps[_videoSystem].clockFreq,
+      _sampleRate);
+    _sid->enable_filter(true);*/
+  
+  
+  
+    //_sid->reset();
+  
+    //Synchronize the waveform generators (must occur after reset)
+    SID_Write(4, 0x08);
+    SID_Write(11, 0x08);
+    SID_Write(18, 0x08);
+    SID_Write(4, 0x00);
+    SID_Write(11, 0x00);
+    SID_Write(18, 0x00);
+  }
+  
+  void resetSID() { // $48D8
+    SIDReg24 = 0x0f;
+  
+    SID_Write(4, 0);
+    SID_Write(11, 0);
+    SID_Write(18, 0);
+    SID_Write(23, 0);
+    SID_Write(21, 0);
+    SID_Write(22, 0);
+    SID_Write(24, SIDReg24);
+  
+    resetPlayerState();
+  }
+  
 
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
 
@@ -372,6 +371,14 @@ void resetSID() { // $48D8
 void c64_startSound(uint8_t sound_id) {
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
+
+  //if (sound_id > 60) {
+    //sound_id = 58;
+  //}
+
+  //if (sound_id != 58) {
+    //return;
+  //}
 
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (!sound_triggers[i]) {
@@ -399,6 +406,8 @@ void c64_sound_handle_play_triggers(void)
 void c64_stopSound(uint8_t sound_id) {
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
+
+  //return;
 
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (sound_triggers[i] == sound_id) {
@@ -886,7 +895,7 @@ void readSongChunk(uint8_t channel) { // $4a6b
 		if (GETBIT(l_cmdByte, 7)) {
       chanloop[channel] = 1;
 
-      debug_out("srsc 7.1 %d", channel);
+      //debug_out("srsc 7.1 %d", channel);
 
 			if (songPosUpdateCounter[channel] == 1) {
 				y += 2;
@@ -1268,9 +1277,9 @@ void initMusic(int8_t songResIndex, uint8_t __far *data) { // $7de6
   _music = data;
 	if (_music == NULL) {
 
-    while(1) {
-      *(volatile uint8_t *)0xd020 = *(volatile uint8_t *)0xd020 + 1;
-    }
+    //while(1) {
+      //*(volatile uint8_t *)0xd020 = *(volatile uint8_t *)0xd020 + 1;
+    //}
 
 		return;
 	}
@@ -1300,7 +1309,7 @@ void initMusic(int8_t songResIndex, uint8_t __far *data) { // $7de6
 	isMusicPlaying = 1;
 	//lockCodeLocation();
 
-	SIDReg23 &= 0xf0;
+  SIDReg23 &= 0xf0;
 	SID_Write(23, SIDReg23);
 
 	handleMusicBuffer();
@@ -1583,7 +1592,7 @@ void startSound(int8_t nr) {
     res_activate_slot(res_page);
     res_lock(RES_TYPE_C64SOUND, nr, 0);
 
-    //debug_out("ssnd: %d", nr);
+    debug_out("ssnd: %d", nr);
 
     uint8_t __far *data = (uint8_t __far *)res_get_huge_ptr(res_page);
     resourceData = data;
@@ -1617,7 +1626,7 @@ void startSound(int8_t nr) {
 }
 
 void stopSound(int8_t nr) {
-  //debug_out("sstp: %d", nr);
+  debug_out("sstp: %d", nr);
 
   if (nr == -1) {
 		return;
@@ -1640,7 +1649,7 @@ int8_t getSoundStatus(int8_t nr) {
 
 	for (int i = 0; (i < 4) /*&& (result == 0)*/; ++i) {
 		if (nr == _soundQueue[i] || nr == channelMap[i]) {
-      debug_out("scl %d %d", i, chanloop[i]);
+      //debug_out("scl %d %d", i, chanloop[i]);
 
 			result |= 1;
 

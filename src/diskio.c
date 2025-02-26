@@ -362,6 +362,7 @@ uint8_t diskio_load_index(void)
     return 0;
   }
 
+
   uint16_t  index_chks = 0;
   uint16_t  num_words  = sizeof(lfl_index_file_contents) >> 1;
   uint16_t *ptr        = (uint16_t *)&lfl_index_file_contents;
@@ -688,43 +689,26 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
   uint8_t trackNo, blockNo;
 
   if  (room_id == 90) {
-    if (room_list_disk_num > 1) {
-      check_and_prompt_for_disk(0);
-
-      read_directory(0);
-      if (room90_track_list[0] == 0) {
+    if (room_list_disk_num > 1 || room90_track_list[room_list_disk_num] == 0) {
+      if (room_list_disk_num > 1) {
+        //diskno = 0;
+        check_and_prompt_for_disk(0);
+      }
+  
+      read_directory(room_list_disk_num);
+      if (room90_track_list[room_list_disk_num] == 0) {
         disk_error(ERR_LFL_FILE_NOT_FOUND);
       }
     }
 
-    // the requested file is on the current disk
-    /*load_block(current_disk, room90_track_list[current_disk], room90_block_list[current_disk]);
-    next_track = FDC.data;
-    next_block = FDC.data;
-    cur_block_read_ptr = 0;
-
-    seek_to(offset);
-    uint8_t chunksize_low = FDC.data ^ 0xff;
-    ++cur_block_read_ptr;
-    if (cur_block_read_ptr == 254) {
-      load_block(current_disk, next_track, next_block);
-      next_track = FDC.data;
-      next_block = FDC.data;
-      cur_block_read_ptr = 0;
-    }
-    uint8_t chunksize_high = FDC.data ^ 0xff;
-    cur_chunk_size = make16(chunksize_low, chunksize_high);
-    ++cur_block_read_ptr;
-
-    return cur_chunk_size;*/
-
     trackNo = room90_track_list[room_list_disk_num];
     blockNo = room90_block_list[room_list_disk_num];
 
-    if (offset == 0 || trackNo == 0 || blockNo == 0 || room_list_disk_num > 1) {
-      while(1) {
-        *(volatile uint8_t *)0xd020 = *(volatile uint8_t *)0xd020 + 1;
-      }
+    if (offset == 0 || trackNo == 0 || room_list_disk_num > 1) {
+      //while(1) {
+        //*(volatile uint8_t *)0xd020 = *(volatile uint8_t *)0xd020 + 1;
+      //}
+      return 0;
     }
 
   } else {

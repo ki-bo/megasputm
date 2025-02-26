@@ -59,6 +59,7 @@ extern uint32_t kernalWriteSiz;
 
 extern settingDetail_t dest_details[];
 
+extern uint8_t bootflags;
 
 uint8_t readDirectoryFiles(const char *ext);
 
