@@ -27,7 +27,7 @@
 #include "inventory.h"
 #include "map.h"
 //#include "sound.h"
-#include "c64sound.h"
+#include "sound_sid.h"
 #include "util.h"
 #include "resource.h"
 #include "script.h"

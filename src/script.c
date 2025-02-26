@@ -27,7 +27,7 @@
 #include "memory.h"
 #include "resource.h"
 //#include "sound.h"
-#include "c64sound.h"
+#include "sound_sid.h"
 #include "util.h"
 #include "vm.h"
 #include "walk_box.h"

@@ -28,7 +28,7 @@
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
-#include "c64sound.h"
+#include "sound_sid.h"
 #include "vm.h"
 #include <string.h>
 #include <stdint.h>

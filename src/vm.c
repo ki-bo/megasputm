@@ -31,7 +31,7 @@
 #include "resource.h"
 #include "script.h"
 //#include "sound.h"
-#include "c64sound.h"
+#include "sound_sid.h"
 #include "ui_strings.h"
 #include "util.h"
 #include "walk_box.h"
