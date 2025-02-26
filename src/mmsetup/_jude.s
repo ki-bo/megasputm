@@ -2810,16 +2810,14 @@ exit$:
 		rts
 
 input$:
-		MvDWMem	zp:zreg4, jude_screeny0
-		lda	zp:zvalkey
-		ldz	#0x00
-		;nop
-		sta	[zp:zreg4], z
-		inz
-		inz
-		lda	zp:zvalkey + 1
-		;nop
-		sta	[zp:zreg4], z
+		;MvDWMem	zp:zreg4, jude_screeny0
+		;lda	zp:zvalkey
+		;ldz	#0x00
+		;sta	[zp:zreg4], z
+		;inz
+		;inz
+		;lda	zp:zvalkey + 1
+		;sta	[zp:zreg4], z
 
 		lda	zp:zvalkey + 1
 		and	#KEY_MOD_SYS
@@ -2983,7 +2981,6 @@ _judeProcVwElemsAccel:
     beq elem$
 
 		ldz	#OBJECT__state
-		;nop
 		lda	[zp:zreg0], z
 
 		and	zp:zptrtemp2 + 1
@@ -2992,7 +2989,6 @@ _judeProcVwElemsAccel:
 
 elem$:
 		ldz	#CONTROL__accelchar
-		;nop
 		lda	[zp:zreg0], z
 
     beq exit$
@@ -3014,9 +3010,9 @@ exit$:
 ;-----------------------------------------------------------
 _judeProcessAccelerators:
 ;-----------------------------------------------------------
-    lda zvalkey
-    and #0x7f
-    sta zvalkey
+    ;lda zvalkey
+    ;and #0x7f
+    ;sta zvalkey
 
 		lda	#.byte0 _judeProcVwElemsAccel
 		sta	zp:zreg6wl

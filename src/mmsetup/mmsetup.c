@@ -28,7 +28,7 @@ judeControl_t ctl_mmsetup_config_0_5 = {
 		NEARTOFARPTRREC(str_mmsetup_config_5),
 		0,
 		0x0,
-	  '4'};
+	  KEY_OF_MODKEY(KEY_M65_SYS_4)};
 
 karlFarPtr_t pnl_mmsetup_welc_1_controls[] = {
 		NEARTOFARPTRREC(&ctl_mmsetup_welc_1_0),
@@ -73,7 +73,7 @@ judeControl_t ctl_mmsetup_config_0_6 = {
 		NEARTOFARPTRREC(str_mmsetup_config_6),
 		0,
 		0x0,
-		'5'};
+		KEY_OF_MODKEY(KEY_M65_SYS_5)};
 
 char str_mmsetup_config_7[] = "6  D64 disk #2...";
 
@@ -168,7 +168,7 @@ judeControl_t ctl_mmsetup_config_0_8 = {
 		NEARTOFARPTRREC(str_mmsetup_config_8),
 		0,
 		0x0,
-		'7'};
+		KEY_OF_MODKEY(KEY_M65_SYS_7)};
 
 char str_mmsetup_config_2[] = "1  D81 disk #1...";
 
@@ -220,7 +220,7 @@ judeControl_t ctl_mmsetup_welc_0_3 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_3),
 		0,
 		0x2,
-		'E'};
+		KEY_OF_MODKEY(KEY_M65_SYS_E)};
 
 judeControl_t ctl_mmsetup_config_0_12 = {
 		sizeof(judeControl_t),
@@ -525,7 +525,7 @@ judeControl_t ctl_mmsetup_start_0_8 = {
   NEARTOFARPTRREC(str_mmsetup_start_8),
   0,
   0x2,
-  'U'};
+  KEY_OF_MODKEY(KEY_M65_SYS_U)};
 
 
 
@@ -581,7 +581,7 @@ judeControl_t ctl_mmsetup_start_1_0 = {
   NEARTOFARPTRREC(str_mmsetup_buttons_7),
   0,
   0x1,
-  'S'};
+  KEY_OF_MODKEY(KEY_M65_SYS_S)};
 
 
 judeControl_t ctl_mmsetup_start_1_1 = {
@@ -606,7 +606,7 @@ judeControl_t ctl_mmsetup_start_1_1 = {
   NEARTOFARPTRREC(str_mmsetup_buttons_6),
   0,
   0xff,
-  KEY_M65_ESC
+  KEY_OF_MODKEY(KEY_M65_SYS_ESC)
 };
 
 
@@ -757,7 +757,7 @@ judeControl_t ctl_mmsetup_config_1_1 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_1),
 		0,
 		0xff,
-		KEY_M65_ESC};
+		KEY_OF_MODKEY(KEY_M65_SYS_ESC)};
 
 judeControl_t ctl_mmsetup_welc_0_5 = {
 		sizeof(judeControl_t),
@@ -781,7 +781,7 @@ judeControl_t ctl_mmsetup_welc_0_5 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_5),
 		0,
 		0x2,
-		'V'};
+		KEY_OF_MODKEY(KEY_M65_SYS_V)};
 
 judeControl_t ctl_mmsetup_welc_0_6 = {
 		sizeof(judeControl_t),
@@ -902,7 +902,7 @@ judeControl_t ctl_mmsetup_config_0_2 = {
 		NEARTOFARPTRREC(str_mmsetup_config_2),
 		0,
 		0x0,
-		'1'};
+		KEY_OF_MODKEY(KEY_M65_SYS_1)};
 
 char str_mmsetup_config_14[] = "<All>";
 
@@ -1028,7 +1028,7 @@ judeControl_t ctl_mmsetup_config_1_0 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_0),
 		0,
 		0x1,
-		'N'};
+    KEY_OF_MODKEY(KEY_M65_SYS_N)};
 
 judeControl_t ctl_mmsetup_welc_0_2 = {
 		sizeof(judeControl_t),
@@ -1052,7 +1052,7 @@ judeControl_t ctl_mmsetup_welc_0_2 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_2),
 		0,
 		0x2,
-		'C'};
+		KEY_OF_MODKEY(KEY_M65_SYS_C)};
 
 char str_mmsetup_config_5[] = "4  ADF disk #2...";
 
@@ -1078,7 +1078,7 @@ judeControl_t ctl_mmsetup_config_0_7 = {
 		NEARTOFARPTRREC(str_mmsetup_config_7),
 		0,
 		0x0,
-		'6'};
+		KEY_OF_MODKEY(KEY_M65_SYS_6)};
 
 judeControl_t ctl_mmsetup_config_0_20 = {
 		sizeof(judeControl_t),
@@ -1135,7 +1135,7 @@ judeControl_t ctl_mmsetup_config_0_3 = {
 		NEARTOFARPTRREC(str_mmsetup_config_3),
 		0,
 		0x0,
-		'2'};
+		KEY_OF_MODKEY(KEY_M65_SYS_2)};
 
 char str_mmsetup_config_6[] = "5  D64 disk #1...";
 
@@ -1316,7 +1316,7 @@ judeControl_t ctl_mmsetup_welc_0_4 = {
 		NEARTOFARPTRREC(str_mmsetup_welc_4),
 		0,
 		0x2,
-		'B'};
+		KEY_OF_MODKEY(KEY_M65_SYS_B)};
 
 char str_mmsetup_config_9[] = "8  Disk #2 rooms...";
 
@@ -1350,7 +1350,7 @@ judeControl_t ctl_mmsetup_welc_1_0 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_0),
 		0,
 		0x1,
-		'N'};
+		KEY_OF_MODKEY(KEY_M65_SYS_N)};
 
 judeControl_t ctl_mmsetup_welc_1_1 = {
 		sizeof(judeControl_t),
@@ -1374,7 +1374,7 @@ judeControl_t ctl_mmsetup_welc_1_1 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_3),
 		0,
 		0x1,
-		'T'};
+		KEY_OF_MODKEY(KEY_M65_SYS_T)};
 
 judeControl_t ctl_mmsetup_welc_1_3 = {
 		sizeof(judeControl_t),
@@ -1398,7 +1398,7 @@ judeControl_t ctl_mmsetup_welc_1_3 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_6),
 		0,
 		0xff,
-		KEY_M65_ESC
+		KEY_OF_MODKEY(KEY_M65_SYS_ESC)
 };
 
 judeControl_t ctl_mmsetup_welc_1_2 = {
@@ -1448,7 +1448,7 @@ judeControl_t ctl_mmsetup_config_0_9 = {
 		NEARTOFARPTRREC(str_mmsetup_config_9),
 		0,
 		0x0,
-		'8'};
+		KEY_OF_MODKEY(KEY_M65_SYS_8)};
 
 judeControl_t ctl_mmsetup_config_0_4 = {
 		sizeof(judeControl_t),
@@ -1472,7 +1472,7 @@ judeControl_t ctl_mmsetup_config_0_4 = {
 		NEARTOFARPTRREC(str_mmsetup_config_4),
 		0,
 		0x0,
-		'3'};
+		KEY_OF_MODKEY(KEY_M65_SYS_3)};
 
 karlFarPtr_t mod_mmsetup_app_units[] = {
 		NEARTOFARPTRREC(&uni_mmsetup_ui)};
@@ -1686,7 +1686,7 @@ judeControl_t ctl_mmsetup_select_0_2 = {
 		NEARTOFARPTRREC(str_mmsetup_select_2),
 		0,
 		0x6,
-		'R'};
+		KEY_OF_MODKEY(KEY_M65_SYS_R)};
 
 judeControl_t ctl_mmsetup_select_0_3 = {
 		sizeof(judeControl_t),
@@ -1710,7 +1710,7 @@ judeControl_t ctl_mmsetup_select_0_3 = {
 		NEARTOFARPTRREC(str_mmsetup_select_3),
 		0,
 		0x9,
-		'N'};
+		KEY_OF_MODKEY(KEY_M65_SYS_N)};
 
 judeControl_t ctl_mmsetup_select_0_4 = {
 		sizeof(judeControl_t),
@@ -1734,7 +1734,7 @@ judeControl_t ctl_mmsetup_select_0_4 = {
 		NEARTOFARPTRREC(str_mmsetup_select_4),
 		0,
 		0x9,
-		'A'};
+		KEY_OF_MODKEY(KEY_M65_SYS_A)};
 
 
 judeListBox_t lbx_mmsetup_select_0_5 = {
@@ -1847,7 +1847,7 @@ judeControl_t ctl_mmsetup_select_1_1 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_1),
 		0,
 		0xff,
-		KEY_M65_ESC};
+		KEY_OF_MODKEY(KEY_M65_SYS_ESC)};
 
 
 judePage_t pge_mmsetup_process = {
@@ -2281,7 +2281,7 @@ judeControl_t ctl_mmsetup_proc_1_0 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_4),
 		0,
 		0x1,
-		'D'};
+		KEY_OF_MODKEY(KEY_M65_SYS_D)};
 
 judeControl_t ctl_mmsetup_proc_1_1 = {
 		sizeof(judeControl_t),
@@ -2305,7 +2305,7 @@ judeControl_t ctl_mmsetup_proc_1_1 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_5),
 		0,
 		0x1,
-		'C'};
+		KEY_OF_MODKEY(KEY_M65_SYS_C)};
 
 judeControl_t ctl_mmsetup_proc_1_2 = {
 		sizeof(judeControl_t),
@@ -2329,7 +2329,7 @@ judeControl_t ctl_mmsetup_proc_1_2 = {
 		NEARTOFARPTRREC(str_mmsetup_buttons_1),
 		0,
 		0xff,
-		KEY_M65_ESC};
+		KEY_OF_MODKEY(KEY_M65_SYS_ESC)};
 
 
 karlFarPtr_t pnl_mmsetup_proc_1_controls[] = {
