@@ -11,12 +11,19 @@
 
 #define NUM_SOUND_SLOTS 6
 
+#define NUM_RES_SLOTS 9
+
 // zdata variables
 #pragma clang section bss="zdata"
 uint8_t sound_triggers[NUM_SOUND_SLOTS];
 
 // sound_sid data/cdata/bss variables
 #pragma clang section data="data_sound_sid" rodata="cdata_sound_sid" bss="bss_sound_sid"
+
+struct {
+  uint8_t id[NUM_RES_SLOTS];
+  uint8_t page[NUM_RES_SLOTS];
+} res_data;
 
 static const uint8_t BITMASK[7] = {
   0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40
@@ -86,7 +93,6 @@ uint8_t chanBuffer[3][45] = {
 int8_t resID_song;
 uint8_t res_page_music;
 uint8_t act_res_page_music;
-uint8_t res_page_sfx;
 
 // statusBits1A/1B are always equal
 uint8_t statusBits1A;
@@ -244,10 +250,10 @@ void read_song_chunk(uint8_t channel); // $4a6b
 void set_sid_freq_as(uint8_t channel); // $4be6
 void set_sid_wave_ctrl_reg(uint8_t channel); // $4C0D
 int8_t setup_song_ptr(uint8_t channel); // $4C1C
-//void unlockResource(int8_t chanResIndex); // $4CDA
+void unlock_resource(int8_t chanResIndex); // $4CDA
 void count_free_channels(); // $4f26
 void func_4F45(uint8_t channel); // $4F45
-//void safeUnlockResource(int8_t resIndex); // $4FEA
+void safe_unlock_resource(int8_t resIndex); // $4FEA
 void release_resource(int8_t resIndex, uint8_t flags); // $5031
 void release_res_channels(int8_t resIndex); // $5070
 void release_resource_unk(int8_t resIndex); // $50A4
@@ -393,7 +399,6 @@ void c64_stop_all_sounds()
 {
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
-
   //Common::StackLock lock(_mutex);
   reset_player_state();
 }
@@ -414,9 +419,6 @@ uint8_t c64_sound_is_playing(uint8_t sound_id)
 
 void c64_sound_update() // $481B
 {
-  //SAVE_CS_AUTO_RESTORE
-  //MAP_CS_SOUND
-
   if (initializing)
     return;
 
@@ -430,8 +432,9 @@ void c64_sound_update() // $481B
   }
 
   // no sound
-  if (busyChannelBits == 0)
+  if (busyChannelBits == 0) {
     return;
+  }
 
   for (int8_t i = 6; i >= 0; --i) {
     if (busyChannelBits & BITMASK[i]) {
@@ -639,10 +642,10 @@ void func_3674(uint8_t channel) // $3674
   if (statusBits1B == 0) {
     isMusicPlaying = 0;
     //unlockCodeLocation();
-    //safeUnlockResource(resID_song);
-    //for (int i = 0; i < 3; ++i) {
-      //safeUnlockResource(RES_ID_CHANNEL[i]);
-    //}
+    safe_unlock_resource(resID_song);
+    for (int i = 0; i < 3; ++i) {
+      safe_unlock_resource(RES_ID_CHANNEL[i]);
+    }
   }
 
   chanPrio[channel] = 2;
@@ -964,12 +967,19 @@ int8_t setup_song_ptr(uint8_t channel) // $4C1C
   }
 }
 
-// ignore: no effect
 // chanResIndex: 3,4,5 or 58
-/*void unlockResource(int8_t chanResIndex) { // $4CDA
-  if ((resStatus[chanResIndex] & 0x7F) != 0)
-    --resStatus[chanResIndex];
-}*/
+void unlock_resource(int8_t chanResIndex) // $4CDA
+{
+  if (chanResIndex > 5) {
+    res_deactivate(RES_TYPE_C64SOUND, chanResIndex, 0);
+
+    for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+      if (res_data.id[i] == (uint8_t)chanResIndex) {
+        res_data.id[i] = 0;
+      }
+    }
+  }
+}
 
 void count_free_channels() // $4f26
 {
@@ -1006,7 +1016,7 @@ void func_4F45(uint8_t channel) // $4F45
       waveCtrlReg[channel] |= 0x01;
       set_sid_wave_ctrl_reg(channel);
 
-      //safeUnlockResource(channelMap[channel]);
+      safe_unlock_resource(channelMap[channel]);
       return;
     }
 
@@ -1020,21 +1030,24 @@ void func_4F45(uint8_t channel) // $4F45
   
   //debug_out("s4f45 %d %d", channel, resIndex);
   
-  //safeUnlockResource(resIndex);
+  safe_unlock_resource(resIndex);
 }
 
 // chanResIndex: 3,4,5 or 58
-/*void safeUnlockResource(int8_t resIndex) { // $4FEA
-  if (!isMusicPlaying) {
-    unlockResource(resIndex);
+void safe_unlock_resource(int8_t resIndex) // $4FEA
+{
+  if (!isMusicPlaying && resIndex > 5) {
+    unlock_resource(resIndex);
   }
-}*/
+}
 
 void release_resource(int8_t resIndex, uint8_t flags) // $5031
 {
   release_res_channels(resIndex);
   if (resIndex == bgSoundResID && var481A == -1) {
-    //safeUnlockResource(resIndex);
+    if (flags) {
+      safe_unlock_resource(resIndex);
+    }
 
     bgSoundResID = 0;
     bgSoundActive = 0;
@@ -1044,10 +1057,6 @@ void release_resource(int8_t resIndex, uint8_t flags) // $5031
     reset_swap_vars();
   }
 
-  if (flags) {
-    res_unlock(RES_TYPE_C64SOUND, resIndex, 0);
-    res_deactivate(RES_TYPE_C64SOUND, resIndex, 0);
-  }
 }
 
 void release_res_channels(int8_t resIndex) // $5070
@@ -1075,9 +1084,9 @@ void stop_music_intern() // $4CAA
   statusBits1B = 0;
   isMusicPlaying = 0;
 
-  //if (resID_song != 0) {
-    //unlockResource(resID_song);
-  //}
+  if (resID_song != 0) {
+    unlock_resource(resID_song);
+  }
 
   chanPrio[0] = 2;
   chanPrio[1] = 2;
@@ -1418,8 +1427,6 @@ void read_vec6_data(int8_t x, int8_t *offset, int8_t chanResID) // $4E99
 
 int8_t init_sound(int8_t soundResID, uint8_t res_page) // $4D0A
 {
-  res_page_sfx = res_page;
-
   initializing = 1;
 
   if (isMusicPlaying && (statusBits1A & 0x07) == 0x07) {
@@ -1527,8 +1534,6 @@ int8_t init_sound(int8_t soundResID, uint8_t res_page) // $4D0A
 
 uint8_t *get_resource(int8_t resID) 
 {
-  //switch (resID) {
-  //case 0:
   if (resID == 0) {
     return NULL;
   }
@@ -1540,23 +1545,20 @@ uint8_t *get_resource(int8_t resID)
     return   (uint8_t *)chanBuffer[resID-3];
   }
   else {
-  //default: {
-//    return vm_getResourceAddress(rtSound, resID);
-      //uint8_t res_page = res_provide(RES_TYPE_C64SOUND, (uint8_t)resID, 0);
-      //res_activate_slot(res_page);
-      //res_lock(RES_TYPE_C64SOUND, (uint8_t)resID, 0);
-      //map_ds_resource(res_page_sfx);
-      __asm(" lda #0x40\n"
-            " ldx #0x21\n"
-            " ldz #0x31\n"
-            " map\n"
-            " eom\n"
-            :
-            : "Ky" (res_page_sfx)
-            : "a", "x", "y", "z");
-      return NEAR_U8_PTR(RES_MAPPED);
-    //}
-  //}
+    for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+      if (res_data.id[i] == (uint8_t)resID) {
+        __asm(" lda #0x40\n"
+              " ldx #0x21\n"
+              " ldz #0x31\n"
+              " map\n"
+              " eom\n"
+              :
+              : "Ky" (res_data.page[i])
+              : "a", "x", "y", "z");
+        return NEAR_U8_PTR(RES_MAPPED);
+      }
+    }
+    return NULL;
   }
 }
 
@@ -1590,8 +1592,26 @@ void sid_write(uint8_t reg, uint8_t data)
 
 void start_sound(int8_t nr) 
 {
-  uint8_t res_page = res_provide(RES_TYPE_C64SOUND, nr, 0);
-  res_activate_slot(res_page);
+  uint8_t res_page;
+  uint8_t i;
+  for (i = 0; i < NUM_RES_SLOTS; ++i) {
+    if (res_data.id[i] == nr) {
+      res_page = res_data.page[i];
+      break;
+    }
+  }
+
+  if (i == NUM_RES_SLOTS) {
+    res_page = res_provide(RES_TYPE_C64SOUND, nr, 0);
+    res_activate_slot(res_page);
+    for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+      if (res_data.id[i] == 0) {
+        res_data.id[i] = (uint8_t)nr;
+        res_data.page[i] = res_page;  
+        break;      
+      }
+    }
+  }
   //map_ds_resource(res_page);
   __asm(" lda #0x40\n"
         " ldx #0x21\n"
