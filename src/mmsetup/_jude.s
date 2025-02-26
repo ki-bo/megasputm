@@ -4269,7 +4269,7 @@ start$:
 ;	Is the VIC-II needing service?
 		lda	VIC_IRQFLGS
 		and	#0x01
-		bne	proc$
+		bne	vicirq$
 
 ;	Some other interrupt source
     lda 0xd080
@@ -4277,7 +4277,6 @@ start$:
     beq nextirq0$
 
 		jsr	karlPanic
-    
 
 nextirq0$:
     lda 0xdc0d
@@ -4287,12 +4286,13 @@ nextirq0$:
     jsr karlPanic
 
 nextirq1$:
+    bra proc$
 
-proc$:
-
+vicirq$:
 ; Seem to need to reguardless
 		asl VIC_IRQFLGS
 
+proc$:
 		MvDWMem	zp:zptrtemp1, zp:zptrself
 
 		jsr	_judeUserIRQHandler
