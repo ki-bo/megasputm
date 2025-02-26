@@ -274,7 +274,7 @@ __task void vm_mainloop(void)
       UNMAP_ALL
       MAP_CS_SOUND
       //sound_reset();
-      c64_stopAllSounds();
+      c64_stop_all_sounds();
 
       MAP_CS_GFX
       gfx_fade_out();
@@ -1298,7 +1298,7 @@ uint8_t vm_load_game(uint8_t slot)
 
   MAP_CS_SOUND
   //sound_reset();
-  c64_stopAllSounds();
+  c64_stop_all_sounds();
 
   load_room(vm_read_var8(VAR_SELECTED_ROOM));
 

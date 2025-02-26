@@ -63,7 +63,7 @@ void global_init(void)
 
   // load and init sound module
   MAP_CS_DISKIO
-  diskio_load_file(0, "M13", (uint8_t __far *)(0x16000)); // load sound code
+  diskio_load_file(0, "M14", (uint8_t __far *)(0x16000)); // load sound code
   
   
   //sound_init();

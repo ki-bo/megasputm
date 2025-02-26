@@ -65,4 +65,5 @@ typedef enum {
     ERR_INDEX_LOAD_FAILED = 43,
     ERR_REALHW_ONLY = 44,
     ERR_LANG_NOT_SUPPORTED = 45,
+    ERR_INVALID_SID_RES_ID = 46,
 } error_code_t;

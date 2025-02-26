@@ -1022,7 +1022,7 @@ static void stop_or_break(void)
     //debug_scr("stop-music");
     
     //sound_stop_music();
-    c64_stopAllSounds();
+    c64_stop_all_sounds();
 
   }
   else {
@@ -1055,7 +1055,7 @@ static void start_music(void)
   //debug_msg("Start music");
   uint8_t music_id = resolve_next_param8();
   //sound_play_music(music_id);
-  c64_startSound(music_id);
+  c64_start_sound(music_id);
 }
 
 static void actor_room(void)
@@ -1573,7 +1573,7 @@ static void start_sound(void)
   //debug_scr("start-sound");
   uint8_t sound_id = resolve_next_param8();
   //sound_play(sound_id);
-  c64_startSound(sound_id);
+  c64_start_sound(sound_id);
 }
 
 static void walk_to(void)
@@ -2042,7 +2042,7 @@ static void stop_sound(void)
   uint8_t sound_id = resolve_next_param8();
 
   //sound_stop(sound_id);
-  c64_stopSound(sound_id);
+  c64_stop_sound(sound_id);
 }
 
 static void actor_elevation(void)
