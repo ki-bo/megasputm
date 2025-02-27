@@ -912,12 +912,12 @@ void behaviourBuildInit(void) {
     zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
     karlObjIncludeState(STATE_DIRTY);
   
-    writeToProcOutput("BUILD   WRITE 90.LFL");
+    writeToProcOutput("BUILD   WRITE 54.LFL");
 
     zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
     progressResetMax(file_size);
   
-    prepareLFLFileName(90);
+    prepareLFLFileName(54);
     prepareKernalWrite(lflfilename, 10);
 
     procstate = PROCST_WRITE;
