@@ -378,6 +378,8 @@ void c64_sound_handle_play_triggers(void)
 
   for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
     if (res_data.count[i] == 0 && res_data.id[i] == 0xff) {
+      debug_out("shpt deactive %d", i);
+      
       res_deactivate_slot(res_data.page[i]);
       res_data.id[i] = 0;
     }
@@ -985,6 +987,9 @@ void unlock_resource(int8_t chanResIndex) // $4CDA
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == (uint8_t)chanResIndex) {
         res_data.count[i]--;
+        
+        debug_out("sur dec %d %d", chanResIndex, res_data.count[i]);
+
         if (res_data.count[i] == 0) {
           res_data.id[i] = 0xff; // 0xff = marked as to be deactivated
         };
@@ -1275,6 +1280,9 @@ void lock_resource(int8_t resIndex) { // $4ff4
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == resIndex) {
         res_data.count[i]++;
+
+        debug_out("slr inc %d %d", resIndex, res_data.count[i]);
+
         break;
       }
     }
@@ -1325,7 +1333,7 @@ void init_music(int8_t songResIndex, uint8_t res_page) // $7de6
   //unlockCodeLocation();
   reset_player_state();
 
-  //lockResource(resID_song);
+  lock_resource(resID_song);
   build_step_tbl(*NEAR_U8_PTR(RES_MAPPED + 5));
 
   // fetch sound
@@ -1606,6 +1614,9 @@ void start_sound(int8_t nr)
   for (i = 0; i < NUM_RES_SLOTS; ++i) {
     if (res_data.id[i] == nr) {
       res_data.count[i]++;
+
+      debug_out("sss found %d %d", nr, res_data.count[i]);
+
       res_page = res_data.page[i];
       break;
     }
@@ -1618,7 +1629,10 @@ void start_sound(int8_t nr)
       if (res_data.id[i] == 0) {
         res_data.id[i] = (uint8_t)nr;
         res_data.page[i] = res_page;
-        res_data.count[i] = 1;
+        res_data.count[i] = 0;
+
+        debug_out("sss start %d %d", nr, res_data.count[i]);
+
         break;      
       }
     }
