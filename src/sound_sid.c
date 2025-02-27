@@ -90,6 +90,8 @@ uint8_t chanBuffer[3][45] = {
     }
   };
 
+uint8_t is_irq;
+
 int8_t resID_song;
 uint8_t res_page_music;
 uint8_t act_res_page_music;
@@ -229,6 +231,7 @@ uint8_t *get_resource(int8_t resID);
 void start_sound(int8_t nr);
 void stop_sound(int8_t nr);
 int8_t get_sound_status(int8_t nr);
+void map_sound_res(uint8_t page);
 
 
 void init_music(int8_t songResIndex, uint8_t res_page); // $7de6
@@ -372,6 +375,13 @@ void c64_sound_handle_play_triggers(void)
   SAVE_DS_AUTO_RESTORE
   MAP_CS_SOUND
 
+  for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+    if (res_data.id[i] == 0xff) {
+      res_deactivate_slot(res_data.page[i]);
+      res_data.id[i] = 0;
+    }
+  }
+
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (sound_triggers[i]) {
       start_sound((int8_t)sound_triggers[i]);
@@ -399,6 +409,7 @@ void c64_stop_all_sounds()
 {
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
+  
   //Common::StackLock lock(_mutex);
   reset_player_state();
 }
@@ -422,6 +433,8 @@ void c64_sound_update() // $481B
   if (initializing)
     return;
 
+  is_irq = 1;
+
   if (_soundInQueue) {
     for (int8_t i = 6; i >= 0; --i) {
       if (_soundQueue[i] != -1) {
@@ -433,6 +446,7 @@ void c64_sound_update() // $481B
 
   // no sound
   if (busyChannelBits == 0) {
+    is_irq = 0;
     return;
   }
 
@@ -471,6 +485,8 @@ void c64_sound_update() // $481B
     //}
     handle_music_buffer();
   }
+
+  is_irq = 0;
 
   return;
 }
@@ -612,16 +628,10 @@ void handle_music_buffer() // $33cd
 
 int8_t setup_song_file_data() // $36cb
 {
+  map_sound_res(res_page_music);
+
   // no new song
   songFileOrChanBufData = NEAR_U8_PTR(RES_MAPPED);
-  __asm(" lda #0x40\n"
-        " ldx #0x21\n"
-        " ldz #0x31\n"
-        " map\n"
-        " eom\n"
-        :
-        : "Ky" (res_page_music)
-        : "a", "x", "y", "z");
 
   if (res_page_music == act_res_page_music) {
     return 0;
@@ -971,11 +981,9 @@ int8_t setup_song_ptr(uint8_t channel) // $4C1C
 void unlock_resource(int8_t chanResIndex) // $4CDA
 {
   if (chanResIndex > 5) {
-    res_deactivate(RES_TYPE_C64SOUND, chanResIndex, 0);
-
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == (uint8_t)chanResIndex) {
-        res_data.id[i] = 0;
+        res_data.id[i] = 0xff; // 0xff = marked as to be deactivated
       }
     }
   }
@@ -1547,14 +1555,7 @@ uint8_t *get_resource(int8_t resID)
   else {
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == (uint8_t)resID) {
-        __asm(" lda #0x40\n"
-              " ldx #0x21\n"
-              " ldz #0x31\n"
-              " map\n"
-              " eom\n"
-              :
-              : "Ky" (res_data.page[i])
-              : "a", "x", "y", "z");
+        map_sound_res(res_data.page[i]);
         return NEAR_U8_PTR(RES_MAPPED);
       }
     }
@@ -1612,15 +1613,7 @@ void start_sound(int8_t nr)
       }
     }
   }
-  //map_ds_resource(res_page);
-  __asm(" lda #0x40\n"
-        " ldx #0x21\n"
-        " ldz #0x31\n"
-        " map\n"
-        " eom\n"
-        :
-        : "Ky" (res_page)
-        : "a", "x", "y", "z");
+  map_sound_res(res_page);
 
   // WORKAROUND:
   // sound[4] contains either a song prio or a music channel usage byte.
@@ -1689,6 +1682,24 @@ int8_t get_sound_status(int8_t nr)
 
   return result;
 }
+
+void map_sound_res(uint8_t page)
+{
+  if (is_irq) {
+    __asm(" lda #0x40\n"
+          " ldx #0x21\n"
+          " ldz #0x31\n"
+          " map\n"
+          " eom\n"
+          :
+          : "Ky" (page)
+          : "a", "x", "y", "z");
+  }
+  else {
+    map_ds_resource(page);
+  }
+}
+
 
 //int8_t getMusicTimer() {
   /*int8_t result = _music_timer;
