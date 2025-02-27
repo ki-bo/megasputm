@@ -23,6 +23,7 @@ uint8_t sound_triggers[NUM_SOUND_SLOTS];
 struct {
   uint8_t id[NUM_RES_SLOTS];
   uint8_t page[NUM_RES_SLOTS];
+  uint8_t count[NUM_RES_SLOTS];
 } res_data;
 
 static const uint8_t BITMASK[7] = {
@@ -267,7 +268,7 @@ void swap_vars(uint8_t channel, int8_t swapIndex); // $51a5
 void reset_swap_vars(); // $52d0
 void prepare_swap_vars(uint8_t channel); // $52E5
 void use_swap_vars(uint8_t channel); // $5342
-//void lockResource(int8_t resIndex); // $4ff4
+void lock_resource(int8_t resIndex); // $4ff4
 void reserve_channel(uint8_t channel, uint8_t prioValue, int8_t chanResIndex); // $4ffe
 //void unlockCodeLocation(); // $513e
 //void lockCodeLocation(); // $514f
@@ -376,7 +377,7 @@ void c64_sound_handle_play_triggers(void)
   MAP_CS_SOUND
 
   for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
-    if (res_data.id[i] == 0xff) {
+    if (res_data.count[i] == 0 && res_data.id[i] == 0xff) {
       res_deactivate_slot(res_data.page[i]);
       res_data.id[i] = 0;
     }
@@ -895,8 +896,6 @@ void read_song_chunk(uint8_t channel) // $4a6b
 
     // song position
     if (GETBIT(l_cmdByte, 7)) {
-      chanloop[channel] = 1;
-
       //debug_out("srsc 7.1 %d", channel);
 
       if (songPosUpdateCounter[channel] == 1) {
@@ -904,6 +903,8 @@ void read_song_chunk(uint8_t channel) // $4a6b
         --songPosUpdateCounter[channel];
         save_song_pos(y, channel);
       } else {
+        chanloop[channel] = 1;
+
         // looping / skipping / ...
         ++y;
         songPosPtr[channel] -= (int8_t)ptr1[y];
@@ -983,7 +984,10 @@ void unlock_resource(int8_t chanResIndex) // $4CDA
   if (chanResIndex > 5) {
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == (uint8_t)chanResIndex) {
-        res_data.id[i] = 0xff; // 0xff = marked as to be deactivated
+        res_data.count[i]--;
+        if (res_data.count[i] == 0) {
+          res_data.id[i] = 0xff; // 0xff = marked as to be deactivated
+        };
       }
     }
   }
@@ -1265,10 +1269,17 @@ void use_swap_vars(uint8_t channel) // $5342
 
 // ignore: no effect
 // resIndex: 3,4,5 or 58
-/*void lockResource(int8_t resIndex) { // $4ff4
-  if (!isMusicPlaying)
-    ++resStatus[resIndex];
-}*/
+void lock_resource(int8_t resIndex) { // $4ff4
+  if (!isMusicPlaying && resIndex > 5) {
+    //++resStatus[resIndex];
+    for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+      if (res_data.id[i] == resIndex) {
+        res_data.count[i]++;
+        break;
+      }
+    }
+  }
+}
 
 void reserve_channel(uint8_t channel, uint8_t prioValue, int8_t chanResIndex) // $4ffe
 {
@@ -1280,7 +1291,8 @@ void reserve_channel(uint8_t channel, uint8_t prioValue, int8_t chanResIndex) //
   }
 
   chanPrio[channel] = prioValue;
-  //lockResource(chanResIndex);
+
+  lock_resource(chanResIndex);
 }
 
 // ignore: no effect
@@ -1597,6 +1609,7 @@ void start_sound(int8_t nr)
   uint8_t i;
   for (i = 0; i < NUM_RES_SLOTS; ++i) {
     if (res_data.id[i] == nr) {
+      res_data.count[i]++;
       res_page = res_data.page[i];
       break;
     }
@@ -1608,7 +1621,8 @@ void start_sound(int8_t nr)
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == 0) {
         res_data.id[i] = (uint8_t)nr;
-        res_data.page[i] = res_page;  
+        res_data.page[i] = res_page;
+        res_data.count[i] = 1;
         break;      
       }
     }
