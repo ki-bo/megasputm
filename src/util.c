@@ -29,10 +29,9 @@ char msg[80];
 extern inline uint16_t make16(uint8_t low, uint8_t high);
 extern inline int16_t i16_div_by_8(int16_t x);
 
-void fatal_error(error_code_t error)
+void fatal_error_int(uint8_t error)
 {
   debug_out("Fatal error: %d", error);
-  //POKE(0xd020, 5);
   MAP_CS_DISKIO
   while (1) {
     diskio_check_motor_off(1);

@@ -90,8 +90,12 @@
     _a < _b ? _a : _b;       \
 })
 
-void fatal_error(error_code_t error);
-void fatal_error_str(const char *message);
+#define fatal_error(err) \
+  __asm(" .extern fatal_error_int\n" \
+        " jmp fatal_error_int\n" \
+        : \
+        : "Ka"((uint8_t)err) \
+        : "a");
 
 uint8_t abs8(int8_t x);
 

@@ -23,7 +23,7 @@
 #include "error.h"
 #include "map.h"
 #include "memory.h"
-//#include "sound.h"
+#include "sound_mod.h"
 #include "vm.h"
 #include <stdint.h>
 #include <string.h>
@@ -47,6 +47,7 @@ enum heap_strategy_t {
 uint8_t page_res_type[256];
 uint8_t page_res_index[256];
 uint8_t music_res_loaded = 0;
+uint8_t sound_resource_type;
 
 //-----------------------------------------------------------------------------------------------
 
@@ -122,7 +123,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
 {
   SAVE_CS_AUTO_RESTORE
   
-  /*if (type == RES_TYPE_SOUND) {
+  if (type == RES_TYPE_SOUND_MOD) {
     // we don't load sounds 6 and 63 as those are never used
     if (id == 6 || id == 63) {
       return 0;
@@ -132,9 +133,8 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
       res_provide_music(id);
       return 0;
     }
-  }*/
-
-  if (type == RES_TYPE_SOUND_SID) {
+  }
+  else if (type == RES_TYPE_SOUND_SID) {
     if (id < 6) {
       return 0;
     }
@@ -180,17 +180,17 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
   return allocated_page;
 }
 
-/*void res_provide_music(uint8_t id)
+void res_provide_music(uint8_t id)
 {
   if (music_res_loaded == id) {
     return;
   }
   SAVE_CS_AUTO_RESTORE
   MAP_CS_DISKIO
-  uint16_t chunk_size = diskio_start_resource_loading(RES_TYPE_SOUND, id);
+  uint16_t chunk_size = diskio_start_resource_loading(RES_TYPE_SOUND_MOD, id);
   diskio_continue_resource_loading(HUGE_U8_PTR(MUSIC_DATA));
   music_res_loaded = id;
-}*/
+}
 
 /**
   * @brief Deactivates all resources in memory

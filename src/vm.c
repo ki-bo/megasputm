@@ -30,7 +30,7 @@
 #include "memory.h"
 #include "resource.h"
 #include "script.h"
-//#include "sound.h"
+#include "sound_mod.h"
 #include "sound_sid.h"
 #include "ui_strings.h"
 #include "util.h"
@@ -107,6 +107,8 @@ uint8_t sentence_length;
 
 uint8_t inventory_pos;
 uint8_t last_selected_actor;
+
+uint8_t use_sid_sounds;
 
 static const uint8_t savegame_magic[] = {'M', '6', '5', 'M', 'C', 'M', 'N'};
 static char savegame_file[] = "MM.SAV.0";
@@ -273,8 +275,12 @@ __task void vm_mainloop(void)
       reset_game = 0;
       UNMAP_ALL
       MAP_CS_SOUND
-      //sound_reset();
-      c64_stop_all_sounds();
+      if (use_sid_sounds) {
+        c64_stop_all_sounds();
+      }
+      else {
+        sound_reset();
+      }
 
       MAP_CS_GFX
       gfx_fade_out();
@@ -283,6 +289,7 @@ __task void vm_mainloop(void)
       gfx_reset_palettes();
       MAP_CS_DISKIO
       diskio_load_game_objects();
+      MAP_CS_MAIN_PRIV
       reset_game_state();
       UNMAP_CS
 
@@ -308,12 +315,10 @@ __task void vm_mainloop(void)
     MAP_CS_DISKIO
     diskio_check_motor_off(elapsed_jiffies);
     
-
-    
-    //MAP_CS_SOUND
-    //sound_stop_finished_slots();
-    
-    
+    if (!use_sid_sounds) {
+      MAP_CS_SOUND
+      sound_stop_finished_slots();
+    }
     
     UNMAP_CS
 
@@ -369,10 +374,12 @@ __task void vm_mainloop(void)
     update_camera();
     UNMAP_CS
 
-
-    //sound_handle_play_triggers();
-    c64_sound_handle_play_triggers();
-
+    if (use_sid_sounds) {
+      c64_sound_handle_play_triggers();
+    }
+    else {
+      sound_handle_play_triggers();
+    }
 
     if (last_selected_actor != vm_read_var8(VAR_SELECTED_ACTOR)) {
       if (last_selected_actor != 0xff) { // makes sure inventory pos is kept when loading a savegame
@@ -1229,7 +1236,9 @@ uint8_t vm_load_game(uint8_t slot)
     return 1;
   }
 
+  MAP_CS_MAIN_PRIV
   reset_game_state();
+  MAP_CS_DISKIO
 
   // read data from disk
   diskio_read((uint8_t *)&vm_state, sizeof(vm_state));
@@ -1297,8 +1306,12 @@ uint8_t vm_load_game(uint8_t slot)
   res_free_heap(heap_slot);
 
   MAP_CS_SOUND
-  //sound_reset();
-  c64_stop_all_sounds();
+  if (use_sid_sounds) {
+    c64_stop_all_sounds();
+  }
+  else {
+    sound_reset();
+  }
 
   load_room(vm_read_var8(VAR_SELECTED_ROOM));
 
@@ -1356,66 +1369,6 @@ void vm_handle_error_wrong_disk(uint8_t expected_disk)
   */
 
 #pragma clang section text="code_main" rodata="cdata_main" data="data_main" bss="zdata"
-static void reset_game_state(void)
-{
-  for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
-    vm_state.proc_state[i]               = PROC_STATE_FREE;
-    vm_state.proc_script_or_object_id[i] = 0xff;
-    vm_state.proc_parent[i]              = 0xff;
-    vm_state.proc_wait_timer[i]          = 0;
-  }
-
-  UNMAP_DS
-  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
-    vm_state.verbs.id[i] = 0xff;
-    free(vm_state.verbs.name[i]);
-  }
-  memset(&vm_state.verbs.name, 0, sizeof(vm_state.verbs.name));
-  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
-    free(vm_state.inv_objects[i]);
-  }
-  memset(&vm_state.inv_objects, 0, sizeof(vm_state.inv_objects));
-  res_deactivate_and_unlock_all();
-
-  uint8_t var_idx = 0;
-  do {
-    vm_write_var(var_idx, 0);
-  }
-  while (++var_idx != 0);
-
-  vm_state.num_actor_palettes = 1;
-  memset(&actors, 0, sizeof(actors));
-  for (uint8_t i = 0; i < NUM_ACTORS; ++i) {
-    actors.local_id[i]    = 0xff;
-    actors.palette_idx[i] = 1; // default actor palette is index 1
-    if (i < MAX_LOCAL_ACTORS) {
-      local_actors.global_id[i] = 0xff;
-    }
-  }
-
-  vm_state.inv_num_objects   = 0;
-  vm_state.flashlight_width  = 6;
-  vm_state.flashlight_height = 4;
-
-  active_script_slot         = 0xff;
-  camera_x                   = 20;
-  camera_state               = 0;
-  camera_follow_actor_id     = 0xff;
-  actor_talking              = 0xff;
-  // this ensures that inventory_pos won't get reset to 0
-  // (which should not happen when loading a savegame)
-  last_selected_actor        = 0xff;
-  vm_state.message_speed     = 6;
-  message_timer              = 0;
-  message_ptr                = NULL;
-  print_message_ptr          = NULL;
-  prev_verb_highlighted      = 0xff;
-  prev_inventory_highlighted = 0xff;
-
-  ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
-  vm_write_var(VAR_CURSOR_STATE, 3);
-}
-
 static void set_proc_state(uint8_t slot, uint8_t state)
 {
   vm_state.proc_state[slot] &= ~0x07; // clear state without changing flags
@@ -2281,6 +2234,66 @@ static void show_helpscreen(void)
 /// @} // vm_private
 
 #pragma clang section text="code_main_private"
+static void reset_game_state(void)
+{
+  for (uint8_t i = 0; i < NUM_SCRIPT_SLOTS; ++i) {
+    vm_state.proc_state[i]               = PROC_STATE_FREE;
+    vm_state.proc_script_or_object_id[i] = 0xff;
+    vm_state.proc_parent[i]              = 0xff;
+    vm_state.proc_wait_timer[i]          = 0;
+  }
+
+  UNMAP_DS
+  for (uint8_t i = 0; i < MAX_VERBS; ++i) {
+    vm_state.verbs.id[i] = 0xff;
+    free(vm_state.verbs.name[i]);
+  }
+  memset(&vm_state.verbs.name, 0, sizeof(vm_state.verbs.name));
+  for (uint8_t i = 0; i < MAX_INVENTORY; ++i) {
+    free(vm_state.inv_objects[i]);
+  }
+  memset(&vm_state.inv_objects, 0, sizeof(vm_state.inv_objects));
+  res_deactivate_and_unlock_all();
+
+  uint8_t var_idx = 0;
+  do {
+    vm_write_var(var_idx, 0);
+  }
+  while (++var_idx != 0);
+
+  vm_state.num_actor_palettes = 1;
+  memset(&actors, 0, sizeof(actors));
+  for (uint8_t i = 0; i < NUM_ACTORS; ++i) {
+    actors.local_id[i]    = 0xff;
+    actors.palette_idx[i] = 1; // default actor palette is index 1
+    if (i < MAX_LOCAL_ACTORS) {
+      local_actors.global_id[i] = 0xff;
+    }
+  }
+
+  vm_state.inv_num_objects   = 0;
+  vm_state.flashlight_width  = 6;
+  vm_state.flashlight_height = 4;
+
+  active_script_slot         = 0xff;
+  camera_x                   = 20;
+  camera_state               = 0;
+  camera_follow_actor_id     = 0xff;
+  actor_talking              = 0xff;
+  // this ensures that inventory_pos won't get reset to 0
+  // (which should not happen when loading a savegame)
+  last_selected_actor        = 0xff;
+  vm_state.message_speed     = 6;
+  message_timer              = 0;
+  message_ptr                = NULL;
+  print_message_ptr          = NULL;
+  prev_verb_highlighted      = 0xff;
+  prev_inventory_highlighted = 0xff;
+
+  ui_state = UI_FLAGS_ENABLE_CURSOR | UI_FLAGS_ENABLE_INVENTORY | UI_FLAGS_ENABLE_SENTENCE | UI_FLAGS_ENABLE_VERBS;
+  vm_write_var(VAR_CURSOR_STATE, 3);
+}
+
 /**
   * @brief Removes all orphan entries from slot table
   *
@@ -2298,7 +2311,6 @@ static void cleanup_slot_table()
     if (slot != 0xff) {
       if (vm_state.proc_parent[slot] != 0xff) {
         // in theory, all slots in the table should be without any parent
-        VICIV.bordercol = 1;
         fatal_error(ERR_SLOT_WITH_PARENT_IN_SLOT_TABLE);
       }
       if (write_ptr != read_ptr) {

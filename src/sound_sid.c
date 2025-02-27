@@ -1554,12 +1554,8 @@ int8_t init_sound(int8_t soundResID, uint8_t res_page) // $4D0A
 
 uint8_t *get_resource(int8_t resID) 
 {
-  if (resID == 0) {
-    return NULL;
-  }
-  else if (resID > 0 && resID < 3) {
+  if (resID > 0 && resID < 3) {
     fatal_error(ERR_INVALID_SID_RES_ID);
-    return NULL;
   }
   else if (resID > 2 && resID < 6) {
     return   (uint8_t *)chanBuffer[resID-3];
@@ -1571,8 +1567,8 @@ uint8_t *get_resource(int8_t resID)
         return NEAR_U8_PTR(RES_MAPPED);
       }
     }
-    return NULL;
   }
+  return NULL;
 }
 
 //int readBuffer(int16_t *buffer, const int numSamples) {

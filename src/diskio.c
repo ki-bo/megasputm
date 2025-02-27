@@ -301,6 +301,7 @@ uint8_t diskio_load_index(void)
 
   // Room 54 is a special file containing both the index for the sid sounds at the beginning and resources after that.
   // The index format is just a list of 16-bit offsets to the sid sounds within the file.
+  use_sid_sounds = 0;
   next_track = room_track_list[ROOM_SID_SOUNDS];
   next_block = room_block_list[ROOM_SID_SOUNDS];
   num_bytes_expected = 70 * 2;
@@ -308,6 +309,7 @@ uint8_t diskio_load_index(void)
   uint16_t offset = 0;
 
   if (next_track != 0) {
+    use_sid_sounds = 1;
     load_block(0, next_track, next_block);
     next_track = FDC.data;
     next_block = FDC.data;
@@ -348,13 +350,12 @@ uint8_t diskio_load_index(void)
         }
       }
     }
-  }
 
-  if (num_bytes_expected != 0) {
-    release_drive();
-    return 0;
+    if (num_bytes_expected != 0) {
+      release_drive();
+      return 0;
+    }
   }
-
 
   uint16_t  index_chks = 0;
   uint16_t  num_words  = sizeof(lfl_index_file_contents) >> 1;
@@ -391,6 +392,10 @@ uint8_t diskio_load_index(void)
   for (uint8_t i = 0; i < sizeof(lfl_index.sound_mod_room); ++i) {
     lfl_index.sound_mod_room[i] = lfl_index_file_contents.sound_room[i];
     lfl_index.sound_mod_offset[i] = lfl_index_file_contents.sound_offset[i];
+  }
+
+  if (use_sid_sounds) {
+    lfl_index.room_disk_num[ROOM_SID_SOUNDS] = 0;
   }
 
   release_drive();
@@ -1235,6 +1240,10 @@ static uint8_t read_lfl_file_entry(uint8_t disk_num)
     return i;
   }
   room_number += tmp - 0x30;
+  if (room_number > 54) {
+    // room number out of range
+    return i;
+  }
   
   const char *file_suffix = ".LFL\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0";
   for (uint8_t j = 0; j < 14; ++j) {

@@ -35,6 +35,8 @@ enum res_type_flags_t {
   RES_ACTIVE_MASK = 0x40
 };
 
+extern uint8_t sound_resource_type;
+
 // code_init functions
 void res_init(void);
 

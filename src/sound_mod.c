@@ -40,7 +40,7 @@
 #define NUM_SOUND_SLOTS 4
 #define NUM_MUSIC       2
 
-#pragma clang section data="data_sound_mod" rodata="cdata_sound_mod" bss="zdata"
+#pragma clang section data="data_sound_mod" rodata="cdata_sound_mod" bss="bss_sound_mod"
 
 enum
 {
@@ -237,8 +237,8 @@ struct sound_slot {
   };
 } sound_slots[NUM_SOUND_SLOTS];
 
-uint8_t channel_use[4] = {0xff, 0xff, 0xff, 0xff};
-uint8_t sound_triggers[NUM_SOUND_SLOTS];
+static uint8_t channel_use[4] = {0xff, 0xff, 0xff, 0xff};
+static uint8_t sound_triggers[NUM_SOUND_SLOTS];
 struct sound_params sounds[70] = {
   // [6]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x007f), .vol = 0x32, .loop = 0}}, // footsteps human actors
   [7]  = {.type = SOUND_TYPE_SAMPLE, .sample = {.timer = DMA_TIMER(0x0258), .vol = 0x32, .loop = 0}},
@@ -373,6 +373,8 @@ void sound_init(void)
 #pragma clang section text="code_main" data="data_main" rodata="cdata_main" bss="zdata"
 void sound_play(uint8_t sound_id)
 {
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_SOUND
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (!sound_triggers[i]) {
       sound_triggers[i] = sound_id;

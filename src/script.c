@@ -26,7 +26,7 @@
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
-//#include "sound.h"
+#include "sound_mod.h"
 #include "sound_sid.h"
 #include "util.h"
 #include "vm.h"
@@ -1021,8 +1021,12 @@ static void stop_or_break(void)
   else if (opcode == 0x20){
     //debug_scr("stop-music");
     
-    //sound_stop_music();
-    c64_stop_all_sounds();
+    if (use_sid_sounds) {
+      c64_stop_all_sounds();
+    }
+    else {
+      sound_stop_music();
+    }  
 
   }
   else {
@@ -1054,8 +1058,12 @@ static void start_music(void)
 {
   //debug_msg("Start music");
   uint8_t music_id = resolve_next_param8();
-  //sound_play_music(music_id);
-  c64_start_sound(music_id);
+  if (use_sid_sounds) {
+    c64_start_sound(music_id);
+  }
+  else {
+    sound_play_music(music_id);
+  }
 }
 
 static void actor_room(void)
@@ -1283,24 +1291,15 @@ static void resource_cmd(void)
       break;
     case 0x61:
       //debug_scr("load-sound %d", resource_id);
-      
-      //res_provide(RES_TYPE_SOUND, resource_id, 0);
-      res_provide(RES_TYPE_SOUND_SID, resource_id, 0);
-      
+      res_provide(sound_resource_type, resource_id, 0);
       break;
     case 0x62:
       //debug_scr("unlock-sound %d", resource_id);
-
-      //res_unlock(RES_TYPE_SOUND, resource_id, 0);
-      res_unlock(RES_TYPE_SOUND_SID, resource_id, 0);
-      
+      res_unlock(sound_resource_type, resource_id, 0);
       break;
     case 0x63:
       //debug_scr("lock-sound %d", resource_id);
-
-      //res_lock(RES_TYPE_SOUND, resource_id, 0);
-      res_lock(RES_TYPE_SOUND_SID, resource_id, 0);
-      
+      res_lock(sound_resource_type, resource_id, 0);
       break;
     default:
       //debug_out("unknown sub-opcode %x", sub_opcode);
@@ -1572,8 +1571,12 @@ static void start_sound(void)
 {
   //debug_scr("start-sound");
   uint8_t sound_id = resolve_next_param8();
-  //sound_play(sound_id);
-  c64_start_sound(sound_id);
+  if (use_sid_sounds) {
+    c64_start_sound(sound_id);
+  }
+  else {
+    sound_play(sound_id);
+  }
 }
 
 static void walk_to(void)
@@ -2041,8 +2044,12 @@ static void stop_sound(void)
   //debug_msg("Stop sound");
   uint8_t sound_id = resolve_next_param8();
 
-  //sound_stop(sound_id);
-  c64_stop_sound(sound_id);
+  if (use_sid_sounds) {
+    c64_stop_sound(sound_id);
+  }
+  else {
+    sound_stop(sound_id);
+  }
 }
 
 static void actor_elevation(void)
@@ -2611,8 +2618,12 @@ static void sound_running(void)
 {
   uint8_t var_idx = read_byte();
   uint8_t sound_id = resolve_next_param8();
-  //vm_write_var(var_idx, sound_is_playing(sound_id));
-  vm_write_var(var_idx, c64_sound_is_playing(sound_id));
+  if (use_sid_sounds) {
+    vm_write_var(var_idx, c64_sound_is_playing(sound_id));
+  }
+  else {
+    vm_write_var(var_idx, sound_is_playing(sound_id));
+  }
 }
 
 /**

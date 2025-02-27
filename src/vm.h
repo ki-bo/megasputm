@@ -229,6 +229,7 @@ extern uint16_t         obj_id[MAX_OBJECTS];
 extern uint8_t          ntsc;
 extern uint8_t          inventory_pos;
 extern uint8_t          last_selected_actor;
+extern uint8_t          use_sid_sounds;
 
 struct sentence_stack_t {
   uint8_t  num_entries;

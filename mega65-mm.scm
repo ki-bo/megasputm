@@ -209,11 +209,19 @@
         ;;;; **** BANKED MEMORY sound ****
 
         ; memory in bank 0 for mapping mod sound module
-        (memory banked-code-4 (address (#x2000 . #x3fff)) 
+        (memory banked-code-4 (address (#x2000 . #x3dff)) 
                 (scatter-to bank1_6000_mod)
                 (section
                         code_sound_mod
                         cdata_sound_mod
+                )
+        )
+
+        ; memory in bank 0 for mapping mod sound bss section
+        (memory banked-bss-4 (address (#x3e00 . #x3fff)) 
+                (scatter-to bank1_7e00_mod)
+                (section
+                        bss_sound_mod
                 )
         )
 
@@ -228,7 +236,7 @@
         )
 
         ; memory in bank 0 for mapping sid sound bss section
-        (memory banked-bss-4 (address (#x3e00 . #x3fff)) 
+        (memory banked-bss-5 (address (#x3e00 . #x3fff)) 
                 (scatter-to bank1_7e00_sid)
                 (section
                         bss_sound_sid
@@ -276,6 +284,7 @@
         (memory m1-3 (address (#x16000 . #x17fff))
                 (section 
                         (bank1_6000_mod #x16000)
+                        (bank1_7e00_mod #x17e00)
                 )
         )
 
