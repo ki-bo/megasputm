@@ -17,9 +17,8 @@
  *
  */
 
-#if 0
 
-#include "sound.h"
+#include "sound_mod.h"
 #include "dma.h"
 #include "index.h"
 #include "io.h"
@@ -41,7 +40,7 @@
 #define NUM_SOUND_SLOTS 4
 #define NUM_MUSIC       2
 
-#pragma clang section data="data_sound" rodata="cdata_sound" bss="zdata"
+#pragma clang section data="data_sound_mod" rodata="cdata_sound_mod" bss="zdata"
 
 enum
 {
@@ -378,7 +377,7 @@ void sound_play(uint8_t sound_id)
     if (!sound_triggers[i]) {
       sound_triggers[i] = sound_id;
       // we do a first res_provide() for each sound to avoid loading latency in sound_handle_play_triggers() later
-      res_provide(RES_TYPE_SOUND, sound_id, 0);
+      res_provide(RES_TYPE_SOUND_MOD, sound_id, 0);
       return;
     }
   }
@@ -429,7 +428,7 @@ void sound_handle_play_triggers(void)
   }
 }
 
-#pragma clang section text="code_sound" data="data_sound" rodata="cdata_sound" bss="bss_sound"
+#pragma clang section text="code_sound_mod" data="data_sound_mod" rodata="cdata_sound_mod" bss="bss_sound_mod"
 void sound_reset(void)
 {
   __auto_type slot = sound_slots;
@@ -477,7 +476,7 @@ void sound_process(void)
   * @defgroup sound_private Sound Private Functions
   * @{
   */
-#pragma clang section text="code_sound" data="data_sound" rodata="cdata_sound" bss="bss_sound"
+#pragma clang section text="code_sound_mod" data="data_sound_mod" rodata="cdata_sound_mod" bss="bss_sound_mod"
 static void play(uint8_t sound_id)
 {
   // debug_out("sound play %d", sound_id);
@@ -500,7 +499,7 @@ static void play(uint8_t sound_id)
   // do this before we allocate the resource as stopping will dectivate/deallocate it
   stop(sound_id);
 
-  uint8_t res_page = res_provide(RES_TYPE_SOUND, sound_id, 0);
+  uint8_t res_page = res_provide(RES_TYPE_SOUND_MOD, sound_id, 0);
   res_activate_slot(res_page);
   __auto_type data = (struct sound_header __far *)res_get_huge_ptr(res_page);
 
@@ -651,7 +650,7 @@ static void stop_slot(struct sound_slot *slot)
     }
   }
   if (!is_music) {
-    res_deactivate(RES_TYPE_SOUND, slot->id, 0);
+    res_deactivate(RES_TYPE_SOUND_MOD, slot->id, 0);
   }
   slot->id       = 0;
   slot->finished = 0;
@@ -1374,5 +1373,3 @@ static void update_pitchbend_loop(struct sound_slot *slot)
 
 
 /// @} // sound_private
-
-#endif

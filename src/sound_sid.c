@@ -363,7 +363,7 @@ void c64_start_sound(uint8_t sound_id)
     if (!sound_triggers[i]) {
       sound_triggers[i] = sound_id;
       // we do a first res_provide() for each sound to avoid loading latency in sound_handle_play_triggers() later
-      res_provide(RES_TYPE_C64SOUND, sound_id, 0);
+      res_provide(RES_TYPE_SOUND_SID, sound_id, 0);
       return;
     }
   }
@@ -1603,7 +1603,7 @@ void start_sound(int8_t nr)
   }
 
   if (i == NUM_RES_SLOTS) {
-    res_page = res_provide(RES_TYPE_C64SOUND, nr, 0);
+    res_page = res_provide(RES_TYPE_SOUND_SID, nr, 0);
     res_activate_slot(res_page);
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == 0) {

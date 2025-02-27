@@ -134,7 +134,7 @@ uint8_t res_provide(uint8_t type, uint8_t id, uint8_t hint)
     }
   }*/
 
-  if (type == RES_TYPE_C64SOUND) {
+  if (type == RES_TYPE_SOUND_SID) {
     if (id < 6) {
       return 0;
     }
