@@ -6,9 +6,7 @@
 
 void mmsetupVewPrepare(void);
 
-void mmsetupStartUnmPrep(void);
-void mmsetupStartUnmChg(void);
-
+void mmsetupStartExitChg(void);
 void mmsetupStartStrtChg(void);
 
 void mmsetupWelcConfigChg(void);

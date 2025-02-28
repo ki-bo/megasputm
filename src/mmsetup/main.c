@@ -68,8 +68,7 @@ void attemptLoadFont(void) {
 
 
 int main(void) {
-  bootflags = (*(uint8_t *)0x0800);
-  bootflags&= 0x5F;
+  bootflags = (*(uint32_t *)0x00fc);
 
   //while(1) {
   //  __asm(" inc 0xd020 ");

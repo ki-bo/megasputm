@@ -506,11 +506,11 @@ judeControl_t ctl_mmsetup_start_0_7 = {
 judeControl_t ctl_mmsetup_start_0_8 = {
   sizeof(judeControl_t),
   FARPTRNULLREC,
-  NEARTOEVENTPTR(mmsetupStartUnmPrep),
+  NEARTOEVENTPTR(judeDefCtlPrepare),
   NEARTOEVENTPTR(judeDefCtlInit),
-  NEARTOEVENTPTR(mmsetupStartUnmChg),
+  NEARTOEVENTPTR(judeDefCtlChange),
   NEARTOEVENTPTR(judeDefCtlRelease),
-  STATE_VISIBLE | STATE_ENABLED,
+  0,
   0x0000,
   0x0000,
   0,
@@ -589,7 +589,7 @@ judeControl_t ctl_mmsetup_start_1_1 = {
   FARPTRNULLREC,
   NEARTOEVENTPTR(judeDefCtlPrepare),
   NEARTOEVENTPTR(judeDefCtlInit),
-  NEARTOEVENTPTR(mmsetupWelcExitChg),
+  NEARTOEVENTPTR(mmsetupStartExitChg),
   NEARTOEVENTPTR(judeDefCtlRelease),
   0x0003,
   0x0000,
@@ -2342,12 +2342,12 @@ char str_mmsetup_start_0[] = "MANIAC MANSION could NOT run";
 char str_mmsetup_start_1[] = "You have entered the setup utility.";
 
 char str_mmsetup_start_2[] = "The data files from the original games are required in order to play the game on";
-char str_mmsetup_start_3[] = "your MEGA65.  You will need the image files from the Amiga disks and C64 disks";
-char str_mmsetup_start_4[] = "in order to create the disks or images you will need for your MEGA65.  You may";
-char str_mmsetup_start_5[] = "do this by using this utility.  To continue, click the Start button below.";
+char str_mmsetup_start_3[] = "your MEGA65.  You will need the image files from the Amiga disks and optionally";
+char str_mmsetup_start_4[] = "the C64 disks in order to create the disks or images you need for your MEGA65.";
+char str_mmsetup_start_5[] = "You may do this by using this utility.  To begin, click the Start button below.";
 
-char str_mmsetup_start_6[] = "If you do not wish to continue, you may unmount any disk image by using the";
-char str_mmsetup_start_7[] = "Unmount button and exit the utility using the Exit button or by pressing ESC.";
+char str_mmsetup_start_6[] = "If you do not wish to continue, you may unmount any disk and exit the utility by";
+char str_mmsetup_start_7[] = "clicking the Exit button or by pressing ESC.";
 
 char str_mmsetup_start_8[] = "  Unmount";
 

@@ -10,47 +10,35 @@
 #include <stdint.h>
 
 
+struct BYTE4 {
+  uint8_t b1, b2, b3, b4;
+};
 
 void mmsetupVewPrepare(void) {
-  if (bootflags) {
+  struct BYTE4 flags = *(struct BYTE4 *)&bootflags;
+  
+  if (flags.b1 == 'K' && flags.b2 == 'M' && flags.b3 > 0 && flags.b4 == 0xFF) {
     vew_mmsetup_main.actvpage = (karlFarPtr_t)(&pge_mmsetup_start);
   }
 
   judeDefViewPrepare();
 }
 
-void mmsetupStartUnmPrep(void) {
-//TODO:  Get proc list details and determine if a disk is mounted
-  
-  judeDefCtlPrepare();
-}
-
-void mmsetupStartUnmChg(void) {
+void mmsetupStartExitChg(void) {
   uint8_t state = ((karlObject_t __huge *)zptrself)->state;
 		    
   judeDefCtlChange();
 
   if (state & STATE_DOWN) {
     hdos_detachD81();
-    
+
+    //dengland Hack the Kernal
     *(uint8_t *)(0x11b1) = 0;
 
-    /*if (hdos_set_filename("MM3.D81")) {
-      while (1) {
-        __asm(
-          "   lda 0x02 \n"
-          "   sta 0xd020 ");
-      }
-    };
-    if (hdos_attachD810()) {
-      while (1) {
-        __asm(
-          "   lda 0x03 \n"
-          "   sta 0xd020 ");
-      }
-    };*/
-    
-    karlObjExcludeState(STATE_ENABLED);
+    //clear the font, otherwise looks terrible
+    *(uint8_t *)(0xd07a) = *(uint8_t *)(0xd07a) & (!0x10);
+
+    hdos_restart();
   }
 }
 
