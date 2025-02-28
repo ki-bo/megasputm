@@ -32,7 +32,7 @@ void mmsetupStartExitChg(void) {
   if (state & STATE_DOWN) {
     hdos_detachD81();
 
-    //dengland Hack the Kernal
+    //dengland FIXME Hack the Kernal do it properly check the version
     *(uint8_t *)(0x11b1) = 0;
 
     //clear the font, otherwise looks terrible

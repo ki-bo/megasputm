@@ -1,16 +1,25 @@
-//===========================================================
+//=============================================================================
 //Karl Jr
-//===========================================================
-//
-// Project: Kentucky
+//=============================================================================
 //
 // Simple object life-time management.
+// 
+// Copyright (c) 2022, 2025 Daniel England.
 //
-// (c) Daniel England 2022, All Rights Reserved.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-// I intend to release this under LGPL 3?
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 //
-//-----------------------------------------------------------
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+//-----------------------------------------------------------------------------
 //
 // Karl Jr allows modules and units to be used and the 
 // objects there-in managed.
@@ -32,7 +41,7 @@
 //				|
 //				+UNIT
 //
-//===========================================================
+//=============================================================================
 
 #pragma once
 
