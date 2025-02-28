@@ -1,6 +1,8 @@
 /* MEGASPUTM - Graphic Adventure Engine for the MEGA65
  *
- * Copyright (C) 2023-2024 Robert Steffens
+ * MEGASPUTM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1583,7 +1585,7 @@ void gfx_helpscreen(void)
       print_helpscreen_en();
       break;
   }
-  print_helpscreen_text(72,  23, "1.1-MM", 0x0d);
+  print_helpscreen_text(72,  23, "1.2-MM", 0x0d);
 
 
   ASCIIKEY = 0; // ack any keypress still pending
@@ -2014,7 +2016,7 @@ static void print_helpscreen_en(void)
   print_helpscreen_text(14, y, "MEGASPUTM - Graphic Adventure Engine for the MEGA65", color1);
   y = 3;
   print_helpscreen_text( 2, y  , "Coding:", color2);
-  print_helpscreen_text(15, y++, "Robert Steffens (kibo)", color1);
+  print_helpscreen_text(15, y++, "Robert Steffens (kibo), Daniel England (M3wP)", color1);
   print_helpscreen_text( 2, y  , "Testers:", color2);
   print_helpscreen_text(15, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
   y += 2;
@@ -2053,7 +2055,7 @@ static void print_helpscreen_de(void)
   print_helpscreen_text(14, y, "MEGASPUTM - Grafische Adventure-Engine f\x5br den MEGA65", color1);
   y = 3;
   print_helpscreen_text( 2, y  , "Programmierung:", color2);
-  print_helpscreen_text(18, y++, "Robert Steffens (kibo)", color1);
+  print_helpscreen_text(18, y++, "Robert Steffens (kibo), Daniel England (M3wP)", color1);
   print_helpscreen_text( 2, y  , "Tester:", color2);
   print_helpscreen_text(18, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
   y += 2;

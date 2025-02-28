@@ -1,3 +1,10 @@
-MEGASPUTM - Graphic Adventure Engine for the MEGA65
+MEGASPUTM - Graphic Adventure Engine for the MEGA65 
 
-Copyright (C) 2023-2024 by Robert Steffens
+Copyright (C) 2023-2025 by Robert Steffens, Daniel England  
+
+This program incorporates portions of source code from the ScummVM project,  
+which is provided under the terms of the GNU General Public License version 3 (GPLv3).  
+For details regarding the copyright and licensing of ScummVM source code,  
+please refer to the files COPYRIGHT.SCUMMVM and COPYING.
+
+All rights reserved.
