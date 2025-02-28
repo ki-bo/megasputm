@@ -397,19 +397,20 @@ void c64_sound_handle_play_triggers(void)
   SAVE_DS_AUTO_RESTORE
   MAP_CS_SOUND
 
-  for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
-    if (res_data.count[i] == 0 && res_data.id[i] == 0xff) {
-      debug_out("shpt deactive %d", i);
-      
-      res_deactivate_slot(res_data.page[i]);
-      res_data.id[i] = 0;
-    }
-  }
-
+  //Do this first so as to keep any sounds required
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (sound_triggers[i]) {
       start_sound((int8_t)sound_triggers[i]);
       sound_triggers[i] = 0;
+    }
+  }
+
+  for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+    if (res_data.count[i] == 0 && res_data.id[i] > 0/*&& res_data.id[i] == 0xff*/) {
+      //debug_out("shpt deactive %d", i);
+      
+      res_deactivate_slot(res_data.page[i]);
+      res_data.id[i] = 0;
     }
   }
 }
@@ -1009,11 +1010,12 @@ void unlock_resource(int8_t chanResIndex) // $4CDA
       if (res_data.id[i] == (uint8_t)chanResIndex) {
         res_data.count[i]--;
         
-        debug_out("sur dec %d %d", chanResIndex, res_data.count[i]);
+        //debug_out("sur dec %d %d", chanResIndex, res_data.count[i]);
 
-        if (res_data.count[i] == 0) {
-          res_data.id[i] = 0xff; // 0xff = marked as to be deactivated
-        };
+        //Don't do this so we can restart it in the same cycle if desired
+        //if (res_data.count[i] == 0) {
+          //res_data.id[i] = 0xff; // 0xff = marked as to be deactivated
+        //};
       }
     }
   }
@@ -1302,7 +1304,7 @@ void lock_resource(int8_t resIndex) { // $4ff4
       if (res_data.id[i] == resIndex) {
         res_data.count[i]++;
 
-        debug_out("slr inc %d %d", resIndex, res_data.count[i]);
+        //debug_out("slr inc %d %d", resIndex, res_data.count[i]);
 
         break;
       }
@@ -1634,9 +1636,9 @@ void start_sound(int8_t nr)
   uint8_t i;
   for (i = 0; i < NUM_RES_SLOTS; ++i) {
     if (res_data.id[i] == nr) {
-      res_data.count[i]++;
+      //res_data.count[i]++;
 
-      debug_out("sss found %d %d", nr, res_data.count[i]);
+      //debug_out("sss found %d %d", nr, res_data.count[i]);
 
       res_page = res_data.page[i];
       break;
@@ -1652,7 +1654,7 @@ void start_sound(int8_t nr)
         res_data.page[i] = res_page;
         res_data.count[i] = 0;
 
-        debug_out("sss start %d %d", nr, res_data.count[i]);
+        //debug_out("sss start %d %d", nr, res_data.count[i]);
 
         break;      
       }
