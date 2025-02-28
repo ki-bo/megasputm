@@ -1,12 +1,9 @@
-;===========================================================
+;=============================================================================
 ;HDOS simplified SD card DOS replacement for MEGA65
+;=============================================================================
 ;
-;Version 0.20A
-;Written by Daniel England of Ecclestial Solutions.
+; Based on Bigglesworth 0.20A.
 ;
-;Copyright 2021, Daniel England. All Rights Reserved.
-;
-;-----------------------------------------------------------
 ;
 ;A simple DOS replacement library.  Use hdosSetFileName
 ;to describe your file and hdosOpenFile to open it.
@@ -18,13 +15,22 @@
 ;Supports only character reads but block reads will be added
 ;in the future.  Read a byte with hdosReadByte.
 ;
-;-----------------------------------------------------------
+; Copyright (c) 2022, 2025 Daniel England.
 ;
-;I want to release this under the LGPL.  I'll make the 
-;commitment and include the licensing infomation soon.
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
 ;
-;===========================================================
-
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+; GNU General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;
+;=============================================================================
 
 		.rtmodel cpu, "*"
 
