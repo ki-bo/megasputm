@@ -44,7 +44,7 @@ typedef enum PROCESS {
   PROC_CONFIGURE,
   PROC_EXTRACT,
   PROC_BUILD,
-  PROC_VERIFY,
+  PROC_VALIDATE,
   PROC_COMPLETE
 } process_t;
 
@@ -61,7 +61,7 @@ typedef enum PROCFLAGS {
   PROCFL_CONFIGURE = 1,
   PROCFL_EXTRACT = 2,
   PROCFL_BUILD = 4,
-  PROCFL_VERIFY = 8,
+  PROCFL_VALIDATE = 8,
 } procflags_t;
 
 typedef void (* procbehaviour_t[6])(void);
@@ -114,3 +114,7 @@ void behaviourExtractInit(void);
 void behaviourExtractRead(void);
 void behaviourExtractWrite(void);
 void behaviourExtractFinish(void);
+void behaviourValidIdle(void);
+void behaviourValidInit(void);
+void behaviourValidRead(void);
+void behaviourValidFinish(void);

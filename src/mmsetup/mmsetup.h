@@ -240,6 +240,7 @@ extern char str_mmsetup_config_15[];
 extern char str_mmsetup_config_16[];
 extern char str_mmsetup_config_17[];
 extern char str_mmsetup_config_18[];
+extern char str_mmsetup_config_19[];
 
 extern karlFarPtr_t config_desc_controls[];
 

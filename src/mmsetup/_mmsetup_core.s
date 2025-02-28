@@ -25,7 +25,9 @@
  .section code
   .public _prepareKernalWrite
   .public _performKernalWrite
-  .public _finishKernalWrite
+  .public _prepareKernalRead
+  .public _performKernalRead
+  .public _finishKernalReadWrite
   .public _performKernalHeaderChange
   .public _performKernalScatchAllRooms
   .public _performKernalValidate
@@ -43,6 +45,8 @@
   .extern kernal_write_byte
   .extern kernal_close_logical_file
   .extern kernal_reset_channels
+  .extern kernal_set_logical_input
+  .extern kernal_read_byte
 
   .extern kernal_error
 
@@ -120,7 +124,7 @@ error$:
     rts               ; Return
 
 
-_finishKernalWrite:
+_finishKernalReadWrite:
     sei
 
     jsr _judeBackupOwnZP
@@ -134,6 +138,123 @@ _finishKernalWrite:
     ;clears the carry
     jsr kernal_close_logical_file
 
+    sei
+
+    jsr _judeBackupKernalZP
+    jsr _judeRestoreOwnZP
+
+    cli
+
+    rts
+
+
+_performKernalRead:
+    sei
+
+    jsr _judeBackupOwnZP
+    jsr _judeRestoreKernalZP
+
+    cli
+
+    lda kernalWriteSiz
+    sta 0x04
+    lda kernalWriteSiz + 1
+    sta 0x05
+    lda kernalWriteSiz + 2
+    sta 0x06 
+    lda kernalWriteSiz + 3
+    sta 0x07
+
+    lda 0x04
+    ora 0x05
+    ora 0x06
+    ora 0x07
+    beq done$
+
+    lda kernalWriteSrc
+    sta 0x08
+    lda kernalWriteSrc + 1
+    sta 0x09
+    lda kernalWriteSrc + 2
+    sta 0x0A 
+    lda kernalWriteSrc + 3
+    sta 0x0B
+
+    lda #1
+    sta 0x0C
+    lda #0
+    sta 0x0D
+    sta 0x0E
+    sta 0x0F
+
+    ;jsr kernal_reset_channels
+    ;ldx #1
+    ;jsr kernal_set_logical_input
+
+    ; Use this for checking a number of byte reads for errors
+    ;lda #0x01
+    ;pha
+
+loop$:
+    jsr 0xffb7      ;READSS
+    bne done$
+
+    jsr kernal_read_byte
+    bcs done$
+
+    ldz #0
+    sta [0x08], Z
+
+    ;sta 0xd020
+
+; Use this code to check errors for a number of reads
+    ;pla
+    ;;beq notest$
+    ;bra notest$
+    ;jsr kernal_get_status
+    ;sta kernal_error
+    ;bcs error$ 
+
+cont$:
+; As above
+    ;pha
+
+    clc
+    ldq 0x08
+    adcq 0x0c
+    stq 0x08
+
+    deq 0x04
+    bne loop$
+    bra done$
+
+; Here also
+;notest$:
+    ;lda #0x00
+    ;bra cont$
+done$:
+    ;pla
+
+    lda 0x04
+    sta kernalWriteSiz
+    lda 0x05
+    sta kernalWriteSiz + 1
+    lda 0x06 
+    sta kernalWriteSiz + 2
+    lda 0x07
+    sta kernalWriteSiz + 3
+
+    lda 0x08
+    sta kernalWriteSrc
+    lda 0x09
+    sta kernalWriteSrc + 1
+    lda 0x0A 
+    sta kernalWriteSrc + 2
+    lda 0x0B
+    sta kernalWriteSrc + 3
+
+
+error$:
     sei
 
     jsr _judeBackupKernalZP
@@ -183,10 +304,9 @@ _performKernalWrite:
     sta 0x0E
     sta 0x0F
 
-    jsr kernal_reset_channels
-
-    ldx #1
-    jsr kernal_set_logical_output
+    ;jsr kernal_reset_channels
+    ;ldx #1
+    ;jsr kernal_set_logical_output
 
     ; Use this for checking a number of byte reads for errors
     ;lda #0x01
@@ -228,6 +348,55 @@ done$:
 
 
 error$:
+    sei
+
+    jsr _judeBackupKernalZP
+    jsr _judeRestoreOwnZP
+
+    cli
+
+    rts
+
+
+_prepareKernalRead:
+    phy
+    phx
+    pha
+
+    sei
+
+    jsr _judeBackupOwnZP
+    jsr _judeRestoreKernalZP
+
+    cli
+
+    lda #0
+    ldx #0
+    jsr kernal_set_banks
+
+    lda #1
+    ldx #8
+    ldy #2
+    jsr kernal_set_logical_file
+
+    pla
+    plx
+    ply
+    jsr kernal_set_name
+
+    jsr kernal_open
+
+    ;jsr kernal_get_status
+    ;sta kernal_error
+    ;bcs done$    
+
+    jsr kernal_reset_channels
+
+    ldx #1
+    jsr kernal_set_logical_input
+
+
+done$:
     sei
 
     jsr _judeBackupKernalZP

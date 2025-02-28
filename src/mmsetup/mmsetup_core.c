@@ -229,12 +229,13 @@ procbehaviour_t proc_behaviours[] = {
   {&behaviourConfigIdle, &behaviourConfigInit, &behaviourConfigWait, 0, 0, 0},
   {&behaviourExtractIdle, &behaviourExtractInit, 0, &behaviourExtractRead, &behaviourExtractWrite, &behaviourExtractFinish},
   {&behaviourBuildIdle, &behaviourBuildInit, 0, &behaviourBuildRead, &behaviourBuildWrite, &behaviourBuildFinish},
-  {0, 0, 0, 0, 0, 0},
+  {&behaviourValidIdle, &behaviourValidInit, 0, &behaviourValidRead, 0, &behaviourValidFinish},
   {0, 0, 0, 0, 0, 0}
 }; 
 
 char adfFileName[65];
 char lflfilename[] = "00.LFL,S,W";
+char lflfileread[] = "00.LFL,S,R";
 char lflfileadf[] = "00.LFL";
 char str_filesize[] = "                    ";
 
@@ -257,7 +258,9 @@ extern uint16_t mouseYPos;
 extern uint8_t kernal_get_last_error(void);
 extern void _prepareKernalWrite(void);
 extern void _performKernalWrite(void);
-extern void _finishKernalWrite(void);
+extern void _prepareKernalRead(void);
+extern void _performKernalRead(void);
+extern void _finishKernalReadWrite(void);
 
 
 int16_t new_x;
@@ -438,6 +441,7 @@ void writesixdecimalstr(char *buf, uint8_t pos, uint32_t value) {
 
 void prepareLFLFileName(uint8_t roomno) {
   writetwodecimalstr(lflfilename, 0, roomno);
+  writetwodecimalstr(lflfileread, 0, roomno);
   writetwodecimalstr(lflfileadf, 0, roomno);
 }
 
@@ -494,8 +498,31 @@ void performKernalWrite(uint32_t source, uint32_t size) {
   _performKernalWrite();
 }
 
-void finishKernalWrite(void) {
-  _finishKernalWrite();
+void finishKernalReadWrite(void) {
+  _finishKernalReadWrite();
+}
+
+void prepareKernalRead(char *filename, uint8_t len) {
+  __asm(
+    " .extern _prepareKernalRead \n"
+    "   lda %[ln] \n"
+    "   ldx %[fn] \n"
+    "   ldy %[fn] + 1 \n"
+    "   jsr _prepareKernalRead \n"
+    :
+    : [fn] __KZ16 (filename), [ln] __KZ08 (len)
+    : __REGA, __REGX, __REGY, __REGZ
+  );
+}
+
+void performKernalRead(uint32_t *source, uint32_t *size) {
+  kernalWriteSrc = *source;
+  kernalWriteSiz = *size;
+
+  _performKernalRead();
+
+  *source = kernalWriteSrc;
+  *size = kernalWriteSiz;
 }
 
 
@@ -577,11 +604,18 @@ uint8_t configurationInvalid(void) {
     }
   }
 
-  if (ctl_mmsetup_welc_0_4._element._object.tag) {
+  if (result == 0 && ctl_mmsetup_welc_0_4._element._object.tag) {
     if (dest_details[4].type == SETTINGT_NONE || dest_details[5].type == SETTINGT_NONE) {
       result = 2;
     }
   }
+
+  if (result == 0 && ctl_mmsetup_welc_0_5._element._object.tag) {
+    if (dest_details[0].type == SETTINGT_NONE && dest_details[1].type == SETTINGT_NONE) {
+      result = 3;
+    }
+  }
+
 
   return result;
 }
@@ -649,6 +683,15 @@ void initiateProcess(void) {
     }
   }
 
+  if (configProcFlags & PROCFL_VALIDATE) {
+    if (dest_details[0].type != SETTINGT_NONE) {
+      max += (sizeof(disk1_en) / sizeof(roomdata_t)) - 1;
+    }
+    if (dest_details[1].type != SETTINGT_NONE) {
+      max += (sizeof(disk2_en) / sizeof(roomdata_t)) - 1;
+    }
+  }
+
   zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_4);
   progressResetMax(max);
 
@@ -704,6 +747,7 @@ void copyFileName(uint8_t detail, char *fileName) {
   for (uint8_t i = 0; i < dest_details[detail].namelen; ++i) {
     fileName[i] = dest_details[detail].fileName[i];
 
+    //dengland Is this debugging and can go?
     *(uint8_t *)(0x0800 + i) = dest_details[detail].fileName[i];
   }
   fileName[dest_details[detail].namelen] = 0;
@@ -846,6 +890,10 @@ void behaviourConfigInit(void) {
           return;
         } else if (configProcFlags & PROCFL_BUILD && !(doneProcFlags & PROCFL_BUILD)) {
           process = PROC_BUILD;
+          procstate = PROCST_IDLE;
+          return;
+        } else if (configProcFlags & PROCFL_VALIDATE && !(doneProcFlags & PROCFL_VALIDATE)) {
+          process = PROC_VALIDATE;
           procstate = PROCST_IDLE;
           return;
         }
@@ -994,7 +1042,7 @@ void behaviourBuildWrite(void) {
 
     if (error) {
       processError("D81 WRITE ERROR");
-      finishKernalWrite();
+      finishKernalReadWrite();
       
       return;
     }
@@ -1006,7 +1054,7 @@ void behaviourBuildWrite(void) {
   progressIncValue(next_size);
 
   if (file_size == 0) {
-    finishKernalWrite();
+    finishKernalReadWrite();
 
     if (kernal_get_status()) {
       processError("FILE CLOSE ERROR");
@@ -1024,6 +1072,143 @@ void behaviourBuildWrite(void) {
 void behaviourBuildFinish(void) {
   
   doneProcFlags |= PROCFL_BUILD;
+  process = PROC_CONFIGURE;
+  procstate = PROCST_IDLE;
+}
+
+
+void behaviourValidIdle(void) {
+  roomidx = 0;
+  roompreprep = 0;
+
+  procstate = PROCST_INIT;
+}
+
+void behaviourValidInit(void) {
+  if (outputDisk > 1) {
+    process = PROC_COMPLETE;
+    procstate = PROCST_IDLE;
+    return;
+  } else if  (dest_details[outputDisk].type == SETTINGT_NONE) {
+    procstate = PROCST_FINISH;
+    return;
+  }
+
+  roomdata_t *rooms;
+  
+  if (outputDisk == 0) {
+    rooms = langs_disk1[0];
+  } else {
+    rooms = langs_disk2[0];
+  }
+
+  if (rooms[roomidx].room == 0xff) {
+    roomidx = 0;
+    procstate = PROCST_FINISH;
+    return;
+  }
+
+  judeSetPointer(MPTR_WAIT);
+
+  char text[] = "VERIFY  READ  00.LFL";
+  writetwodecimalstr(text, 14, rooms[roomidx].room);
+  writeToProcOutput(text);
+
+  prepareLFLFileName(rooms[roomidx].room);
+
+  file_pos = FILE_MEMORY;
+  file_size = 0;
+
+  prepareKernalRead(lflfileread, 10);
+  if (kernal_get_last_error()) {
+    processError("D81 PREPARE ERROR");
+    return;
+  }
+
+  judeSetPointer(MPTR_NORMAL);
+  procstate = PROCST_READ;
+}
+
+void behaviourValidRead(void) {
+  roomdata_t *rooms;
+  
+  if (outputDisk == 0) {
+    rooms = langs_disk1[0];
+  } else {
+    rooms = langs_disk2[0];
+  }
+  
+  uint32_t nextpos = (uint32_t)(file_pos);
+  uint32_t nextsz = 253;
+  performKernalRead(&nextpos, &nextsz);
+  file_pos = (uint8_t __huge *)nextpos;
+  file_size += 253 - nextsz;
+
+  if (file_size > 80000) {
+    processError("INTERNAL ERROR");
+    return;
+  }
+
+  writesixdecimalstr(str_filesize, 14, file_size);
+  ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)((char __huge *)str_filesize);
+  zptrself = (uint32_t)((karlFarPtr_t)&ctl_mmsetup_proc_0_6);
+  karlObjIncludeState(STATE_DIRTY);
+
+  if (nextsz > 0) {
+    finishKernalReadWrite();
+
+    if (langidx != 0xff) {
+      if (outputDisk == 0) {
+        rooms = langs_disk1[langidx];
+      } else {
+        rooms = langs_disk2[langidx];
+      }
+
+      if (file_size != rooms[roomidx].size || !verifyMemory(FILE_MEMORY, file_size, rooms[roomidx].check)) {
+        processError("VERIFY  FAIL");
+        return;
+      } else {
+        writeToProcOutput("VERIFY  PASS");
+      }
+    } else {
+      uint8_t nextlang = 0;
+
+      for (nextlang = 0; nextlang < 2; nextlang++) {
+        if (outputDisk == 0) {
+          rooms = langs_disk1[nextlang];
+        } else {
+          rooms = langs_disk2[nextlang];
+        }
+
+        if (file_size == rooms[roomidx].size && verifyMemory(FILE_MEMORY, file_size, rooms[roomidx].check)) {
+          break;
+        }
+      }
+      
+      if (nextlang == 2) {
+        processError("VERIFY  FAIL");
+        return;
+      } else if (nextlang == 0) {
+        writeToProcOutput("VERIFY  PASS ENGLISH");
+      } else {
+        writeToProcOutput("VERIFY  PASS GERMAN");
+      }
+    }
+
+    roomidx++;
+    procstate = PROCST_INIT;
+
+    zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_4);
+    progressIncValue(1);
+  }
+}
+
+void behaviourValidFinish(void) {
+  writeToProcOutput("VERIFY  FINISH");
+  judeSetPointer(MPTR_NORMAL);
+  
+  doneProcFlags |= PROCFL_VALIDATE;
+ 
   process = PROC_CONFIGURE;
   procstate = PROCST_IDLE;
 }
@@ -1192,7 +1377,7 @@ void behaviourExtractWrite(void) {
 
     if (error) {
       processError("D81 WRITE ERROR");
-      finishKernalWrite();
+      finishKernalReadWrite();
       return;
     }
   }
@@ -1203,7 +1388,7 @@ void behaviourExtractWrite(void) {
   progressIncValue(next_size);
 
   if (file_size == 0) {
-    finishKernalWrite();
+    finishKernalReadWrite();
 
     if (kernal_get_status()) {
       processError("FILE CLOSE ERROR");

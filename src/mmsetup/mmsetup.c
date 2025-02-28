@@ -790,7 +790,7 @@ judeControl_t ctl_mmsetup_welc_0_5 = {
 		NEARTOEVENTPTR(judeDefCtlInit),
 		NEARTOEVENTPTR(judeDefCtlChange),
 		NEARTOEVENTPTR(judeDefCtlRelease),
-		STATE_VISIBLE,
+		STATE_VISIBLE | STATE_ENABLED,
 		0x0000,
 		0x0020,
 		0,
@@ -2393,6 +2393,7 @@ char str_mmsetup_config_16[] = "<No Selection>";
 
 char str_mmsetup_config_17[] = "You must provide the D81/ADF Extraction details.";
 char str_mmsetup_config_18[] = "You must provide the D64 Build details.";
+char str_mmsetup_config_19[] = "You must provide the D81 Source details.";
 
 
 char str_mmsetup_proc_0[] = "Performing Data Operations";

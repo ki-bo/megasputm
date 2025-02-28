@@ -92,20 +92,20 @@ void mmsetupWelcNextChg(void) {
         configProcFlags |= PROCFL_EXTRACT;
       if (ctl_mmsetup_welc_0_4._element._object.tag) 
         configProcFlags |= PROCFL_BUILD;
+      if (ctl_mmsetup_welc_0_5._element._object.tag) 
+        configProcFlags |= PROCFL_VALIDATE;
 
       if (!(configProcFlags & ~PROCFL_CONFIGURE)) {
         ctl_mmsetup_welc_0_6.text_p = (karlFarPtr_t)str_mmsetup_welc_7;
 
         zptrself = (uint32_t)&ctl_mmsetup_welc_0_6;
-        karlObjIncludeState(STATE_VISIBLE);
-        karlObjIncludeState(STATE_CHANGED);
+        karlObjIncludeState(STATE_VISIBLE | STATE_CHANGED);
 
       } else if (configurationInvalid() && !ctl_mmsetup_welc_0_2._element._object.tag) {
         ctl_mmsetup_welc_0_6.text_p = (karlFarPtr_t)str_mmsetup_welc_6;
 
         zptrself = (uint32_t)&ctl_mmsetup_welc_0_6;
-        karlObjIncludeState(STATE_VISIBLE);
-        karlObjIncludeState(STATE_CHANGED);
+        karlObjIncludeState(STATE_VISIBLE | STATE_CHANGED);
 
       } else {
         zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
@@ -151,8 +151,7 @@ void mmsetupWelcConfigChg(void){
     ctl_mmsetup_welc_0_6.text_p = (karlFarPtr_t)str_mmsetup_welc_6;
 
     zptrself = (uint32_t)&ctl_mmsetup_welc_0_6;
-    karlObjIncludeState(STATE_VISIBLE);
-    karlObjIncludeState(STATE_CHANGED);
+    karlObjIncludeState(STATE_VISIBLE | STATE_CHANGED);
   }
 }
 
@@ -373,16 +372,18 @@ void mmsetupConfigNextChg(void) {
       ctl_mmsetup_config_0_21.text_p = (karlFarPtr_t)str_mmsetup_config_17;
 
       zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
-      karlObjIncludeState(STATE_VISIBLE);
-      karlObjIncludeState(STATE_CHANGED);
-
+      karlObjIncludeState(STATE_VISIBLE | STATE_CHANGED);
     } else if (invalid == 2) {
       ctl_mmsetup_config_0_21.text_p = (karlFarPtr_t)str_mmsetup_config_18;
 
       zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
-      karlObjIncludeState(STATE_VISIBLE);
-      karlObjIncludeState(STATE_CHANGED);
-    } else {
+      karlObjIncludeState(STATE_VISIBLE | STATE_CHANGED);
+    } else if (invalid == 3) {
+      ctl_mmsetup_config_0_21.text_p = (karlFarPtr_t)str_mmsetup_config_19;
+
+      zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
+      karlObjIncludeState(STATE_VISIBLE | STATE_CHANGED);
+    } else if (invalid == 0) {
       zptrself = (uint32_t)&ctl_mmsetup_config_0_21;
       karlObjExcludeState(STATE_VISIBLE);
 

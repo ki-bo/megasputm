@@ -34,6 +34,8 @@
       .public kernal_write_byte
       .public kernal_close_logical_file
       .public kernal_reset_channels
+      .public kernal_set_logical_input
+      .public kernal_read_byte
 
       .public kernal_error
 
@@ -115,6 +117,34 @@ noerror$:
     lda #0x00
     sta kernal_error
     rts
+
+
+kernal_set_logical_input:
+; .X = logical
+    
+    jsr 0xffc6
+    bcc noerror$
+    sta kernal_error
+    lda #1
+    rts
+noerror$:
+    lda #0x00
+    sta kernal_error
+    rts
+
+
+kernal_read_byte:
+    lda #0x00
+    sta kernal_error
+    ;jsr 0xffe4            ;GETIN NOT BASIN
+    jsr 0xffcf             ;BASIN
+    bcc noerror$
+    lda #1
+    sta kernal_error
+    rts
+noerror$:
+    rts
+
 
 kernal_write_byte:
 ; .A = data
