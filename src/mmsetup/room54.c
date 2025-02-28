@@ -22,7 +22,7 @@
 //=============================================================================
 
 
-#include "room90.h"
+#include "room54.h"
 #include <stdint.h>
 
 #define NUM_ROOMS 55
@@ -135,7 +135,7 @@ uint8_t __huge *pushSound(uint8_t __huge *data, uint16_t *offs, uint8_t __huge *
   return q;
 }
 
-uint16_t makeRoom90(uint8_t __huge *image1, uint8_t __huge *image2, uint8_t __huge *dest) {
+uint16_t makeRoom54(uint8_t __huge *image1, uint8_t __huge *image2, uint8_t __huge *dest) {
   //space for size and index
   uint16_t offs = 4 + NUM_SOUNDS * 2;
   uint8_t __huge *m = dest + offs;

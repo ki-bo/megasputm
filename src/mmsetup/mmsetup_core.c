@@ -31,7 +31,7 @@
 #include "hdos.h"
 
 #include "adf.h"
-#include "room90.h"
+#include "room54.h"
 
 #include "jude.h"
 #include "karljr.h"
@@ -52,8 +52,8 @@ uint8_t outputDisk;
 uint8_t newDisk = 0;
 uint8_t roomidx = 0xff;
 uint8_t roompreprep = 0xff;
-uint8_t haveRoom90 = 0;
-uint16_t room90size = 0;
+uint8_t haveRoom54 = 0;
+uint16_t room54size = 0;
 uint8_t langidx = 0xff;
 uint8_t configProcFlags = 0;
 uint8_t doneProcFlags = 0;
@@ -618,7 +618,7 @@ void initiateProcess(void) {
   newDisk = 1;
   roomidx = 0;
   roompreprep = 0;
-  haveRoom90 = 0;
+  haveRoom54 = 0;
   langidx = 0xff;
 
   procOutput = (uint8_t __huge *)LISTBOXLINESMEM;
@@ -919,7 +919,7 @@ void behaviourBuildIdle(void) {
 }
 
 void behaviourBuildInit(void) {
-  if (!haveRoom90) {
+  if (!haveRoom54) {
     writeToProcOutput("BUILD   READ  D64 IMAGES");
     judeSetPointer(MPTR_WAIT);
 
@@ -928,7 +928,7 @@ void behaviourBuildInit(void) {
   } else {
     judeSetPointer(MPTR_WAIT);
 
-    file_size = room90size;
+    file_size = room54size;
     file_pos = (uint8_t __huge *)(0x0001B000);
 
     writesixdecimalstr(str_filesize, 14, file_size);
@@ -971,9 +971,9 @@ void behaviourBuildRead(void) {
   uint8_t __huge *image2 = (uint8_t __huge *)(0x08032000);
   uint8_t __huge *dest = (uint8_t __huge *)(0x0001B000);
   
-  room90size = makeRoom90(image1,image2, dest);
+  room54size = makeRoom54(image1,image2, dest);
 
-  haveRoom90 = 1;
+  haveRoom54 = 1;
   judeSetPointer(MPTR_NORMAL);
   procstate = PROCST_INIT;
 }
