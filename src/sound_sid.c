@@ -685,10 +685,11 @@ void reset_player_state() // $48f7
     sound_triggers[i] = 0;
   }
 
+  isMusicPlaying = 0;
+
   for (int8_t i = 6; i >= 0; --i)
     release_channel(i);
 
-  isMusicPlaying = 0;
   //unlockCodeLocation(); // does nothing
   statusBits1B = 0;
   statusBits1A = 0;
