@@ -99,10 +99,11 @@ void progressRealise(void) {
     //x+= self->last;
 
     //while (delta > 0) {
+    if (delta > 0) {
       judeEraseLine(delta, x, y, CLR_FOCUS);
       //--delta;
       //++x;
-    //}
+    }
   
     self->last = self->alloc;
   }
