@@ -399,7 +399,7 @@ void c64_sound_handle_play_triggers(void)
 
   for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
     if (res_data.count[i] == 0 && res_data.id[i] > 0) {
-      //debug_out("shpt deactive %d", i);
+      //debug_out("shpt deactive %d %d", res_data.id[i], i);
       
       res_deactivate_slot(res_data.page[i]);
       res_data.id[i] = 0;
@@ -697,6 +697,10 @@ void reset_player_state() // $48f7
   filterSwapped = 0;
   pulseWidthSwapped = 0;
   //var5163 = 0;
+
+  for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+    res_data.count[i] = 0;
+  }
 
   initializing = 0;
 }
@@ -1594,8 +1598,6 @@ void start_sound(int8_t nr)
   uint8_t i;
   for (i = 0; i < NUM_RES_SLOTS; ++i) {
     if (res_data.id[i] == nr) {
-      //debug_out("sss found %d %d", nr, res_data.count[i]);
-
       res_page = res_data.page[i];
       break;
     }
@@ -1604,18 +1606,18 @@ void start_sound(int8_t nr)
   if (i == NUM_RES_SLOTS) {
     res_page = res_provide(RES_TYPE_SOUND, nr, 0);
     res_activate_slot(res_page);
-    for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
+    for (i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == 0) {
         res_data.id[i] = (uint8_t)nr;
         res_data.page[i] = res_page;
         res_data.count[i] = 0;
-
-        //debug_out("sss start %d %d", nr, res_data.count[i]);
-
         break;      
       }
     }
   }
+
+  //debug_out("sss start %d %d %d", nr, i, res_data.count[i]);
+
   map_sound_res(res_page);
 
   // WORKAROUND:

@@ -1931,6 +1931,10 @@ static void override_cutscene(void)
       vm_state.proc_state[vm_state.cs_proc_slot] = PROC_STATE_RUNNING;
     }
     vm_write_var(VAR_OVERRIDE_HIT, 1);
+
+    if (use_sid_sounds) {
+      c64_stop_all_sounds();
+    }
   }
 }
 
