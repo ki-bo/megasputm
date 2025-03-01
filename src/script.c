@@ -1293,15 +1293,15 @@ static void resource_cmd(void)
       break;
     case 0x61:
       //debug_scr("load-sound %d", resource_id);
-      res_provide(sound_resource_type, resource_id, 0);
+      res_provide(RES_TYPE_SOUND, resource_id, 0);
       break;
     case 0x62:
       //debug_scr("unlock-sound %d", resource_id);
-      res_unlock(sound_resource_type, resource_id, 0);
+      res_unlock(RES_TYPE_SOUND, resource_id, 0);
       break;
     case 0x63:
       //debug_scr("lock-sound %d", resource_id);
-      res_lock(sound_resource_type, resource_id, 0);
+      res_lock(RES_TYPE_SOUND, resource_id, 0);
       break;
     default:
       //debug_out("unknown sub-opcode %x", sub_opcode);

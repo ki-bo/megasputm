@@ -377,7 +377,7 @@ void c64_start_sound(uint8_t sound_id)
     if (!sound_triggers[i]) {
       sound_triggers[i] = sound_id;
       // we do a first res_provide() for each sound to avoid loading latency in sound_handle_play_triggers() later
-      res_provide(RES_TYPE_SOUND_SID, sound_id, 0);
+      res_provide(RES_TYPE_SOUND, sound_id, 0);
       return;
     }
   }
@@ -398,7 +398,7 @@ void c64_sound_handle_play_triggers(void)
   }
 
   for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
-    if (res_data.count[i] == 0 && res_data.id[i] > 0/*&& res_data.id[i] == 0xff*/) {
+    if (res_data.count[i] == 0 && res_data.id[i] > 0) {
       //debug_out("shpt deactive %d", i);
       
       res_deactivate_slot(res_data.page[i]);
@@ -679,6 +679,8 @@ void func_3674(uint8_t channel) // $3674
 
 void reset_player_state() // $48f7
 {
+  initializing = 1;
+
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     sound_triggers[i] = 0;
   }
@@ -695,6 +697,8 @@ void reset_player_state() // $48f7
   filterSwapped = 0;
   pulseWidthSwapped = 0;
   //var5163 = 0;
+
+  initializing = 0;
 }
 
 // channel: 0..6
@@ -1598,7 +1602,7 @@ void start_sound(int8_t nr)
   }
 
   if (i == NUM_RES_SLOTS) {
-    res_page = res_provide(RES_TYPE_SOUND_SID, nr, 0);
+    res_page = res_provide(RES_TYPE_SOUND, nr, 0);
     res_activate_slot(res_page);
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
       if (res_data.id[i] == 0) {

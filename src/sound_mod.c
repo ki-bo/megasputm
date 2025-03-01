@@ -381,7 +381,7 @@ void sound_play(uint8_t sound_id)
     if (!sound_triggers[i]) {
       sound_triggers[i] = sound_id;
       // we do a first res_provide() for each sound to avoid loading latency in sound_handle_play_triggers() later
-      res_provide(RES_TYPE_SOUND_MOD, sound_id, 0);
+      res_provide(RES_TYPE_SOUND, sound_id, 0);
       return;
     }
   }
@@ -503,7 +503,7 @@ static void play(uint8_t sound_id)
   // do this before we allocate the resource as stopping will dectivate/deallocate it
   stop(sound_id);
 
-  uint8_t res_page = res_provide(RES_TYPE_SOUND_MOD, sound_id, 0);
+  uint8_t res_page = res_provide(RES_TYPE_SOUND, sound_id, 0);
   res_activate_slot(res_page);
   __auto_type data = (struct sound_header __far *)res_get_huge_ptr(res_page);
 
@@ -654,7 +654,7 @@ static void stop_slot(struct sound_slot *slot)
     }
   }
   if (!is_music) {
-    res_deactivate(RES_TYPE_SOUND_MOD, slot->id, 0);
+    res_deactivate(RES_TYPE_SOUND, slot->id, 0);
   }
   slot->id       = 0;
   slot->finished = 0;

@@ -663,18 +663,20 @@ uint16_t diskio_start_resource_loading(uint8_t type, uint8_t id)
       room_id = lfl_index.script_room[id];
       offset = lfl_index.script_offset[id];
       break;
-    case RES_TYPE_SOUND_MOD:
-      room_id = lfl_index.sound_mod_room[id];
-      offset = lfl_index.sound_mod_offset[id];
-      break;
-    case RES_TYPE_SOUND_SID:
-      room_id = ROOM_SID_SOUNDS;
-      offset = lfl_index.sound_sid_offset[id];
+    case RES_TYPE_SOUND:
+      if (use_sid_sounds) {
+        room_id = ROOM_SID_SOUNDS;
+        offset = lfl_index.sound_sid_offset[id];
 
-      if (offset == 0) {
-        return 0;
+        if (offset == 0) {
+          return 0;
+        }
+
       }
-
+      else {
+        room_id = lfl_index.sound_mod_room[id];
+        offset = lfl_index.sound_mod_offset[id];
+      }
       break;
   }
 

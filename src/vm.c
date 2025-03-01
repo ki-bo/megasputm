@@ -1221,6 +1221,17 @@ uint8_t vm_load_game(uint8_t slot)
   uint8_t     *pal_ptr          = NEAR_U8_PTR(RES_MAPPED + 0x200);
 
   SAVE_CS_AUTO_RESTORE
+  MAP_CS_SOUND
+  if (use_sid_sounds) {
+    //debug_out("stop-all-sounds c64");
+    c64_stop_all_sounds();
+    c64_sound_handle_play_triggers();
+  }
+  else {
+    //debug_out("reset sound");
+    sound_reset();
+  }
+
   MAP_CS_DISKIO
 
   savegame_file[7] = slot + 0x30;
@@ -1307,13 +1318,6 @@ uint8_t vm_load_game(uint8_t slot)
   
   res_free_heap(heap_slot);
 
-  MAP_CS_SOUND
-  if (use_sid_sounds) {
-    c64_stop_all_sounds();
-  }
-  else {
-    sound_reset();
-  }
 
   load_room(vm_read_var8(VAR_SELECTED_ROOM));
 

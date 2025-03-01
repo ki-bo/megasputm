@@ -26,8 +26,7 @@ enum res_type_t {
     RES_TYPE_ROOM,
     RES_TYPE_COSTUME,
     RES_TYPE_SCRIPT,
-    RES_TYPE_SOUND_MOD,
-    RES_TYPE_SOUND_SID,
+    RES_TYPE_SOUND,
     RES_TYPE_HEAP
 };
 
@@ -36,8 +35,6 @@ enum res_type_flags_t {
   RES_LOCKED_MASK = 0x80,
   RES_ACTIVE_MASK = 0x40
 };
-
-extern uint8_t sound_resource_type;
 
 // code_init functions
 void res_init(void);

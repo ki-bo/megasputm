@@ -76,12 +76,10 @@ void global_init(void)
   // load and init sound module (depends on use_sid_sounds, which gets set during vm_init() when loading the index)
   MAP_CS_DISKIO
   if (!use_sid_sounds) {
-    sound_resource_type = RES_TYPE_SOUND_MOD;
     diskio_load_file(0, "M13", (uint8_t __far *)(0x16000)); // load mod sound code
     sound_init();
   }
   else {
-    sound_resource_type = RES_TYPE_SOUND_SID;
     diskio_load_file(0, "M14", (uint8_t __far *)(0x16000)); // load sid sound code
     c64_sound_init();
   }
