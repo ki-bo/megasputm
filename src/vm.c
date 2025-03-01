@@ -1223,12 +1223,9 @@ uint8_t vm_load_game(uint8_t slot)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
   if (use_sid_sounds) {
-    //debug_out("stop-all-sounds c64");
     c64_stop_all_sounds();
-    c64_sound_handle_play_triggers();
   }
   else {
-    //debug_out("reset sound");
     sound_reset();
   }
 
