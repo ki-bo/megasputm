@@ -51,7 +51,7 @@ void progressResetMax(uint32_t max) {
     self->step = 0;
   }
 
-  karlObjIncludeState(STATE_DIRTY);
+  karlObjIncludeState(STATE_CHANGED);
 };
 
 void progressIncValue(uint32_t delta) {
@@ -75,7 +75,7 @@ void progressIncValue(uint32_t delta) {
     }
   }
 
-  karlObjIncludeState(STATE_DIRTY);
+  karlObjIncludeState(STATE_CHANGED);
 };
 
 //char space[] = "-";
@@ -83,24 +83,26 @@ void progressIncValue(uint32_t delta) {
 void progressRealise(void) {
   judeProgressBar_t __huge *self = ((judeProgressBar_t __huge *)zptrself);
 
-  uint8_t delta = self->alloc - self->last;
+  uint8_t delta = self->alloc;// - self->last;
 
   uint8_t w = ((judeElement_t __huge *)zptrself)->width;
   uint8_t x = ((judeElement_t __huge *)zptrself)->posx;
   uint8_t y = ((judeElement_t __huge *)zptrself)->posy;
 
-  if (self->max == 0 || (self->last == 0 && self->value == 0)) {
-    judeEraseLine(w, x, y, CLR_SHADOW);
-  } else if (self->alloc == w)  {
+  if (delta >= w)  {
     judeEraseLine(w, x, y, CLR_FOCUS);
   } else {
-    x+= self->last;
+    //if (self->max == 0 || (self->last == 0 && self->value == 0)) {
+    judeEraseLine(w - delta, x + delta, y, CLR_SHADOW);
+    //} else {
+    
+    //x+= self->last;
 
-    while (delta > 0) {
-      judeEraseLine(1, x, y, CLR_FOCUS);
-      --delta;
-      ++x;
-    }
+    //while (delta > 0) {
+      judeEraseLine(delta, x, y, CLR_FOCUS);
+      //--delta;
+      //++x;
+    //}
   
     self->last = self->alloc;
   }

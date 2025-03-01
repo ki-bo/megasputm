@@ -862,7 +862,7 @@ void behaviourConfigInit(void) {
       if (newDisk) {
         if (dest_details[outputDisk].type == SETTINGT_DISK) {
 
-          char text[20] = "REQUIRED DISK #00";
+          char text[20] = "REQUIRE DISK  #00";
       
           writetwodecimalstr(text, 15, outputDisk + 1);
           writeToProcOutput(text);
@@ -986,7 +986,7 @@ void behaviourBuildInit(void) {
   
     writeToProcOutput("BUILD   WRITE 54.LFL");
 
-    zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
+    zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_8);
     progressResetMax(file_size);
   
     prepareLFLFileName(54);
@@ -1050,7 +1050,7 @@ void behaviourBuildWrite(void) {
   
   file_size -= next_size;
   file_pos += next_size;
-  zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
+  zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_8);
   progressIncValue(next_size);
 
   if (file_size == 0) {
@@ -1351,7 +1351,7 @@ void behaviourExtractRead(void) {
 
   file_pos = FILE_MEMORY;
 
-  zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
+  zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_8);
   progressResetMax(file_size);
 
   char text2[] = "EXTRACT WRITE 00.LFL";
@@ -1384,7 +1384,7 @@ void behaviourExtractWrite(void) {
   
   file_size -= next_size;
   file_pos += next_size;
-  zptrself = (uint32_t)((karlFarPtr_t)&pgb_mmsetup_proc_0_8);
+  zptrself = (uint32_t)((karlObject_t __huge *)&pgb_mmsetup_proc_0_8);
   progressIncValue(next_size);
 
   if (file_size == 0) {

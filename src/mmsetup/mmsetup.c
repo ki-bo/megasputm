@@ -2026,7 +2026,7 @@ judeControl_t ctl_mmsetup_proc_0_3 = {
   0};
 
 judeProgressBar_t pgb_mmsetup_proc_0_4 = {    //Process progress bar
-  sizeof(judeControl_t),
+  sizeof(judeProgressBar_t),
   FARPTRNULLREC,
   NEARTOEVENTPTR(judeDefCtlPrepare),
   NEARTOEVENTPTR(judeDefCtlInit),
@@ -2131,7 +2131,7 @@ judeControl_t ctl_mmsetup_proc_0_7 = {
   0};
 
 judeProgressBar_t pgb_mmsetup_proc_0_8 = {    //write progress
-  sizeof(judeControl_t),
+  sizeof(judeProgressBar_t),
   FARPTRNULLREC,
   NEARTOEVENTPTR(judeDefCtlPrepare),
   NEARTOEVENTPTR(judeDefCtlInit),
