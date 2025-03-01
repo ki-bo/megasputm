@@ -304,20 +304,12 @@ static int8_t apply_acceleration(int8_t value)
   return value;
 }
 
-// move this to common header to be used by the engine and mmsetup
-struct __pot {
-  uint8_t x;
-  uint8_t y;
-};
-#define POT         (*(volatile struct __pot *)         0xd419)
-
-
 static void handle_mouse(void)
 {
   static uint8_t old_potx = 0;
   static uint8_t old_poty = 0;
-  uint8_t potx = POT.x;
-  uint8_t poty = POT.y;
+  uint8_t potx = SID1.ad1;
+  uint8_t poty = SID1.ad2;
   // prepare CIA1 already now for joystick handling, as this takes some time
   CIA1.pra  = 0xff;
 

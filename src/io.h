@@ -167,14 +167,16 @@ enum {
   ADMA_SBITS_4L = 0b00
 };
 
-struct __pot {
-  uint8_t x;
-  uint8_t y;
+struct __sid_raw {
+  uint8_t regs[sizeof(struct __sid)];
 };
 
 #define CPU_VECTORS (*(volatile struct __cpu_vectors *) 0xfffa)
 #define FDC         (*(volatile struct __f011 *)        0xd080)
-#define POT         (*(volatile struct __pot *)         0xd419)
+#define SID1_RAW    (*(volatile struct __sid_raw *)     0xd400)
+#define SID2_RAW    (*(volatile struct __sid_raw *)     0xd420)
+#define SID3_RAW    (*(volatile struct __sid_raw *)     0xd440)
+#define SID4_RAW    (*(volatile struct __sid_raw *)     0xd460)
 #define UART_E_PRA  (*(volatile uint8_t *)              0xd607)
 #define UART_E_DDR  (*(volatile uint8_t *)              0xd608)
 #define ASCIIKEY    (*(volatile uint8_t *)              0xd610)

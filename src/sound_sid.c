@@ -20,10 +20,12 @@
  */
 
 #include "sound_sid.h"
+#include "io.h"
 #include "map.h"
 #include "memory.h"
 #include "resource.h"
 #include "util.h"
+#include <calypsi/intrinsics6502.h>
 
 
 #define ZEROMEM(a) memset(a, 0, sizeof(a))
@@ -341,16 +343,6 @@ void c64_sound_init(void)
 
 void init_sid() 
 {
-  /*  _sid = new Resid::SID();
-    _sid->set_sampling_parameters(
-      timingProps[_videoSystem].clockFreq,
-      _sampleRate);
-    _sid->enable_filter(true);*/
-  
-  
-  
-    //_sid->reset();
-  
     //Synchronize the waveform generators (must occur after reset)
     sid_write(4, 0x08);
     sid_write(11, 0x08);
@@ -420,8 +412,6 @@ void c64_stop_sound(uint8_t sound_id)
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
 
-  //return;
-
   for (uint8_t i = 0; i < NUM_SOUND_SLOTS; ++i) {
     if (sound_triggers[i] == sound_id) {
       sound_triggers[i] = 0;
@@ -435,7 +425,6 @@ void c64_stop_all_sounds()
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
   
-  //Common::StackLock lock(_mutex);
   reset_player_state();
 }
 
@@ -505,9 +494,6 @@ void c64_sound_update() // $481B
   };
 
   if (isMusicPlaying) {
-    //while(1) {
-      //*(volatile uint8_t *)0xd020 =  *(volatile uint8_t *)0xd020 + 1;
-    //}
     handle_music_buffer();
   }
 
@@ -1011,11 +997,6 @@ void unlock_resource(int8_t chanResIndex) // $4CDA
         res_data.count[i]--;
         
         //debug_out("sur dec %d %d", chanResIndex, res_data.count[i]);
-
-        //Don't do this so we can restart it in the same cycle if desired
-        //if (res_data.count[i] == 0) {
-          //res_data.id[i] = 0xff; // 0xff = marked as to be deactivated
-        //};
       }
     }
   }
@@ -1343,12 +1324,9 @@ void init_music(int8_t songResIndex, uint8_t res_page) // $7de6
   //unlockResource(resID_song);
 
   resID_song = songResIndex;
-  //_music = getResource(resID_song);
   res_page_music = res_page;
 
   // song base address
-  //actSongFileData = _music;
-
   initializing = 1;
   _soundInQueue = 0;
   isMusicPlaying = 0;
@@ -1485,8 +1463,6 @@ int8_t init_sound(int8_t soundResID, uint8_t res_page) // $4D0A
     return -2;
   }
 
-  //uint8_t __far *songFilePtr = getResource(soundResID);
-
   uint8_t soundPrio = *NEAR_U8_PTR(RES_MAPPED + 4);
   // for (mostly but not always looped) background sounds
   if (soundPrio == 1) {
@@ -1602,33 +1578,11 @@ uint8_t *get_resource(int8_t resID)
   return NULL;
 }
 
-//int readBuffer(int16_t *buffer, const int numSamples) {
-  /*int samplesLeft = numSamples;
-
-  Common::StackLock lock(_mutex);
-
-  while (samplesLeft > 0) {
-    // update SID status after each frame
-    if (_cpuCyclesLeft <= 0) {
-      update();
-      _cpuCyclesLeft = timingProps[_videoSystem].cyclesPerFrame;
-    }
-    // fetch samples
-    int sampleCount = _sid->updateClock(_cpuCyclesLeft, (short *)buffer, samplesLeft);
-    samplesLeft -= sampleCount;
-    buffer += sampleCount;
-  }*/
-
-  //return numSamples;
-//}
-
 void sid_write(uint8_t reg, uint8_t data) 
 {
-  //_sid->write(reg, data);
-  *(volatile uint8_t *)(0xd400 + reg) = data;
-  *(volatile uint8_t *)(0xd440 + reg) = data;
+  SID1_RAW.regs[reg] = data;
+  SID3_RAW.regs[reg] = data;
 }
-
 
 void start_sound(int8_t nr) 
 {
@@ -1636,8 +1590,6 @@ void start_sound(int8_t nr)
   uint8_t i;
   for (i = 0; i < NUM_RES_SLOTS; ++i) {
     if (res_data.id[i] == nr) {
-      //res_data.count[i]++;
-
       //debug_out("sss found %d %d", nr, res_data.count[i]);
 
       res_page = res_data.page[i];
@@ -1668,12 +1620,7 @@ void start_sound(int8_t nr)
   // prio 7 is never used in any sound file use this byte for auto-detection.
   uint8_t isMusic = (*NEAR_U8_PTR(RES_MAPPED + 4) == 0x07);
 
-  //Common::StackLock lock(_mutex);
-
-  __asm volatile (
-    "   sei "
-    :::
-  );
+  __disable_interrupts();
 
   if (isMusic) {
     init_music(nr, res_page);
@@ -1682,10 +1629,7 @@ void start_sound(int8_t nr)
     init_sound(nr, res_page);
   }
 
-  __asm volatile (
-    "   cli "
-    :::
-  );
+  __enable_interrupts();
 }
 
 void stop_sound(int8_t nr) 
@@ -1696,7 +1640,6 @@ void stop_sound(int8_t nr)
     return;
   }
 
-  //Common::StackLock lock(_mutex);
   stop_sound_intern(nr, 1);
   //releaseResource(nr, 1);
 }
@@ -1705,14 +1648,12 @@ int8_t get_sound_status(int8_t nr)
 {
   int result = 0;
 
-  //Common::StackLock lock(_mutex);
-
   if (resID_song == nr && isMusicPlaying) {
     result = 1;
     return result;
   }
 
-  for (int i = 0; (i < 4) /*&& (result == 0)*/; ++i) {
+  for (int i = 0; i < 4; ++i) {
     if (nr == _soundQueue[i] || nr == channelMap[i]) {
       //debug_out("scl %d %d", i, chanloop[i]);
 

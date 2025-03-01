@@ -162,8 +162,8 @@ static void handle_mouse(void)
 {
   static uint8_t old_potx = 0;
   static uint8_t old_poty = 0;
-  uint8_t potx = POT.x;
-  uint8_t poty = POT.y;
+  uint8_t potx = SID1.ad1;
+  uint8_t poty = SID1.ad2;
   // prepare CIA1 already now for joystick handling, as this takes some time
   CIA1.pra  = 0xff;
 
