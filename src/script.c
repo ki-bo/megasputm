@@ -1024,7 +1024,7 @@ static void stop_or_break(void)
     //debug_scr("stop-music");
     
     if (use_sid_sounds) {
-      c64_stop_all_sounds();
+      c64_stop_music();
     }
     else {
       sound_stop_music();

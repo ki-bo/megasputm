@@ -420,7 +420,17 @@ void c64_stop_sound(uint8_t sound_id)
   stop_sound((int8_t)sound_id);
 }
 
-void c64_stop_all_sounds() 
+void c64_stop_music(void)
+{
+  SAVE_CS_AUTO_RESTORE
+  MAP_CS_SOUND
+
+  if (isMusicPlaying) {
+    c64_stop_all_sounds();
+  }
+}
+
+void c64_stop_all_sounds(void) 
 {
   SAVE_CS_AUTO_RESTORE
   MAP_CS_SOUND
@@ -1002,7 +1012,7 @@ void unlock_resource(int8_t chanResIndex) // $4CDA
 {
   if (chanResIndex > 5) {
     for (uint8_t i = 0; i < NUM_RES_SLOTS; ++i) {
-      if (res_data.id[i] == (uint8_t)chanResIndex) {
+      if (res_data.id[i] == (uint8_t)chanResIndex && res_data.count[i] != 0) {
         res_data.count[i]--;
         
         //debug_out("sur dec %d %d", chanResIndex, res_data.count[i]);
@@ -1651,13 +1661,18 @@ void stop_sound(int8_t nr)
     return;
   }
 
+  if (isMusicPlaying && resID_song == nr) {
+    c64_stop_all_sounds();
+    return;
+  }
+
   stop_sound_intern(nr, 1);
   //releaseResource(nr, 1);
 }
 
 int8_t get_sound_status(int8_t nr) 
 {
-  int result = 0;
+  uint8_t result = 0;
 
   if (resID_song == nr && isMusicPlaying) {
     result = 1;
