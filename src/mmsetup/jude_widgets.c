@@ -92,19 +92,10 @@ void progressRealise(void) {
   if (delta >= w)  {
     judeEraseLine(w, x, y, CLR_FOCUS);
   } else {
-    //if (self->max == 0 || (self->last == 0 && self->value == 0)) {
     judeEraseLine(w - delta, x + delta, y, CLR_SHADOW);
-    //} else {
-    
-    //x+= self->last;
-
-    //while (delta > 0) {
     if (delta > 0) {
       judeEraseLine(delta, x, y, CLR_FOCUS);
-      //--delta;
-      //++x;
     }
-  
     self->last = self->alloc;
   }
     

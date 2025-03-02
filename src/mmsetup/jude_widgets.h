@@ -99,7 +99,7 @@ typedef struct PROGRESSBAR {
   uint32_t max;
   uint32_t value;
   uint32_t next;
-  uint16_t step;
+  uint32_t step;
 } judeProgressBar_t;
 
 void progressResetMax(uint32_t max);
