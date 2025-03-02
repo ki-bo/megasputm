@@ -539,6 +539,10 @@ void vm_change_ui_flags(uint8_t flags)
   */
 void vm_set_current_room(uint8_t room_no)
 {
+  if (room_no == vm_read_var8(VAR_SELECTED_ROOM)) {
+    return;
+  }
+
   // save DS
   SAVE_DS_AUTO_RESTORE
 
