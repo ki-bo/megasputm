@@ -1615,6 +1615,10 @@ void start_sound(int8_t nr)
         break;      
       }
     }
+    if (i == NUM_RES_SLOTS) {
+      VICIV.bordercol = 2;
+      fatal_error(ERR_NO_FREE_SOUND_RES_SLOT);
+    }
   }
 
   //debug_out("sss start %d %d %d", nr, i, res_data.count[i]);

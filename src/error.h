@@ -68,4 +68,5 @@ typedef enum {
     ERR_REALHW_ONLY = 44,
     ERR_LANG_NOT_SUPPORTED = 45,
     ERR_INVALID_SID_RES_ID = 46,
+    ERR_NO_FREE_SOUND_RES_SLOT = 47,
 } error_code_t;
