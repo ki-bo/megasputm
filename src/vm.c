@@ -1815,14 +1815,14 @@ static const char *get_object_name(uint16_t global_object_id)
       return ((const char *)obj_hdr) + name_offset;
     }
   }
-  else if (owner == vm_read_var8(VAR_SELECTED_ACTOR)) {
-    // is inventory object
-    uint8_t inv_pos = inv_get_position_by_id(global_object_id);
-    if (inv_pos != 0xff) {
-      return inv_get_object_name(inv_pos);
-    }
+
+  // is inventory object
+  uint8_t inv_pos = inv_get_position_by_id(global_object_id);
+  if (inv_pos != 0xff) {
+    return inv_get_object_name(inv_pos);
   }
 
+  // not found
   return NULL;
 }
 
