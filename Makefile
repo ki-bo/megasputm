@@ -125,4 +125,4 @@ doxygen:
 
 clean:
 	-rm -rf obj
-	-rm *.prg *.raw *.d mm-mega65.lst mm1.d81 mm2.d81
+	-rm *.prg *.raw *.d *.lst mm1.d81 mm2.d81
