@@ -25,7 +25,7 @@ LN_FLAGS_MM    = $(LN_FLAGS) mega65-mm.scm --raw-multiple-memories --cstartup=mm
 
 ETHLOAD   = etherload
 M65FTP    = mega65_ftp
-C1541     = c1541
+CC1541    = cc1541
 XMEGA65   = /Applications/Xemu/xmega65.app/Contents/MacOS/xmega65
 
 # megasputm engine sources and objects
@@ -47,7 +47,7 @@ export ETHLOAD_IP_PARAM
 
 .PHONY: all clean run debug_xemu doxygen
 
-all: mm1.d81 mm2.d81 mmsetup.prg
+all: mm1.d81 mm2.d81
 
 run: mm1.d81 mm2.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm1.d81"
@@ -82,41 +82,40 @@ mmsetup.prg: $(SETUP_OBJS)
 	$(LN) $(LN_FLAGS_SETUP) -o mmsetup.prg $(SETUP_OBJS)
 
 # Rule for building the runtime.raw target
-runtime.raw: $(OBJS) mega65-mm.scm
+autoboot.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS_MM) -o $@ $(filter-out mega65-mm.scm,$^)
 
 # Rule for creating the mm1.d81 disk image
-mm1.d81: runtime.raw mmsetup.prg autoboot.c65.bas $(SAVE_FILES)
-	echo "creating  mm1.d81 disk image"; \
-	$(C1541) -format "maniac mansion,m1" d81 mm1.d81; \
-	$(C1541) -attach mm1.d81 -write autoboot.c65.bas autoboot.c65 -write runtime.raw boot -write mmsetup.prg mmsetup -write script.raw m01 -write main.raw m02 -write m0-3.raw m03 -write m1-0.raw m10 -write m1-2.raw m12 -write m1-3.raw m13 -write m1-4.raw m14 -write mc-0.raw mc0; \
+mm1.d81: autoboot.raw mmsetup.prg autoboot.c65.bas $(SAVE_FILES)
+	@echo "Creating  mm1.d81 disk image"; \
+	$(CC1541) -q -n "maniac mansion" -i "m1#a03d" -f autoboot.c65 -w autoboot.c65.bas -f boot -w autoboot.raw -f mmsetup -w mmsetup.prg -f m01 -w script.raw -f m02 -w main.raw -f m03 -w m0-3.raw -f m10 -w m1-0.raw -f m12 -w m1-2.raw -f m13 -w m1-3.raw -f m14 -w m1-4.raw -f mc0 -w mc-0.raw mm1.d81; \
 	for file in gamedata/disk1/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \
 		if [ "$$ext" = "LFL" ]; then \
-			$(C1541) -attach mm1.d81 -write $$file $$lowercasefile; \
+			$(CC1541) -q -f $$lowercasefile -w $$file mm1.d81; \
 		elif [ "$$ext" = "lfl" ]; then \
-			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file); \
+			$(CC1541) -q -f $$(basename $$file) -w $$file mm1.d81; \
 		fi; \
 	done; \
-	echo "Copying save game files to disk image..."
+	echo "Copying save game files to disk image..."; \
 	for file in $(SAVE_FILES); do \
 		if [ -f "$$file" ]; then \
 			echo "Adding $$file to mm1.d81..."; \
-			$(C1541) -attach mm1.d81 -write $$file $$(basename $$file),s; \
+			@$(C1541) -attach mm1.d81 -write $$file $$(basename $$file),s; \
 		fi \
 	done
 
 mm2.d81:
-	echo "creating mm2.d81 disk image"; \
-	$(C1541) -format "maniac mansion,m2" d81 mm2.d81; \
+	@echo "Creating mm2.d81 disk image"; \
+	$(CC1541) -q -n "maniac mansion" -i "m2#a03d" mm2.d81; \
 	for file in gamedata/disk2/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \
 		if [ "$$ext" = "LFL" ]; then \
-			$(C1541) -attach mm2.d81 -write $$file $$lowercasefile; \
+			$(CC1541) -q -f $$lowercasefile -w $$file mm2.d81; \
 		elif [ "$$ext" = "lfl" ]; then \
-			$(C1541) -attach mm2.d81 -write $$file $$(basename $$file); \
+			$(CC1541) -q -f $$(basename $$file) -w $$file mm2.d81; \
 		fi; \
 	done
 
