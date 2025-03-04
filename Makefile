@@ -51,7 +51,7 @@ all: mm1.d81 mm2.d81
 
 run: mm1.d81 mm2.d81
 	$(M65FTP)  $(ETHLOAD_IP_PARAM) -e -c"put mm1.d81"
-	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm1.d81 -r runtime.raw
+	$(ETHLOAD) $(ETHLOAD_IP_PARAM) -m mm1.d81 -r autoboot.raw
 
 debug_xemu: mm1.d81 mm2.d81
 	@echo "--------------------------------------------------"
@@ -81,7 +81,7 @@ obj/%.o: src/%.c
 mmsetup.prg: $(SETUP_OBJS)
 	$(LN) $(LN_FLAGS_SETUP) -o mmsetup.prg $(SETUP_OBJS)
 
-# Rule for building the runtime.raw target
+# Rule for building the autoboot.raw target
 autoboot.raw: $(OBJS) mega65-mm.scm
 	$(LN) $(LN_FLAGS_MM) -o $@ $(filter-out mega65-mm.scm,$^)
 
