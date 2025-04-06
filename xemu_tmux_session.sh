@@ -1,3 +1,3 @@
 #!/bin/zsh
-tmux new-session -s mmxemu
+tmux new-session -s megasputm-xemu
 

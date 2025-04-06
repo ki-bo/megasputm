@@ -19,7 +19,7 @@
  *
  */
 
-		.rtmodel cstartup, "mm"
+		.rtmodel cstartup, "sputm"
 
 		.rtmodel version, "1"
 		.rtmodel cpu, "*"
