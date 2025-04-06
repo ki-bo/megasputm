@@ -763,7 +763,6 @@ static void set_channel_vol_and_pan(uint8_t ch, uint8_t vol, uint8_t pan)
   if (ch >= 4) {
     return;
   }
-  vol >>= 2;
   __auto_type dma_ch = &DMA.aud_ch[ch];
   if (pan == PAN_CENTER) {
     DMA.aud_ch_pan_vol[ch] = vol;
@@ -1098,7 +1097,7 @@ static void start_explosion(uint8_t slot_id, int8_t __far *data, uint16_t size)
   slot->update = update_explosion;
   slot->stop   = stop_slot;
   
-  priv->ch = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, freq_to_timer(priv->freq), 0x3f >> 1, PAN_CENTER);
+  priv->ch = alloc_and_start_channel(slot->id, data, size, 0, ADMA_CHLOOP_MASK, freq_to_timer(priv->freq), 0x3f, PAN_CENTER);
 
   slot->type = SOUND_TYPE_EXPLOSION;
 }
@@ -1124,7 +1123,7 @@ static void update_explosion(struct sound_slot *slot)
   priv->freq = freq;
   priv->vol  = vol;
 
-  set_channel_vol_and_pan(ch, vol >> 1, PAN_CENTER);
+  set_channel_vol_and_pan(ch, vol, PAN_CENTER);
 }
 
 static void start_old_record(uint8_t slot_id, int8_t __far *data)
