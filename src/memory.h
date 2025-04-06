@@ -24,7 +24,7 @@
 #define RES_MAPPED          0x8000
 #define HEAP                0x8000
 #define BACKBUFFER_SCREEN   0xa000
-#define BACKBUFFER_COLRAM   0xb800
+#define BACKBUFFER_COLRAM   0xb770
 #define SCREEN_RAM          0x10000UL
 #define DISKIO_SECTION      0x12000UL
 #define GFX_SECTION         0x14000UL

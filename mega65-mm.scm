@@ -19,8 +19,8 @@
 ;;; placement |  |           |        | stack |         | parser code                      | code        | (strings,  | screen ram  | color ram   | code         | cdata_main   | stack |            | code   | code   | bss    | code  | bss   | code  | bss   | 256 pages      | (room, objects,   |               |     |                   | helpscreen        |
 ;;;           |  |           |        |       |         | (M01)                            | (M02)       | inventory) |             |             | (M03)        | zdata        |       |            | (M10)  |        |        | (M12) |       |       |       | each 256 bytes |  actors)          |               |     |                   |                   |
 ;;;            \ +-----------+--------+-------+---------+------+------+---+---+------------+-------------+------------+-------------+------+------+--------------+--------------+-------+------------+--------+--------+--------+-------+-------+-------+-------+----------------+-------------------+---------------+ ... +-------------------+-------------------+
-;;;              0x0000      0x0080   0x0100  0x0200    0x2000 0x3000 0x3800  0x3a00      0x4000         0x8000       0xa000        0xb800 0xc000 0xd000         0xe000         0xf800  0x10000      0x11800  0x12000  0x13a80  0x14000 0x15900 0x16000 0x17800 0x18000          0x28000             0x53800   0x5ffff     0xff80800     0xff82000   0xff83fff
-;;;                                                                       0x3900                        |    8 kb     |     6 kb    |     6 kb    |     4 kb     |   6 kb       |  2 kb |    6 kb    |  2 kb  | 6.5 kb | ~1.5 kb|  6 kb | ~2 kb |  6 kb |  2 kb |     64 kb      |       174 kb      |     50 kb     |     |        6 kb       |        8 kb       |
+;;;              0x0000      0x0080   0x0100  0x0200    0x2000 0x3000 0x3800  0x3a00      0x4000         0x8000       0xa000        0xb770 0xc000 0xcee0         0xe000         0xf800  0x10000      0x11800  0x12000  0x13a80  0x14000 0x15900 0x16000 0x17800 0x18000          0x28000             0x53800   0x5ffff     0xff80800     0xff82000   0xff83fff
+;;;                                                                       0x3900                        |    8 kb     |     ~6 kb   |     ~6 kb   |     ~4 kb    |     6 kb     |  2 kb |    6 kb    |  2 kb  | 6.5 kb | ~1.5 kb|  6 kb | ~2 kb |  6 kb |  2 kb |     64 kb      |       174 kb      |     50 kb     |     |        6 kb       |        8 kb       |
 ;;;                                                     |<----   Code Segment (CS)  ---->|              |<---    Data Segment (DS)   ---->|
 ;;;                                                     |        (0x2000 - 0x3fff)       |              |        (0x8000 - 0xbfff)        |
 ;;;              |                 8kb                  |              8 kb              |     16 kb    |              16 kb              |
@@ -103,8 +103,8 @@
         (memory bssram-main (address (#x8000 . #xfff9))
                 (section 
                         (heap              (#x8000 . #x9fff))
-                        (backbuffer-screen (#xa000 . #xb7ff))
-                        (backbuffer-color  (#xb800 . #xbfff))
+                        (backbuffer-screen (#xa000 . #xb76f))
+                        (backbuffer-color  (#xb770 . #xcedf))
                         (zdata             (#xe380 . #xf7ff))
                         (cstack            (#xf800 . #xfff9))
                 )
@@ -120,8 +120,8 @@
         ;;;; **** BANKED MEMORY code_main_private ****
 
         ; memory in bank 0 for mapping private vm code
-        (memory main_private (address (#x3000 . #x3fff))
-                (scatter-to bank0_d000)
+        (memory main_private (address (#x2ee0 . #x3fff))
+                (scatter-to bank0_cee0)
                 (section
                         code_main_private
                         cdata_main_private
@@ -248,9 +248,9 @@
         ;;;; ********************************************
 
         ; memory holding code_main_private section (will be mapped to 0x3000 during execution)
-        (memory m0-3 (address (#xd000 . #xe37f))
+        (memory m0-3 (address (#xcee0 . #xe37f))
                 (section
-                        (bank0_d000 #xd000)
+                        (bank0_cee0 #xcee0)
                         (data_sound_mod #xe000)
                         cdata_main
                 )

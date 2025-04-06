@@ -50,7 +50,7 @@ __task void main(void)
   MAP_CS_DISKIO
   diskio_load_file(0, "M01", (uint8_t __far *)(0x2000));     // load script parser code
   diskio_load_file(0, "M02", (uint8_t __far *)(0x4000));     // load main code
-  diskio_load_file(0, "M03", (uint8_t __far *)(0xd000));     // load main private code
+  diskio_load_file(0, "M03", (uint8_t __far *)(0xcee0));     // load main private code
   diskio_load_file(0, "MC0", (uint8_t __far *)(0xff82000));  // load gfx helpscreen code
   // switch back to real drive
   //diskio_switch_to_real_drive();

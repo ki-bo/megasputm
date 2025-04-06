@@ -14,6 +14,5 @@
 /*.lst
 /*.d81
 /*.d
-/gamedata/disk1/*.lfl
-/gamedata/disk2/*.lfl
+/gamedata/**/*.lfl
 mm.sav.*
