@@ -6,7 +6,7 @@ LN = ln6502
 
 CONFIG ?= default
 
-SAVEGAME_PREFIX = mm
+GAME_ID = mm
 DISK1_NAME = mm1.d81
 DISK2_NAME = mm2.d81
 DISK1_HEADER = maniac mansion
@@ -14,7 +14,7 @@ DISK2_HEADER = maniac mansion
 DISK1_INDEX = m1
 DISK2_INDEX = m2
 
-SAVE_FILES = $(wildcard $(SAVEGAME_PREFIX).sav.*)
+SAVE_FILES = $(wildcard $(GAME_ID).sav.*)
 
 CC_FLAGS       = --target=mega65 --code-model=plain -O2 -Werror --list-file=$(@:%.o=%.lst)
 ifeq ($(CONFIG),debug)
@@ -91,7 +91,7 @@ autoboot.raw: $(OBJS) mega65-sputm.scm
 $(DISK1_NAME): autoboot.raw setup.prg autoboot.c65.bas $(SAVE_FILES)
 	@echo "Creating  $(DISK1_NAME) disk image"; \
 	$(CC1541) -q -n "$(DISK1_HEADER)" -i "$(DISK1_INDEX)#a03d" -f autoboot.c65 -w autoboot.c65.bas -f boot -w autoboot.raw -f setup -w setup.prg -f m01 -w script.raw -f m02 -w main.raw -f m03 -w m0-3.raw -f m10 -w m1-0.raw -f m12 -w m1-2.raw -f m13 -w m1-3.raw -f m14 -w m1-4.raw -f mc0 -w mc-0.raw $(DISK1_NAME); \
-	for file in gamedata/disk1/*; do \
+	for file in gamedata/$(GAME_ID)/disk1/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \
 		if [ "$$ext" = "LFL" ]; then \
@@ -111,7 +111,7 @@ $(DISK1_NAME): autoboot.raw setup.prg autoboot.c65.bas $(SAVE_FILES)
 $(DISK2_NAME):
 	@echo "Creating $(DISK2_NAME) disk image"; \
 	$(CC1541) -q -n "$(DISK2_HEADER)" -i "$(DISK2_INDEX)#a03d" $(DISK2_NAME); \
-	for file in gamedata/disk2/*; do \
+	for file in gamedata/$(GAME_ID)/disk2/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \
 		if [ "$$ext" = "LFL" ]; then \
