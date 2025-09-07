@@ -2033,6 +2033,9 @@ loop1$:
 ;	Sprite 8 bytes wide
 		tsb	0xD057
 
+;	Sprite disable V400
+		trb	0xD076
+
 ;***FIXME What was this, is it fixed?
 ;	Workaround BUG #339
 		lda	#0x08
