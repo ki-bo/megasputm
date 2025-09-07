@@ -211,6 +211,9 @@ void vm_init(void)
     case LANG_DE:
       init_strings_de();
       break;
+    case LANG_ES:
+      init_strings_es();
+      break;
     default:
       fatal_error(ERR_LANG_NOT_SUPPORTED);
   }
@@ -597,7 +600,7 @@ void vm_set_current_room(uint8_t room_no)
     camera_x = 20;
     vm_write_var(VAR_CAMERA_X, camera_x);
     actor_room_changed();
-
+  
     // run entry script
     uint16_t entry_script_offset = room_hdr->entry_script_offset;
     if (entry_script_offset) {
@@ -1336,13 +1339,13 @@ void vm_handle_error_wrong_disk(uint8_t expected_disk)
   SAVE_DS_AUTO_RESTORE
   UNMAP_DS
 
-  char error_str[41];
-  sprintf(error_str, ui_strings[UI_STR_SWITCH_DISK], expected_disk);
+  char error_str[81];
+  uint8_t num_chars = sprintf(error_str, ui_strings[UI_STR_SWITCH_DISK], expected_disk);
 
   input_key_pressed = 0; // ack the latest key in the queue
   MAP_CS_GFX
   gfx_clear_dialog();
-  gfx_print_interface_text(0, 0, error_str, TEXT_STYLE_SENTENCE);
+  gfx_print_dialog(TEXT_STYLE_SENTENCE, error_str, num_chars);
   script_watchdog = WATCHDOG_TIMEOUT;
   wait_for_jiffy();  // this resets the elapsed jiffies timer
 
@@ -2098,11 +2101,11 @@ static void update_inventory_highlighting(void)
   if (cur_inventory != prev_inventory_highlighted) {
     MAP_CS_GFX
     if (prev_inventory_highlighted != 0xff) {
-      uint8_t style = (prev_inventory_highlighted & 4) ? TEXT_STYLE_INVENTORY_ARROW : TEXT_STYLE_INVENTORY;
+      uint8_t col = (prev_inventory_highlighted & 4) ? TEXT_STYLE_INVENTORY_ARROW : TEXT_STYLE_INVENTORY;
       gfx_change_interface_text_style(inventory_ui_pos_to_x(prev_inventory_highlighted), 
                                       inventory_ui_pos_to_y(prev_inventory_highlighted), 
                                       prev_inventory_highlighted & 4 ? 4 : 18, 
-                                      style);
+                                      col);
     }
     if (cur_inventory != 0xff) {
       gfx_change_interface_text_style(inventory_ui_pos_to_x(cur_inventory), 

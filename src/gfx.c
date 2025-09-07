@@ -204,12 +204,12 @@ static void place_rrb_object(uint16_t char_num, int16_t screen_pos_x, int8_t scr
 static void apply_actor_masking(void);
 static void decode_single_mask_column(int16_t col, int8_t y_start, uint8_t num_lines);
 static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_start, uint8_t num_lines, uint8_t idx_dst);
-static uint16_t text_style_to_color(enum text_style style);
 // private gfx helpscreen functions
 static void draw_helpscreen_border(void);
 static void print_helpscreen_text(uint8_t x, uint8_t y, const char *text, uint8_t color);
 static void print_helpscreen_en(void);
 static void print_helpscreen_de(void);
+static void print_helpscreen_es(void);
 
 //-----------------------------------------------------------------------------------------------
 
@@ -1531,23 +1531,28 @@ void gfx_update_main_screen(void)
   dma_trigger(&dmalist_copy_gfx);
 }
 
-void gfx_print_interface_text(uint8_t x, uint8_t y, const char *name, enum text_style style)
+void gfx_print_interface_text(uint8_t x, uint8_t y, const char *name, uint8_t color)
 {
-  uint16_t col = text_style_to_color(style);
-  uint16_t __far *screen_ptr = FAR_U16_PTR(SCREEN_RAM) + times_chrcount[y] + x;
-  uint16_t __far *colram_ptr = FAR_U16_PTR(COLRAM) + times_chrcount[y] + x;
+  uint16_t __far *screen_ptr = FAR_U16_PTR(SCREEN_RAM) + (times_chrcount[y] + x);
+  uint8_t __far *colram_ptr = FAR_U8_PTR(COLRAM) + 2 * (times_chrcount[y] + x);
   while (*name) {
-    *screen_ptr++ = *name++;
-    *colram_ptr++ = col;
+    *screen_ptr = *name++;
+    ++screen_ptr;
+    *colram_ptr = 0;
+    ++colram_ptr;
+    *colram_ptr = color;
+    ++colram_ptr;
   }
 }
 
-void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, enum text_style style)
+void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, uint8_t color)
 {
-  uint16_t col = text_style_to_color(style);
-  uint16_t __far *colram_ptr = FAR_U16_PTR(COLRAM) + times_chrcount[y] + x;
+  uint8_t __far *colram_ptr = FAR_U8_PTR(COLRAM) + 2 * (times_chrcount[y] + x);
   while (size--) {
-    *colram_ptr++ = col;
+    *colram_ptr = 0;
+    ++colram_ptr;
+    *colram_ptr = color;
+    ++colram_ptr;
   }
 }
 
@@ -1581,11 +1586,14 @@ void gfx_helpscreen(void)
     case LANG_DE:
       print_helpscreen_de();
       break;
+    case LANG_ES:
+      print_helpscreen_es();
+      break;
     default:
       print_helpscreen_en();
       break;
   }
-  print_helpscreen_text(72,  23, "1.2-MM", 0x0d);
+  print_helpscreen_text(72,  23, "1.3-MM", 0x0d);
 
 
   ASCIIKEY = 0; // ack any keypress still pending
@@ -1949,23 +1957,6 @@ static void decode_object_mask_column(uint8_t local_id, int16_t col, uint8_t y_s
   }
 }
 
-static uint16_t text_style_to_color(enum text_style style)
-{
-  switch (style) {
-    case TEXT_STYLE_NORMAL:
-      return 0x0200;
-    case TEXT_STYLE_HIGHLIGHTED:
-      return 0x0e00;
-    case TEXT_STYLE_SENTENCE:
-    case TEXT_STYLE_INVENTORY:
-      return 0x0d00;
-    case TEXT_STYLE_INVENTORY_ARROW:
-      return 0x0100;
-    default:
-      return 0x0200;
-  }
-}
-
 #pragma clang section text="code_gfx_helpscreen" rodata="cdata_gfx_helpscreen" data="data_gfx_helpscreen" bss="bss_gfx_helpscreen"
 static void draw_helpscreen_border(void)
 {
@@ -2081,6 +2072,45 @@ static void print_helpscreen_de(void)
   print_helpscreen_text(40, y++, "K,L        Inventar unten links/rechts", color1);
   y += 2;
   print_helpscreen_text(22, y++, "Port 1 - Maus     Port 2 - Joystick", color1);
+  print_helpscreen_text( 2,  23, "github.com/ki-bo/megasputm", color2);
+  print_helpscreen_text(64,  23, "Version", color2);
+}
+
+static void print_helpscreen_es(void)
+{
+  uint8_t y = 1;
+  const uint8_t color1 = 0x02;
+  const uint8_t color2 = 0x0d;
+
+  print_helpscreen_text(14, y, "MEGASPUTM - Graphic Adventure Engine para el MEGA65", color1);
+  y = 3;
+  print_helpscreen_text( 2, y  , "Programaci\xfbn:", color2);
+  print_helpscreen_text(16, y++, "Robert Steffens (kibo), Daniel England (M3wP)", color1);
+  print_helpscreen_text( 2, y  , "Testeo:", color2);
+  print_helpscreen_text(16, y  , "Nico, Robert Hennig (kjubert), Sarah, Thomas Runge (Lefty64)", color1);
+  y += 2;
+  print_helpscreen_text( 2, y++, "Agradecimientos especiales:", color2);
+  print_helpscreen_text( 2, y++, "ScummVM Team - Este proyecto fue posible gracias a su completa WIKI y", color1);
+  print_helpscreen_text( 2, y++, "base de datos que nos han dado todos los detalles impagables de sus", color1);
+  print_helpscreen_text( 2, y++, "juegos en SCUMM.", color1);
+  y = 12;
+  print_helpscreen_text( 2, y++, "Controles de las teclas:", color2);
+  print_helpscreen_text( 2, y++, "F1,F3,F5     Seleccionar personaje", color1);
+  print_helpscreen_text( 2, y++, "F8           Reiniciar partida", color1);
+  print_helpscreen_text( 2, y++, "F9           Cargar/Grabar partida", color1);
+  print_helpscreen_text( 2, y++, "ESC,STOP,F4  Esquivar entreactos", color1);
+  print_helpscreen_text( 2, y++, "<,>          Velocidad de los textos", color1);
+  print_helpscreen_text( 2, y++, "SPACE        Pausar la partida", color1);
+  print_helpscreen_text( 2, y++, "RETURN       Ejecutar frase", color1);
+  y = 13;
+  print_helpscreen_text(40, y++, "Q,W,E,R,T   Verbos de la 1a l\xfanea", color1);
+  print_helpscreen_text(40, y++, "A,S,D,F,G   Verbos de la 2a l\xfanea", color1);
+  print_helpscreen_text(40, y++, "Z,X,C,V,B   Verbos de la 3a l\xfanea", color1);
+  print_helpscreen_text(40, y++, "U,J         Subir/bajar en el inv", color1); 
+  print_helpscreen_text(40, y++, "I,O         Ir Arriba IZQ/DER del inv", color1);
+  print_helpscreen_text(40, y++, "K,L         Ir Abajo IZQ/DER del inv", color1);
+  y += 2;
+  print_helpscreen_text(22, y++, "Port 1 - Rat\xfbn     Port 2 - Joystick", color1);
   print_helpscreen_text( 2,  23, "github.com/ki-bo/megasputm", color2);
   print_helpscreen_text(64,  23, "Version", color2);
 }

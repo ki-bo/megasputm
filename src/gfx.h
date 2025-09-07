@@ -24,12 +24,12 @@
 #include "costume.h"
 #include <stdint.h>
 
-enum text_style {
-  TEXT_STYLE_NORMAL,
-  TEXT_STYLE_HIGHLIGHTED,
-  TEXT_STYLE_SENTENCE,
-  TEXT_STYLE_INVENTORY,
-  TEXT_STYLE_INVENTORY_ARROW
+enum text_color {
+  TEXT_STYLE_NORMAL = 0x02,
+  TEXT_STYLE_HIGHLIGHTED = 0x0e,
+  TEXT_STYLE_SENTENCE = 0x0d,
+  TEXT_STYLE_INVENTORY = 0x0d,
+  TEXT_STYLE_INVENTORY_ARROW = 0x01
 };
 
 // code_init functions
@@ -63,8 +63,8 @@ void gfx_apply_actor_masking(int16_t xpos, int8_t ypos, uint8_t masking);
 void gfx_finalize_actor_drawing(void);
 void gfx_reset_actor_drawing(void);
 void gfx_update_main_screen(void);
-void gfx_print_interface_text(uint8_t x, uint8_t y, const char *name, enum text_style style);
-void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, enum text_style style);
+void gfx_print_interface_text(uint8_t x, uint8_t y, const char *name, uint8_t color);
+void gfx_change_interface_text_style(uint8_t x, uint8_t y, uint8_t size, uint8_t color);
 void gfx_clear_sentence(void);
 void gfx_clear_verbs(void);
 void gfx_clear_inventory(void);

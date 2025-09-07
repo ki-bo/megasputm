@@ -30,5 +30,6 @@ char disk_header[29] = { 0x28, 0x03, 0x44, 0x00,
 
 uint16_t index_lang_chks[LANG_COUNT] = {
   [LANG_EN] = 0xdd69,
-  [LANG_DE] = 0xcfe5
+  [LANG_DE] = 0xcfe5,
+  [LANG_ES] = 0x1132
 };

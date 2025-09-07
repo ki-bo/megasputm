@@ -37,3 +37,4 @@ extern char *ui_strings[];
 // code_init functions
 void init_strings_en(void);
 void init_strings_de(void);
+void init_strings_es(void);

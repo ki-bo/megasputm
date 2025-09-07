@@ -56,6 +56,19 @@ void init_strings_de(void)
   restart_key_yes = 'j';
 }
 
+void init_strings_es(void)
+{
+  ui_strings[UI_STR_PREP_IN]     = add_string("en");
+  ui_strings[UI_STR_PREP_WITH]   = add_string("con");
+  ui_strings[UI_STR_PREP_ON]     = add_string("en");
+  ui_strings[UI_STR_PREP_TO]     = add_string("a");
+  ui_strings[UI_STR_PAUSED]      = add_string("Juego pausado. ESPACIO para continuar");
+  ui_strings[UI_STR_SWITCH_DISK] = add_string("Inserta el disco %d y pulsa RETURN.");
+  ui_strings[UI_STR_RESTART]     = add_string("?Quieres reiniciar? (s/n)");
+
+  restart_key_yes = 's';
+}
+
 static char *add_string(const char *str)
 {
   char *ptr = malloc(strlen(str) + 1);

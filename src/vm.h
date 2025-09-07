@@ -34,6 +34,7 @@
 enum {
   LANG_EN,
   LANG_DE,
+  LANG_ES,
   LANG_COUNT
 };
 

@@ -210,16 +210,81 @@ roomdata_t disk2_de[] = {
   {0xff, 0, 0}
 };
 
+roomdata_t disk1_es[] = {
+  {0,  1988, 0x1132},  
+  {30,  25008, 0x967b},
+  {33,  21253, 0xd463},
+  {40,  5170, 0x606e}, 
+  {44,  33253, 0x8ed0},
+  {45,  16276, 0xb98d},
+  {49,  4710, 0xf024}, 
+  {50,  6236, 0xd8c3}, 
+  {51,  23366, 0x1848},
+  {53,  71724, 0x2d9e},
+  {0xff, 0, 0}
+};
+
+roomdata_t disk2_es[] = {
+  {1,  30556, 0xa4e1}, 
+  {2,  5094, 0x5ce7},  
+  {3,  11334, 0x330b}, 
+  {4,  40893, 0x64fb}, 
+  {5,  18562, 0xbc6e}, 
+  {6,  13206, 0x410a}, 
+  {7,  23622, 0x1484}, 
+  {8,  12895, 0x85ee}, 
+  {9,  6905, 0x892b},  
+  {10,  10296, 0x616a},
+  {11,  12230, 0xc2ed},
+  {12,  23941, 0xfc07},
+  {13,  16387, 0xe7af},
+  {14,  4957, 0x85e3}, 
+  {15,  11603, 0xd9ca},
+  {16,  21807, 0xf8e7},
+  {17,  31221, 0x6454},
+  {18,  11985, 0xc38b},
+  {19,  12023, 0x649c},
+  {20,  9500, 0xecef}, 
+  {21,  20532, 0x3355},
+  {22,  7362, 0x7a03}, 
+  {23,  16932, 0xa1cf},
+  {24,  36750, 0xb4a1},
+  {25,  14068, 0x493f},
+  {26,  17555, 0xb954},
+  {27,  14676, 0xd91c},
+  {28,  4690, 0x1108}, 
+  {29,  22829, 0x446f},
+  {31,  15025, 0xa16e},
+  {32,  7656, 0x1b6a}, 
+  {34,  4994, 0xcf9f}, 
+  {35,  10849, 0xdb19},
+  {36,  9372, 0x1c34}, 
+  {37,  17125, 0x5b55},
+  {38,  19253, 0xa6af},
+  {39,  2518, 0x3947}, 
+  {41,  5602, 0x5929}, 
+  {42,  6660, 0x3213}, 
+  {43,  3145, 0x6190}, 
+  {44,  33253, 0x8ed0},
+  {46,  6649, 0x29db}, 
+  {47,  20193, 0x28ac},
+  {48,  4050, 0x9067}, 
+  {52,  4026, 0xdcd1}, 
+  {53,  71724, 0x2d9e},
+  {0xff, 0, 0}
+};
 
 roomdata_t *langs_disk1[] = {
   disk1_en,
   disk1_de,
+  disk1_es,
   0
 };
 
 roomdata_t *langs_disk2[] = {
   disk2_en,
   disk2_de,
+  disk2_es,
   0
 };
 
@@ -1165,7 +1230,7 @@ void behaviourValidRead(void) {
     } else {
       uint8_t nextlang = 0;
 
-      for (nextlang = 0; nextlang < 2; nextlang++) {
+      for (nextlang = 0; nextlang < 3; nextlang++) {
         if (outputDisk == 0) {
           rooms = langs_disk1[nextlang];
         } else {
@@ -1177,13 +1242,15 @@ void behaviourValidRead(void) {
         }
       }
       
-      if (nextlang == 2) {
+      if (nextlang == 3) {
         processError("VERIFY  FAIL");
         return;
       } else if (nextlang == 0) {
         writeToProcOutput("VERIFY  PASS ENGLISH");
-      } else {
+      } else if (nextlang == 1) {
         writeToProcOutput("VERIFY  PASS GERMAN");
+      } else {
+        writeToProcOutput("VERIFY  PASS SPANISH");
       }
     }
 
@@ -1256,6 +1323,9 @@ void behaviourExtractInit(void) {
     } else if (file_size == disk1_en[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_en[0].check)) {
       writeToProcOutput("ENGLISH LANGUAGE DETECTED");
       langidx = 0;
+    } else if (file_size == disk1_es[0].size && verifyMemory(FILE_MEMORY, file_size, disk1_es[0].check)) {
+      writeToProcOutput("SPANISH LANGUAGE DETECTED");
+      langidx = 2;
     } else {
       writesixdecimalstr(str_filesize, 14, chks);
       ctl_mmsetup_proc_0_6.text_p = (karlFarPtr_t)((char __huge *)str_filesize);
