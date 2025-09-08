@@ -143,7 +143,7 @@ void actor_put_in_room(uint8_t actor_id, uint8_t room_no)
   }
 }
 
-void actor_room_changed(void)
+void actor_remove_all(void)
 {
   SAVE_DS_AUTO_RESTORE
 
@@ -154,6 +154,15 @@ void actor_room_changed(void)
       remove_local_actor(global_id);
     }
   }
+  
+  vm_update_actors();
+}
+
+void actor_new_room(void)
+{
+  SAVE_DS_AUTO_RESTORE
+
+  uint8_t new_room = vm_read_var8(VAR_SELECTED_ROOM);
   
   vm_update_actors();
 

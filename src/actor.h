@@ -105,7 +105,8 @@ void actor_init(void);
 // main functions
 void actor_map_palette(uint8_t actor_id, uint8_t dest_idx, uint8_t src_idx);
 void actor_put_in_room(uint8_t actor_id, uint8_t room_no);
-void actor_room_changed(void);
+void actor_remove_all(void);
+void actor_new_room(void);
 void actor_change_costume(uint8_t actor_id, uint8_t costume_id);
 uint8_t actor_find(uint8_t x, uint8_t y);
 void actor_place_at(uint8_t actor_id, uint8_t x, uint8_t y);

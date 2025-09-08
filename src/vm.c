@@ -584,13 +584,13 @@ void vm_set_current_room(uint8_t room_no)
   }
 
   vm_write_var(VAR_SELECTED_ROOM, room_no);
+  actor_remove_all();
 
   if (room_no == 0) {
     MAP_CS_GFX
     room_width = 40;
     vm_set_camera_to(20);
     gfx_clear_bg_image();
-    actor_room_changed();
     num_objects = 0;
   }
   else {
@@ -599,7 +599,7 @@ void vm_set_current_room(uint8_t room_no)
     load_room(room_no);
     camera_x = 20;
     vm_write_var(VAR_CAMERA_X, camera_x);
-    actor_room_changed();
+    actor_new_room();
   
     // run entry script
     uint16_t entry_script_offset = room_hdr->entry_script_offset;
