@@ -16,7 +16,7 @@ DISK2_INDEX = m2
 
 SAVE_FILES = $(wildcard $(GAME_ID).sav.*)
 
-CC_FLAGS       = --target=mega65 --code-model=plain -O2 -Werror --list-file=$(@:%.o=%.lst)
+CC_FLAGS       = --target=mega65 -O2 -Werror --list-file=$(@:%.o=%.lst)
 ifeq ($(CONFIG),debug)
 	CC_FLAGS += -DDEBUG
 endif
@@ -29,7 +29,7 @@ DEP_FLAGS      = -MMD -MP -MF$(@:%.o=%.d)
 ASM_FLAGS      = --target=mega65 --list-file=$(@:%.o=%.lst)
 LN_FLAGS       = --target=mega65 --verbose --rtattr printf=nofloat
 LN_FLAGS_SETUP = $(LN_FLAGS) mega65-setup.scm --output-format=prg --list-file=setup-mega65.lst
-LN_FLAGS_SPUTM = $(LN_FLAGS) mega65-sputm.scm --raw-multiple-memories --cstartup=sputm --rtattr exit=simplified --output-format=raw --list-file=sputm-mega65.lst
+LN_FLAGS_SPUTM = $(LN_FLAGS) mega65-sputm.scm --raw-multiple-memories --no-merge-raw-memories --cstartup=sputm --rtattr exit=simplified --output-format=raw --list-file=sputm-mega65.lst
 
 ETHLOAD   = etherload
 M65FTP    = mega65_ftp
