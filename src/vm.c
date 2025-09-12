@@ -1219,7 +1219,6 @@ uint8_t vm_load_game(uint8_t slot)
   uint8_t  magic_hdr[8];
   uint8_t  num_locked_resources;
 
-  uint8_t      cur_pc           = script_get_current_pc();
   uint8_t      cur_script_id    = vm_state.proc_script_or_object_id[active_script_slot];
   uint8_t      heap_slot        = res_reserve_heap(5);
   __auto_type  heap_obj_huge    = (struct object_code __huge *)res_get_huge_ptr(heap_slot);

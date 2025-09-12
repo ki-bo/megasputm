@@ -1683,7 +1683,6 @@ static void come_out_door(void)
   actor_stop_and_turn(actor_id, dir);
   vm_set_camera_to(actors.x[actor_id]);
   vm_set_camera_follow_actor(actor_id);
-  vm_revert_sentence();
 
   if (walk_to_x != 0xff && walk_to_y != 0xff) {
     actor_walk_to(actor_id, walk_to_x, walk_to_y, 0xff);
