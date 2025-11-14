@@ -15,4 +15,5 @@
 /*.d81
 /*.d
 /gamedata/**/*.lfl
+/gamedata/**/*.lec
 mm.sav.*
