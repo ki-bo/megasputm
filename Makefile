@@ -29,7 +29,7 @@ DEP_FLAGS      = -MMD -MP -MF$(@:%.o=%.d)
 ASM_FLAGS      = --target=mega65 --list-file=$(@:%.o=%.lst)
 LN_FLAGS       = --target=mega65 --verbose --rtattr printf=nofloat
 LN_FLAGS_SETUP = $(LN_FLAGS) mega65-setup.scm --output-format=prg --list-file=setup-mega65.lst
-LN_FLAGS_SPUTM = $(LN_FLAGS) mega65-sputm.scm --raw-multiple-memories --no-merge-raw-memories --cstartup=sputm --rtattr exit=simplified --output-format=raw --list-file=sputm-mega65.lst
+LN_FLAGS_SPUTM = $(LN_FLAGS) mega65-sputm.scm --raw-multiple-memories --no-merge-raw-memories --root-symbol=mega65_load_address --rtattr exit=simplified --output-format=raw --list-file=sputm-mega65.lst
 
 ETHLOAD   = etherload
 M65FTP    = mega65_ftp
@@ -90,7 +90,7 @@ autoboot.raw: $(OBJS) mega65-sputm.scm
 
 $(DISK1_NAME): autoboot.raw setup.prg autoboot.c65.bas $(SAVE_FILES)
 	@echo "Creating  $(DISK1_NAME) disk image"; \
-	$(CC1541) -q -n "$(DISK1_HEADER)" -i "$(DISK1_INDEX)#a03d" -f autoboot.c65 -w autoboot.c65.bas -f boot -w autoboot.raw -f setup -w setup.prg -f m01 -w script.raw -f m02 -w main.raw -f m03 -w m0-3.raw -f m10 -w m1-0.raw -f m12 -w m1-2.raw -f m13 -w m1-3.raw -f m14 -w m1-4.raw -f mc0 -w mc-0.raw $(DISK1_NAME); \
+	$(CC1541) -q -n "$(DISK1_HEADER)" -i "$(DISK1_INDEX)#a03d" -f autoboot.c65 -w autoboot.c65.bas -f boot -w autoboot.raw -f setup -w setup.prg -f m01 -w m0-1.raw -f m02 -w m0-2.raw -f m03 -w m0-3.raw -f m10 -w m1-0.raw -f m11 -w m1-1.raw -f m12 -w m1-2.raw -f m13 -w m1-3.raw -f m14 -w m1-4.raw -f mc0 -w mc-0.raw $(DISK1_NAME); \
 	for file in gamedata/$(GAME_ID)/disk1/*; do \
 		ext=$${file##*.}; \
 		lowercasefile=$$(basename $$file | tr '[:upper:]' '[:lower:]'); \

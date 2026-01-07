@@ -1,8 +1,6 @@
 /* MEGASPUTM - Graphic Adventure Engine for the MEGA65
  *
- * MEGASPUTM is the legal property of its developers, whose names
- * are too numerous to list here. Please refer to the COPYRIGHT
- * file distributed with this source distribution.
+ * Copyright (C) 2023-2024 Robert Steffens
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +17,23 @@
  *
  */
 
-#pragma once
+		.rtmodel cpu, "*"
 
-// code_init functions
-void global_init(void);
-void relocate_runtime(void);
+		.section runtime_copy
+		.section code
+
+		.section code_init
+		.public relocate_runtime
+relocate_runtime:
+		; execute inline DMA job to copy the runtime section
+		sta 0xd707
+		.byte 0						; end of job options
+		.byte 0						; copy command
+		.word (.sectionSize runtime_copy)		; count
+		.word (.sectionStart runtime_copy)		; source
+		.byte 0						; source bank
+		.word (.sectionStart code)			; destination
+		.byte 0						; destination bank
+		.byte 0						; cmd high
+		.byte 0						; modulo / ignored
+		rts

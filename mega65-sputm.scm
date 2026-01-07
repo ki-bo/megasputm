@@ -29,37 +29,13 @@
 (define memories
 '(
         ;;;; ***********************
-        ;;;; MEMORY LAYOUT OF BANK 0
+        ;;;; STARTUP AND INIT MEMORY
         ;;;; ***********************
 
-        (block stack  (size #x0100)) 
-        (block cstack (size #x07fa))
-        (block heap   (size #x2000))
-
-        (memory zeropage (address (#x2 . #xff))  (qualifier zpage)
-	        (section (registers (#x2. #x7f)))
-                (section zzpage)
-        )
-    
-        (memory stackpage (address (#x100 . #x1ff)) 
-                (section stack)
-        )
-
-        ; Memory m0-0 for the runtime module
-        ; The runtime code will be moved to 0x200 in startup
-        (memory runtime (address (#x208 . #x1fff))
-                (scatter-to runtime_copy)
-                (section
-                        code
-                        data
-                        switch
-                        cdata
-                )        
-        )
-
+        ; startup memory configuration
         ; memory for boot program (autoboot.c65)
-        ; contains copies of m00 (runtime) and m11 (diskio) and will relocate them to their final memory locations
-        (memory autoboot (address (#x1fff . #x7a7f))
+        ; contains copy of the runtime module and will relocate it to its final memory location
+        (memory autoboot (address (#x1fff . #x5fff))
                 (section 
                         (autoboot_load_address #x1fff)
                         (programStart          #x2001) 
@@ -71,19 +47,52 @@
                                 cdata_init
                                 data_init
                                                #x4000)
-                        (diskio_copy           #x6000)
                 )
         )
 
         ; temporary memory for init program (will be discarded when init is done)
         (memory bssram-init (address (#x6000 . #x7fff))
-                (section 
+                (section
                         bss_init
                 )
         )
 
+
+        ;;;; ***********************
+        ;;;; MEMORY LAYOUT OF BANK 0
+        ;;;; ***********************
+
+        (memory zeropage (address (#x2 . #xff))  (qualifier zpage)
+	        (section (registers (#x2. #x7f)))
+                (section zzpage)
+        )
+    
+        (block stack  (size #x0100)) 
+        (memory stackpage (address (#x100 . #x1ff)) 
+                (section stack)
+        )
+
+        ; page aligned memory in lower 32kb space for hyppo filename transfer
+        (memory bss-hyppo-xfer (address (#x200 . #x20a))
+                (section
+                        data_hyppo
+                )
+        )
+
+        ; Memory for the runtime module
+        ; The runtime code will be relocated to here during startup
+        (memory m0-0 (address (#x20b . #x1fff))
+                (scatter-to runtime_copy)
+                (section
+                        code
+                        data
+                        switch
+                        cdata
+                )
+        )
+
         ; memory m0-1 for script module
-        (memory script (address (#x2000 . #x3fff))
+        (memory m0-1 (address (#x2000 . #x3fff))
                 (section
                         code_script
                         cdata_script
@@ -92,21 +101,29 @@
         )
 
         ; memory m0-2 for main program (loaded after init is done)
-        (memory main (address (#x4000 . #x7fff))
+        (memory m0-2 (address (#x4000 . #x7fff))
                 (section
                         code_main
                         data_main
                 )
         )
 
-        ; memory for heap, bss, and soft stack in bank 0
-        (memory bssram-main (address (#x8000 . #xfff9))
+        ; memory for heap and back buffers
+        (block heap   (size #x2000))
+        (memory bss_main_lo (address (#x8000 . #xcedf))
                 (section 
-                        (heap              (#x8000 . #x9fff))
-                        (backbuffer-screen (#xa000 . #xb76f))
-                        (backbuffer-color  (#xb770 . #xcedf))
-                        (zdata             (#xe380 . #xf7ff))
-                        (cstack            (#xf800 . #xfff9))
+                        (heap              #x8000)
+                        (backbuffer_screen #xa000)
+                        (backbuffer_colram #xb770)
+                )
+        )
+
+        ; memory for main program bss data and soft stack
+        (block cstack (size #x06fa))
+        (memory bss_main_hi (address (#xe380 . #xfff9))
+                (section
+                        zdata
+                        cstack
                 )
         )
 
@@ -133,15 +150,15 @@
         ;;;; **** BANKED MEMORY gfx2 ****
 
         ; memory in bank 0 for mapping screenram
-        (memory banked-bss-0 (address (#x2000 . #x37ff)) 
+        (memory banked-bss-0 (address (#x2000 . #x376f)) 
                 (scatter-to bank1_0000)
                 (section
                         bss_screenram
                 )
         )
         ; memory in bank 0 for mapping additional gfx module (gfx2)
-        (memory banked-code-0 (address (#x3800 . #x3fff)) 
-                (scatter-to bank1_1800)
+        (memory banked-code-0 (address (#x3770 . #x3fbf)) 
+                (scatter-to bank1_1770)
                 (section
                         code_gfx2
                         cdata_gfx2
@@ -153,19 +170,17 @@
         ;;;; **** BANKED MEMORY diskio ****
 
         ; memory in bank 0 for mapping diskio module
-        (memory banked-code-1 (address (#x2000 . #x3a7f)) 
-                (scatter-to diskio_copy)
-                (section
-                        code_diskio
-                        cdata_diskio
-                        data_diskio
+        (memory banked-code-1 (address (#x2000 . #x3fff)) 
+                (scatter-to bank1_2000)
+                (placement-group diskio-bits
+                        (section
+                                code_diskio
+                                cdata_diskio
+                                data_diskio
+                        )
                 )
-        )
-        ; memory in bank 0 for mapping diskio bss section
-        (memory banked-bss-1 (address (#x3a80 . #x3fff)) 
-                (scatter-to bank1_3a80)
-                (section
-                        bss_diskio
+                (placement-group diskio-nobits
+                        (section bss_diskio)
                 )
         )
  
@@ -173,35 +188,31 @@
         ;;;; **** BANKED MEMORY gfx ****
 
         ; memory in bank 0 for mapping gfx module
-        (memory banked-code-2 (address (#x2000 . #x38ff)) 
+        (memory banked-code-2 (address (#x2000 . #x3fff)) 
                 (scatter-to bank1_4000)
-                (section
-                        code_gfx
-                        cdata_gfx
-                        data_gfx
+                (placement-group gfx-bits
+                        (section
+                                code_gfx
+                                cdata_gfx
+                                data_gfx
+                        )
                 )
-        )
-        ; memory in bank 0 for mapping gfx bss section
-        (memory banked-bss-2 (address (#x3900 . #x3fff)) 
-                (scatter-to bank1_5900)
-                (section
-                        bss_gfx
+                (placement-group gfx-nobits
+                        (section bss_gfx)
                 )
         )
 
         ; memory in colram for mapping gfx helpscreen module
         (memory banked-code-3 (address (#x2000 . #x3fff)) 
                 (scatter-to bankc_2000)
-                (section
-                        code_gfx_helpscreen
-                        cdata_gfx_helpscreen
+                (placement-group gfx-helpscreen-bits
+                        (section
+                                code_gfx_helpscreen
+                                cdata_gfx_helpscreen
+                        )
                 )
-        )
-        ; memory in colram for mapping gfx helpscreen bss section
-        (memory banked-bss-3 (address (#x3f00 . #x3fff)) 
-                (scatter-to bankc_3f00)
-                (section
-                        bss_gfx_helpscreen
+                (placement-group gfx-helpscreen-nobits
+                        (section bss_gfx_helpscreen)
                 )
         )
  
@@ -209,37 +220,31 @@
         ;;;; **** BANKED MEMORY sound ****
 
         ; memory in bank 0 for mapping mod sound module
-        (memory banked-code-4 (address (#x2000 . #x3dff)) 
+        (memory banked-code-4 (address (#x2000 . #x3fff)) 
                 (scatter-to bank1_6000_mod)
-                (section
-                        code_sound_mod
-                        cdata_sound_mod
+                (placement-group sound-mod-bits
+                        (section
+                                code_sound_mod
+                                cdata_sound_mod
+                        )
                 )
-        )
-
-        ; memory in bank 0 for mapping mod sound bss section
-        (memory banked-bss-4 (address (#x3e00 . #x3fff)) 
-                (scatter-to bank1_7e00_mod)
-                (section
-                        bss_sound_mod
+                (placement-group sound-mod-nobits
+                        (section bss_sound_mod)
                 )
         )
 
         ; memory in bank 0 for mapping sid sound module
-        (memory banked-code-5 (address (#x2000 . #x3dff)) 
+        (memory banked-code-5 (address (#x2000 . #x3fff)) 
                 (scatter-to bank1_6000_sid)
-                (section
-                        code_sound_sid
-                        data_sound_sid
-                        cdata_sound_sid
+                (placement-group sound-sid-bits
+                        (section
+                                code_sound_sid
+                                data_sound_sid
+                                cdata_sound_sid
+                        )
                 )
-        )
-
-        ; memory in bank 0 for mapping sid sound bss section
-        (memory banked-bss-5 (address (#x3e00 . #x3fff)) 
-                (scatter-to bank1_7e00_sid)
-                (section
-                        bss_sound_sid
+                (placement-group sound-sid-nobits
+                        (section bss_sound_sid)
                 )
         )
 
@@ -262,43 +267,30 @@
                 )
         )
 
-        (memory m1-0 (address (#x11800 . #x11fff))
+        (memory m1-0 (address (#x11770 . #x11fff))
                 (section 
-                        (bank1_1800 #x11800)
+                        (bank1_1770 #x11770)
+                        (sprites    #x11fc0)
                 )
         )
 
         (memory m1-1 (address (#x12000 . #x13fff))
-                (section 
-                        (bank1_3a80 #x13a80)
-                )
+                (section bank1_2000)
         )
 
         (memory m1-2 (address (#x14000 . #x15fff))
-                (section 
-                        (bank1_4000 #x14000)
-                        (bank1_5900 #x15900)
-                )
+                (section bank1_4000)
         )
 
         (memory m1-3 (address (#x16000 . #x17fff))
-                (section 
-                        (bank1_6000_mod #x16000)
-                        (bank1_7e00_mod #x17e00)
-                )
+                (section bank1_6000_mod)
         )
 
         (memory m1-4 (address (#x16000 . #x17fff))
-                (section 
-                        (bank1_6000_sid #x16000)
-                        (bank1_7e00_sid #x17e00)
-                )
+                (section bank1_6000_sid)
         )
 
         (memory mc-0 (address (#xff82000 . #xff83fff))
-                (section
-                        (bankc_2000 #xff82000)
-                        (bankc_3f00 #xff83f00)
-                )
+                (section bankc_2000)
         )
 ))
