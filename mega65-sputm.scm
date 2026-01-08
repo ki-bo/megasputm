@@ -1,29 +1,29 @@
 ;;; Memory layout breakdown:
-;;;            /                                               +---------------------------+
-;;;           |                                                | main_private code         |
-;;;           |                                                | (0xd000)                  |
-;;;           |                                         +------+---------------------------+
-;;;           |                                         | screen ram  | gfx2 code          |
-;;; mapped    |                                         | (0x10000)   | (0x11800)          |
-;;;           |                                         +-------------+-------+------------+
-;;;           |                                         | diskio code         | diskio bss |
-;;;           |                                         | (0x12000)           | (0x13a00)  |
-;;;           |                                         +---------------------+------------+
-;;;           |                                         | gfx code        | gfx bss        |
-;;;            \                                        | (0x14000)       | (0x15800)      |
-;;;           |                                         +-----------------+----------------+             +---------------------------------+
-;;;           |                                         | sound code                       |             | resource (room, script, ...)    |
-;;;            \                                        | (0x16000)                        |             | (64 pages from 0x18000-0x27fff) |                                 
-;;;            / +-----------+--------+-------+---------+----------------------------------+-------------+------------+-------------+------+------+--------------+--------------+-------+------------+--------+--------+--------+-------+-------+-------+-------+----------------+-------------------+---------------+     +-------------------+-------------------+
-;;; physical  |  | registers | zzpage | CPU   | runtime | script                           | main        | heap       | backbuffer  | backbuffer  | main_private | data_sound   | soft  | screen ram | gfx2   | diskio | diskio | gfx   | gfx   | sound | sound | resource heap  | gfx/char memory   | music memory  |     | color ram         | gfx               |
-;;; placement |  |           |        | stack |         | parser code                      | code        | (strings,  | screen ram  | color ram   | code         | cdata_main   | stack |            | code   | code   | bss    | code  | bss   | code  | bss   | 256 pages      | (room, objects,   |               |     |                   | helpscreen        |
-;;;           |  |           |        |       |         | (M01)                            | (M02)       | inventory) |             |             | (M03)        | zdata        |       |            | (M10)  |        |        | (M12) |       |       |       | each 256 bytes |  actors)          |               |     |                   |                   |
-;;;            \ +-----------+--------+-------+---------+------+------+---+---+------------+-------------+------------+-------------+------+------+--------------+--------------+-------+------------+--------+--------+--------+-------+-------+-------+-------+----------------+-------------------+---------------+ ... +-------------------+-------------------+
-;;;              0x0000      0x0080   0x0100  0x0200    0x2000 0x3000 0x3800  0x3a00      0x4000         0x8000       0xa000        0xb770 0xc000 0xcee0         0xe000         0xf800  0x10000      0x11800  0x12000  0x13a80  0x14000 0x15900 0x16000 0x17800 0x18000          0x28000             0x53800   0x5ffff     0xff80800     0xff82000   0xff83fff
-;;;                                                                       0x3900                        |    8 kb     |     ~6 kb   |     ~6 kb   |     ~4 kb    |     6 kb     |  2 kb |    6 kb    |  2 kb  | 6.5 kb | ~1.5 kb|  6 kb | ~2 kb |  6 kb |  2 kb |     64 kb      |       174 kb      |     50 kb     |     |        6 kb       |        8 kb       |
-;;;                                                     |<----   Code Segment (CS)  ---->|              |<---    Data Segment (DS)   ---->|
-;;;                                                     |        (0x2000 - 0x3fff)       |              |        (0x8000 - 0xbfff)        |
-;;;              |                 8kb                  |              8 kb              |     16 kb    |              16 kb              |
+;;;            /                                               +-------------------------+
+;;;           |                                                | main_private module     |
+;;;           |                                                | (0xcee0)                |
+;;;           |                                         +------+-------------------------+
+;;;           |                                         | screen ram  | gfx2 module      |
+;;; mapped    |                                         | (0x10000)   | (0x11770)        |
+;;;           |                                         +-------------+------------------+
+;;;           |                                         | diskio module                  |
+;;;           |                                         | (0x12000)                      |
+;;;           |                                         +--------------------------------+
+;;;           |                                         | gfx module                     |
+;;;           |                                         | (0x14000)                      |             +---------------------------------+
+;;;           |                                         +--------------------------------+             | resources (room, script, ...)   |
+;;;           |                                         | sound module                   |             | (window of 64 pages from        |
+;;;            \                                        | (0x16000)                      |             |  0x18000-0x27fff)               |                                 
+;;;            / +-----------+--------+-------+---------+--------------------------------+-------------+------------+-------------+------+------+--------------+--------------+---------+------------+--------------+-----------------+-----------------+-----------------+-----------------+-------------------+-------------------+     +-------------------+-------------------+
+;;; physical  |  | registers | zzpage | CPU   | runtime | script                         | main        | heap       | backbuffer  | backbuffer  | main_private | data_sound   | zdata,  | screen ram | gfx2 module  | diskio module   | gfx module      | sound module    | resource heap   | FCM chars memory  | music memory      |     | color ram         | gfx               |
+;;; placement |  |           |        | stack |         | parser code                    | code & data | (strings,  | screen ram  | color ram   | (M03)        | cdata_main   | soft    |            | (M10)        | (M11)           | (M12)           | (M13 if MOD)    | 256 pages       | (room, objects,   |                   |     |                   | helpscreen        |
+;;;           |  |           |        |       |         | (M01)                          | (M02)       | inventory) |             |             |              | zdata        | stack   |            |              |                 |                 | (M14 if SID)    | each 256 bytes  |  actors)          |                   |     |                   |                   |
+;;;            \ +-----------+--------+-------+---------+--------------------------------+-------------+------------+-------------+------+------+--------------+--------------+---------+------------+--------------+-----------------+-----------------+-----------------+-----------------+-------------------+-------------------+ ... +-------------------+-------------------+
+;;;              0x0000      0x0080   0x0100  0x0200    0x2000                           0x4000        0x8000       0xa000        0xb770        0xcee0         0xe000         0xe380    0x10000      0x11770        0x12000           0x14000           0x16000           0x18000           0x28000             0x53800       0x5ffff     0xff80800           0xff82000   0xff83fff
+;;;                                                                                                     |    8 kb   |  6000 bytes |  6000 bytes |     ~4 kb    |     ~1 kb    |  ~7 kb  | 6000 bytes |     ~2 kb    |       8 kb      |       8 kb      |       8 kb      |      64 kb      |       174 kb      |       50 kb       |     |        6 kb       |        8 kb       |
+;;;                                                     |<----   Code Segment (CS)  ---->|              |<---   Data Segment (DS)   ---->|
+;;;                                                     |        (0x2000 - 0x3fff)       |              |       (0x8000 - 0xbfff)        |
+;;;              |                 8kb                  |              8 kb              |     16 kb    |             16 kb              |
 
 
 (define memories
@@ -34,7 +34,9 @@
 
         ; startup memory configuration
         ; memory for boot program (autoboot.c65)
-        ; contains copy of the runtime module and will relocate it to its final memory location
+        ; - contains copy of the runtime module and will relocate it to its final memory location
+        ; - runtime_copy and init sections will be overwritten with main code after initialization 
+        ;   is done
         (memory autoboot (address (#x1fff . #x5fff))
                 (section 
                         (autoboot_load_address #x1fff)
